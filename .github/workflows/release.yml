@@ -44,7 +44,7 @@ jobs:
         with:
           distribution: goreleaser
           version: latest
-          args: release --clean --config=cloud-clip/.goreleaser.yaml
+          args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
