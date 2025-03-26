@@ -1,9 +1,9 @@
-name: Releaser
+name: Release
+
 on:
   push:
     tags:
-      - '*'
-  # 添加手动触发选项
+      - 'v*'
   workflow_dispatch:
     inputs:
       version:
@@ -19,7 +19,7 @@ on:
 permissions:
   contents: write
   packages: write
-  
+
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -27,33 +27,49 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0
-      - name: Tag
-        run: git fetch --force --tags
+          fetch-depth: 0  # 这一行很关键，确保获取整个历史记录和所有标签
+      
       - name: Setup Go
         uses: actions/setup-go@v4
         with:
           go-version: stable
+          
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '22'
+          
       - name: Release
         uses: goreleaser/goreleaser-action@v4
         with:
           distribution: goreleaser
           version: latest
           args: release --clean
+          workdir: ./cloud-clip  # 指定工作目录为 cloud-clip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   docker:
     runs-on: ubuntu-latest
     needs: release
+    # 只在推送标签时运行，或手动触发且选择推送时运行
+    if: github.event_name == 'push' || github.event.inputs.push_to_registry == 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-      # 提取版本号，不带 'v' 前缀
+        with:
+          fetch-depth: 0  # 同样确保 Docker 任务也获取所有标签
+      
+      # 提取版本号
       - name: Extract version
         id: extract_version
         run: |
-          VERSION=${GITHUB_REF#refs/tags/}
-          VERSION=${VERSION#v}
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION=${GITHUB_REF#refs/tags/}
+            VERSION=${VERSION#v}
+          fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Extracted version: $VERSION"
 
@@ -68,17 +84,6 @@ jobs:
             type=ref,event=tag
             type=raw,value=latest
             type=raw,value=${{ steps.extract_version.outputs.version }}
-
-      # - name: Docker meta (Alpine)
-      #   id: meta-alpine
-      #   uses: docker/metadata-action@v5
-      #   with:
-      #     images: |
-      #       ghcr.io/${{ github.repository }}
-      #       ${{ secrets.DOCKERHUB_USERNAME }}/${{ github.event.repository.name }}
-      #     tags: |
-      #       type=ref,event=tag,suffix=-alpine
-      #       type=raw,value=latest-alpine
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -108,12 +113,3 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           tags: ${{ steps.meta-alpine.outputs.tags }}
           labels: ${{ steps.meta-alpine.outputs.labels }}
-          
-      # - name: Build and push (Debian)
-      #   uses: docker/build-push-action@v5
-      #   with:
-      #     context: .
-      #     push: true
-      #     platforms: linux/amd64,linux/arm64,linux/arm/v7
-      #     tags: ${{ steps.meta-debian.outputs.tags }}
-      #     labels: ${{ steps.meta-debian.outputs.labels }}
