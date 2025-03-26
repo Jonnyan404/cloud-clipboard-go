@@ -62,7 +62,20 @@ go run .
 #### mac用户从 homebrew 运行
 
 ```
+#安装
 brew install Jonnyan404/tap/cloud-clipboard-go
+
+# 启动服务
+brew services start cloud-clipboard-go
+
+# 查看服务状态
+brew services info cloud-clipboard-go
+
+# 停止服务
+brew services stop cloud-clipboard-go
+
+# 重启服务
+brew services restart cloud-clipboard-go
 ```
 
 ### 配置文件说明
