@@ -7,11 +7,8 @@ before:
     - sh -c 'cd $GITHUB_WORKSPACE/cloud-clip && go mod tidy'
 
 builds:
-  - env:
-      - CGO_ENABLED=0
-    # 其他构建配置保持不变...
-builds:
-  - env:
+  - dir: ./cloud-clip
+    env:
       - CGO_ENABLED=0
     goos:
       - linux
