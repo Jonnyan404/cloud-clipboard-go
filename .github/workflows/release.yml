@@ -1,5 +1,4 @@
 name: Releaser
-
 on:
   push:
     tags:

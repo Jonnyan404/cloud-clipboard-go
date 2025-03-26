@@ -1,3 +1,4 @@
+version: 2
 before:
   hooks:
     # 先编译前端项目（注意路径）
