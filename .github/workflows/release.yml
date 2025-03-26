@@ -9,7 +9,7 @@ on:
       version:
         description: '版本号 (例如: 1.0.0)'
         required: true
-        default: 'latest'
+        default: 'v1.0'
       push_to_registry:
         description: '是否推送到镜像仓库'
         type: boolean
