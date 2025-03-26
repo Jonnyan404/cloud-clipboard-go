@@ -76,9 +76,9 @@ brews:
     install: |
       bin.install "cloud-clipboard"
     test: |
-      system "#{bin}/cloud-clipboard", "--version"
+      system "#{bin}/cloud-clipboard", "-v"
     service: |
-      run [opt_bin/"cloud-clipboard", "--config", etc/"cloud-clipboard/config.json"]
+      run [opt_bin/"cloud-clipboard", "-config", etc/"cloud-clipboard/config.json"]
       working_dir var
       keep_alive true
       log_path var/"log/cloud-clipboard.log"
