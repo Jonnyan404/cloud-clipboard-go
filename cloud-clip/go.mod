@@ -21,5 +21,5 @@ require (
 
 require (
 	github.com/hashicorp/golang-lru v0.5.4 // indirect
-	gopkg.in/yaml.v2 v2.2.1 // indirect
+	gopkg.in/yaml.v2 v2.2.8 // indirect
 )
