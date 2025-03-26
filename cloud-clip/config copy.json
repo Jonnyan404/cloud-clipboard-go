@@ -1,7 +1,7 @@
 {
 	"server": {
 		"host": "",
-		"port": 9502,
+		"port": 9507,
 		"prefix": "",
 		"history": 100,
 		"historyFile": "",
