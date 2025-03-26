@@ -1,8 +1,6 @@
 version: 2
 before:
   hooks:
-    # 使用单命令完成前端构建
-    - hooks:
     - sh -c 'cd $GITHUB_WORKSPACE/client && npm install && npm run build && mkdir -p $GITHUB_WORKSPACE/cloud-clip/static && cp -r $GITHUB_WORKSPACE/client/dist/* $GITHUB_WORKSPACE/cloud-clip/static/ && ls -la $GITHUB_WORKSPACE/cloud-clip/static/'
     # Go 依赖管理
     - sh -c 'cd $GITHUB_WORKSPACE/cloud-clip && go mod tidy'
