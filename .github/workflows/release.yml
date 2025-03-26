@@ -103,12 +103,12 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push (Alpine)
+      - name: Build and push (Debian)
         uses: docker/build-push-action@v5
         with:
           context: .
           file: cloud-clip/Dockerfile
           push: true
           platforms: linux/amd64,linux/arm64,linux/arm/v7
-          tags: ${{ steps.meta-alpine.outputs.tags }}
-          labels: ${{ steps.meta-alpine.outputs.labels }}
+          tags: ${{ steps.meta-meta-debian.outputs.tags }}
+          labels: ${{ steps.meta-output.outputs.labels }}
