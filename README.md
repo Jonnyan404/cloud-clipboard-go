@@ -29,12 +29,12 @@
 ##### 从 Docker Hub 拉取
 
 ```sh
-docker run -d --name=cloud-clipboard-go -p 9501:9501 -v /path/your/dir/data:/app/server-node/data jonnyan404/cloud-clipboard-go
+docker run -d --name=cloud-clipboard-go -p 9502:9502 -v /path/your/dir/data:/app/server-node/data jonnyan404/cloud-clipboard-go
 或者
-docker run -d --name=cloud-clipboard -p 9501:9501 -v /path/your/dir/data:/app/server-node/data ghcr.io/jonnyan404/cloud-clipboard-go
+docker run -d --name=cloud-clipboard -p 9502:9502 -v /path/your/dir/data:/app/server-node/data ghcr.io/jonnyan404/cloud-clipboard-go
 ```
 
-然后访问 http://127.0.0.1:9501
+然后访问 http://127.0.0.1:9502
 
 #### 从源代码运行
 
@@ -58,6 +58,12 @@ go run .
 * 在命令行中指定：`暂未支持`
 
 服务端默认会监听本机所有网卡的 IP 地址（也可以自己设定），并在终端中显示前端界面所在的网址，使用浏览器打开即可使用。
+
+#### mac用户从 homebrew 运行
+
+```
+brew install Jonnyan404/tap/cloud-clipboard-go
+```
 
 ### 配置文件说明
 

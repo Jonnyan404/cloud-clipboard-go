@@ -51,6 +51,51 @@ archives:
       - goos: windows
         format: zip
 
+# 添加 Homebrew 支持配置
+brews:
+  - name: cloud-clipboard
+    homepage: "https://github.com/Jonnyan404/cloud-clipboard-go"
+    description: "云剪贴板：跨设备共享文本和文件"
+    license: "MIT"
+    # 指定发布到哪个 tap 仓库
+    tap:
+      owner: Jonnyan404
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    # 指定 Git 提交的作者信息
+    commit_author:
+      name: goreleaserbot
+      email: goreleaser@carlosbecker.com
+    # Formula 文件存放的文件夹
+    folder: Formula
+    # 安装指令
+    install: |
+      bin.install "cloud-clipboard-go"
+    # 测试指令
+    test: |
+      system "#{bin}/cloud-clipboard-go", "--version"
+    # 服务配置（可选）
+    service: |
+      run [opt_bin/"cloud-clipboard-go", "--config", etc"/cloud-clipboard-go/config.json"]
+      working_dir var
+      keep_alive true
+      log_path var/"log/cloud-clipboard-go.log"
+      error_log_path var/"log/cloud-clipboard-go.error.log"
+    post_install: |
+      (etc/"cloud-clipboard").mkpath
+      (var/"log").mkpath
+      # 如果配置文件不存在，创建一个默认配置
+      unless (etc/"cloud-clipboard/config.json").exist?
+        (etc/"cloud-clipboard/config.json").write <<~EOS
+          {
+            "server": {
+              "host": "0.0.0.0",
+              "port": 9502
+            }
+          }
+        EOS
+      end
+
 changelog:
   sort: asc
   filters:
@@ -59,4 +104,4 @@ changelog:
       - '^test:'
       - '^chore:'
       - Merge pull request
-      - Merge branch 
+      - Merge branch

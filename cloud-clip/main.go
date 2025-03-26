@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"flag"
 	"fmt"
 	"html"
 	"io"
@@ -29,9 +28,12 @@ var (
 	deviceConnected = make(map[string]string)
 )
 
-var server_version = "go-1.x.x"
+var server_version = "go-1.22.x"
 var build_git_hash = show_bin_info()
-var config = load_config(config_path) // run before main()
+
+// 将配置相关变量声明为指针，不要立即初始化
+// config_path 已在 config.go 中声明
+var config *Config // 配置会在 main() 中加载
 
 var websockets = make(map[*websocket.Conn]bool)
 var room_ws = make(map[*websocket.Conn]string)
@@ -423,12 +425,16 @@ func handleClearAll(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	// 首先解析命令行参数
+	parseFlags()
+
+	// 加载配置，应用命令行覆盖
+	config = loadConfigWithOverrides()
+
 	load_history()
 	mkdir_uploads() // mkdir -p uplodas
 
 	prefix := config.Server.Prefix
-
-	flag.Parse()
 
 	// serve static
 	server_static(prefix)
