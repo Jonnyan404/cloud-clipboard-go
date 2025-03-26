@@ -62,7 +62,7 @@ func load_config(config_path string) *Config {
 	// Set default values
 	if config.Server.Port == 0 {
 		// config.Server.Port = 9501
-		config.Server.Port = 8000
+		config.Server.Port = 9502
 	}
 
 	config.Server.Prefix = strings.TrimRight(config.Server.Prefix, "/")
@@ -121,10 +121,6 @@ func load_config(config_path string) *Config {
 	// litter.Dump(config)
 
 	return &config
-}
-
-func typeof(v interface{}) string {
-	return fmt.Sprintf("%T", v)
 }
 
 /*

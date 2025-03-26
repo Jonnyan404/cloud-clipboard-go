@@ -9,7 +9,7 @@ cat>"${CONFIG_FILE}"<<EOF
         "host": [
             "${LISTEN_IP:-0.0.0.0}"
         ],
-        "port": ${LISTEN_PORT:-9501},
+        "port": ${LISTEN_PORT:-9502},
         "uds": "/var/run/cloud-clipboard.sock",
         "prefix": "${PREFIX}",
         "key": "",
