@@ -44,8 +44,7 @@ jobs:
         with:
           distribution: goreleaser
           version: latest
-          args: release --clean
-          workdir: ./cloud-clip  # 指定工作目录为 cloud-clip
+          args: release --clean --config=cloud-clip/.goreleaser.yml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

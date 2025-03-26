@@ -2,10 +2,10 @@ version: 2
 before:
   hooks:
     # 先编译前端项目（注意路径）
-    - cd ../client && npm install && npm run build
+    - cd client && npm install && npm run build
     # 将前端构建结果复制到 cloud-clip/static 目录
-    - mkdir -p ./static
-    - cp -r ../client/dist/* ./static/
+    - mkdir -p cloud-clip/static
+    - cp -r client/dist/* cloud-clip/static/
     # 然后再整理 Go 依赖
     - go mod tidy
 builds:
