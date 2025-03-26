@@ -1,13 +1,15 @@
 version: 2
 before:
   hooks:
-    # 先编译前端项目（注意路径）
-    - cd client && npm install && npm run build
-    # 将前端构建结果复制到 cloud-clip/static 目录
-    - mkdir -p cloud-clip/static
-    - cp -r client/dist/* cloud-clip/static/
-    # 然后再整理 Go 依赖
-    - go mod tidy
+    # 使用单命令完成前端构建
+    - sh -c 'cd $GITHUB_WORKSPACE/client && npm install && npm run build && mkdir -p $GITHUB_WORKSPACE/cloud-clip/static && cp -r $GITHUB_WORKSPACE/client/dist/* $GITHUB_WORKSPACE/cloud-clip/static/'
+    # Go 依赖管理
+    - sh -c 'cd $GITHUB_WORKSPACE/cloud-clip && go mod tidy'
+
+builds:
+  - env:
+      - CGO_ENABLED=0
+    # 其他构建配置保持不变...
 builds:
   - env:
       - CGO_ENABLED=0
