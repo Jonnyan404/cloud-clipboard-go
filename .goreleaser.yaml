@@ -83,7 +83,7 @@ brews:
       keep_alive true
       log_path var/"log/cloud-clipboard.log"
       error_log_path var/"log/cloud-clipboard.error.log"
-    folder: Formula
+    directory: Formula
     post_install: |
       (etc/"cloud-clipboard").mkpath
       (var/"log").mkpath
