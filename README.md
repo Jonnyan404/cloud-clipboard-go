@@ -28,6 +28,9 @@
 
 去项目 [release](https://github.com/Jonnyan404/cloud-clipboard-go/releases) 下载对应系统文件运行即可
 
+- 命令行参数: `-config` 用来自定义配置文件
+- 命令行参数: `-static` 用来自定义加载外部前端文件
+
 #### 使用 Docker 运行
 
 ```sh
@@ -103,7 +106,7 @@ go run .
 配置文件是按照以下顺序尝试读取的：
 
 * 和 `main.go` 放在同一目录的 `config.json`
-* 在命令行中指定：`暂未支持`
+* 在命令行中指定：`./cloud-clipboard-go -config=/tmp/config.json`
 
 服务端默认会监听本机所有网卡的 IP 地址（也可以自己设定），并在终端中显示前端界面所在的网址，使用浏览器打开即可使用。
 
