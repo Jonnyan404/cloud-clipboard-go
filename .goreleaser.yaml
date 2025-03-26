@@ -10,6 +10,10 @@ builds:
   - dir: cloud-clip
     env:
       - CGO_ENABLED=0
+      - GOOS=darwin
+      - GOARCH=amd64
+      - GOAMD64=v1
+      - GOMACOSVERSION=10.13  # 支持较旧的 macOS 版本
     goos:
       - linux
       - windows
@@ -29,6 +33,11 @@ builds:
       - goos: darwin
         goarch: "386"
     mod_timestamp: '{{ .CommitTimestamp }}'
+    hooks:
+      post:
+        # 确保 macOS 文件有执行权限
+        - cmd: chmod +x {{ .Path }}
+          dir: ./dist
     flags:
       - -trimpath
     ldflags:
@@ -105,3 +114,13 @@ changelog:
       - '^chore:'
       - Merge pull request
       - Merge branch
+
+signs:
+  - id: macos
+    cmd: gon
+    args:
+      - ./gon.hcl
+    artifacts: all
+    ids:
+      - darwin-amd64
+      - darwin-arm64
