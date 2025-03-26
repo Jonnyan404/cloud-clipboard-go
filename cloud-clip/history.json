@@ -1,0 +1,23 @@
+{
+	"file": [
+		{
+			"name": "test.sh",
+			"uuid": "74da0e67-e893-4711-91eb-98522b5fdc3b",
+			"size": 11,
+			"uploadTime": 1742952586,
+			"expireTime": 1742956186
+		}
+	],
+	"receive": [
+		{
+			"id": 0,
+			"type": "file",
+			"room": "",
+			"name": "test.sh",
+			"size": 11,
+			"cache": "74da0e67-e893-4711-91eb-98522b5fdc3b",
+			"expire": 1742956186,
+			"thumbnail": ""
+		}
+	]
+}

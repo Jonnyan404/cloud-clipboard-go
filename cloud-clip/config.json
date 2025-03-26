@@ -1,0 +1,19 @@
+{
+	"server": {
+		"host": "",
+		"port": 8000,
+		"prefix": "",
+		"history": 100,
+		"auth": false,
+		"historyFile": "/tmp/cloud/history.json",
+        "storageDir": "/tmp/cloud/storage"
+	},
+	"text": {
+		"limit": 4096
+	},
+	"file": {
+		"expire": 3600,
+		"chunk": 2097152,
+		"limit": 268435456
+	}
+}
