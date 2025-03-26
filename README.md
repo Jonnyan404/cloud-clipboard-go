@@ -1,6 +1,7 @@
 # cloud-clipboard-go
 
 基于 https://github.com/TransparentLC/cloud-clipboard 项目,用go复刻了一个
+
 在 https://github.com/yurenchen000/cloud-clipboard 基础上增加一些功能
 
 ## 截图
@@ -101,7 +102,7 @@ go run .
 > 如果启用“密码认证”，只有输入正确的密码才能连接到服务端并查看剪贴板内容。
 > 可以将 `server.auth` 字段设为 `true`（随机生成六位密码）或字符串（自定义密码）来启用这个功能，启动服务端后终端会以 `Authorization code: ******` 的格式输出当前使用的密码。
 
-# clooud-clipboard-launcher(画饼)
+# cloud-clipboard-launcher(画饼)
 
 为 cloud-clipboard-go 制作的启动器,方便不想或不会使用终端的用户
 
