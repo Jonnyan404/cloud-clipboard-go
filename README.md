@@ -24,9 +24,11 @@
 
 ### go 版服务端
 
-#### 使用 Docker 运行
+#### 使用二进制文件运行
 
-##### 从 Docker Hub 拉取
+去项目 [release](https://github.com/Jonnyan404/cloud-clipboard-go/releases) 下载对应系统文件运行即可
+
+#### 使用 Docker 运行
 
 ```sh
 docker run -d --name=cloud-clipboard-go -p 9502:9502 -v /path/your/dir/data:/app/server-node/data jonnyan404/cloud-clipboard-go
@@ -34,7 +36,53 @@ docker run -d --name=cloud-clipboard-go -p 9502:9502 -v /path/your/dir/data:/app
 docker run -d --name=cloud-clipboard -p 9502:9502 -v /path/your/dir/data:/app/server-node/data ghcr.io/jonnyan404/cloud-clipboard-go
 ```
 
+- vi docker-compose.yml
+
+```
+
+services:
+    cloud-clipboard-go:
+        container_name: cloud-clipboard-go
+        restart: always
+        ports:
+            - "9502:9502"
+        environment:
+            - LISTEN_IP= #默认为0.0.0.0,可设置为 127.0.0.1 不懂勿动
+            - LISTEN_PORT= #默认为9502,可设置为其他端口
+            - PREFIX= #子路径,可配合nginx使用,格式: /cloud-clipboard
+            - MESSAGE_NUM= #历史记录的数量,默认为10
+            - AUTH_PASSWORD= #访问密码,默认为false,可自定义字符串密码
+            - TEXT_LIMIT= #文本长度限制,默认为4096(2048个汉字),可设置为其他长度
+            - FILE_EXPIRE= #文件过期时间,默认为3600(1小时),可设置为其他时间,单位为秒
+            - FILE_LIMIT= #文件大小限制,默认为104857600(100MB),可设置为其他大小,单位为字节
+        volumes:
+            - /path/your/dir/data:/app/server-node/data #请注意修改为你自己的目录
+        image: jonnyan404/cloud-clipboard-go:latest
+
+```
+
 然后访问 http://127.0.0.1:9502
+
+
+#### mac用户从 homebrew 运行
+
+```
+#安装
+brew install Jonnyan404/tap/cloud-clipboard-go
+
+# 启动服务
+brew services start cloud-clipboard-go
+
+# 查看服务状态
+brew services info cloud-clipboard-go
+
+# 停止服务
+brew services stop cloud-clipboard-go
+
+# 重启服务
+brew services restart cloud-clipboard-go
+```
+
 
 #### 从源代码运行
 
@@ -58,25 +106,6 @@ go run .
 * 在命令行中指定：`暂未支持`
 
 服务端默认会监听本机所有网卡的 IP 地址（也可以自己设定），并在终端中显示前端界面所在的网址，使用浏览器打开即可使用。
-
-#### mac用户从 homebrew 运行
-
-```
-#安装
-brew install Jonnyan404/tap/cloud-clipboard-go
-
-# 启动服务
-brew services start cloud-clipboard-go
-
-# 查看服务状态
-brew services info cloud-clipboard-go
-
-# 停止服务
-brew services stop cloud-clipboard-go
-
-# 重启服务
-brew services restart cloud-clipboard-go
-```
 
 ### 配置文件说明
 
@@ -112,8 +141,6 @@ brew services restart cloud-clipboard-go
 ```
 > HTTPS 的说明：
 >
-> 如果同时设定了私钥和证书路径，则会使用 HTTPS 协议访问前端界面，未设定则会使用 HTTP 协议。
-> 自用的话，可以使用 [mkcert](https://mkcert.dev/) 自行生成证书，并将根证书添加到系统/浏览器的信任列表中。
 > 如果使用了 Nginx 等软件的反向代理，且这些软件已经提供了 HTTPS 连接，则无需在这里设定。
 >
 > “密码认证”的说明：
