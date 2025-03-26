@@ -32,5 +32,5 @@ EOF
 else
         echo "#####Configuration file already exists#####"
 fi
-cd /app/server-node && ./cloud-clipboard
+cd /app/server-node && ./cloud-clipboard-go
 exec "$@"
