@@ -114,5 +114,5 @@ jobs:
           file: cloud-clip/Dockerfile
           push: true
           platforms: linux/amd64,linux/arm64,linux/arm/v7
-          tags: ${{ steps.meta-meta-debian.outputs.tags }}
-          labels: ${{ steps.meta-output.outputs.labels }}
+          tags: ${{ steps.meta-debian.outputs.tags }}
+          labels: ${{ steps.meta-debian.outputs.labels }}
