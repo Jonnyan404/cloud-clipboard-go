@@ -1,23 +1,101 @@
 {
-	"file": [
-		{
-			"name": "test.sh",
-			"uuid": "74da0e67-e893-4711-91eb-98522b5fdc3b",
-			"size": 11,
-			"uploadTime": 1742952586,
-			"expireTime": 1742956186
-		}
-	],
+	"file": [],
 	"receive": [
 		{
 			"id": 0,
-			"type": "file",
+			"type": "text",
 			"room": "",
-			"name": "test.sh",
-			"size": 11,
-			"cache": "74da0e67-e893-4711-91eb-98522b5fdc3b",
-			"expire": 1742956186,
-			"thumbnail": ""
+			"content": "123"
+		},
+		{
+			"id": 1,
+			"type": "text",
+			"room": "",
+			"content": "foobar"
+		},
+		{
+			"id": 2,
+			"type": "text",
+			"room": "",
+			"content": "foobar"
+		},
+		{
+			"id": 3,
+			"type": "text",
+			"room": "",
+			"content": "foobar"
+		},
+		{
+			"id": 4,
+			"type": "text",
+			"room": "",
+			"content": "foobar"
+		},
+		{
+			"id": 5,
+			"type": "text",
+			"room": "",
+			"content": "foobar123"
+		},
+		{
+			"id": 6,
+			"type": "text",
+			"room": "",
+			"content": "foobar"
+		},
+		{
+			"id": 7,
+			"type": "text",
+			"room": "",
+			"content": "foobar"
+		},
+		{
+			"id": 8,
+			"type": "text",
+			"room": "",
+			"content": "foobar"
+		},
+		{
+			"id": 9,
+			"type": "text",
+			"room": "",
+			"content": "foobar"
+		},
+		{
+			"id": 10,
+			"type": "text",
+			"room": "yuyuko-1981",
+			"content": "foobar"
+		},
+		{
+			"id": 11,
+			"type": "text",
+			"room": "yuyuko-1981",
+			"content": "foobar"
+		},
+		{
+			"id": 12,
+			"type": "text",
+			"room": "yuyuko-1981",
+			"content": "foobar"
+		},
+		{
+			"id": 13,
+			"type": "text",
+			"room": "yuyuko-1981",
+			"content": "foobar"
+		},
+		{
+			"id": 14,
+			"type": "text",
+			"room": "yuyuko-1981",
+			"content": "foobar"
+		},
+		{
+			"id": 15,
+			"type": "text",
+			"room": "yuyuko-1981",
+			"content": "foobar"
 		}
 	]
 }

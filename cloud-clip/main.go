@@ -422,31 +422,44 @@ func handleClearAll(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	// 解析命令行参数，加载配置等
 	load_history()
-	mkdir_uploads() // mkdir -p uplodas
+	mkdir_uploads()
 	config = load_config(*flg_config)
 	prefix := config.Server.Prefix
 
-	// flag.Parse()
-
-	// serve static
+	// 服务静态文件
 	server_static(prefix)
 
-	// api
+	// 注册不需要认证的路由
 	http.HandleFunc(prefix+"/server", handle_server)
-	http.HandleFunc(prefix+"/text", handle_text)
-	http.HandleFunc(prefix+"/upload", handle_upload)
-	http.HandleFunc(prefix+"/upload/chunk/", handle_chunk)
-	http.HandleFunc(prefix+"/upload/finish/", handle_finish)
 	http.HandleFunc(prefix+"/push", handle_push)
-	http.HandleFunc(prefix+"/file/", handle_file)
-	http.HandleFunc(prefix+"/revoke/", handle_revoke)
-	http.HandleFunc(prefix+"/revoke/all", handleClearAll)
 
-	// expire cleaner
+	// 处理GET文件请求（不需要认证）和DELETE文件请求（需要认证）
+	http.HandleFunc(prefix+"/file/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			handle_file(w, r)
+		} else {
+			// 需要认证的操作
+			authMiddleware(handle_file)(w, r)
+		}
+	})
+
+	// 需要认证的路由
+	http.HandleFunc(prefix+"/text", authMiddleware(enhanceHandleText(handle_text)))
+	http.HandleFunc(prefix+"/upload", authMiddleware(handle_upload))
+	http.HandleFunc(prefix+"/upload/chunk/", authMiddleware(handle_chunk))
+	http.HandleFunc(prefix+"/upload/finish/", authMiddleware(enhanceHandleFinish(handle_finish)))
+	http.HandleFunc(prefix+"/revoke/", authMiddleware(handle_revoke))
+	http.HandleFunc(prefix+"/revoke/all", authMiddleware(handleClearAll))
+
+	// 添加内容直接访问路由（需要认证）
+	http.HandleFunc(prefix+"/content/", authMiddleware(handleContent))
+
+	// 过期文件清理
 	go clean_expire_files()
 
-	// run
+	// 运行服务器
 	listen_addr := fmt.Sprintf("%s:%d", config.Server.Host, config.Server.Port)
 	fmt.Println("--- server run on", listen_addr, prefix)
 	log.Fatal(http.ListenAndServe(listen_addr, nil))
