@@ -215,9 +215,10 @@ foobar
 ```
 
 
-# cloud-clipboard-launcher(画饼)
+# cloud-clipboard-go-launcher
 
 为 cloud-clipboard-go 制作的启动器,方便不想或不会使用终端的用户
+- https://github.com/Jonnyan404/cloud-clipboard-go-launcher
 
 
 # luci-app-cloud-clipboard-go(画饼)
