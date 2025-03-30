@@ -59,19 +59,6 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0  # 同样确保 Docker 任务也获取所有标签
-      
-      # 提取版本号
-      - name: Extract version
-        id: extract_version
-        run: |
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            VERSION="${{ github.event.inputs.version }}"
-          else
-            VERSION=${GITHUB_REF#refs/tags/}
-            VERSION=${VERSION#v}
-          fi
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Extracted version: $VERSION"
 
       - name: Docker meta (Debian)
         id: meta-debian
@@ -83,7 +70,6 @@ jobs:
           tags: |
             type=ref,event=tag
             type=raw,value=latest
-            type=raw,value=${{ steps.extract_version.outputs.version }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
