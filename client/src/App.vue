@@ -275,24 +275,6 @@ export default {
                 for (const file of files) {
                     await this.$http.delete(`file/${file.cache}`);
                 }
-            // 添加成功通知
-            this.$toast.success('剪贴板已清空');
-            
-            // 主动刷新页面 - 两种方式可选
-            
-            // 方式1: 刷新整个页面
-            // window.location.reload();
-            
-            // 方式2: 只清空Vue组件状态（更优雅）
-            if (this.$root.received) {
-                this.$root.received = [];
-            }
-            
-            // 如果您使用Vuex存储，还需要清空store
-            // this.$store.commit('CLEAR_CLIPBOARD');
-            
-            // 如果有必要，可以发送一个事件通知其他组件剪贴板已清空
-            this.$root.$emit('clipboard-cleared');
             } catch (error) {
                 console.log(error);
                 if (error.response && error.response.data.msg) {
