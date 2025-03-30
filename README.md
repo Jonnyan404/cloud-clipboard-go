@@ -34,9 +34,10 @@
 #### 使用 Docker 运行
 
 ```sh
+# dockerhub镜像(二选一)
 docker run -d --name=cloud-clipboard-go -p 9501:9501 -v /path/your/dir/data:/app/server-node/data jonnyan404/cloud-clipboard-go
-或者
-docker run -d --name=cloud-clipboard -p 9501:9501 -v /path/your/dir/data:/app/server-node/data ghcr.io/jonnyan404/cloud-clipboard-go
+# github镜像(二选一)
+docker run -d --name=cloud-clipboard-go -p 9501:9501 -v /path/your/dir/data:/app/server-node/data ghcr.io/jonnyan404/cloud-clipboard-go
 ```
 
 - vi docker-compose.yml
