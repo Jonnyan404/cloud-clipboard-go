@@ -42,7 +42,7 @@ COPY cloud-clip/entrypoint.sh /app/
 RUN apk add --no-cache git tzdata \
     && chmod +x /app/entrypoint.sh
 # 暴露端口
-EXPOSE 9502
+EXPOSE 9501
 
 # 运行应用
 ENTRYPOINT ["/app/entrypoint.sh"]

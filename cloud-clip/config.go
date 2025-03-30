@@ -62,7 +62,7 @@ func load_config(config_path string) *Config {
 	// Set default values
 	if config.Server.Port == 0 {
 		// config.Server.Port = 9501
-		config.Server.Port = 9502
+		config.Server.Port = 9501
 	}
 
 	config.Server.Prefix = strings.TrimRight(config.Server.Prefix, "/")
