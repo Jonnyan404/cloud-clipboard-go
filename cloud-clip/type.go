@@ -35,10 +35,12 @@ type FileReceive struct {
 	Room string `json:"room"`
 
 	Name      string `json:"name"`
+	UUID      string `json:"uuid"`
 	Size      int    `json:"size"`
 	Cache     string `json:"cache"`
 	Expire    int64  `json:"expire"`
 	Thumbnail string `json:"thumbnail"`
+	URL       string `json:"url,omitempty"`
 }
 
 // holds either a TextReceive or a FileReceive
