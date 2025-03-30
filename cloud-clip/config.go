@@ -8,7 +8,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"strings"
 	// "github.com/sanity-io/litter"
@@ -45,7 +44,7 @@ func load_config(config_path string) *Config {
 	file_content, err := os.ReadFile(config_path)
 	need_create := false
 	if err != nil {
-		fmt.Printf("Error reading config file: %v\n", err)
+		// fmt.Printf("Error reading config file: %v\n", err)
 		// os.Exit(1)
 		file_content = []byte("{}")
 		need_create = true
@@ -61,7 +60,6 @@ func load_config(config_path string) *Config {
 
 	// Set default values
 	if config.Server.Port == 0 {
-		// config.Server.Port = 9501
 		config.Server.Port = 9501
 	}
 
@@ -80,7 +78,7 @@ func load_config(config_path string) *Config {
 			fmt.Printf("Auth is unexpected type: %T\n", auth)
 		}
 	} else {
-		fmt.Println("Auth field is not provided in the config file")
+		// fmt.Println("Auth field is not provided in the config file")
 		config.Server.Auth = false
 	}
 
@@ -107,7 +105,7 @@ func load_config(config_path string) *Config {
 				fmt.Printf("Error writing config file: %v\n", err)
 				// os.Exit(1)
 			}
-			log.Println("++ config.json created with default config")
+			// log.Println("++ config.json created with default config")
 		}
 	}
 
@@ -116,7 +114,7 @@ func load_config(config_path string) *Config {
 	}
 
 	// Print the parsed configuration
-	fmt.Printf("\n---Parsed Config: %+v\n", config)
+	// fmt.Printf("\n---Parsed Config: %+v\n", config)
 	// fmt.Println("\n---litter.dump:")
 	// litter.Dump(config)
 

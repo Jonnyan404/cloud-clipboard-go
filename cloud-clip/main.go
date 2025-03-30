@@ -542,6 +542,8 @@ func main() {
 	load_history()
 	mkdir_uploads()
 	config = load_config(*flg_config)
+	// 应用命令行参数，覆盖配置文件中的设置
+	applyCommandLineArgs()
 	prefix := config.Server.Prefix
 
 	// 服务静态文件
