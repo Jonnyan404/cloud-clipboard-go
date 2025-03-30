@@ -70,19 +70,17 @@ services:
 
 #### mac用户从 homebrew 运行
 
+默认配置文件分别在`homebrew`根目录下的`etc/cloud-clipboard-go`和`var`目录
+
 ```
 #安装
 brew install Jonnyan404/tap/cloud-clipboard-go
-
 # 启动服务
 brew services start cloud-clipboard-go
-
 # 查看服务状态
 brew services info cloud-clipboard-go
-
 # 停止服务
 brew services stop cloud-clipboard-go
-
 # 重启服务
 brew services restart cloud-clipboard-go
 ```
