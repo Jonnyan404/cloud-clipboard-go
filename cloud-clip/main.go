@@ -92,9 +92,123 @@ func handle_text(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{})
 }
 
-// create new fileEntry in file_map
+// 修改 handle_upload 函数处理表单上传
 func handle_upload(w http.ResponseWriter, r *http.Request) {
-	// filename := r.PostFormValue("filename")
+	// 检查是否是表单上传
+	contentType := r.Header.Get("Content-Type")
+
+	// 如果是表单上传（multipart/form-data）
+	if strings.Contains(contentType, "multipart/form-data") {
+		fmt.Println("处理表单文件上传")
+
+		// 解析表单
+		if err := r.ParseMultipartForm(32 << 20); err != nil { // 32MB
+			http.Error(w, "无法解析表单", http.StatusBadRequest)
+			return
+		}
+
+		// 获取上传的文件
+		file, fileHeader, err := r.FormFile("file")
+		if err != nil {
+			http.Error(w, "无法获取文件", http.StatusBadRequest)
+			return
+		}
+		defer file.Close()
+
+		// 获取房间参数
+		room := r.URL.Query().Get("room")
+
+		// 生成UUID
+		uuid := gen_UUID()
+
+		// 确保上传目录存在
+		mkdir_uploads()
+
+		// 保存文件
+		filePath := filepath.Join(storage_folder, uuid)
+		outFile, err := os.Create(filePath)
+		if err != nil {
+			http.Error(w, "无法创建文件", http.StatusInternalServerError)
+			return
+		}
+		defer outFile.Close()
+
+		written, err := io.Copy(outFile, file)
+		if err != nil {
+			http.Error(w, "无法保存文件", http.StatusInternalServerError)
+			os.Remove(filePath)
+			return
+		}
+
+		// 创建文件信息
+		fileInfo := File{
+			Name:       fileHeader.Filename,
+			UUID:       uuid,
+			Size:       int(written),
+			UploadTime: time.Now().Unix(),
+			ExpireTime: time.Now().Unix() + int64(config.File.Expire),
+		}
+		uploadFileMap[uuid] = fileInfo
+
+		// 获取下一个消息ID
+		nextID := messageQueue.nextid
+
+		// 创建文件消息
+		message := PostEvent{
+			Event: "receive",
+			Data: ReceiveHolder{
+				FileReceive: &FileReceive{
+					ID:     nextID,
+					Type:   "file",
+					Room:   room,
+					Name:   fileHeader.Filename,
+					Size:   int(written),
+					Cache:  uuid,
+					Expire: fileInfo.ExpireTime,
+				},
+			},
+		}
+
+		// 如果文件不太大，创建缩略图
+		if written <= 32*1024*1024 { // 32MB
+			thumbnail, err := gen_thumbnail(filePath)
+			if err == nil {
+				message.Data.FileReceive.Thumbnail = thumbnail
+			}
+		}
+
+		// 添加到消息队列
+		messageQueue.Append(&message)
+
+		// 广播消息
+		messageJSON, err := json.Marshal(message)
+		if err == nil {
+			broadcast_ws_msg(websockets, string(messageJSON), room)
+		}
+
+		// 保存历史记录
+		save_history()
+
+		// 构造内容访问URL
+		scheme := getScheme(r)
+		contentURL := fmt.Sprintf("%s://%s%s/content/%d",
+			scheme, r.Host, config.Server.Prefix, nextID)
+		if room != "" {
+			contentURL += fmt.Sprintf("?room=%s", room)
+		}
+
+		// 返回与Node.js版本兼容的URL响应
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"code":   200,
+			"msg":    "",
+			"result": map[string]interface{}{"url": contentURL},
+		})
+
+		return
+	}
+
+	// 否则处理文件名上传（初始化大文件上传）
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "无法读取请求体", http.StatusBadRequest)
@@ -112,6 +226,8 @@ func handle_upload(w http.ResponseWriter, r *http.Request) {
 		ExpireTime: time.Now().Unix() + int64(config.File.Expire),
 	}
 	uploadFileMap[uuid] = fileInfo
+
+	// 返回UUID响应（用于分片上传）
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"code":   200,
 		"msg":    "",
@@ -448,6 +564,7 @@ func main() {
 	// 需要认证的路由
 	http.HandleFunc(prefix+"/text", authMiddleware(enhanceHandleText(handle_text)))
 	http.HandleFunc(prefix+"/upload", authMiddleware(handle_upload))
+	http.HandleFunc(prefix+"/upload/chunk", authMiddleware(handle_upload))
 	http.HandleFunc(prefix+"/upload/chunk/", authMiddleware(handle_chunk))
 	http.HandleFunc(prefix+"/upload/finish/", authMiddleware(enhanceHandleFinish(handle_finish)))
 	http.HandleFunc(prefix+"/revoke/", authMiddleware(handle_revoke))

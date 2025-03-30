@@ -1,5 +1,41 @@
 {
-	"file": [],
+	"file": [
+		{
+			"name": "test.sh",
+			"uuid": "0a47d9c4-cf18-4f90-98f2-d956d3c13ef5",
+			"size": 11,
+			"uploadTime": 1743323233,
+			"expireTime": 1743326833
+		},
+		{
+			"name": "output.txt",
+			"uuid": "3bebfbc2-72f6-4380-ac27-d8a66f6b4a9e",
+			"size": 99,
+			"uploadTime": 1743323945,
+			"expireTime": 1743327545
+		},
+		{
+			"name": "test.sh",
+			"uuid": "3dc6346a-558b-444d-bcde-982048020c9a",
+			"size": 11,
+			"uploadTime": 1743324672,
+			"expireTime": 1743328272
+		},
+		{
+			"name": "2.mp4",
+			"uuid": "7d981219-e9d3-41d6-bd78-d44b54142033",
+			"size": 44700438,
+			"uploadTime": 1743324689,
+			"expireTime": 1743328289
+		},
+		{
+			"name": "test.sh",
+			"uuid": "36bbbe66-3530-423d-a7fe-3479204e8dee",
+			"size": 11,
+			"uploadTime": 1743324775,
+			"expireTime": 1743328375
+		}
+	],
 	"receive": [
 		{
 			"id": 0,
@@ -96,6 +132,67 @@
 			"type": "text",
 			"room": "yuyuko-1981",
 			"content": "foobar"
+		},
+		{
+			"id": 16,
+			"type": "file",
+			"room": "",
+			"name": "test.sh",
+			"uuid": "",
+			"size": 11,
+			"cache": "0a47d9c4-cf18-4f90-98f2-d956d3c13ef5",
+			"expire": 1743326833,
+			"thumbnail": ""
+		},
+		{
+			"id": 17,
+			"type": "file",
+			"room": "",
+			"name": "output.txt",
+			"uuid": "",
+			"size": 99,
+			"cache": "3bebfbc2-72f6-4380-ac27-d8a66f6b4a9e",
+			"expire": 1743327545,
+			"thumbnail": ""
+		},
+		{
+			"id": 18,
+			"type": "file",
+			"room": "",
+			"name": "test.sh",
+			"uuid": "",
+			"size": 11,
+			"cache": "3dc6346a-558b-444d-bcde-982048020c9a",
+			"expire": 1743328272,
+			"thumbnail": ""
+		},
+		{
+			"id": 19,
+			"type": "file",
+			"room": "",
+			"name": "2.mp4",
+			"uuid": "",
+			"size": 44700438,
+			"cache": "7d981219-e9d3-41d6-bd78-d44b54142033",
+			"expire": 1743328289,
+			"thumbnail": ""
+		},
+		{
+			"id": 20,
+			"type": "text",
+			"room": "test",
+			"content": "答复"
+		},
+		{
+			"id": 21,
+			"type": "file",
+			"room": "test",
+			"name": "test.sh",
+			"uuid": "",
+			"size": 11,
+			"cache": "36bbbe66-3530-423d-a7fe-3479204e8dee",
+			"expire": 1743328375,
+			"thumbnail": ""
 		}
 	]
 }

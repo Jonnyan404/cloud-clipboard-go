@@ -2,4 +2,5 @@
 /server-go-ai/
 /server/
 /cloud-clip/static/
-/cloud-clip/upload/
+/cloud-clip/uploads/
+/cloud-clip/config.json

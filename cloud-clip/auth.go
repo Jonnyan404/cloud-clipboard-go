@@ -180,38 +180,38 @@ func enhanceHandleText(original http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// 修改现有的上传完成处理函数，使其返回内容URL
+// 修改现有的文件上传完成处理函数，使其返回内容URL
 func enhanceHandleFinish(original http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// 获取 messageQueue 的当前大小作为即将添加的消息的 ID
-		nextID := messageQueue.nextid
+		// 获取UUID和房间参数
+		// uuid := strings.TrimPrefix(r.URL.Path, config.Server.Prefix+"/upload/finish/")
 		room := r.URL.Query().Get("room")
 
-		// 调用原始处理函数
+		// 调用原始处理函数，它会创建消息并广播
 		original(w, r)
 
-		// 如果状态码已经不是 200，说明原始处理函数已经处理了错误
-		if w.Header().Get("Status") != "" && w.Header().Get("Status") != "200 OK" {
-			return
-		}
+		// 请求处理完成后，构造与Node.js版兼容的URL响应
+		// 获取最新添加的消息ID
+		id := messageQueue.nextid - 1
 
 		// 构造内容访问URL
 		scheme := getScheme(r)
 		contentURL := fmt.Sprintf("%s://%s%s/content/%d",
-			scheme, r.Host, config.Server.Prefix, nextID)
+			scheme, r.Host, config.Server.Prefix, id)
 
-		// 如果有房间参数，添加到URL
 		if room != "" {
 			contentURL += fmt.Sprintf("?room=%s", room)
 		}
 
-		// 返回带URL的响应
+		// 返回带URL的响应 - 与Node.js版本完全一致的格式
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(map[string]interface{}{
-			"code":   200,
-			"msg":    "",
-			"result": map[string]interface{}{"url": contentURL},
+			"code": 200,
+			"msg":  "",
+			"result": map[string]interface{}{
+				"url": contentURL,
+			},
 		})
 	}
 }
