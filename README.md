@@ -34,9 +34,9 @@
 #### 使用 Docker 运行
 
 ```sh
-docker run -d --name=cloud-clipboard-go -p 9502:9502 -v /path/your/dir/data:/app/server-node/data jonnyan404/cloud-clipboard-go
+docker run -d --name=cloud-clipboard-go -p 9501:9501 -v /path/your/dir/data:/app/server-node/data jonnyan404/cloud-clipboard-go
 或者
-docker run -d --name=cloud-clipboard -p 9502:9502 -v /path/your/dir/data:/app/server-node/data ghcr.io/jonnyan404/cloud-clipboard-go
+docker run -d --name=cloud-clipboard -p 9501:9501 -v /path/your/dir/data:/app/server-node/data ghcr.io/jonnyan404/cloud-clipboard-go
 ```
 
 - vi docker-compose.yml
@@ -48,10 +48,10 @@ services:
         container_name: cloud-clipboard-go
         restart: always
         ports:
-            - "9502:9502"
+            - "9501:9501"
         environment:
             - LISTEN_IP= #默认为0.0.0.0,可设置为 127.0.0.1 不懂勿动
-            - LISTEN_PORT= #默认为9502,可设置为其他端口
+            - LISTEN_PORT= #默认为9501,可设置为其他端口
             - PREFIX= #子路径,可配合nginx使用,格式: /cloud-clipboard
             - MESSAGE_NUM= #历史记录的数量,默认为10
             - AUTH_PASSWORD= #访问密码,默认为false,可自定义字符串密码
@@ -64,7 +64,7 @@ services:
 
 ```
 
-然后访问 http://127.0.0.1:9502
+然后访问 http://127.0.0.1:9501
 
 
 #### mac用户从 homebrew 运行
