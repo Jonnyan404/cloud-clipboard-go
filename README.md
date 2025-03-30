@@ -28,8 +28,8 @@
 
 去项目 [release](https://github.com/Jonnyan404/cloud-clipboard-go/releases) 下载对应系统文件运行即可
 
-- 命令行参数: `-config` 用来自定义配置文件
-- 命令行参数: `-static` 用来自定义加载外部前端文件
+- 命令行参数: `-config` 用来加载自定义配置文件
+- 命令行参数: `-static` 用来加载自定义外部前端文件
 
 #### 使用 Docker 运行
 
