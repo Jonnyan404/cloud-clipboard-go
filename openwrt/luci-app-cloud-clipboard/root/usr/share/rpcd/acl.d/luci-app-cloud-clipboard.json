@@ -1,0 +1,24 @@
+{
+    "luci-app-cloud-clipboard": {
+        "description": "Grant access to cloud-clipboard settings",
+        "read": {
+            "file": {
+                "/var/log/cloud-clipboard.log": [ "read" ]
+            },
+            "uci": [ "cloud-clipboard" ],
+            "ubus": {
+                "service": [ "list" ],
+                "system": [ "board" ]
+            }
+        },
+        "write": {
+            "file": {
+                "/var/log/cloud-clipboard.log": [ "write" ]
+            },
+            "uci": [ "cloud-clipboard" ],
+            "ubus": {
+                "service": [ "list" ]
+            }
+        }
+    }
+}

@@ -1,0 +1,19 @@
+#!/bin/sh
+
+case "$1" in
+    list)
+        echo '{"status":{"description":"Get cloud-clipboard service status"}}'
+    ;;
+    call)
+        case "$2" in
+            status)
+                echo '{"result":'
+                if pgrep -f cloud-clipboard >/dev/null; then
+                    echo '"running"}'
+                else
+                    echo '"stopped"}'
+                fi
+            ;;
+        esac
+    ;;
+esac
