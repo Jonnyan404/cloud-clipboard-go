@@ -7,8 +7,9 @@
             },
             "uci": [ "cloud-clipboard" ],
             "ubus": {
-                "service": [ "list" ],
-                "system": [ "board" ]
+                "service": [ "list", "restart" ],
+                "system": [ "board" ],
+                "luci": [ "getProcessList" ]
             }
         },
         "write": {
@@ -17,7 +18,12 @@
             },
             "uci": [ "cloud-clipboard" ],
             "ubus": {
-                "service": [ "list" ]
+                "service": [ "list", "restart" ]
+            }
+        },
+        "execute": {
+            "file": {
+                "/etc/init.d/cloud-clipboard": [ "exec" ]
             }
         }
     }
