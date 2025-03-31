@@ -44,7 +44,7 @@ return view.extend({
             return Promise.resolve();
         };
         o.render = function() {
-            return rpc.delegated('luci.cloud-clipboard', 'status').then(function(result) {
+            return rpc.call('luci.cloud-clipboard', 'status', []).then(function(result) {
                 if (result && result.result === "running")
                     return E('span', { 'class': 'label success' }, [ _('运行中') ]);
                 else
