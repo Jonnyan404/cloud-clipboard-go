@@ -78,10 +78,7 @@ return view.extend({
     handleSaveApply: function() {
         ui.addNotification(null, E('p', _('正在应用设置...')));
         return this.m.save()
-            // 直接提交配置而不是调用 uci.apply
-            .then(function() {
-                return uci.commit('cloud-clipboard');
-            })
+            // 保存后直接执行重启操作，无需调用 uci.commit
             .then(function() {
                 return fs.exec('/etc/init.d/cloud-clipboard', ['restart']);
             })
