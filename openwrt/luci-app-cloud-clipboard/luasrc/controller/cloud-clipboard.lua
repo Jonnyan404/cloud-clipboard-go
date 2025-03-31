@@ -5,10 +5,10 @@ function index()
         return
     end
 
-    local page = entry({"admin", "services", "cloud-clipboard"}, cbi("cloud-clipboard"), _("Cloud Clipboard"), 100)
-    page.dependent = true
-    page.acl_depends = { "luci-app-cloud-clipboard" }
+    -- 更新为新的菜单注册方式
+    entry({"admin", "services", "cloud-clipboard"}, alias("admin", "services", "cloud-clipboard", "settings"), _("Cloud Clipboard"), 100)
     
+    entry({"admin", "services", "cloud-clipboard", "settings"}, cbi("cloud-clipboard"), _("Settings"), 10).leaf = true
     entry({"admin", "services", "cloud-clipboard", "status"}, call("act_status")).leaf = true
     entry({"admin", "services", "cloud-clipboard", "log"}, call("act_log")).leaf = true
 end

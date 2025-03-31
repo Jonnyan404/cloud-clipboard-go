@@ -5,8 +5,9 @@ PKG_VERSION:=1.0.0
 PKG_RELEASE:=1
 
 LUCI_TITLE:=LuCI support for Cloud Clipboard
-LUCI_DEPENDS:=+cloud-clipboard
+LUCI_DEPENDS:=+luci-base +cloud-clipboard
 LUCI_PKGARCH:=all
+LUCI_DESCRIPTION:=LuCI interface for Cloud Clipboard service
 
 include $(TOPDIR)/feeds/luci/luci.mk
 
