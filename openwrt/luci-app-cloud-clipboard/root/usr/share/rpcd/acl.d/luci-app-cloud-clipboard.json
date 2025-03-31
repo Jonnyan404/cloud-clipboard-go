@@ -7,9 +7,8 @@
             },
             "uci": [ "cloud-clipboard" ],
             "ubus": {
-                "service": [ "list", "restart" ],
-                "system": [ "board" ],
-                "luci": [ "getProcessList" ]
+                "service": [ "list" ],
+                "system": [ "board" ]
             }
         },
         "write": {

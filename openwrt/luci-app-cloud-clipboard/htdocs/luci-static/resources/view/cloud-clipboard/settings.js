@@ -16,14 +16,26 @@ return view.extend({
     handleSaveApply: function(ev, mode) {
         ui.addNotification(null, E('p', _('正在应用设置...')));
         
-        return fs.exec('/etc/init.d/cloud-clipboard', ['restart']).then(function() {
-            ui.addNotification(null, E('p', _('设置已应用，服务已重启')));
-            window.setTimeout(function() {
-                location.reload();
-            }, 1000);
-        }).catch(function(error) {
-            ui.addNotification(null, E('p', _('错误: ') + error));
-        });
+        return this.map.save()
+            .then(function() {
+                return uci.apply();
+            })
+            .then(function() {
+                return ubus.call('service', 'list', { name: 'cloud-clipboard' });
+            })
+            .then(function() {
+                return ubus.call('service', 'restart', { name: 'cloud-clipboard' });
+            })
+            .then(function() {
+                ui.addNotification(null, E('p', _('设置已应用，服务已重启')));
+                window.setTimeout(function() {
+                    location.reload();
+                }, 1000);
+            })
+            .catch(function(error) {
+                console.error('应用设置失败:', error); // 添加错误日志
+                ui.addNotification(null, E('p', _('错误: ') + error));
+            });
     },
     
     render: function() {
