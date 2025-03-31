@@ -4,17 +4,28 @@
 'require uci';
 'require fs';
 'require ui';
+'require rpc';
+
+var serviceRPC = rpc.declare({
+    object: 'service',
+    method: 'list',
+    params: ['name'],
+    expect: { '': {} }
+});
 
 return view.extend({
     load: function() {
-        return Promise.all([uci.load('cloud-clipboard')]);
+        return Promise.all([
+            uci.load('cloud-clipboard'),
+            serviceRPC('cloud-clipboard')
+        ]);
     },
     
-    render: function() {
+    render: function(data) {
         let m, s, o;
         
         m = new form.Map('cloud-clipboard', _('Cloud Clipboard'), 
-            _('Cloud Clipboard是一个文本和文件传输工具，可在多个设备之间共享剪贴板内容。'));
+            _('云剪贴板工具，支持跨设备共享文本和文件'));
 
         // 基本设置部分
         s = m.section(form.TypedSection, 'cloud-clipboard', _('基本设置'));
@@ -36,7 +47,6 @@ return view.extend({
         o = s.option(form.Value, 'auth', _('访问密码'));
         o.password = true;
         o.rmempty = true;
-        o.description = _('如果设置，访问时需要输入此密码。留空表示不需要密码。');
 
         // 服务状态部分
         s = m.section(form.TypedSection, 'cloud-clipboard', _('服务状态'));
@@ -44,79 +54,63 @@ return view.extend({
         
         o = s.option(form.DummyValue, '_status', _('状态'));
         o.cfgvalue = function() {
-            return fs.exec('/bin/busybox', ['ps']).then(function(res) {
-                var running = (res.stdout || '').indexOf('cloud-clipboard') > -1;
-                return fs.exec('/etc/init.d/cloud-clipboard', ['enabled']).then(function(res) {
-                    var enabled = res.code === 0;
-                    
-                    return E('div', [
-                        E('span', { 'class': running ? 'label success' : 'label danger' }, 
-                            [ _(running ? '运行中' : '未运行') ]),
-                        ' ',
-                        E('span', { 'class': enabled ? 'label notice' : 'label warning' },
-                            [ _(enabled ? '已启用' : '已禁用') ])
-                    ]);
-                });
+            return Promise.resolve(data[1]).then(function(svc) {
+                const running = svc['cloud-clipboard']?.instances?.instance?.running || false;
+                const enabled = uci.get('cloud-clipboard', 'main', 'enabled') === '1';
+                
+                return E('div', { 'class': 'cbi-value-field' }, [
+                    E('span', { 
+                        'class': running ? 'label-success' : 'label-danger',
+                        'style': 'padding: 2px 5px; border-radius: 3px;' 
+                    }, [ running ? _('运行中') : _('已停止') ]),
+                    E('span', { 
+                        'class': enabled ? 'label-success' : 'label-warning',
+                        'style': 'margin-left: 10px; padding: 2px 5px; border-radius: 3px;' 
+                    }, [ enabled ? _('已启用') : _('已禁用') ])
+                ]);
             }).catch(function(err) {
-                ui.addNotification(null, E('p', _('获取服务状态失败: ') + err.message));
-                return E('em', _('获取状态失败'));
+                ui.addNotification(null, E('p', _('状态获取失败: ') + err.message));
+                return E('em', _('状态未知'));
             });
         };
 
-        // 服务控制
-        o = s.option(form.Button, '_restart', _('重启服务'));
-        o.inputtitle = _('重启');
+        // 服务控制按钮
+        o = s.option(form.Button, '_control', _('服务操作'));
+        o.inputtitle = _('重启服务');
         o.inputstyle = 'apply';
         o.onclick = function() {
-            return fs.exec('/etc/init.d/cloud-clipboard', ['restart']).then(function(res) {
-                if (res.code === 0) {
-                    ui.addNotification(null, E('p', _('服务已重启')));
-                } else {
-                    ui.addNotification(null, E('p', _('重启失败: ') + res.stderr));
-                }
-                
-                window.setTimeout(function() {
-                    location.reload();
-                }, 1000);
-            });
-        };
-        
-        o = s.option(form.Button, '_stop', _('停止服务'));
-        o.inputtitle = _('停止');
-        o.inputstyle = 'reset';
-        o.onclick = function() {
-            return fs.exec('/etc/init.d/cloud-clipboard', ['stop']).then(function(res) {
-                if (res.code === 0) {
-                    ui.addNotification(null, E('p', _('服务已停止')));
-                } else {
-                    ui.addNotification(null, E('p', _('停止失败: ') + res.stderr));
-                }
-                
-                window.setTimeout(function() {
-                    location.reload();
-                }, 1000);
-            });
+            return rpc.call('service', 'list', { name: 'cloud-clipboard' })
+                .then(function(res) {
+                    const running = res['cloud-clipboard']?.instances?.instance?.running;
+                    const action = running ? 'restart' : 'start';
+                    
+                    return rpc.call('service', action', { name: 'cloud-clipboard' });
+                })
+                .then(function(res) {
+                    if (res.code !== 0) throw new Error(res.stderr || '操作失败');
+                    ui.addNotification(null, E('p', _('操作成功，1秒后刷新页面')));
+                    setTimeout(window.location.reload.bind(window.location), 1000);
+                })
+                .catch(function(err) {
+                    ui.addNotification(null, E('p', _('操作失败: ') + err.message));
+                });
         };
 
-        // 服务访问链接
-        s = m.section(form.TypedSection, 'cloud-clipboard', _('服务访问'));
+        // 访问链接
+        s = m.section(form.TypedSection, 'cloud-clipboard', _('访问入口'));
         s.anonymous = true;
         
         o = s.option(form.DummyValue, '_access', _('Web界面'));
         o.cfgvalue = function() {
-            var host = uci.get('cloud-clipboard', 'main', 'host') || '0.0.0.0';
-            var port = uci.get('cloud-clipboard', 'main', 'port') || '9501';
-            
-            // 如果监听地址是0.0.0.0，使用当前访问的地址
-            if (host === '0.0.0.0') {
-                host = window.location.hostname;
-            }
+            const host = uci.get('cloud-clipboard', 'main', 'host') || window.location.hostname;
+            const port = uci.get('cloud-clipboard', 'main', 'port') || '9501';
             
             return E('a', {
-                'href': 'http://' + host + ':' + port,
+                'href': `http://${host}:${port}`,
                 'target': '_blank',
-                'class': 'btn cbi-button cbi-button-neutral'
-            }, [ _('打开 Cloud Clipboard') ]);
+                'class': 'cbi-button cbi-button-action',
+                'style': 'text-decoration: none; padding: 5px 15px;'
+            }, [ _('打开控制面板') ]);
         };
 
         return m.render();
