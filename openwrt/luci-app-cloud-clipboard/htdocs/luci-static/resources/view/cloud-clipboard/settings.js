@@ -6,6 +6,7 @@
 'require ui';
 'require tools.widgets as widgets';
 'require rpc';
+'require ubus'; 
 
 return view.extend({
     load: function() {
