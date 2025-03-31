@@ -1,0 +1,4 @@
+#!/bin/sh
+/etc/init.d/cloud-clipboard disable
+/etc/init.d/cloud-clipboard stop
+exit 0

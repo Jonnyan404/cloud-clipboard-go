@@ -1,0 +1,6 @@
+<script type="text/javascript">//<![CDATA[
+    function view_log() {
+        window.open('<%=luci.dispatcher.build_url("admin", "services", "cloud-clipboard", "log")%>', '_blank');
+    }
+//]]></script>
+<input class="btn cbi-button cbi-button-apply" type="button" value="<%:查看日志%>" onclick="view_log()" />
