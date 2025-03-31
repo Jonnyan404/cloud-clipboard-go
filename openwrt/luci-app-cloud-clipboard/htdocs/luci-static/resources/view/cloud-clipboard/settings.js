@@ -43,15 +43,7 @@ return view.extend({
         const m = new form.Map('cloud-clipboard', _('Cloud Clipboard'), 
             _('云剪贴板工具，支持跨设备共享文本和文件'));
 
-        // 自动提交配置变更
-        m.on('apply', function() {
-            return Promise.all([
-                uci.commit(),
-                uci.apply(['cloud-clipboard'])
-            ]).catch(err => {
-                ui.addNotification(null, E('p', _('配置应用失败: ') + err.message));
-            });
-        });
+        // 移除m.on('apply')，使用LuCI默认的保存和应用机制
 
         // 基本设置部分
         const basicSection = m.section(form.TypedSection, 'cloud-clipboard', _('基本设置'));
@@ -164,5 +156,15 @@ return view.extend({
         };
 
         return m.render();
+    },
+
+    // 添加保存时的处理程序（可选）
+    handleSaveApply: function() {
+        // 保存配置后重启服务
+        return uci.apply().then(() => {
+            return rpc.call('service', 'restart', { name: 'cloud-clipboard' });
+        }).then(() => {
+            ui.addNotification(null, E('p', _('配置已应用，服务已重启')));
+        });
     }
 });
