@@ -40,8 +40,6 @@ else
     echo "! 警告: 找不到root目录结构"
 fi
 
-chmod +x "$PKG_DIR/"*
-
 # 复制htdocs目录结构（如果存在）
 if [ -d "$LUCI_DIR/htdocs" ]; then
     mkdir -p "$PKG_DIR/www"
