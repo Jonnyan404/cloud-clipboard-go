@@ -8,6 +8,24 @@
 'require rpc';
 
 return view.extend({
+    handleSave: function() {
+        ui.addNotification(null, E('p', _('设置已保存')));
+        return true;
+    },
+    
+    handleSaveApply: function(ev, mode) {
+        ui.addNotification(null, E('p', _('正在应用设置...')));
+        
+        return fs.exec('/etc/init.d/cloud-clipboard', ['restart']).then(function() {
+            ui.addNotification(null, E('p', _('设置已应用，服务已重启')));
+            window.setTimeout(function() {
+                location.reload();
+            }, 1000);
+        }).catch(function(error) {
+            ui.addNotification(null, E('p', _('错误: ') + error));
+        });
+    },
+    
     render: function() {
         var m, s, o;
 
@@ -34,11 +52,11 @@ return view.extend({
         o.rmempty = true;
         o.description = _('如果设置，访问时需要输入此密码。留空表示不需要密码。');
         
-        // 添加状态节
-        s = m.section(form.TypedSection, 'cloud-clipboard', _('服务状态'));
+        // 添加状态节 - 使用不同的section标识符，避免与UCI配置冲突
+        s = m.section(form.NamedSection, '_status', 'status', _('服务状态'));
         s.anonymous = true;
         
-        o = s.option(form.DummyValue, '_status', _('运行状态'));
+        o = s.option(form.DummyValue, 'status', _('运行状态'));
         o.rawhtml = true;
         o.load = function() {
             return Promise.resolve();
@@ -54,7 +72,7 @@ return view.extend({
             });
         };
         
-        o = s.option(form.Button, '_restart', _('重启服务'));
+        o = s.option(form.Button, 'restart', _('服务控制'));
         o.inputtitle = _('重启服务');
         o.inputstyle = 'apply';
         o.onclick = function() {
@@ -65,24 +83,6 @@ return view.extend({
                 }, 1000);
             });
         };
-
-        // 在表单保存和应用时执行
-        m.on('save', function() {
-            ui.addNotification(null, E('p', _('设置已保存')));
-            return true;
-        });
-
-        m.on('apply', function() {
-            ui.addNotification(null, E('p', _('正在应用设置...')));
-            return fs.exec('/etc/init.d/cloud-clipboard', ['restart']).then(function() {
-                ui.addNotification(null, E('p', _('设置已应用，服务已重启')));
-                window.setTimeout(function() {
-                    location.reload();
-                }, 1000);
-            }).catch(function(error) {
-                ui.addNotification(null, E('p', _('错误: ') + error));
-            });
-        });
 
         return m.render();
     }
