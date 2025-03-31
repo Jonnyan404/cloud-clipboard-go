@@ -5,10 +5,8 @@
             "file": {
                 "/var/log/cloud-clipboard.log": ["read"],
                 "/etc/init.d/cloud-clipboard": ["exec"],
-                "/bin/ps": ["exec"],
                 "/bin/busybox": ["exec"],
-                "/bin/sh": ["exec"],
-                "/usr/bin/pgrep": ["exec"]
+                "/bin/ps": ["exec"]
             },
             "uci": ["cloud-clipboard"]
         },
