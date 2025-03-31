@@ -37,11 +37,11 @@ build() {
 }
 
 # 构建各种架构
-build linux amd64 "" "" "amd64"
-build linux 386 "" "" "i386"
-build linux arm "7" "" "arm-7"
 build linux arm64 "" "" "aarch64"
-build linux mips "" "softfloat" "mips"
-build linux mipsle "" "softfloat" "mipsel"
+# build linux amd64 "" "" "amd64"
+# build linux 386 "" "" "i386"
+# build linux arm "7" "" "arm-7"
+# build linux mips "" "softfloat" "mips"
+# build linux mipsle "" "softfloat" "mipsel"
 
 echo "=== 所有架构构建完成，二进制文件位于: $OUTPUT_DIR ==="
