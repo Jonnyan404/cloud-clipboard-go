@@ -38,25 +38,31 @@ return view.extend({
         s = m.section(form.TypedSection, 'cloud-clipboard', _('服务状态'));
         s.anonymous = true;
 
+        // 修改运行状态检测
         o = s.option(form.DummyValue, '_status', _('运行状态'));
+        o.rawhtml = true;  // 确保HTML内容能正确渲染
         o.cfgvalue = function() {
-            return Promise.all([
-                fs.exec('/bin/busybox', ['ps']),
-                fs.exec('/etc/init.d/cloud-clipboard', ['enabled'])
-            ]).then(function(res) {
-                var running = (res[0].stdout || '').indexOf('cloud-clipboard') > -1;
-                var enabled = res[1].code === 0;
-                
-                return E('div', [
-                    E('span', { 'class': running ? 'label success' : 'label danger' }, 
-                      [ _(running ? '运行中' : '未运行') ]),
-                    ' ',
-                    E('span', { 'class': enabled ? 'label notice' : 'label warning' },
-                      [ _(enabled ? '已启用' : '已禁用') ])
-                ]);
-            }).catch(function() {
-                return E('span', { 'class': 'label danger' }, [ _('获取状态失败') ]);
-            });
+            return fs.exec('/bin/sh', ['-c', 'pgrep -f cloud-clipboard || echo "not running"'])
+                .then(function(res) {
+                    var running = res.stdout.trim() !== 'not running';
+                    
+                    return fs.exec('/etc/init.d/cloud-clipboard', ['enabled'])
+                        .then(function(res2) {
+                            var enabled = res2.code === 0;
+                            
+                            return E('div', [
+                                E('span', { 'class': running ? 'label success' : 'label danger' }, 
+                                  [ _(running ? '运行中' : '未运行') ]),
+                                ' ',
+                                E('span', { 'class': enabled ? 'label notice' : 'label warning' },
+                                  [ _(enabled ? '已启用' : '已禁用') ])
+                            ]);
+                        });
+                })
+                .catch(function(err) {
+                    console.error('Status check error:', err);
+                    return E('span', { 'class': 'label danger' }, [ _('获取状态失败') ]);
+                });
         };
 
         // 添加服务控制按钮组
