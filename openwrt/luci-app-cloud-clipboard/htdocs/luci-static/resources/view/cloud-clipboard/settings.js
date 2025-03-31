@@ -43,11 +43,13 @@ return view.extend({
             return Promise.resolve();
         };
         o.render = function() {
-            return fs.exec('/bin/ps', ['-w']).then(function(res) {
-                if (res.code === 0 && res.stdout.match(/cloud-clipboard/))
+            return rpc.delegated('luci.cloud-clipboard', 'status').then(function(result) {
+                if (result && result.result === "running")
                     return E('span', { 'class': 'label success' }, [ _('运行中') ]);
                 else
                     return E('span', { 'class': 'label danger' }, [ _('未运行') ]);
+            }).catch(function() {
+                return E('span', { 'class': 'label danger' }, [ _('状态未知') ]);
             });
         };
         
