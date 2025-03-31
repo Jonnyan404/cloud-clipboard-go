@@ -1,0 +1,46 @@
+name: Build LuCI IPK
+
+on:
+    workflow_dispatch: # 允许手动触发
+      inputs:
+        version:
+            description: '版本号 (不含v前缀)'
+            required: true
+            default: '1.0.0'
+
+jobs:
+  build-luci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Get Version
+        run: |
+          # 如果上一级工作流输出没有传递版本号，则从输入获取版本号
+          if [ -z "${{ github.event.inputs.version }}" ]; then
+            echo "未指定版本号，请在输入version变量"
+            exit 1
+          fi
+          VERSION="${{ github.event.inputs.version }}"
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+      
+      - name: Create directory structure and set permissions
+        run: |
+          mkdir -p openwrt/ipk/build
+          # 设置权限，递归为所有.sh文件增加可执行权限
+          find openwrt/luci-app-cloud-clipboard -type f -name "*.sh" -exec chmod +x {} \;
+          chmod +x openwrt/luci-app-cloud-clipboard/root/etc/uci-defaults/luci-app-cloud-clipboard || true
+          chmod +x openwrt/luci-app-cloud-clipboard/root/usr/libexec/rpcd/luci.cloud-clipboard || true
+      
+      - name: Package LuCI App
+        run: |
+          chmod +x openwrt/ipk/scripts/package-luci-app.sh
+          ./openwrt/ipk/scripts/package-luci-app.sh ${{ env.VERSION }}
+      
+      - name: Upload LuCI IPK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: luci-app-cloud-clipboard_${{ env.VERSION }}_all.ipk
+          path: openwrt/ipk/build/luci-app-cloud-clipboard_${{ env.VERSION }}_all.ipk
