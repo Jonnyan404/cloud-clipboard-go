@@ -23,9 +23,21 @@ return view.extend({
     
     render: function(data) {
         const [configData, serviceData] = data;
-        const configSection = Object.keys(configData.sections)[0];
-        const enabled = configData.sections[configSection].enabled === '1';
-        const serviceInfo = serviceData['cloud-clipboard']?.instances?.instance || {};
+        
+        // 安全地获取配置节
+        let configSection = 'main';
+        let enabled = false;
+        
+        if (configData && configData.sections) {
+            const sections = Object.keys(configData.sections);
+            if (sections.length > 0) {
+                configSection = sections[0];
+                enabled = configData.sections[configSection].enabled === '1';
+            }
+        }
+        
+        // 安全地获取服务状态
+        const serviceInfo = serviceData && serviceData['cloud-clipboard']?.instances?.instance || {};
         const isRunning = serviceInfo.running === true;
 
         const m = new form.Map('cloud-clipboard', _('Cloud Clipboard'), 
@@ -88,7 +100,7 @@ return view.extend({
             ]);
         };
 
-        // 服务控制按钮
+        // 服务控制按钮 - 保留使用 rpc.call
         o = statusSection.option(form.Button, '_control', _('服务操作'));
         o.inputtitle = function() {
             return enabled ? (isRunning ? _('重启服务') : _('启动服务')) : _('强制操作');
@@ -126,11 +138,15 @@ return view.extend({
 
         o = accessSection.option(form.DummyValue, '_access', _('控制面板'));
         o.cfgvalue = function() {
-            const host = uci.get('cloud-clipboard', configSection, 'host') || window.location.hostname;
+            // 安全地获取配置值，提供默认值
+            const host = uci.get('cloud-clipboard', configSection, 'host') || '0.0.0.0';
             const port = uci.get('cloud-clipboard', configSection, 'port') || '9501';
             const auth = uci.get('cloud-clipboard', configSection, 'auth') || '';
             
-            const url = `http://${host}:${port}${auth ? `#auth=${auth}` : ''}`;
+            // 将0.0.0.0替换为当前主机名
+            const displayHost = host === '0.0.0.0' ? window.location.hostname : host;
+            
+            const url = `http://${displayHost}:${port}${auth ? `#auth=${auth}` : ''}`;
             
             return E('a', {
                 'href': url,
