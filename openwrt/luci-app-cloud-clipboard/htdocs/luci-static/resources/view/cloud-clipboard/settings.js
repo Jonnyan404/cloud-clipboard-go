@@ -6,7 +6,6 @@
 'require ui';
 'require tools.widgets as widgets';
 'require rpc';
-'require ubus'; 
 
 return view.extend({
     load: function() {
@@ -78,16 +77,13 @@ return view.extend({
 
     handleSaveApply: function() {
         ui.addNotification(null, E('p', _('正在应用设置...')));
-
         return this.m.save()
             .then(function() {
                 return uci.apply();
             })
+            // 使用 fs.exec 代替 ubus 调用进行服务重启
             .then(function() {
-                return ubus.call('service', 'list', { name: 'cloud-clipboard' });
-            })
-            .then(function() {
-                return ubus.call('service', 'restart', { name: 'cloud-clipboard' });
+                return fs.exec('/etc/init.d/cloud-clipboard', ['restart']);
             })
             .then(function() {
                 ui.addNotification(null, E('p', _('设置已应用，服务已重启')));
@@ -96,7 +92,7 @@ return view.extend({
                 }, 1000);
             })
             .catch(function(error) {
-                console.error('应用设置失败:', error); // 添加错误日志
+                console.error('应用设置失败:', error);
                 ui.addNotification(null, E('p', _('错误: ') + error));
             });
     },
