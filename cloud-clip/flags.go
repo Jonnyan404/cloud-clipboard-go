@@ -14,6 +14,7 @@ var (
 	flg_version = flag.Bool("v", false, "显示版本信息并退出")
 	flg_host    = flag.String("host", "", "指定监听主机地址，如果设置则覆盖配置文件")
 	flg_port    = flag.Int("port", 0, "指定监听端口，如果设置则覆盖配置文件")
+	flg_auth    = flag.String("auth", "", "指定访问密码,如果设置则覆盖配置文件")
 	flg_help    = flag.Bool("h", false, "显示帮助信息")
 )
 
@@ -91,5 +92,9 @@ func applyCommandLineArgs() {
 	if *flg_port > 0 {
 		fmt.Printf("使用命令行指定的端口: %d\n", *flg_port)
 		config.Server.Port = *flg_port
+	}
+	if *flg_auth != "" {
+		fmt.Printf("使用命令行指定的访问密码: %s\n", *flg_auth)
+		config.Server.Auth = *flg_auth
 	}
 }
