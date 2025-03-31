@@ -24,7 +24,7 @@ jobs:
     strategy:
       matrix:
         # arch: [aarch64]
-        arch: [amd64, i386, arm-7, aarch64, mips, mipsel]
+        arch: [x86_64, i386, arm_cortex-a5, arm_cortex-a7, arm_cortex-a8, arm_cortex-a9, arm_cortex-a15_neon-vfpv4, aarch64, mips_24kc, mipsel_24kc]
 
     steps:
       - name: Checkout code

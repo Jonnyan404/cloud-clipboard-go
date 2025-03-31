@@ -77,12 +77,16 @@ build() {
 }
 
 # 构建各种架构
-build linux arm64 "" "" "aarch64"
-build linux amd64 "" "" "amd64"
+build linux amd64 "" "" "x86_64"
 build linux 386 "" "" "i386"
-build linux arm "7" "" "arm-7"
-build linux mips "" "softfloat" "mips"
-build linux mipsle "" "softfloat" "mipsel"
+build linux arm "7" "" "arm_cortex-a5"
+build linux arm "7" "" "arm_cortex-a7"
+build linux arm "7" "" "arm_cortex-a8"
+build linux arm "7" "" "arm_cortex-a9"
+build linux arm "7" "" "arm_cortex-a15_neon-vfpv4"  # 新增这一行
+build linux arm64 "" "" "aarch64"
+build linux mips "" "softfloat" "mips_24kc"
+build linux mipsle "" "softfloat" "mipsel_24kc"
 
 # 返回原目录
 cd ..

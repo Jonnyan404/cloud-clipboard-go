@@ -119,6 +119,7 @@ start_service() {
 service_triggers() {
     procd_add_reload_trigger "cloud-clipboard"
 }
+
 EOF
     chmod 755 "$PKG_DIR/etc/init.d/cloud-clipboard"
     echo "✓ 已创建默认初始化脚本"
@@ -135,6 +136,7 @@ config cloud-clipboard 'main'
     option host '0.0.0.0'
     option port '9501'
     option auth ''
+
 EOF
     echo "✓ 已创建默认配置文件"
 fi
@@ -157,6 +159,7 @@ Section: net
 Architecture: $ARCH
 Maintainer: jonnyan404
 Description: Cloud clipboard application for transferring text and files between devices
+
 EOF
     echo "✓ 已创建默认控制文件"
 fi
@@ -171,6 +174,7 @@ else
 #!/bin/sh
 /etc/init.d/cloud-clipboard enable
 exit 0
+
 EOF
     chmod 755 "$PKG_DIR/CONTROL/postinst"
     echo "✓ 已创建默认postinst脚本"
@@ -187,6 +191,7 @@ else
 /etc/init.d/cloud-clipboard disable
 /etc/init.d/cloud-clipboard stop
 exit 0
+
 EOF
     chmod 755 "$PKG_DIR/CONTROL/prerm"
     echo "✓ 已创建默认prerm脚本"
