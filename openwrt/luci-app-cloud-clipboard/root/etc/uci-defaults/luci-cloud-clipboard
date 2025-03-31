@@ -1,0 +1,11 @@
+#!/bin/sh
+
+uci -q batch <<-EOF >/dev/null
+    delete ucitrack.@cloud-clipboard[-1]
+    add ucitrack cloud-clipboard
+    set ucitrack.@cloud-clipboard[-1].init=cloud-clipboard
+    commit ucitrack
+EOF
+
+rm -f /tmp/luci-indexcache
+exit 0

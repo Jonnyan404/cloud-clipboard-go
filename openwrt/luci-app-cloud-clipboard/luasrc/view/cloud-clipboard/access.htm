@@ -1,0 +1,13 @@
+<%+cbi/valueheader%>
+<%-
+local val = self.map:get(section, "host") or "0.0.0.0"
+if val == "0.0.0.0" then val = luci.http.getenv("SERVER_NAME") or val end
+local port = self.map:get(section, "port") or "9501"
+local auth = self.map:get(section, "auth") or ""
+local url = string.format("http://%s:%s", val, port)
+if auth ~= "" then
+    url = url .. "#auth=" .. auth
+end
+-%>
+<a href="<%=url%>" target="_blank" class="cbi-button cbi-button-action"><%:打开 Cloud Clipboard%></a>
+<%+cbi/valuefooter%>
