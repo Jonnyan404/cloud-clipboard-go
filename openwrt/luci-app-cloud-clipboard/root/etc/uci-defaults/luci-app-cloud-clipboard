@@ -11,7 +11,7 @@ EOF
 if [ ! -f /etc/config/cloud-clipboard ]; then
     cat > /etc/config/cloud-clipboard <<-EOF
 config cloud-clipboard 'main'
-    option enabled '0'
+    option enabled '1'
     option host '0.0.0.0'
     option port '9501'
     option auth ''
