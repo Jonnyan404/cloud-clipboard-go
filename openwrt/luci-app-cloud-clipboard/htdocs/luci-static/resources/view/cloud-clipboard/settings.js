@@ -39,14 +39,20 @@ return view.extend({
         s.anonymous = true;
 
         o = s.option(form.DummyValue, 'status', _('运行状态'));
+        o.rawhtml = true;  // 添加此行，确保 HTML 内容正确显示
+        o.load = function() {  // 添加 load 方法，确保值被正确加载
+            return Promise.resolve();
+        };
         o.render = function() {
-            return fs.exec('/etc/init.d/cloud-clipboard', ['status'])
+            return fs.exec('/bin/sh', ['-c', '/etc/init.d/cloud-clipboard status'])  // 使用 sh -c 调用，与按钮调用保持一致
                 .then(function(res) {
-                    var running = res.stdout.indexOf('running') > -1;
+                    var running = res.stdout && res.stdout.indexOf('running') > -1;
+                    console.log('Service status check result:', res);  // 添加调试日志
                     return E('span', { 'class': running ? 'label success' : 'label danger' },
                            [ _(running ? '运行中' : '未运行') ]);
                 })
-                .catch(function() {
+                .catch(function(error) {
+                    console.error('Service status check error:', error);  // 添加错误日志
                     return E('span', { 'class': 'label danger' }, [ _('状态未知') ]);
                 });
         };
