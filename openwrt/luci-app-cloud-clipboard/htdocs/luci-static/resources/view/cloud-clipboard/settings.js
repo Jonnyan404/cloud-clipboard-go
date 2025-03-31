@@ -66,6 +66,24 @@ return view.extend({
             });
         };
 
+        // 在表单保存和应用时执行
+        m.on('save', function() {
+            ui.addNotification(null, E('p', _('设置已保存')));
+            return true;
+        });
+
+        m.on('apply', function() {
+            ui.addNotification(null, E('p', _('正在应用设置...')));
+            return fs.exec('/etc/init.d/cloud-clipboard', ['restart']).then(function() {
+                ui.addNotification(null, E('p', _('设置已应用，服务已重启')));
+                window.setTimeout(function() {
+                    location.reload();
+                }, 1000);
+            }).catch(function(error) {
+                ui.addNotification(null, E('p', _('错误: ') + error));
+            });
+        });
+
         return m.render();
     }
 });

@@ -27,14 +27,10 @@ start_service() {
     procd_set_param command $PROG -host $host -port $port
     [ -n "$auth" ] && procd_append_param command -config /etc/cloud-clipboard/config.json
     
-    # 重定向输出到日志文件
     procd_set_param stdout 1
     procd_set_param stderr 1
     procd_set_param file "$LOG_FILE"
     procd_set_param respawn
-    
-    # 限制日志大小
-    procd_set_param limits nofile="1000 1000"
     
     procd_close_instance
     
@@ -43,10 +39,4 @@ start_service() {
 
 service_triggers() {
     procd_add_reload_trigger "cloud-clipboard"
-}
-
-reload_service() {
-    stop
-    start
-    echo "$(date): Cloud Clipboard reloaded" >> "$LOG_FILE"
 }
