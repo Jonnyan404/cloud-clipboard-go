@@ -23,8 +23,8 @@ jobs:
       version: ${{ steps.get_version.outputs.VERSION }}
     strategy:
       matrix:
-        arch: [aarch64]
-        # arch: [amd64, i386, arm-7, aarch64, mips, mipsel]
+        # arch: [aarch64]
+        arch: [amd64, i386, arm-7, aarch64, mips, mipsel]
 
     steps:
       - name: Checkout code
