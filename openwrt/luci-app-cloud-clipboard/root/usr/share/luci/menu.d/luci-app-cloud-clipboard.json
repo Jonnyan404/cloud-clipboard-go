@@ -1,0 +1,25 @@
+{
+    "admin/services/cloud-clipboard": {
+        "title": "Cloud Clipboard",
+        "order": 100,
+        "action": {
+            "type": "firstchild"
+        }
+    },
+    "admin/services/cloud-clipboard/settings": {
+        "title": "Settings",
+        "order": 10,
+        "action": {
+            "type": "view",
+            "path": "cloud-clipboard/settings"
+        }
+    },
+    "admin/services/cloud-clipboard/log": {
+        "title": "Log",
+        "order": 20,
+        "action": {
+            "type": "view",
+            "path": "cloud-clipboard/log"
+        }
+    }
+}
