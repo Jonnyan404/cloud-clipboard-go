@@ -74,7 +74,7 @@ return view.extend({
             });
         };
 
-        // 服务控制按钮
+        // 服务控制按钮（修复重点）
         o = s.option(form.Button, '_control', _('服务操作'));
         o.inputtitle = _('重启服务');
         o.inputstyle = 'apply';
@@ -84,7 +84,8 @@ return view.extend({
                     const running = res['cloud-clipboard']?.instances?.instance?.running;
                     const action = running ? 'restart' : 'start';
                     
-                    return rpc.call('service', action', { name: 'cloud-clipboard' });
+                    // 修复点：移除多余的单引号
+                    return rpc.call('service', action, { name: 'cloud-clipboard' });
                 })
                 .then(function(res) {
                     if (res.code !== 0) throw new Error(res.stderr || '操作失败');
