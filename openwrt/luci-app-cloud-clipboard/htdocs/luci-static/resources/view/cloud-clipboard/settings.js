@@ -78,10 +78,10 @@ return view.extend({
     handleSaveApply: function() {
         ui.addNotification(null, E('p', _('正在应用设置...')));
         return this.m.save()
+            // 直接提交配置而不是调用 uci.apply
             .then(function() {
-                return uci.apply();
+                return uci.commit('cloud-clipboard');
             })
-            // 使用 fs.exec 代替 ubus 调用进行服务重启
             .then(function() {
                 return fs.exec('/etc/init.d/cloud-clipboard', ['restart']);
             })
