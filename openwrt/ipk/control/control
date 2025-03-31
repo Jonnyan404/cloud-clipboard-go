@@ -1,0 +1,9 @@
+Package: cloud-clipboard
+Version: {{VERSION}}
+Depends: libc
+Source: https://github.com/jonnyan404/cloud-clipboard-go
+License: MIT
+Section: net
+Architecture: {{ARCH}}
+Maintainer: jonnyan404
+Description: Cloud clipboard application for transferring text and files between devices

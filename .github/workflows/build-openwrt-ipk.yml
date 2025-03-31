@@ -1,0 +1,120 @@
+name: Build OpenWrt IPK
+
+on:
+  push:
+    tags:
+      - 'v*' # 当创建版本标签时触发
+    # branches:
+    #   - main # 也可以在推送到main分支时触发
+  workflow_dispatch: # 允许手动触发
+    inputs:
+      version:
+        description: '版本号 (不含v前缀)'
+        required: true
+        default: '1.0.0'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [amd64, i386, arm-7, aarch64, mips, mipsel]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.22'
+
+      - name: Get version info
+        id: get_version
+        run: |
+          if [[ $GITHUB_REF == refs/tags/v* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+          elif [[ "${{ github.event.inputs.version }}" != "" ]]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION=$(grep 'server_version =' cloud-clip/main.go | head -1 | cut -d '"' -f 2)
+            GIT_HASH=$(git rev-parse --short HEAD)
+            VERSION="${VERSION}-${GIT_HASH}"
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create directory structure
+        run: |
+          mkdir -p openwrt/ipk/build
+
+      - name: Build binary
+        run: |
+          chmod +x openwrt/ipk/scripts/build.sh
+          ./openwrt/ipk/scripts/build.sh ${{ env.VERSION }}
+
+      - name: Package IPK
+        run: |
+          chmod +x openwrt/ipk/scripts/package-openwrt.sh
+          ./openwrt/ipk/scripts/package-openwrt.sh ${{ env.VERSION }} ${{ matrix.arch }}
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: cloud-clipboard-${{ env.VERSION }}-${{ matrix.arch }}
+          path: openwrt/ipk/build/cloud-clipboard-${{ env.VERSION }}-${{ matrix.arch }}
+
+      - name: Upload IPK artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: cloud-clipboard_${{ env.VERSION }}_${{ matrix.arch }}.ipk
+          path: openwrt/ipk/build/cloud-clipboard_${{ env.VERSION }}_${{ matrix.arch }}.ipk
+
+  build-luci:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Create directory structure
+        run: |
+          mkdir -p openwrt/ipk/build/luci-app
+      
+      - name: Package LuCI App
+        run: |
+          chmod +x openwrt/ipk/scripts/package-luci-app.sh
+          ./openwrt/ipk/scripts/package-luci-app.sh ${{ needs.build.outputs.version }}
+      
+      - name: Upload LuCI IPK artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: luci-app-cloud-clipboard_${{ needs.build.outputs.version }}_all.ipk
+          path: openwrt/ipk/build/luci-app-cloud-clipboard_${{ needs.build.outputs.version }}_all.ipk
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: artifacts
+
+      - name: Display structure of downloaded files
+        run: ls -R artifacts
+
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: artifacts/**/*
+          draft: false
+          prerelease: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v{0}', github.event.inputs.version) }}
+          name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v{0}', github.event.inputs.version) }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
