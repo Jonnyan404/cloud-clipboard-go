@@ -24,6 +24,10 @@ mkdir -p "$PKG_DIR/usr/lib/lua/luci/controller"
 mkdir -p "$PKG_DIR/usr/lib/lua/luci/model/cbi"
 mkdir -p "$PKG_DIR/usr/lib/lua/luci/view/cloud-clipboard"
 mkdir -p "$PKG_DIR/CONTROL"
+mkdir -p "$PKG_DIR/usr/share/luci/menu.d"
+mkdir -p "$PKG_DIR/usr/share/rpcd/acl.d"
+mkdir -p "$PKG_DIR/www/luci-static/resources/view/cloud-clipboard"
+mkdir -p "$PKG_DIR/usr/libexec/rpcd/luci"
 
 # 复制文件
 echo "复制文件..."
@@ -31,6 +35,115 @@ cp "$LUCI_DIR/luasrc/controller/cloud-clipboard.lua" "$PKG_DIR/usr/lib/lua/luci/
 cp "$LUCI_DIR/luasrc/model/cbi/cloud-clipboard.lua" "$PKG_DIR/usr/lib/lua/luci/model/cbi/"
 cp "$LUCI_DIR/luasrc/view/cloud-clipboard/status.htm" "$PKG_DIR/usr/lib/lua/luci/view/cloud-clipboard/"
 cp "$LUCI_DIR/luasrc/view/cloud-clipboard/log.htm" "$PKG_DIR/usr/lib/lua/luci/view/cloud-clipboard/"
+
+# 添加新的菜单描述文件
+cat > "$PKG_DIR/usr/share/luci/menu.d/luci-app-cloud-clipboard.json" << EOF
+{
+    "admin/services/cloud-clipboard": {
+        "title": "Cloud Clipboard",
+        "order": 100,
+        "action": {
+            "type": "alias",
+            "path": "admin/services/cloud-clipboard/settings"
+        }
+    },
+    "admin/services/cloud-clipboard/settings": {
+        "title": "Settings",
+        "order": 10,
+        "action": {
+            "type": "view",
+            "path": "cloud-clipboard/settings"
+        }
+    }
+}
+
+EOF
+
+# 添加 ACL 文件
+cat > "$PKG_DIR/usr/share/rpcd/acl.d/luci-app-cloud-clipboard.json" << EOF
+{
+    "luci-app-cloud-clipboard": {
+        "description": "Grant access to cloud-clipboard settings",
+        "read": {
+            "file": {
+                "/var/log/cloud-clipboard.log": [ "read" ]
+            },
+            "uci": [ "cloud-clipboard" ],
+            "ubus": {
+                "service": [ "list" ]
+            }
+        },
+        "write": {
+            "uci": [ "cloud-clipboard" ]
+        }
+    }
+}
+
+EOF
+
+# 添加 RPCD 脚本
+cat > "$PKG_DIR/usr/libexec/rpcd/luci/cloud-clipboard" << 'EOF'
+#!/bin/sh
+case "$1" in
+    list)
+        echo '{"status":{"description":"Get cloud-clipboard service status"}}'
+    ;;
+    call)
+        case "$2" in
+            status)
+                echo '{"status":'
+                if pgrep -f cloud-clipboard >/dev/null; then
+                    echo '"running"}'
+                else
+                    echo '"stopped"}'
+                fi
+            ;;
+        esac
+    ;;
+esac
+EOF
+
+chmod +x "$PKG_DIR/usr/libexec/rpcd/luci/cloud-clipboard"
+
+# 添加设置页面脚本
+cat > "$PKG_DIR/www/luci-static/resources/view/cloud-clipboard/settings.js" << 'EOF'
+'use strict';
+'require view';
+'require form';
+'require uci';
+'require fs';
+
+return view.extend({
+    render: function() {
+        var m, s, o;
+
+        m = new form.Map('cloud-clipboard', _('Cloud Clipboard'), _('Cloud Clipboard是一个文本和文件传输工具，可在多个设备之间共享剪贴板内容。'));
+
+        s = m.section(form.TypedSection, 'cloud-clipboard', _('基本设置'));
+        s.anonymous = true;
+
+        o = s.option(form.Flag, 'enabled', _('启用'));
+        o.rmempty = false;
+
+        o = s.option(form.Value, 'host', _('监听地址'));
+        o.datatype = 'ip4addr';
+        o.default = '0.0.0.0';
+        o.rmempty = false;
+
+        o = s.option(form.Value, 'port', _('监听端口'));
+        o.datatype = 'port';
+        o.default = '9501';
+        o.rmempty = false;
+
+        o = s.option(form.Value, 'auth', _('访问密码'));
+        o.password = true;
+        o.rmempty = true;
+        o.description = _('如果设置，访问时需要输入此密码。留空表示不需要密码。');
+
+        return m.render();
+    }
+});
+EOF
 
 # 创建控制文件
 echo "准备控制文件..."
