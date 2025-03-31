@@ -40,9 +40,21 @@ if [ -d "client" ]; then
         cd ..
     else
         echo "! 警告: 未找到Node.js，跳过前端构建"
+        # 检查是否有预构建的静态文件
+        if [ ! -d "cloud-clip/static" ] || [ -z "$(ls -A cloud-clip/static 2>/dev/null)" ]; then
+            echo "! 错误: 静态文件不存在且无法构建前端"
+            echo "! 请先在本地构建前端文件并复制到 cloud-clip/static 目录"
+            exit 1
+        fi
     fi
 else
-    echo "! 未找到前端代码目录，跳过前端构建"
+    echo "! 未找到前端代码目录，检查是否已有静态文件"
+    # 检查是否有预构建的静态文件
+    if [ ! -d "cloud-clip/static" ] || [ -z "$(ls -A cloud-clip/static 2>/dev/null)" ]; then
+        echo "! 错误: 找不到静态文件目录 cloud-clip/static"
+        echo "! 请先创建该目录并添加静态文件"
+        exit 1
+    fi
 fi
 
 # 进入Go项目目录
@@ -56,6 +68,14 @@ if [ ! -f "go.mod" ]; then
     echo "Go模块初始化完成"
 fi
 
+# 在编译前检查是否有static目录
+if [ ! -d "static" ]; then
+    echo "错误: 找不到static目录，无法嵌入静态文件"
+    exit 1
+fi
+
+echo "✓ 已找到静态文件目录，将嵌入到二进制文件中"
+
 # 编译函数
 build() {
     local GOOS=$1
@@ -63,7 +83,7 @@ build() {
     local ARM=$3
     local MIPS=$4
     local ARCH_NAME=$5
-    local OUTPUT="../$OUTPUT_DIR/cloud-clipboard-$VERSION-$ARCH_NAME"  # 注意添加了../
+    local OUTPUT="../$OUTPUT_DIR/cloud-clipboard-$VERSION-$ARCH_NAME"
     
     echo "构建 $ARCH_NAME 架构..."
     
@@ -71,7 +91,8 @@ build() {
     [ -n "$ARM" ] && BUILD_CMD="$BUILD_CMD GOARM=$ARM"
     [ -n "$MIPS" ] && BUILD_CMD="$BUILD_CMD GOMIPS=$MIPS"
     
-    eval "$BUILD_CMD go build -ldflags=\"-s -w -X main.server_version=$VERSION\" -o \"$OUTPUT\" ."
+    # 添加 -tags=embed 参数和 -X main.useEmbedded=true 标记
+    eval "$BUILD_CMD go build -trimpath -tags=embed -ldflags=\"-s -w -X main.server_version=$VERSION -X main.useEmbedded=true\" -o \"$OUTPUT\" ."
     
     echo "✓ 完成: $OUTPUT"
 }
@@ -83,7 +104,7 @@ build linux arm "7" "" "arm_cortex-a5"
 build linux arm "7" "" "arm_cortex-a7"
 build linux arm "7" "" "arm_cortex-a8"
 build linux arm "7" "" "arm_cortex-a9"
-build linux arm "7" "" "arm_cortex-a15_neon-vfpv4"  # 新增这一行
+build linux arm "7" "" "arm_cortex-a15_neon-vfpv4"
 build linux arm64 "" "" "aarch64"
 build linux mips "" "softfloat" "mips_24kc"
 build linux mipsle "" "softfloat" "mipsel_24kc"

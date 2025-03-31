@@ -9,7 +9,7 @@ ARCH=$2
 
 if [ -z "$VERSION" ] || [ -z "$ARCH" ]; then
     echo "用法: $0 <版本号> <架构>"
-    echo "支持的架构: amd64, i386, arm-7, aarch64, mips, mipsel"
+    echo "支持的架构: x86_64, i386, arm_cortex-a7, arm_cortex-a15_neon-vfpv4, aarch64, mips_24kc, mipsel_24kc"
     exit 1
 fi
 
@@ -43,29 +43,12 @@ rm -rf "$PKG_DIR"
 mkdir -p "$PKG_DIR/usr/bin"
 mkdir -p "$PKG_DIR/etc/init.d"
 mkdir -p "$PKG_DIR/etc/config"
-mkdir -p "$PKG_DIR/usr/share/cloud-clipboard/static"
 mkdir -p "$PKG_DIR/CONTROL"
 
 # 复制文件
 echo "复制文件..."
 cp "$BINARY" "$PKG_DIR/usr/bin/cloud-clipboard"
 chmod 755 "$PKG_DIR/usr/bin/cloud-clipboard"
-
-# 复制静态文件
-echo "正在查找静态文件..."
-if [ -d "$ROOT_DIR/cloud-clip/static" ]; then
-    echo "✓ 找到静态文件目录: $ROOT_DIR/cloud-clip/static"
-    cp -r "$ROOT_DIR/cloud-clip/static/"* "$PKG_DIR/usr/share/cloud-clipboard/static/"
-    echo "✓ 静态文件已复制到IPK包"
-elif [ -d "$ROOT_DIR/client/dist" ]; then
-    echo "✓ 找到客户端构建目录: $ROOT_DIR/client/dist"
-    cp -r "$ROOT_DIR/client/dist/"* "$PKG_DIR/usr/share/cloud-clipboard/static/"
-    echo "✓ 静态文件已复制到IPK包"
-else
-    echo "! 警告: 找不到静态文件，创建占位符文件"
-    echo '<html><body><h1>Cloud Clipboard</h1><p>Web界面未构建。请参考项目文档进行构建。</p></body></html>' > "$PKG_DIR/usr/share/cloud-clipboard/static/index.html"
-    echo "✓ 创建了占位符静态文件"
-fi
 
 # 复制脚本和配置
 echo "复制脚本和配置文件..."
