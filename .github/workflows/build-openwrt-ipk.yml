@@ -1,9 +1,9 @@
 name: Build OpenWrt IPK
 
 on:
-  push:
-    tags:
-      - 'v*' # 当创建版本标签时触发
+#   push:
+#     tags:
+#       - 'v*' # 当创建版本标签时触发
     # branches:
     #   - main # 也可以在推送到main分支时触发
   workflow_dispatch: # 允许手动触发
