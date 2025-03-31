@@ -16,6 +16,35 @@ mkdir -p "$OUTPUT_DIR"
 
 echo "=== 构建 Cloud Clipboard 版本: $VERSION ==="
 
+# 构建前端文件
+echo "检查前端代码..."
+if [ -d "client" ]; then
+    echo "找到前端代码目录，准备构建..."
+    
+    # 检查Node.js是否可用
+    if command -v node &> /dev/null && command -v npm &> /dev/null; then
+        echo "Node.js已安装，开始构建前端代码..."
+        
+        # 构建前端
+        cd client
+        npm install
+        npm run build
+        
+        # 创建static目录并复制前端文件
+        mkdir -p "../cloud-clip/static"
+        cp -r dist/* "../cloud-clip/static/"
+        
+        echo "✓ 前端文件构建完成并复制到 cloud-clip/static"
+        
+        # 返回项目根目录
+        cd ..
+    else
+        echo "! 警告: 未找到Node.js，跳过前端构建"
+    fi
+else
+    echo "! 未找到前端代码目录，跳过前端构建"
+fi
+
 # 进入Go项目目录
 cd cloud-clip
 
