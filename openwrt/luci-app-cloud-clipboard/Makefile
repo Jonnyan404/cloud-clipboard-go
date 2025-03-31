@@ -8,7 +8,7 @@ PKG_MAINTAINER:=jonnyan404
 PKG_LICENSE:=MIT
 
 LUCI_TITLE:=LuCI support for Cloud Clipboard
-LUCI_DEPENDS:=+luci-base +cloud-clipboard
+LUCI_DEPENDS:=+luci-base +cloud-clipboard +rpcd
 LUCI_PKGARCH:=all
 
 include $(TOPDIR)/feeds/luci/luci.mk
