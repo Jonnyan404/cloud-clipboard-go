@@ -4,6 +4,7 @@
 'require uci';
 'require fs';
 'require ui';
+'require sys';  // 添加系统调用模块
 
 return view.extend({
     load: function() {
@@ -38,33 +39,26 @@ return view.extend({
         s = m.section(form.TypedSection, 'cloud-clipboard', _('服务状态'));
         s.anonymous = true;
 
-        // 修改运行状态检测
+        // 修改运行状态检测，使用 sys.call 代替 fs.exec
         o = s.option(form.DummyValue, '_status', _('运行状态'));
         o.rawhtml = true;  // 确保HTML内容能正确渲染
         o.cfgvalue = function() {
-            return fs.exec('/usr/bin/pgrep', ['-f', 'cloud-clipboard'])
-                .then(function(res) {
-                    // 如果 pgpereg 成功执行且 stdout 非空，则认为服务在运行
-                    var running = res.stdout.trim() !== '';
-                    return fs.exec('/etc/init.d/cloud-clipboard', ['enabled'])
-                        .then(function(res2) {
-                            var enabled = res2.code === 0;
-                            return E('div', [
-                                E('span', { 'class': running ? 'label success' : 'label danger' },
-                                  [ _(running ? '运行中' : '未运行') ]),
-                                ' ',
-                                E('span', { 'class': enabled ? 'label notice' : 'label warning' },
-                                  [ _(enabled ? '已启用' : '已禁用') ])
-                            ]);
-                        });
-                })
-                .catch(function(err) {
-                    console.error('Status check error:', err);
-                    return E('span', { 'class': 'label danger' }, [ _('获取状态失败') ]);
-                });
+            // 使用 sys.call 检查进程是否运行
+            var running = sys.call("pgrep -f 'cloud-clipboard' >/dev/null") === 0;
+            
+            // 使用 sys.call 检查服务是否启用
+            var enabled = sys.call("/etc/init.d/cloud-clipboard enabled") === 0;
+            
+            return E('div', [
+                E('span', { 'class': running ? 'label success' : 'label danger' },
+                  [ _(running ? '运行中' : '未运行') ]),
+                ' ',
+                E('span', { 'class': enabled ? 'label notice' : 'label warning' },
+                  [ _(enabled ? '已启用' : '已禁用') ])
+            ]);
         };
 
-        // 添加服务控制按钮组
+        // 添加服务控制按钮组，使用 sys.call 代替 fs.exec
         o = s.option(form.DummyValue, '_buttons', _('服务控制'));
         o.rawhtml = true;
         o.cfgvalue = function() {
@@ -72,22 +66,45 @@ return view.extend({
                 E('button', {
                     'class': 'btn cbi-button cbi-button-apply',
                     'click': ui.createHandlerFn(this, function() {
-                        return fs.exec('/etc/init.d/cloud-clipboard', ['restart']).then(function() {
-                            ui.addNotification(null, E('p', _('已重启服务')));
-                            window.setTimeout(function() { location.reload() }, 1000);
-                        });
+                        sys.call("/etc/init.d/cloud-clipboard restart");
+                        ui.addNotification(null, E('p', _('已重启服务')));
+                        window.setTimeout(function() { location.reload() }, 1000);
                     })
                 }, [ _('重启') ]),
                 ' ',
                 E('button', {
                     'class': 'btn cbi-button cbi-button-remove',
                     'click': ui.createHandlerFn(this, function() {
-                        return fs.exec('/etc/init.d/cloud-clipboard', ['stop']).then(function() {
-                            ui.addNotification(null, E('p', _('已停止服务')));
-                            window.setTimeout(function() { location.reload() }, 1000);
-                        });
+                        sys.call("/etc/init.d/cloud-clipboard stop");
+                        ui.addNotification(null, E('p', _('已停止服务')));
+                        window.setTimeout(function() { location.reload() }, 1000);
                     })
                 }, [ _('停止') ])
+            ]);
+        };
+        
+        // 添加服务快速访问链接
+        s = m.section(form.TypedSection, 'cloud-clipboard', _('服务访问'));
+        s.anonymous = true;
+        
+        o = s.option(form.DummyValue, '_access', _('Web界面'));
+        o.rawhtml = true;
+        o.cfgvalue = function() {
+            // 获取当前主机地址和端口
+            var host = uci.get('cloud-clipboard', 'main', 'host') || '0.0.0.0';
+            var port = uci.get('cloud-clipboard', 'main', 'port') || '9501';
+            
+            // 如果监听地址是0.0.0.0，使用当前访问的地址
+            if (host === '0.0.0.0') {
+                host = window.location.hostname;
+            }
+            
+            return E('div', { 'class': 'cbi-value-field' }, [
+                E('a', {
+                    'href': 'http://' + host + ':' + port,
+                    'target': '_blank',
+                    'class': 'btn cbi-button cbi-button-neutral'
+                }, [ _('打开 Cloud Clipboard') ])
             ]);
         };
 
