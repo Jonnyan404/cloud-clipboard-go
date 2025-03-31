@@ -221,6 +221,10 @@ foobar
 - https://github.com/Jonnyan404/cloud-clipboard-go-launcher
 
 
-# luci-app-cloud-clipboard-go(画饼)
+# luci-app-cloud-clipboard-go
 
 移植为openwrt项目
+
+IPK文件能用了,下载链接: https://github.com/Jonnyan404/cloud-clipboard-go/releases/tag/v1.0.9
+
+但是luci-app界面解决不了前端调用后端命令,等大佬解决或以后学习后再修复
