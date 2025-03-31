@@ -34,61 +34,56 @@ return view.extend({
         o.rmempty = true;
         o.description = _('如果设置，访问时需要输入此密码。留空表示不需要密码。');
 
-        // 添加状态节和控制按钮
-        s = m.section(form.NamedSection, '_status', 'status', _('服务状态'));
+        // 修改服务状态显示部分，使用 TypedSection 代替 NamedSection
+        s = m.section(form.TypedSection, 'cloud-clipboard', _('服务状态'));
         s.anonymous = true;
 
-        o = s.option(form.DummyValue, 'status', _('运行状态'));
-        o.rawhtml = true;  // 添加此行，确保 HTML 内容正确显示
-        o.load = function() {  // 添加 load 方法，确保值被正确加载
-            return Promise.resolve();
-        };
-        o.render = function() {
-            return fs.exec('/bin/sh', ['-c', '/etc/init.d/cloud-clipboard status'])  // 使用 sh -c 调用，与按钮调用保持一致
-                .then(function(res) {
-                    var running = res.stdout && res.stdout.indexOf('running') > -1;
-                    console.log('Service status check result:', res);  // 添加调试日志
-                    return E('span', { 'class': running ? 'label success' : 'label danger' },
-                           [ _(running ? '运行中' : '未运行') ]);
-                })
-                .catch(function(error) {
-                    console.error('Service status check error:', error);  // 添加错误日志
-                    return E('span', { 'class': 'label danger' }, [ _('状态未知') ]);
-                });
+        o = s.option(form.DummyValue, '_status', _('运行状态'));
+        o.cfgvalue = function() {
+            return Promise.all([
+                fs.exec('/bin/busybox', ['ps']),
+                fs.exec('/etc/init.d/cloud-clipboard', ['enabled'])
+            ]).then(function(res) {
+                var running = (res[0].stdout || '').indexOf('cloud-clipboard') > -1;
+                var enabled = res[1].code === 0;
+                
+                return E('div', [
+                    E('span', { 'class': running ? 'label success' : 'label danger' }, 
+                      [ _(running ? '运行中' : '未运行') ]),
+                    ' ',
+                    E('span', { 'class': enabled ? 'label notice' : 'label warning' },
+                      [ _(enabled ? '已启用' : '已禁用') ])
+                ]);
+            }).catch(function() {
+                return E('span', { 'class': 'label danger' }, [ _('获取状态失败') ]);
+            });
         };
 
-        // 添加服务控制按钮
-        o = s.option(form.Button, 'restart', _('服务控制'));
-        o.inputtitle = _('重启服务');
-        o.inputstyle = 'apply';
-        o.onclick = function() {
-            return fs.exec('/bin/sh', ['-c', '/etc/init.d/cloud-clipboard restart'])
-                .then(function() {
-                    ui.addNotification(null, E('p', _('已重启Cloud Clipboard服务')));
-                    window.setTimeout(function() {
-                        location.reload();
-                    }, 1000);
-                })
-                .catch(function(error) {
-                    ui.addNotification(null, E('p', _('重启服务失败: ') + error));
-                });
-        };
-        
-        // 添加停止服务按钮
-        o = s.option(form.Button, 'stop', _('停止服务'));
-        o.inputtitle = _('停止服务');
-        o.inputstyle = 'reset';
-        o.onclick = function() {
-            return fs.exec('/bin/sh', ['-c', '/etc/init.d/cloud-clipboard stop'])
-                .then(function() {
-                    ui.addNotification(null, E('p', _('已停止Cloud Clipboard服务')));
-                    window.setTimeout(function() {
-                        location.reload();
-                    }, 1000);
-                })
-                .catch(function(error) {
-                    ui.addNotification(null, E('p', _('停止服务失败: ') + error));
-                });
+        // 添加服务控制按钮组
+        o = s.option(form.DummyValue, '_buttons', _('服务控制'));
+        o.rawhtml = true;
+        o.cfgvalue = function() {
+            return E('div', { 'class': 'cbi-value-field' }, [
+                E('button', {
+                    'class': 'btn cbi-button cbi-button-apply',
+                    'click': ui.createHandlerFn(this, function() {
+                        return fs.exec('/etc/init.d/cloud-clipboard', ['restart']).then(function() {
+                            ui.addNotification(null, E('p', _('已重启服务')));
+                            window.setTimeout(function() { location.reload() }, 1000);
+                        });
+                    })
+                }, [ _('重启') ]),
+                ' ',
+                E('button', {
+                    'class': 'btn cbi-button cbi-button-remove',
+                    'click': ui.createHandlerFn(this, function() {
+                        return fs.exec('/etc/init.d/cloud-clipboard', ['stop']).then(function() {
+                            ui.addNotification(null, E('p', _('已停止服务')));
+                            window.setTimeout(function() { location.reload() }, 1000);
+                        });
+                    })
+                }, [ _('停止') ])
+            ]);
         };
 
         return m.render();
