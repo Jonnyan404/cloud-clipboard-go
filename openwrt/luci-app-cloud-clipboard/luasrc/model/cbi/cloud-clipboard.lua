@@ -28,39 +28,50 @@ o.description = translate("如果设置，访问时需要输入此密码。留�
 s = m:section(TypedSection, "cloud-clipboard", translate("服务控制"))
 s.anonymous = true
 
-local pid = luci.sys.exec("pgrep -f 'cloud-clipboard'")
-local status = pid ~= "" and translate("运行中") or translate("未运行")
+-- 使用更精确的命令行检测服务状态
+local running = (luci.sys.call("pgrep -f '^/usr/bin/cloud-clipboard' >/dev/null") == 0)
+local status_text = running and translate("运行中") or translate("未运行")
+local status_code = running and "running" or "stopped"  -- 用代码而非文本判断状态
 
 o = s:option(DummyValue, "_status", translate("运行状态"))
-o.value = status
+o.value = status_text
 o.rawhtml = true
 o.template = "cloud-clipboard/status"
 
+-- 启动按钮：只在停止状态显示
 o = s:option(Button, "_start", translate("启动"))
-o:depends("_status", translate("未运行"))
-o.inputtitle = translate("启动服务")
-o.inputstyle = "apply"
-o.write = function()
-    luci.sys.call("/etc/init.d/cloud-clipboard start >/dev/null")
-    luci.http.redirect(luci.dispatcher.build_url("admin", "services", "cloud-clipboard"))
+o:depends("_status", translate("未运行"))  -- 这行可能不生效
+if not running then  -- 添加额外判断，确保按钮显示
+    o.inputtitle = translate("启动服务")
+    o.inputstyle = "apply"
+    o.write = function()
+        luci.sys.call("/etc/init.d/cloud-clipboard start >/dev/null")
+        luci.http.redirect(luci.dispatcher.build_url("admin", "services", "cloud-clipboard"))
+    end
 end
 
+-- 停止按钮：只在运行状态显示
 o = s:option(Button, "_stop", translate("停止"))
-o:depends("_status", translate("运行中"))
-o.inputtitle = translate("停止服务")
-o.inputstyle = "reset"
-o.write = function()
-    luci.sys.call("/etc/init.d/cloud-clipboard stop >/dev/null") 
-    luci.http.redirect(luci.dispatcher.build_url("admin", "services", "cloud-clipboard"))
+o:depends("_status", translate("运行中"))  -- 这行可能不生效
+if running then  -- 添加额外判断，确保按钮显示
+    o.inputtitle = translate("停止服务")
+    o.inputstyle = "reset"
+    o.write = function()
+        luci.sys.call("/etc/init.d/cloud-clipboard stop >/dev/null") 
+        luci.http.redirect(luci.dispatcher.build_url("admin", "services", "cloud-clipboard"))
+    end
 end
 
+-- 重启按钮：只在运行状态显示
 o = s:option(Button, "_restart", translate("重启"))
-o:depends("_status", translate("运行中"))
-o.inputtitle = translate("重启服务")
-o.inputstyle = "reload"
-o.write = function()
-    luci.sys.call("/etc/init.d/cloud-clipboard restart >/dev/null")
-    luci.http.redirect(luci.dispatcher.build_url("admin", "services", "cloud-clipboard"))
+o:depends("_status", translate("运行中"))  -- 这行可能不生效
+if running then  -- 添加额外判断，确保按钮显示
+    o.inputtitle = translate("重启服务")
+    o.inputstyle = "reload"
+    o.write = function()
+        luci.sys.call("/etc/init.d/cloud-clipboard restart >/dev/null")
+        luci.http.redirect(luci.dispatcher.build_url("admin", "services", "cloud-clipboard"))
+    end
 end
 
 -- 访问服务
