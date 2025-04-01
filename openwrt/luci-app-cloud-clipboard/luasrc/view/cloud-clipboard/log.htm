@@ -6,28 +6,55 @@
 <%+header%>
 
 <h2 name="content"><%:Cloud Clipboard 日志%></h2>
-<div id="content_syslog">
-<textarea readonly="readonly" wrap="off" style="width:100%; height:500px; font-size:12px; font-family:monospace; white-space:pre; overflow-y:scroll;" id="syslog" rows=""></textarea>
+
+<!-- 使用pre标签代替textarea，避免可能的样式问题 -->
+<div id="content_syslog" style="background-color: #f9f9f9; border: 1px solid #e4e4e4; padding: 10px; border-radius: 4px;">
+<pre id="syslog" style="width:100%; height:500px; overflow:auto; white-space:pre-wrap; word-break:break-all; margin:0; font-size:12px; font-family:monospace;"><%:加载中...%></pre>
 </div>
 
 <script type="text/javascript">
-  const textarea = document.getElementById('syslog');
-  let refreshLogTimer;
+  var syslog = document.getElementById('syslog');
+  var refreshLogTimer;
   
   function refreshLog() {
+    // 显示加载状态
+    // syslog.textContent = '<%:加载中...%>';
+    
+    // 使用LuCI的XHR对象发送请求
     XHR.get('<%=luci.dispatcher.build_url("admin", "services", "cloud-clipboard", "getlog")%>', null,
       function(x, data) {
-        textarea.value = data;
-        textarea.scrollTop = textarea.scrollHeight;
+        if (x.status === 200) {
+          // 直接显示文本内容
+          if (typeof data === 'string' && data.length > 0) {
+            syslog.textContent = data;
+          } else {
+            syslog.textContent = '<%:日志为空%>';
+          }
+          // 滚动到底部
+          syslog.scrollTop = syslog.scrollHeight;
+          
+          // 添加调试信息
+          console.log("日志更新成功，长度:", (typeof data === 'string') ? data.length : 0);
+        } else {
+          syslog.textContent = '<%:获取日志失败%>: ' + x.status;
+          console.error("获取日志失败:", x.status);
+        }
+      },
+      function() {
+        syslog.textContent = '<%:获取日志失败，请检查网络连接%>';
+        console.error("获取日志请求失败");
       }
     );
   }
   
-  // 初始化加载日志
-  refreshLog();
-  
-  // 每5秒刷新一次
-  refreshLogTimer = setInterval(refreshLog, 5000);
+  // 页面加载完成后初始化
+  document.addEventListener('DOMContentLoaded', function() {
+    // 初始化加载日志
+    refreshLog();
+    
+    // 每5秒刷新一次
+    refreshLogTimer = setInterval(refreshLog, 5000);
+  });
   
   // 页面离开时清除定时器
   window.addEventListener('beforeunload', function() {
@@ -35,11 +62,11 @@
   });
 </script>
 
-<div style="text-align:right; margin-right:30px;">
+<div style="text-align:right; margin-right:30px; margin-top: 10px;">
   <small><%:自动刷新已启用%></small><br />
   <input class="cbi-button cbi-button-apply" type="button" value="<%:刷新%>" onclick="refreshLog()" />
   <input class="cbi-button cbi-button-remove" type="button" value="<%:清空日志%>" 
-    onclick="if(confirm('<%:确定要清空日志?%>'))XHR.get('<%=luci.dispatcher.build_url("admin", "services", "cloud-clipboard", "clearlog")%>',null,function(x,data){refreshLog();})" />
+    onclick="if(confirm('<%:确定要清空日志?%>'))XHR.get('<%=luci.dispatcher.build_url("admin", "services", "cloud-clipboard", "clearlog")%>',null,function(x,data){refreshLog();},function(){alert('<%:清空日志失败%>');})" />
 </div>
 
 <%+footer%>
