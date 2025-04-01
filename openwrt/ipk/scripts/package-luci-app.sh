@@ -54,7 +54,7 @@ echo "准备控制文件..."
 cat > "$PKG_DIR/CONTROL/control" << EOF
 Package: luci-app-cloud-clipboard
 Version: $VERSION
-Depends: luci-base, cloud-clipboard
+Depends: luci-base, cloud-clipboard, rpcd, luci-compat
 Source: https://github.com/jonnyan404/cloud-clipboard-go
 License: MIT
 Section: luci
