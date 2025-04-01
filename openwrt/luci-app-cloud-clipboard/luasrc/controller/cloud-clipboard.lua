@@ -12,10 +12,10 @@ function index()
     entry({"admin", "services", "cloud-clipboard", "status"}, call("act_status")).leaf = true
 end
 
--- 服务状态检查函数
+-- 服务状态检查函数 - 使用更精确的匹配
 function act_status()
     local e = {}
-    e.running = luci.sys.call("pgrep -f 'cloud-clipboard' >/dev/null") == 0
+    e.running = luci.sys.call("pgrep -f '^/usr/bin/cloud-clipboard' >/dev/null") == 0
     luci.http.prepare_content("application/json")
     luci.http.write_json(e)
 end
