@@ -11,7 +11,7 @@ else
 fi
 
 # 确定输出目录
-OUTPUT_DIR="openwrt/ipk/build"
+OUTPUT_DIR="openwrt/build"
 mkdir -p "$OUTPUT_DIR"
 
 echo "=== 构建 Cloud Clipboard 版本: $VERSION ==="
