@@ -84,7 +84,7 @@ brew services restart cloud-clipboard-go
 
 ### 使用 OpenWrt 运行
 
-- [x] OpenWrt24.10.0 测试通过
+- ✅ OpenWrt 24.10.0 测试通过
 
 1. 查看所属架构命令: `opkg print-architecture` (最后一行第二列就是)
 
@@ -100,11 +100,13 @@ opkg install *_all.ipk
 
 去项目 [release](https://github.com/Jonnyan404/cloud-clipboard-go/releases) 下载对应系统文件运行即可
 
-- 命令行参数: `-config` 用来加载自定义配置文件
-- 命令行参数: `-static` 用来加载自定义外部前端文件
-- 命令行参数: `-auth` 用来自定义密码
 - 命令行参数: `-host` 用来自定义服务器监听地址
 - 命令行参数: `-port` 用来自定义服务器监听端口
+- 命令行参数: `-auth` 用来自定义密码
+- 命令行参数: `-config` 用来加载自定义配置文件
+- 命令行参数: `-static` 用来加载自定义外部前端文件
+
+
 
 ### 使用源代码运行
 
@@ -141,7 +143,6 @@ go run .
 
 ## 衍生项目
 
-### cloud-clipboard-go-launcher
+- 为 cloud-clipboard-go 制作的启动器,方便不想或不会使用终端的用户,[cloud-clipboard-go-launcher](https://github.com/Jonnyan404/cloud-clipboard-go-launcher)
 
-为 cloud-clipboard-go 制作的启动器,方便不想或不会使用终端的用户
-- https://github.com/Jonnyan404/cloud-clipboard-go-launcher
+
