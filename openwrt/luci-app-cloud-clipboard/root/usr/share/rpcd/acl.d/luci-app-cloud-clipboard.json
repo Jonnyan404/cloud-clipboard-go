@@ -5,21 +5,26 @@
             "uci": ["cloud-clipboard"],
             "file": {
                 "/etc/config/cloud-clipboard": ["read"],
-                "/usr/sbin/cloud-clipboard": ["exec"],
+                "/var/log/cloud-clipboard.log": ["read"],
+                "/etc/init.d/cloud-clipboard": ["exec"],
+                "/usr/bin/cloud-clipboard": ["exec"],
                 "/bin/busybox": ["exec"],
                 "/usr/bin/pgrep": ["exec"]
             }
         },
         "write": {
             "uci": ["cloud-clipboard"],
-             "file": {
+            "file": {
                 "/etc/config/cloud-clipboard": ["write"],
-                "/usr/sbin/cloud-clipboard": ["exec"]
+                "/var/log/cloud-clipboard.log": ["write"],
+                "/etc/init.d/cloud-clipboard": ["exec"],
+                "/usr/bin/cloud-clipboard": ["exec"]
             }
         },
         "execute": {
             "file": {
-                "/usr/sbin/cloud-clipboard": ["exec"],
+                "/usr/bin/cloud-clipboard": ["exec"],
+                "/etc/init.d/cloud-clipboard": ["exec"],
                 "/bin/busybox": ["exec"],
                 "/usr/bin/pgrep": ["exec"]
             }
