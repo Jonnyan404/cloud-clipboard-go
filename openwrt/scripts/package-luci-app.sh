@@ -11,13 +11,15 @@ fi
 
 # 目录定义
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BASE_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
-ROOT_DIR="$(dirname "$BASE_DIR")"
-LUCI_DIR="$ROOT_DIR/openwrt/luci-app-cloud-clipboard"
+BASE_DIR="$(dirname "$SCRIPT_DIR")"  # 这是 openwrt 目录
+LUCI_DIR="$BASE_DIR/luci-app-cloud-clipboard"  # 直接在 openwrt 目录下
 PKG_DIR="$BASE_DIR/ipk/build/luci-app"
 IPK_NAME="luci-app-cloud-clipboard_${VERSION}_all.ipk"
 
 echo "=== 打包 LuCI 应用 $VERSION 为 OpenWrt IPK ==="
+echo "SCRIPT_DIR: $SCRIPT_DIR"
+echo "BASE_DIR: $BASE_DIR"
+echo "LUCI_DIR: $LUCI_DIR"
 
 # 检查LuCI应用目录是否存在
 if [ ! -d "$LUCI_DIR" ]; then
