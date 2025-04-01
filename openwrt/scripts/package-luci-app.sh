@@ -13,7 +13,7 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BASE_DIR="$(dirname "$SCRIPT_DIR")"  # 这是 openwrt 目录
 LUCI_DIR="$BASE_DIR/luci-app-cloud-clipboard"  # 直接在 openwrt 目录下
-PKG_DIR="$BASE_DIR/ipk/build/luci-app"
+PKG_DIR="$BASE_DIR/build/luci-app"
 IPK_NAME="luci-app-cloud-clipboard_${VERSION}_all.ipk"
 
 echo "=== 打包 LuCI 应用 $VERSION 为 OpenWrt IPK ==="
@@ -110,14 +110,14 @@ chmod 755 "$PKG_DIR/CONTROL/prerm"
 # 打包
 echo "创建IPK包..."
 cd "$PKG_DIR"
-tar -czf "$BASE_DIR/ipk/build/data.tar.gz" ./usr ./www ./etc 2>/dev/null || tar -czf "$BASE_DIR/ipk/build/data.tar.gz" ./usr ./www 2>/dev/null || tar -czf "$BASE_DIR/ipk/build/data.tar.gz" ./usr 2>/dev/null
+tar -czf "$BASE_DIR/build/data.tar.gz" ./usr ./www ./etc 2>/dev/null || tar -czf "$BASE_DIR/build/data.tar.gz" ./usr ./www 2>/dev/null || tar -czf "$BASE_DIR/build/data.tar.gz" ./usr 2>/dev/null
 cd "$PKG_DIR/CONTROL"
-tar -czf "$BASE_DIR/ipk/build/control.tar.gz" ./*
-cd "$BASE_DIR/ipk/build"
+tar -czf "$BASE_DIR/build/control.tar.gz" ./*
+cd "$BASE_DIR/build"
 echo "2.0" > debian-binary
 tar -czf "$IPK_NAME" ./debian-binary ./control.tar.gz ./data.tar.gz
 
 # 清理
 rm -f debian-binary control.tar.gz data.tar.gz
 
-echo "=== LuCI应用打包完成: $BASE_DIR/ipk/build/$IPK_NAME ==="
+echo "=== LuCI应用打包完成: $BASE_DIR/build/$IPK_NAME ==="
