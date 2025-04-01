@@ -48,8 +48,8 @@ mkdir -p "$PKG_DIR/usr/lib/lua/luci/controller"
 mkdir -p "$PKG_DIR/usr/lib/lua/luci/view/cloud-clipboard"
 
 # 单独复制每个文件
-cp -v "$LUCI_DIR/luasrc/model/cbi/cloud-clipboard.lua" "$PKG_DIR/usr/lib/lua/luci/model/cbi/"
-cp -v "$LUCI_DIR/luasrc/controller/cloud-clipboard.lua" "$PKG_DIR/usr/lib/lua/luci/controller/"
+cp -v "$LUCI_DIR/luasrc/model/cbi/"*.lua "$PKG_DIR/usr/lib/lua/luci/model/cbi/"
+cp -v "$LUCI_DIR/luasrc/controller/"*.lua "$PKG_DIR/usr/lib/lua/luci/controller/"
 cp -v "$LUCI_DIR/luasrc/view/cloud-clipboard/"*.htm "$PKG_DIR/usr/lib/lua/luci/view/cloud-clipboard/"
 
 # 复制root目录结构（如果存在）
