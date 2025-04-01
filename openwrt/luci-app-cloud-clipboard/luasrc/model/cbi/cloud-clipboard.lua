@@ -75,4 +75,25 @@ s.anonymous = true
 o = s:option(DummyValue, "_access", translate("Web界面"))
 o.template = "cloud-clipboard/access"
 
+-- 日志显示
+s = m:section(TypedSection, "cloud-clipboard", translate("日志"))
+s.anonymous = true
+
+-- 添加一个按钮查看日志
+o = s:option(Button, "_logview", translate("查看日志"))
+o.inputtitle = translate("查看日志")
+o.inputstyle = "apply"
+o.write = function()
+    luci.http.redirect(luci.dispatcher.build_url("admin", "services", "cloud-clipboard", "logview"))
+end
+
+-- 添加一个按钮清空日志
+o = s:option(Button, "_logclear", translate("清空日志"))
+o.inputtitle = translate("清空日志")
+o.inputstyle = "reset"
+o.write = function()
+    luci.sys.call("> /var/log/cloud-clipboard.log")
+    luci.http.redirect(luci.dispatcher.build_url("admin", "services", "cloud-clipboard"))
+end
+
 return m
