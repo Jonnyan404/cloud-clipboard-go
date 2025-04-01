@@ -16,7 +16,7 @@
             "uci": ["cloud-clipboard"],
             "file": {
                 "/etc/config/cloud-clipboard": ["write"],
-                "/var/log/cloud-clipboard.log": ["write"],
+                "/var/log/cloud-clipboard.log": ["write", "truncate"],
                 "/etc/init.d/cloud-clipboard": ["exec"],
                 "/usr/bin/cloud-clipboard": ["exec"]
             }
