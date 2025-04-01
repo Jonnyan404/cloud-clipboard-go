@@ -115,7 +115,7 @@ else
     echo "! 找不到配置文件，创建默认配置"
     cat > "$PKG_DIR/etc/config/cloud-clipboard" << 'EOF'
 config cloud-clipboard 'main'
-    option enabled '0'
+    option enabled '1'
     option host '0.0.0.0'
     option port '9501'
     option auth ''
