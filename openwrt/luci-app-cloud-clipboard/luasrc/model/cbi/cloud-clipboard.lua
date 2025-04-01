@@ -24,11 +24,6 @@ o.password = true
 o.rmempty = true
 o.description = translate("如果设置，访问时需要输入此密码。留空表示不需要密码。")
 
-o = s:option(Value, "auth", translate("访问密码"))
-o.password = true
-o.rmempty = true
-o.description = translate("如果设置，访问时需要输入此密码。留空表示不需要密码。")
-
 -- 添加配置文件路径设置
 o = s:option(Value, "config", translate("配置文件路径"))
 o.default = ""
