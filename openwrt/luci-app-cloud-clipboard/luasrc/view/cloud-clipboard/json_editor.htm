@@ -1,0 +1,96 @@
+<%+cbi/valueheader%>
+<textarea class="cbi-input-textarea" style="font-family:monospace; resize:vertical; width:100%;"
+  data-update="change"
+  rows="<%=self.rows or 20%>"
+  id="<%=cbid%>"
+  name="<%=cbid%>"
+  <% if self.wrap == "off" then %> wrap="off" <% end %>
+  <% if self.readonly then %> readonly="readonly" <% end %>
+  <% if self.placeholder then %> placeholder="<%=self.placeholder%>" <% end %>
+><%=pcdata((self:cfgvalue(section) or ""))%></textarea>
+<script type="text/javascript">
+//<![CDATA[
+  var textarea = document.getElementById('<%=cbid%>');
+  var btnContainer = document.createElement('div');
+  btnContainer.style.marginTop = '5px';
+  btnContainer.style.textAlign = 'right';
+  
+  // 添加验证按钮
+  var validateBtn = document.createElement('input');
+  validateBtn.type = 'button';
+  validateBtn.className = 'btn cbi-button cbi-button-apply';
+  validateBtn.value = '<%:验证 JSON%>';
+  validateBtn.onclick = function() {
+    try {
+      var jsonValue = textarea.value.trim();
+      if (!jsonValue) {
+        alert('<%:请输入 JSON 内容%>');
+        return;
+      }
+      JSON.parse(jsonValue);
+      alert('<%:JSON 格式有效!%>');
+    } catch (e) {
+      alert('<%:JSON 格式无效: %>' + e.message);
+    }
+  };
+  
+  // 添加格式化按钮
+  var formatBtn = document.createElement('input');
+  formatBtn.type = 'button';
+  formatBtn.className = 'btn cbi-button cbi-button-neutral';
+  formatBtn.value = '<%:格式化 JSON%>';
+  formatBtn.style.marginLeft = '8px';
+  formatBtn.onclick = function() {
+    try {
+      var jsonValue = textarea.value.trim();
+      if (!jsonValue) {
+        alert('<%:请输入 JSON 内容%>');
+        return;
+      }
+      var formatted = JSON.stringify(JSON.parse(jsonValue), null, 2);
+      textarea.value = formatted;
+    } catch (e) {
+      alert('<%:无法格式化: %>' + e.message);
+    }
+  };
+  
+  // 添加恢复默认值按钮
+  var resetBtn = document.createElement('input');
+  resetBtn.type = 'button';
+  resetBtn.className = 'btn cbi-button cbi-button-reset';
+  resetBtn.value = '<%:恢复默认%>';
+  resetBtn.style.marginLeft = '8px';
+  resetBtn.onclick = function() {
+    if (confirm('<%:确定要恢复默认配置吗？当前内容将丢失。%>')) {
+      textarea.value = JSON.stringify({
+        "server": {
+          "host": "",
+          "port": 9501,
+          "prefix": "",
+          "history": 100,
+          "historyFile": "",
+          "storageDir": "",
+          "auth": <%=(luci.model.uci.cursor():get("cloud-clipboard", "main", "auth") or "") ~= "" and "true" or "false"%>
+        },
+        "text": {
+          "limit": 4096
+        },
+        "file": {
+          "expire": 3600,
+          "chunk": 2097152,
+          "limit": 268435456
+        }
+      }, null, 2);
+    }
+  };
+  
+  // 添加按钮到容器
+  btnContainer.appendChild(validateBtn);
+  btnContainer.appendChild(formatBtn);
+  btnContainer.appendChild(resetBtn);
+  
+  // 添加容器到文本框后面
+  textarea.parentNode.insertBefore(btnContainer, textarea.nextSibling);
+//]]>
+</script>
+<%+cbi/valuefooter%>
