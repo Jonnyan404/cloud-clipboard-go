@@ -1,0 +1,46 @@
+<%#
+ Copyright 2023 jonnyan404
+ Licensed under the MIT License
+-%>
+
+<%+header%>
+
+<h2 name="content"><%:Cloud Clipboard 日志%></h2>
+<div id="content_syslog">
+<textarea readonly="readonly" wrap="off" style="width:100%; height:500px; font-size:12px; font-family:monospace; white-space:pre; overflow-y:scroll;" id="syslog" rows=""></textarea>
+</div>
+
+<script type="text/javascript">
+  const textarea = document.getElementById('syslog');
+  let refreshLogTimer;
+  
+  function refreshLog() {
+    XHR.get('<%=luci.dispatcher.build_url("admin", "services", "cloud-clipboard", "logview")%>', null,
+      function(x, data) {
+        textarea.value = data;
+        textarea.scrollTop = textarea.scrollHeight;
+      }
+    );
+  }
+  
+  // 初始化加载日志
+  refreshLog();
+  
+  // 每5秒刷新一次
+  refreshLogTimer = setInterval(refreshLog, 5000);
+  
+  // 页面离开时清除定时器
+  window.addEventListener('beforeunload', function() {
+    if (refreshLogTimer) clearInterval(refreshLogTimer);
+  });
+</script>
+
+<div style="text-align:right; margin-right:30px;">
+  <small><%:自动刷新已启用%></small><br />
+  <input class="cbi-button cbi-button-apply" type="button" value="<%:刷新%>" onclick="refreshLog()" />
+  <input class="cbi-button cbi-button-reset" type="button" value="<%:返回%>" onclick="location.href='<%=luci.dispatcher.build_url("admin", "services", "cloud-clipboard")%>'" />
+  <input class="cbi-button cbi-button-remove" type="button" value="<%:清空日志%>" 
+    onclick="if(confirm('<%:确定要清空日志?%>'))XHR.get('<%=luci.dispatcher.build_url("admin", "services", "cloud-clipboard", "clearlog")%>',null,function(x,data){refreshLog()})" />
+</div>
+
+<%+footer%>
