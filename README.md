@@ -24,7 +24,7 @@
 
 这里是 go 版服务端
 
-### 傻瓜式运行(图形化UI,推荐小白用户们)
+### 傻瓜式运行(UI辅助器,推荐小白用户们)
 
 去 https://github.com/Jonnyan404/cloud-clipboard-go-launcher/releases 下载后,双击使用
 
