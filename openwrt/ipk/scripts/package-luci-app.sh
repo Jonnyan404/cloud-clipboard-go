@@ -32,6 +32,26 @@ mkdir -p "$PKG_DIR/CONTROL"
 # 复制LuCI应用程序文件
 echo "复制LuCI应用文件..."
 
+# 确保luasrc目录存在
+if [ ! -d "$LUCI_DIR/luasrc" ]; then
+    echo "错误: LuCI应用luasrc目录不存在: $LUCI_DIR/luasrc"
+    exit 1
+fi
+
+# 打印文件清单
+echo "检查CBI文件是否存在:"
+ls -la "$LUCI_DIR/luasrc/model/cbi/cloud-clipboard.lua"
+
+# 创建目标目录
+mkdir -p "$PKG_DIR/usr/lib/lua/luci/model/cbi"
+mkdir -p "$PKG_DIR/usr/lib/lua/luci/controller"
+mkdir -p "$PKG_DIR/usr/lib/lua/luci/view/cloud-clipboard"
+
+# 单独复制每个文件
+cp -v "$LUCI_DIR/luasrc/model/cbi/cloud-clipboard.lua" "$PKG_DIR/usr/lib/lua/luci/model/cbi/"
+cp -v "$LUCI_DIR/luasrc/controller/cloud-clipboard.lua" "$PKG_DIR/usr/lib/lua/luci/controller/"
+cp -v "$LUCI_DIR/luasrc/view/cloud-clipboard/"*.htm "$PKG_DIR/usr/lib/lua/luci/view/cloud-clipboard/"
+
 # 复制root目录结构（如果存在）
 if [ -d "$LUCI_DIR/root" ]; then
     cp -r "$LUCI_DIR/root/"* "$PKG_DIR/"
