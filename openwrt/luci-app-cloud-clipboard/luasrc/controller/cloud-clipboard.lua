@@ -6,8 +6,8 @@ function index()
         return
     end
     
-    -- 简化菜单结构
-    entry({"admin", "services", "cloud-clipboard"}, cbi("cloud-clipboard"), _("Cloud Clipboard"), 90)
+    -- 添加legacy标记
+    entry({"admin", "services", "cloud-clipboard"}, cbi("cloud-clipboard"), _("Cloud Clipboard"), 90).dependent = true
 end
 
 function act_status()
