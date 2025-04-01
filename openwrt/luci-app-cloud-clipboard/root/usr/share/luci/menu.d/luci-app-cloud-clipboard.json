@@ -3,7 +3,7 @@
         "title": "Cloud Clipboard",
         "order": 90,
         "action": {
-            "type": "view",
+            "type": "cbi",
             "path": "cloud-clipboard"
         }
     }
