@@ -18,8 +18,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BASE_DIR="$(dirname "$SCRIPT_DIR")"  # 这是 openwrt 目录
 BINARY="$BASE_DIR/build/cloud-clipboard-$VERSION-$ARCH"
 PKG_DIR="$BASE_DIR/build/pkg-$ARCH"
-CONTROL_DIR="$BASE_DIR/control"
-ROOTFS_DIR="$BASE_DIR/rootfs"
+CONTROL_DIR="$BASE_DIR/ipk/control"
+ROOTFS_DIR="$BASE_DIR/ipk/rootfs"
 IPK_NAME="cloud-clipboard_${VERSION}_${ARCH}.ipk"
 
 # 调试输出
