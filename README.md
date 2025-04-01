@@ -101,13 +101,14 @@ opkg install *_all.ipk
 
 去项目 [release](https://github.com/Jonnyan404/cloud-clipboard-go/releases) 下载对应系统文件运行即可
 
+> 参数优先级: 命令行参数 > 配置文件
+
 - 命令行参数: `-host` 用来自定义服务器监听地址
 - 命令行参数: `-port` 用来自定义服务器监听端口
 - 命令行参数: `-auth` 用来自定义密码
 - 命令行参数: `-config` 用来加载自定义配置文件
 - 命令行参数: `-static` 用来加载自定义外部前端文件
 
-参数优先级: 命令行参数 > 配置文件
 
 
 ### 使用源代码运行
