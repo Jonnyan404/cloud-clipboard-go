@@ -225,6 +225,6 @@ foobar
 
 移植为openwrt项目
 
-IPK文件能用了,下载链接: https://github.com/Jonnyan404/cloud-clipboard-go/releases/tag/v1.0.9
+- [x] OpenWrt24.10.0 测试通过
 
-但是luci-app界面解决不了前端调用后端命令,等大佬解决或以后学习后再修复
+下载链接: https://github.com/Jonnyan404/cloud-clipboard-go/releases/tag/v1.1.0
