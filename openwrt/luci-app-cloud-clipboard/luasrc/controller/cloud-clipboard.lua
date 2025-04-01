@@ -5,23 +5,22 @@ function index()
         return
     end
     
-    -- 使用acl_depends明确指定依赖的ACL权限
-    entry({"admin", "services", "cloud-clipboard"}, cbi("cloud-clipboard"), _("Cloud Clipboard"), 90).acl_depends = { "luci-app-cloud-clipboard" }
+    -- 注册主菜单和多个子页面
+    entry({"admin", "services", "cloud-clipboard"}, firstchild(), _("Cloud Clipboard"), 90).dependent = true
     
-    -- 添加状态API
+    -- 设置页面
+    entry({"admin", "services", "cloud-clipboard", "settings"}, cbi("cloud-clipboard"), _("设置"), 10).leaf = true
+    
+    -- 日志页面
+    entry({"admin", "services", "cloud-clipboard", "log"}, template("cloud-clipboard/log"), _("日志"), 20).leaf = true
+    
+    -- API接口
     entry({"admin", "services", "cloud-clipboard", "status"}, call("act_status")).leaf = true
-    
-    -- 添加日志查看功能 (页面形式)
-    entry({"admin", "services", "cloud-clipboard", "logview"}, template("cloud-clipboard/logview")).leaf = true
-
-    -- 添加日志内容API
     entry({"admin", "services", "cloud-clipboard", "getlog"}, call("get_log")).leaf = true
-
-    -- 添加日志清除API
     entry({"admin", "services", "cloud-clipboard", "clearlog"}, call("clear_log")).leaf = true
 end
 
--- 服务状态检查函数 - 使用更精确的匹配
+-- 服务状态检查函数
 function act_status()
     local e = {}
     e.running = luci.sys.call("pgrep -f '^/usr/bin/cloud-clipboard' >/dev/null") == 0

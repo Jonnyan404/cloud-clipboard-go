@@ -3,8 +3,23 @@
         "title": "Cloud Clipboard",
         "order": 90,
         "action": {
+            "type": "firstchild"
+        }
+    },
+    "admin/services/cloud-clipboard/settings": {
+        "title": "设置",
+        "order": 10,
+        "action": {
             "type": "cbi",
             "path": "cloud-clipboard"
+        }
+    },
+    "admin/services/cloud-clipboard/log": {
+        "title": "日志",
+        "order": 20,
+        "action": {
+            "type": "template",
+            "path": "cloud-clipboard/log"
         }
     }
 }

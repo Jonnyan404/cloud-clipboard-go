@@ -15,7 +15,7 @@
   let refreshLogTimer;
   
   function refreshLog() {
-    XHR.get('<%=luci.dispatcher.build_url("admin", "services", "cloud-clipboard", "logview")%>', null,
+    XHR.get('<%=luci.dispatcher.build_url("admin", "services", "cloud-clipboard", "getlog")%>', null,
       function(x, data) {
         textarea.value = data;
         textarea.scrollTop = textarea.scrollHeight;
@@ -38,9 +38,8 @@
 <div style="text-align:right; margin-right:30px;">
   <small><%:自动刷新已启用%></small><br />
   <input class="cbi-button cbi-button-apply" type="button" value="<%:刷新%>" onclick="refreshLog()" />
-  <input class="cbi-button cbi-button-reset" type="button" value="<%:返回%>" onclick="location.href='<%=luci.dispatcher.build_url("admin", "services", "cloud-clipboard")%>'" />
   <input class="cbi-button cbi-button-remove" type="button" value="<%:清空日志%>" 
-    onclick="if(confirm('<%:确定要清空日志?%>'))XHR.get('<%=luci.dispatcher.build_url("admin", "services", "cloud-clipboard", "clearlog")%>',null,function(x,data){refreshLog()})" />
+    onclick="if(confirm('<%:确定要清空日志?%>'))XHR.get('<%=luci.dispatcher.build_url("admin", "services", "cloud-clipboard", "clearlog")%>',null,function(x,data){refreshLog();})" />
 </div>
 
 <%+footer%>
