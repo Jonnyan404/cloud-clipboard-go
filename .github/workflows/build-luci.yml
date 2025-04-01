@@ -28,18 +28,18 @@ jobs:
       
       - name: Create directory structure and set permissions
         run: |
-          mkdir -p openwrt/ipk/build
+          mkdir -p openwrt/build
           # 设置权限，递归为所有文件增加可执行权限
           find openwrt/luci-app-cloud-clipboard -type f -exec chmod +x {} \;
       
       
       - name: Package LuCI App
         run: |
-          chmod +x openwrt/ipk/scripts/package-luci-app.sh
-          ./openwrt/ipk/scripts/package-luci-app.sh ${{ env.VERSION }}
+          chmod +x openwrt/scripts/package-luci-app.sh
+          ./openwrt/scripts/package-luci-app.sh ${{ env.VERSION }}
       
       - name: Upload LuCI IPK artifact
         uses: actions/upload-artifact@v4
         with:
           name: luci-app-cloud-clipboard_${{ env.VERSION }}_all.ipk
-          path: openwrt/ipk/build/luci-app-cloud-clipboard_${{ env.VERSION }}_all.ipk
+          path: openwrt/build/luci-app-cloud-clipboard_${{ env.VERSION }}_all.ipk

@@ -30,13 +30,13 @@ o.rmempty = true
 o.description = translate("如果设置，访问时需要输入此密码。留空表示不需要密码。")
 
 -- 添加配置文件路径设置
-o = s:option(Value, "config", translate("配置文件路径"))
+o = s:option(Value, "config", translate("配置文件路径")) .. 
+' <a href="' .. 
+luci.dispatcher.build_url("admin", "services", "cloud-clipboard", "config") .. 
+'" class="cbi-button cbi-button-apply">' .. translate("编辑配置文件") .. '</a>'
 o.default = ""
 o.rmempty = true
-o.description = translate("高级选项：自定义配置文件路径。留空表示使用默认路径。") .. 
-                ' <a href="' .. 
-                luci.dispatcher.build_url("admin", "services", "cloud-clipboard", "config") .. 
-                '" class="cbi-button cbi-button-apply">' .. translate("编辑配置文件") .. '</a>'
+o.description = translate("高级选项：自定义配置文件路径。留空表示使用默认路径。")
 
 -- 服务状态和控制
 s = m:section(TypedSection, "cloud-clipboard", translate("服务控制"))
