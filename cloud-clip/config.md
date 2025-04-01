@@ -1,0 +1,102 @@
+
+
+### 配置文件说明
+
+`//` 开头的部分是注释，**并不需要写入配置文件中**，否则会导致读取失败。
+
+```json
+{
+    "server": {
+        // 监听的 IP 地址，省略或设为 null 则会监听所有网卡的IP地址
+        "host": [
+            "127.0.0.1"
+        ],
+        "port": 9501, // 端口号，falsy 值表示不监听
+        "prefix": "", // 部署时的URL前缀，例如想要在 http://localhost/prefix/ 访问，则将这一项设为 /prefix
+        "history": 10, // 消息历史记录的数量
+        "auth": false, // 是否在连接时要求使用密码认证，falsy 值表示不使用
+        "historyFile": null, // 自定义历史记录存储路径，默认为当前目录的 history.json
+        "storageDir": null // 自定义文件存储目录，默认为临时文件夹的.cloud-clipboard-storage目录
+    },
+    "text": {
+        "limit": 4096 // 文本的长度限制
+    },
+    "file": {
+        "expire": 3600, // 上传文件的有效期，超过有效期后自动删除，单位为秒
+        "chunk": 1048576, // 上传文件的分片大小，不能超过 5 MB，单位为 byte
+        "limit": 104857600 // 上传文件的大小限制，单位为 byte
+    }
+}
+```
+> HTTPS 的说明：
+>
+> 建议使用 nginx/caddy 来反向代理
+>
+> “密码认证”的说明：
+>
+> 如果启用“密码认证”，只有输入正确的密码才能连接到服务端并查看剪贴板内容。
+> 可以将 `server.auth` 字段设为 `true`（随机生成六位密码）或字符串（自定义密码）来启用这个功能，启动服务端后终端会以 `Authorization code: ******` 的格式输出当前使用的密码。
+
+
+### HTTP API
+
+#### 发送文本
+
+```console
+$ curl -H "Content-Type: text/plain" --data-binary "foobar" http://localhost:9501/text
+{"code":200,"msg":"","result":{"url":"http://localhost:9501/content/1"}}
+
+$ curl http://localhost:9501/content/1
+foobar
+```
+
+注意：请求头中不能缺少 `Content-Type: text/plain`
+
+#### 发送文件
+
+```console
+$ curl -F file=@image.png http://localhost:9501/upload
+{"code":200,"msg":"","result":{"url":"http://localhost:9501/content/2"}}
+
+$ curl http://localhost:9501/content/2
+Redirecting to <a href="http://localhost:9501/file/xxxx">http://localhost:9501/file/xxxx</a>.
+
+$ curl -L http://localhost:9501/content/2
+Warning: Binary output can mess up your terminal. Use "--output -" to tell curl to output it to your terminal anyway,
+Warning: or consider "--output <FILE>" to save to a file.
+```
+
+#### 在设定房间的情况下发送文本或文件
+
+```console
+$ curl -H "Content-Type: text/plain" --data-binary @package.json http://localhost:9501/text?room=reisen-8fce
+{"code":200,"msg":"","result":{"url":"http://localhost:9501/content/3?room=reisen-8fce"}}
+
+$ curl http://localhost:9501/content/3
+Not Found
+
+$ curl http://localhost:9501/content/3?room=suika-51ba
+Not Found
+
+$ curl http://localhost:9501/content/3?room=reisen-8fce
+{
+  "name": "cloud-clipboard-server-node",
+  ...
+}
+```
+
+#### 密码认证
+
+```console
+$ curl -H "Content-Type: text/plain" --data-binary "foobar" http://localhost:9501/text
+Forbidden
+
+$ curl -H "Authorization: Bearer xxxx" -H "Content-Type: text/plain" --data-binary "foobar" http://localhost:9501/text
+{"code":200,"msg":"","result":{"url":"http://localhost:9501/content/1"}}
+
+$ curl http://localhost:9501/content/1
+Forbidden
+
+$ curl -H "Authorization: Bearer xxxx" http://localhost:9501/content/1
+foobar
+```
