@@ -22,16 +22,13 @@
 
 ## 使用方法
 
-### go 版服务端
+这里是 go 版服务端
 
-#### 使用二进制文件运行
+### 傻瓜式运行(图形化UI,推荐小白用户们)
 
-去项目 [release](https://github.com/Jonnyan404/cloud-clipboard-go/releases) 下载对应系统文件运行即可
+去 https://github.com/Jonnyan404/cloud-clipboard-go-launcher/releases 下载后,双击使用
 
-- 命令行参数: `-config` 用来加载自定义配置文件
-- 命令行参数: `-static` 用来加载自定义外部前端文件
-
-#### 使用 Docker 运行
+### 使用 Docker 运行
 
 ```sh
 # dockerhub镜像(二选一)
@@ -68,7 +65,7 @@ services:
 然后访问 http://127.0.0.1:9501
 
 
-#### mac用户从 homebrew 运行
+### 使用 homebrew 运行
 
 默认配置文件分别在`homebrew`根目录下的`etc/cloud-clipboard-go`和`var`目录
 
@@ -85,8 +82,31 @@ brew services stop cloud-clipboard-go
 brew services restart cloud-clipboard-go
 ```
 
+### 使用 OpenWrt 运行
 
-#### 从源代码运行
+- [x] OpenWrt24.10.0 测试通过
+
+1. 查看所属架构命令: `opkg print-architecture` (最后一行第二列就是)
+
+2. 去 https://github.com/Jonnyan404/cloud-clipboard-go/releases/tag/v1.1.0 下载对应系统的`*平台.ipk`文件和`*_all.ipk`文件
+3. 安装
+```
+opkg install *平台.ipk
+opkg install *_all.ipk
+```
+
+
+### 使用二进制文件运行
+
+去项目 [release](https://github.com/Jonnyan404/cloud-clipboard-go/releases) 下载对应系统文件运行即可
+
+- 命令行参数: `-config` 用来加载自定义配置文件
+- 命令行参数: `-static` 用来加载自定义外部前端文件
+- 命令行参数: `-auth` 用来自定义密码
+- 命令行参数: `-host` 用来自定义服务器监听地址
+- 命令行参数: `-port` 用来自定义服务器监听端口
+
+### 使用源代码运行
 
 需要安装 [Node.js>=22.12](https://nodejs.org)。
 需要安装 [go>=1.22]
@@ -109,122 +129,19 @@ go run .
 
 服务端默认会监听本机所有网卡的 IP 地址（也可以自己设定），并在终端中显示前端界面所在的网址，使用浏览器打开即可使用。
 
+
+
 ### 配置文件说明
 
-`//` 开头的部分是注释，**并不需要写入配置文件中**，否则会导致读取失败。
-
-```json
-{
-    "server": {
-        // 监听的 IP 地址，省略或设为 null 则会监听所有网卡的IP地址
-        "host": [
-            "127.0.0.1",
-            "::1"
-        ],
-        "port": 9501, // 端口号，falsy 值表示不监听
-        "uds": "/var/run/cloud-clipboard.sock", // UNIX domain socket 路径，可以后接“:666”设定权限（默认666），falsy 值表示不监听
-        "prefix": "", // 部署时的URL前缀，例如想要在 http://localhost/prefix/ 访问，则将这一项设为 /prefix
-        "key": "localhost-key.pem", // HTTPS 私钥路径
-        "cert": "localhost.pem", // HTTPS 证书路径
-        "history": 10, // 消息历史记录的数量
-        "auth": false, // 是否在连接时要求使用密码认证，falsy 值表示不使用
-        "historyFile": null, // 自定义历史记录存储路径，默认为当前目录的 history.json
-        "storageDir": null // 自定义文件存储目录，默认为临时文件夹的.cloud-clipboard-storage目录
-    },
-    "text": {
-        "limit": 4096 // 文本的长度限制
-    },
-    "file": {
-        "expire": 3600, // 上传文件的有效期，超过有效期后自动删除，单位为秒
-        "chunk": 1048576, // 上传文件的分片大小，不能超过 5 MB，单位为 byte
-        "limit": 104857600 // 上传文件的大小限制，单位为 byte
-    }
-}
-```
-> HTTPS 的说明：
->
-> 如果使用了 Nginx 等软件的反向代理，且这些软件已经提供了 HTTPS 连接，则无需在这里设定。
->
-> “密码认证”的说明：
->
-> 如果启用“密码认证”，只有输入正确的密码才能连接到服务端并查看剪贴板内容。
-> 可以将 `server.auth` 字段设为 `true`（随机生成六位密码）或字符串（自定义密码）来启用这个功能，启动服务端后终端会以 `Authorization code: ******` 的格式输出当前使用的密码。
-
+- 请查看: https://github.com/Jonnyan404/cloud-clipboard-go/blob/main/cloud-clip/config.md
 
 ### HTTP API
 
-#### 发送文本
+- 请查看: https://github.com/Jonnyan404/cloud-clipboard-go/blob/main/cloud-clip/config.md
 
-```console
-$ curl -H "Content-Type: text/plain" --data-binary "foobar" http://localhost:9501/text
-{"code":200,"msg":"","result":{"url":"http://localhost:9501/content/1"}}
+## 衍生项目
 
-$ curl http://localhost:9501/content/1
-foobar
-```
-
-注意：请求头中不能缺少 `Content-Type: text/plain`
-
-#### 发送文件
-
-```console
-$ curl -F file=@image.png http://localhost:9501/upload
-{"code":200,"msg":"","result":{"url":"http://localhost:9501/content/2"}}
-
-$ curl http://localhost:9501/content/2
-Redirecting to <a href="http://localhost:9501/file/xxxx">http://localhost:9501/file/xxxx</a>.
-
-$ curl -L http://localhost:9501/content/2
-Warning: Binary output can mess up your terminal. Use "--output -" to tell curl to output it to your terminal anyway,
-Warning: or consider "--output <FILE>" to save to a file.
-```
-
-#### 在设定房间的情况下发送文本或文件
-
-```console
-$ curl -H "Content-Type: text/plain" --data-binary @package.json http://localhost:9501/text?room=reisen-8fce
-{"code":200,"msg":"","result":{"url":"http://localhost:9501/content/3?room=reisen-8fce"}}
-
-$ curl http://localhost:9501/content/3
-Not Found
-
-$ curl http://localhost:9501/content/3?room=suika-51ba
-Not Found
-
-$ curl http://localhost:9501/content/3?room=reisen-8fce
-{
-  "name": "cloud-clipboard-server-node",
-  ...
-}
-```
-
-#### 密码认证
-
-```console
-$ curl -H "Content-Type: text/plain" --data-binary "foobar" http://localhost:9501/text
-Forbidden
-
-$ curl -H "Authorization: Bearer xxxx" -H "Content-Type: text/plain" --data-binary "foobar" http://localhost:9501/text
-{"code":200,"msg":"","result":{"url":"http://localhost:9501/content/1"}}
-
-$ curl http://localhost:9501/content/1
-Forbidden
-
-$ curl -H "Authorization: Bearer xxxx" http://localhost:9501/content/1
-foobar
-```
-
-
-# cloud-clipboard-go-launcher
+### cloud-clipboard-go-launcher
 
 为 cloud-clipboard-go 制作的启动器,方便不想或不会使用终端的用户
 - https://github.com/Jonnyan404/cloud-clipboard-go-launcher
-
-
-# luci-app-cloud-clipboard-go
-
-移植为openwrt项目
-
-- [x] OpenWrt24.10.0 测试通过
-
-下载链接: https://github.com/Jonnyan404/cloud-clipboard-go/releases/tag/v1.1.0
