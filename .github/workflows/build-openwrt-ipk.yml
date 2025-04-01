@@ -54,29 +54,29 @@ jobs:
 
       - name: Create directory structure
         run: |
-          mkdir -p openwrt/ipk/build
+          mkdir -p openwrt/build
 
       - name: Build binary
         run: |
-          chmod +x openwrt/ipk/scripts/build.sh
-          ./openwrt/ipk/scripts/build.sh ${{ env.VERSION }}
+          chmod +x openwrt/scripts/build.sh
+          ./openwrt/scripts/build.sh ${{ env.VERSION }}
 
       - name: Package IPK
         run: |
-          chmod +x openwrt/ipk/scripts/package-openwrt.sh
-          ./openwrt/ipk/scripts/package-openwrt.sh ${{ env.VERSION }} ${{ matrix.arch }}
+          chmod +x openwrt/scripts/package-openwrt.sh
+          ./openwrt/scripts/package-openwrt.sh ${{ env.VERSION }} ${{ matrix.arch }}
 
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4
         with:
           name: cloud-clipboard-${{ env.VERSION }}-${{ matrix.arch }}
-          path: openwrt/ipk/build/cloud-clipboard-${{ env.VERSION }}-${{ matrix.arch }}
+          path: openwrt/build/cloud-clipboard-${{ env.VERSION }}-${{ matrix.arch }}
 
       - name: Upload IPK artifact
         uses: actions/upload-artifact@v4
         with:
           name: cloud-clipboard_${{ env.VERSION }}_${{ matrix.arch }}.ipk
-          path: openwrt/ipk/build/cloud-clipboard_${{ env.VERSION }}_${{ matrix.arch }}.ipk
+          path: openwrt/build/cloud-clipboard_${{ env.VERSION }}_${{ matrix.arch }}.ipk
 
   build-luci:
     runs-on: ubuntu-latest
@@ -92,20 +92,20 @@ jobs:
       
       - name: Create directory structure
         run: |
-          mkdir -p openwrt/ipk/build
+          mkdir -p openwrt/build
           # 设置权限，递归为所有文件增加可执行权限
           find openwrt/luci-app-cloud-clipboard -type f -exec chmod +x {} \;
       
       - name: Package LuCI App
         run: |
-          chmod +x openwrt/ipk/scripts/package-luci-app.sh
-          ./openwrt/ipk/scripts/package-luci-app.sh ${{ env.VERSION }}
+          chmod +x openwrt/scripts/package-luci-app.sh
+          ./openwrt/scripts/package-luci-app.sh ${{ env.VERSION }}
       
       - name: Upload LuCI IPK artifact
         uses: actions/upload-artifact@v4
         with:
           name: luci-app-cloud-clipboard_${{ env.VERSION }}_all.ipk
-          path: openwrt/ipk/build/luci-app-cloud-clipboard_${{ env.VERSION }}_all.ipk
+          path: openwrt/build/luci-app-cloud-clipboard_${{ env.VERSION }}_all.ipk
 
   release:
     needs: [build, build-luci]

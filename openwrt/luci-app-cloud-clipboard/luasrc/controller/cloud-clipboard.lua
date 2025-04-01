@@ -11,8 +11,8 @@ function index()
     -- 设置页面
     entry({"admin", "services", "cloud-clipboard", "settings"}, cbi("cloud-clipboard"), _("设置"), 10).leaf = true
     
--- 配置文件编辑页面
-entry({"admin", "services", "cloud-clipboard", "config"}, cbi("cloud-clipboard-config"), _("配置文件"), 15).leaf = true
+    -- 配置文件编辑页面
+    entry({"admin", "services", "cloud-clipboard", "config"}, cbi("cloud-clipboard-config"), _("配置文件"), 15).leaf = true
     -- 日志页面
     entry({"admin", "services", "cloud-clipboard", "log"}, template("cloud-clipboard/log"), _("日志"), 20).leaf = true
     
