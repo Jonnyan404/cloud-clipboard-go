@@ -12,6 +12,7 @@ start_service() {
     local host
     local port
     local auth
+    local config
     
     config_get enabled main enabled "0"
     [ "$enabled" = "0" ] && return 1
@@ -19,13 +20,13 @@ start_service() {
     config_get host main host "0.0.0.0"
     config_get port main port "9501"
     config_get auth main auth ""
-    
+    config_get config main config ""
+
     mkdir -p /tmp/cloud-clipboard
     touch "$LOG_FILE"
     
     procd_open_instance
-    procd_set_param command $PROG -host $host -port $port
-    [ -n "$auth" ] && procd_append_param command -config /etc/cloud-clipboard/config.json
+    procd_set_param command $PROG -host $host -port $port -auth "$auth" -config "$config"
     
     procd_set_param stdout 1
     procd_set_param stderr 1
