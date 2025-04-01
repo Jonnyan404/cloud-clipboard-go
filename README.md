@@ -110,8 +110,8 @@ opkg install *_all.ipk
 
 ### 使用源代码运行
 
-需要安装 [Node.js>=22.12](https://nodejs.org)。
-需要安装 [go>=1.22]
+- 需要安装 [Node.js>=22.12](https://nodejs.org)。
+- 需要安装 [go>=1.22](https://go.dev/)
 
 ```bash
 cd client
