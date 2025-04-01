@@ -6,10 +6,8 @@ function index()
         return
     end
     
-    -- 修改为明确指定节点类型和ACL依赖
-    entry({"admin", "services", "cloud-clipboard"}, firstchild(), _("Cloud Clipboard"), 90)
-    entry({"admin", "services", "cloud-clipboard", "settings"}, cbi("cloud-clipboard"), _("Settings"), 1)
-    entry({"admin", "services", "cloud-clipboard", "status"}, call("act_status")).leaf = true
+    -- 简化菜单结构
+    entry({"admin", "services", "cloud-clipboard"}, cbi("cloud-clipboard"), _("Cloud Clipboard"), 90)
 end
 
 function act_status()
