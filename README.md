@@ -84,12 +84,13 @@ brew services restart cloud-clipboard-go
 
 ### 使用 OpenWrt 运行
 
-- ✅ OpenWrt 24.10.0 测试通过
+✅ OpenWrt 24.10.0 测试通过
 
-1. 查看所属架构命令: `opkg print-architecture` (最后一行第二列就是)
+查看所属架构命令: `opkg print-architecture` (最后一行第二列就是)
 
-2. 去 https://github.com/Jonnyan404/cloud-clipboard-go/releases/tag/v1.1.0 下载对应系统的`*平台.ipk`文件和`*_all.ipk`文件
-3. 安装
+去 https://github.com/Jonnyan404/cloud-clipboard-go/releases/tag/v1.1.0 下载对应系统的`*平台.ipk`文件和`*_all.ipk`文件
+
+然后在命令行执行下列命令
 ```
 opkg install *平台.ipk
 opkg install *_all.ipk
@@ -106,6 +107,7 @@ opkg install *_all.ipk
 - 命令行参数: `-config` 用来加载自定义配置文件
 - 命令行参数: `-static` 用来加载自定义外部前端文件
 
+参数优先级: 命令行参数 > 配置文件
 
 
 ### 使用源代码运行
@@ -123,13 +125,6 @@ cd ../cloud-clip
 go mod tidy
 go run .
 ```
-
-配置文件是按照以下顺序尝试读取的：
-
-* 和 `main.go` 放在同一目录的 `config.json`
-* 在命令行中指定：`./cloud-clipboard-go -config=/tmp/config.json`
-
-服务端默认会监听本机所有网卡的 IP 地址（也可以自己设定），并在终端中显示前端界面所在的网址，使用浏览器打开即可使用。
 
 
 
