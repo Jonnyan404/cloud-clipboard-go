@@ -40,6 +40,19 @@
 
 ### HTTP API
 
+#### 获取内容
+
+- 方式一: 
+```
+http://localhost:9501/content/latest  永远返回最新一条内容
+http://localhost:9501/content/latest?room=test 永远返回指定房间的最新一条内容
+```
+- 方式二: 
+```
+http://localhost:9501/content/1   根据ID访问
+http://localhost:9501/content/1?room=test   指定房间
+```
+
 #### 发送文本
 
 ```console
