@@ -11,6 +11,11 @@ on:
         description: '构建平台 (用逗号分隔的平台列表)'
         required: true
         default: 'linux/amd64,linux/arm64,linux/arm/v7'
+      also_latest:
+        description: '同时推送为latest标签'
+        type: boolean
+        required: true
+        default: true
 
 permissions:
   contents: read
@@ -44,8 +49,10 @@ jobs:
             ghcr.io/${{ github.repository }}
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ github.event.repository.name }}
           tags: |
+            # 总是添加输入的版本标签
             type=raw,value=${{ steps.set_version.outputs.version }}
-            type=raw,value=latest,enable=${{ steps.set_version.outputs.version == 'latest' }}
+            # 只有当选择了also_latest时才添加latest标签
+            type=raw,value=latest,enable=${{ github.event.inputs.also_latest == 'true' }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
