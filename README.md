@@ -68,9 +68,12 @@ services:
 
 ### 使用 homebrew 运行
 
+> 已知问题:brew services 无法tab补全,参考:https://github.com/orgs/Homebrew/discussions/6047#discussioncomment-12668536
+
 默认配置文件分别在`homebrew`根目录下的`etc/cloud-clipboard-go`和`var`目录
 
 ```
+brew update
 #安装
 brew install Jonnyan404/tap/cloud-clipboard-go
 # 启动服务
