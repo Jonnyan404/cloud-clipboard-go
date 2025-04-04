@@ -1,8 +1,8 @@
 # cloud-clipboard-go
 
-基于 https://github.com/TransparentLC/cloud-clipboard 项目,用go复刻了一个
+基于 [TransparentLC](https://github.com/TransparentLC/cloud-clipboard) 项目,用go复刻了一个
 
-在 https://github.com/yurenchen000/cloud-clipboard 基础上增加一些功能
+在 [yurenchen000](https://github.com/yurenchen000/cloud-clipboard) 基础上增加一些功能
 
 ## 截图
 
@@ -26,7 +26,7 @@
 
 ### 傻瓜式运行(UI辅助器,推荐小白用户们)
 
-去 https://github.com/Jonnyan404/cloud-clipboard-go-launcher/releases 下载后,双击使用
+去 [项目release](https://github.com/Jonnyan404/cloud-clipboard-go-launcher/releases) 下载后,双击使用
 
 ### 使用 Docker 运行
 
@@ -62,7 +62,8 @@ services:
 
 ```
 
-然后访问 http://127.0.0.1:9501
+- 访问主页: http://127.0.0.1:9501
+- 访问 http://127.0.0.1:9501/content/latest 将永远返回最新的一条内容,可添加房间参数`?room=xxx`
 
 
 ### 使用 homebrew 运行
