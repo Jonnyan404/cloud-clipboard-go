@@ -581,10 +581,61 @@ func main() {
 	// 过期文件清理
 	go clean_expire_files()
 
-	// 运行服务器
-	listen_addr := fmt.Sprintf("%s:%d", config.Server.Host, config.Server.Port)
-	fmt.Println("--- server run on", listen_addr, prefix)
-	log.Fatal(http.ListenAndServe(listen_addr, nil))
+	// 修改此部分以支持多地址监听
+	var hostList []string
+
+	// 从配置中获取主机地址列表
+	switch host := config.Server.Host.(type) {
+	case string:
+		// 单个地址
+		hostList = []string{host}
+	case []interface{}:
+		// 地址数组
+		for _, h := range host {
+			if hostStr, ok := h.(string); ok {
+				hostList = append(hostList, hostStr)
+			}
+		}
+	case []string:
+		// 已经是字符串数组
+		hostList = host
+	default:
+		// 未知类型，使用默认值
+		hostList = []string{"0.0.0.0"}
+	}
+
+	// 确保至少有一个地址
+	if len(hostList) == 0 {
+		hostList = []string{"0.0.0.0"}
+	}
+
+	// 创建错误通道和等待组
+	errChan := make(chan error, len(hostList))
+
+	// 打印服务器启动信息
+	fmt.Printf("===== Cloud Clipboard Server %s =====\n", server_version)
+	fmt.Printf("Storage: %s\n", storage_folder)
+
+	// 启动多个监听器
+	for _, host := range hostList {
+		// IPv6 地址需要用方括号括起来
+		formattedHost := host
+		if strings.Contains(host, ":") && !strings.HasPrefix(host, "[") {
+			formattedHost = "[" + host + "]"
+		}
+
+		listen_addr := fmt.Sprintf("%s:%d", formattedHost, config.Server.Port)
+		fmt.Printf("--- 监听地址: %s%s\n", listen_addr, config.Server.Prefix)
+
+		// 使用 goroutine 启动服务器
+		go func(addr string) {
+			errChan <- http.ListenAndServe(addr, nil)
+		}(listen_addr)
+	}
+
+	// 等待任意一个服务器出错
+	err := <-errChan
+	log.Fatalf("服务器错误: %v", err)
 }
 
 // clean expire file

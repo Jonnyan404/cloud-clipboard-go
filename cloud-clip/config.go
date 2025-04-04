@@ -15,12 +15,12 @@ import (
 
 type Config struct {
 	Server struct {
-		Host        string `json:"host"`        //done
-		Port        int    `json:"port"`        //done
-		Prefix      string `json:"prefix"`      //done
-		History     int    `json:"history"`     //done
-		HistoryFile string `json:"historyFile"` // 添加历史文件路径
-		StorageDir  string `json:"storageDir"`  // 添加存储目录路径
+		Host        interface{} `json:"host"`        //done
+		Port        int         `json:"port"`        //done
+		Prefix      string      `json:"prefix"`      //done
+		History     int         `json:"history"`     //done
+		HistoryFile string      `json:"historyFile"` // 添加历史文件路径
+		StorageDir  string      `json:"storageDir"`  // 添加存储目录路径
 		// Auth    string `json:"auth"`
 		Auth interface{} `json:"auth"` //done
 	} `json:"server"`
@@ -80,6 +80,38 @@ func load_config(config_path string) *Config {
 	} else {
 		// fmt.Println("Auth field is not provided in the config file")
 		config.Server.Auth = false
+	}
+
+	if config.Server.Host != nil {
+		switch host := config.Server.Host.(type) {
+		case string:
+			// 如果是字符串，转换为单元素数组
+			fmt.Printf("Host is string: %s\n", host)
+			config.Server.Host = []string{host}
+		case []interface{}:
+			// 如果是接口数组，转换为字符串数组
+			hostList := make([]string, 0, len(host))
+			for i, h := range host {
+				if hostStr, ok := h.(string); ok {
+					hostList = append(hostList, hostStr)
+					fmt.Printf("Host[%d]: %s\n", i, hostStr)
+				} else {
+					fmt.Printf("Warning: Host[%d] is not a string: %T\n", i, h)
+					// 跳过无效元素
+				}
+			}
+			if len(hostList) == 0 {
+				hostList = []string{"0.0.0.0"}
+				fmt.Printf("No valid hosts in array, using default: 0.0.0.0\n")
+			}
+			config.Server.Host = hostList
+		default:
+			fmt.Printf("Host is unexpected type: %T, using default\n", host)
+			config.Server.Host = []string{"0.0.0.0"}
+		}
+	} else {
+		// 如果未提供，设置默认值
+		config.Server.Host = []string{"0.0.0.0"}
 	}
 
 	if config.Text.Limit == 0 {
