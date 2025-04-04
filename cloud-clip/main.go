@@ -572,8 +572,11 @@ func main() {
 	http.HandleFunc(prefix+"/revoke/", authMiddleware(handle_revoke))
 	http.HandleFunc(prefix+"/revoke/all", authMiddleware(handleClearAll))
 
-	// 添加内容直接访问路由（需要认证）
-	http.HandleFunc(prefix+"/content/", authMiddleware(handleContent))
+	// 注册内容访问路由
+	http.HandleFunc(config.Server.Prefix+"/content/", authMiddleware(handleContent))
+
+	// 添加最新内容路由
+	http.HandleFunc(config.Server.Prefix+"/content/latest", authMiddleware(handleLatestContent))
 
 	// 过期文件清理
 	go clean_expire_files()
