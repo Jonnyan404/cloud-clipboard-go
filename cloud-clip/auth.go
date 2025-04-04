@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"html"
 	"net/http"
+	"net/url"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -75,6 +77,11 @@ func authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 func handleContent(w http.ResponseWriter, r *http.Request) {
 	// 从路径中提取ID
 	idStr := strings.TrimPrefix(r.URL.Path, config.Server.Prefix+"/content/")
+	// 检查是否是访问 "latest"，如果是，让专用处理函数处理
+	if idStr == "latest" {
+		handleLatestContent(w, r)
+		return
+	}
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		http.Error(w, "Invalid content ID", http.StatusBadRequest)
@@ -214,4 +221,74 @@ func enhanceHandleFinish(original http.HandlerFunc) http.HandlerFunc {
 			},
 		})
 	}
+}
+
+// 处理最新内容访问，返回消息队列中最新的消息内容
+func handleLatestContent(w http.ResponseWriter, r *http.Request) {
+	// 获取room参数
+	room := r.URL.Query().Get("room")
+
+	// 检查消息队列是否为空
+	if messageQueue.nextid <= 0 || len(messageQueue.List) == 0 {
+		http.Error(w, "No content available", http.StatusNotFound)
+		return
+	}
+
+	// 从最新消息向前搜索
+	// 注意：这里假设消息队列中的消息是按时间顺序排列的，最新的消息在后面
+	for i := len(messageQueue.List) - 1; i >= 0; i-- {
+		msg := messageQueue.List[i]
+
+		// 只处理接收类型的消息
+		if msg.Event != "receive" {
+			continue
+		}
+
+		// 如果指定了room参数，检查消息是否属于该房间
+		if room != "" {
+			// 检查文本消息
+			if msg.Data.TextReceive != nil && msg.Data.TextReceive.Room != room {
+				continue
+			}
+			// 检查文件消息
+			if msg.Data.FileReceive != nil && msg.Data.FileReceive.Room != room {
+				continue
+			}
+		}
+
+		// 找到符合条件的最新消息，根据类型处理
+		if msg.Data.TextReceive != nil {
+			// 文本类型，直接返回内容
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			content := html.UnescapeString(msg.Data.TextReceive.Content)
+			if !strings.HasSuffix(content, "\n") {
+				content += "\n"
+			}
+			w.Write([]byte(content))
+			return
+		}
+
+		if msg.Data.FileReceive != nil {
+			// 文件类型，与handle_file使用相同的逻辑
+			uuid := msg.Data.FileReceive.Cache
+
+			// 检查文件是否存在于上传映射中
+			if _, ok := uploadFileMap[uuid]; !ok {
+				http.Error(w, "File not found", http.StatusNotFound)
+				return
+			}
+
+			// 使用与handle_file相同的方式提供文件
+			filename := msg.Data.FileReceive.Name
+			w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=%s",
+				url.QueryEscape(filename)))
+
+			// 直接使用ServeFile，与handle_file函数相同
+			http.ServeFile(w, r, filepath.Join(storage_folder, uuid))
+			return
+		}
+	}
+
+	// 如果没有找到符合条件的消息
+	http.Error(w, "No matching content found", http.StatusNotFound)
 }
