@@ -25,7 +25,7 @@ RUN mkdir -p ./static
 COPY --from=frontend /app/dist ./static/
 
 # 编译应用，启用嵌入式静态文件
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w -X main.useEmbedded=true" -o cloud-clipboard-go .
+RUN CGO_ENABLED=0 GOOS=linux go build -tags=embed -ldflags="-s -w -X main.useEmbedded=true" -o cloud-clipboard-go .
 
 # 最终镜像
 FROM alpine:latest
