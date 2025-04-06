@@ -26,6 +26,7 @@
 
 ### 傻瓜式运行(UI辅助器,推荐小白用户们)
 
+![](https://github.com/Jonnyan404/cloud-clipboard-go-launcher/blob/main/demo.png)
 去 [项目release](https://github.com/Jonnyan404/cloud-clipboard-go-launcher/releases) 下载后,双击使用
 
 ### 使用 Docker 运行
@@ -87,6 +88,11 @@ brew services restart cloud-clipboard-go
 ```
 
 ### 使用 OpenWrt 运行
+
+luci 界面预览
+<details>
+![](https://github.com/Jonnyan404/cloud-clipboard-go/blob/main/openwrt/demo.png)
+</details>
 
 ✅ OpenWrt 24.10.0 测试通过
 
