@@ -26,7 +26,12 @@
 
 ### 傻瓜式运行(UI辅助器,推荐小白用户们)
 
+<details>
+    <summary>点击查看预览图</summary>
+
 ![](https://github.com/Jonnyan404/cloud-clipboard-go-launcher/blob/main/demo.png)
+
+</details>
 
 去 [项目release](https://github.com/Jonnyan404/cloud-clipboard-go-launcher/releases) 下载后,双击使用
 
@@ -90,12 +95,6 @@ brew services restart cloud-clipboard-go
 
 ### 使用 OpenWrt 运行
 
-luci 界面预览
-<details>
-
-![](https://github.com/Jonnyan404/cloud-clipboard-go/blob/main/openwrt/demo.png)
-
-</details>
 
 ✅ OpenWrt 24.10.0 测试通过
 
@@ -108,6 +107,13 @@ luci 界面预览
 opkg install *平台.ipk
 opkg install *_all.ipk
 ```
+
+<details>
+    <summary>点击预览luci界面</summary>
+
+![](https://github.com/Jonnyan404/cloud-clipboard-go/blob/main/openwrt/demo.png)
+
+</details>
 
 
 ### 使用二进制文件运行
