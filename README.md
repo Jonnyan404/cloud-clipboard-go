@@ -45,7 +45,7 @@
 
 </details>
 
-去 [项目release](https://github.com/Jonnyan404/cloud-clipboard-go-launcher/releases) 下载后,双击使用
+去 [UI辅助器](https://github.com/Jonnyan404/cloud-clipboard-go-launcher/releases) 下载后,双击使用
 
 ### 使用 Docker 运行
 
