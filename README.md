@@ -1,5 +1,17 @@
 # cloud-clipboard-go
 
+<p>
+  <a href="https://raw.githubusercontent.com/jonnyan404/cloud-clipboard-go-launcher/main/LICENSE">
+    <img src="https://img.shields.io/github/license/jonnyan404/cloud-clipboard-go-launcher?color=brightgreen" alt="license">
+  </a>
+  <a href="https://github.com/jonnyan404/cloud-clipboard-go/releases/latest">
+    <img src="https://img.shields.io/github/v/release/jonnyan404/cloud-clipboard-go?color=brightgreen&include_prereleases" alt="release">
+  </a>
+  <a href="https://github.com/jonnyan404/cloud-clipboard-go/releases/latest">
+    <img src="https://img.shields.io/github/downloads/jonnyan404/cloud-clipboard-go/total?color=brightgreen&include_prereleases" alt="release">
+  </a>
+</p>
+
 基于 [TransparentLC](https://github.com/TransparentLC/cloud-clipboard) 项目,用go复刻了一个
 
 在 [yurenchen000](https://github.com/yurenchen000/cloud-clipboard) 基础上增加一些功能
@@ -21,18 +33,6 @@
 </details>
 
 ## 使用方法
-
-<p>
-  <a href="https://raw.githubusercontent.com/jonnyan404/cloud-clipboard-go-launcher/main/LICENSE">
-    <img src="https://img.shields.io/github/license/jonnyan404/cloud-clipboard-go-launcher?color=brightgreen" alt="license">
-  </a>
-  <a href="https://github.com/jonnyan404/cloud-clipboard-go/releases/latest">
-    <img src="https://img.shields.io/github/v/release/jonnyan404/cloud-clipboard-go?color=brightgreen&include_prereleases" alt="release">
-  </a>
-  <a href="https://github.com/jonnyan404/cloud-clipboard-go/releases/latest">
-    <img src="https://img.shields.io/github/downloads/jonnyan404/cloud-clipboard-go/total?color=brightgreen&include_prereleases" alt="release">
-  </a>
-</p>
 
 这里是 go 版服务端
 
