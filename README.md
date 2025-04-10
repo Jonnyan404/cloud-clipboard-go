@@ -22,6 +22,18 @@
 
 ## 使用方法
 
+<p>
+  <a href="https://raw.githubusercontent.com/jonnyan404/cloud-clipboard-go-launcher/main/LICENSE">
+    <img src="https://img.shields.io/github/license/jonnyan404/cloud-clipboard-go-launcher?color=brightgreen" alt="license">
+  </a>
+  <a href="https://github.com/jonnyan404/cloud-clipboard-go/releases/latest">
+    <img src="https://img.shields.io/github/v/release/jonnyan404/cloud-clipboard-go?color=brightgreen&include_prereleases" alt="release">
+  </a>
+  <a href="https://github.com/jonnyan404/cloud-clipboard-go/releases/latest">
+    <img src="https://img.shields.io/github/downloads/jonnyan404/cloud-clipboard-go/total?color=brightgreen&include_prereleases" alt="release">
+  </a>
+</p>
+
 这里是 go 版服务端
 
 ### 傻瓜式运行(UI辅助器,推荐小白用户们)
