@@ -67,12 +67,7 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-      
-      - name: Get version from build job
-        run: |
-          VERSION="${{ needs.build.outputs.version }}"
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-      
+
       - name: Create directory structure
         run: |
           mkdir -p openwrt/build
