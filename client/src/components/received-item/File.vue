@@ -186,9 +186,40 @@ export default {
             }
         },
         copyLink() {
-            navigator.clipboard
-                .writeText(`${location.protocol}//${location.host}/content/${this.meta.id}${this.$root.room ? `?room=${this.$root.room}` : ''}`)
-                .then(() => this.$toast('复制成功'));
+            const textToCopy = `${location.protocol}//${location.host}/content/${this.meta.id}${this.$root.room ? `?room=${this.$root.room}` : ''}`;
+
+            // 优先使用 navigator.clipboard (需要安全上下文)
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(textToCopy)
+                    .then(() => this.$toast('复制成功'))
+                    .catch(err => {
+                        console.error('使用 navigator.clipboard 复制失败:', err);
+                        this.$toast('复制失败');
+                    });
+            } else {
+                // 后备方案：使用 document.execCommand (兼容性更好，但已不推荐)
+                try {
+                    const textArea = document.createElement("textarea");
+                    textArea.value = textToCopy;
+                    // 使 textarea 在屏幕外，避免干扰布局
+                    textArea.style.position = "absolute";
+                    textArea.style.left = "-9999px";
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    const successful = document.execCommand('copy');
+                    document.body.removeChild(textArea);
+
+                    if (successful) {
+                        this.$toast('复制成功');
+                    } else {
+                        console.error('使用 document.execCommand 复制失败');
+                        this.$toast('复制失败');
+                    }
+                } catch (err) {
+                    console.error('复制时发生错误:', err);
+                    this.$toast('复制失败');
+                }
+            }
         },
         deleteItem() {
             this.$http.delete(`revoke/${this.meta.id}`, {
