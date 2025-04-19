@@ -1,12 +1,14 @@
 name: Docker Manual Build
 
 on:
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
       version:
         description: '版本标签 (例如: v1.0.0)'
         required: true
-        default: 'latest'
+        default: 'v4.3.1'
       platforms:
         description: '构建平台 (用逗号分隔的平台列表)'
         required: true
@@ -30,17 +32,6 @@ jobs:
         with:
           fetch-depth: 0  # 确保获取所有标签
 
-      - name: Set version variable
-        id: set_version
-        run: |
-          VERSION=${{ github.event.inputs.version }}
-          # 如果输入的版本不是以v开头且不是latest，则添加v前缀
-          if [[ ! $VERSION == v* && $VERSION != "latest" ]]; then
-            VERSION="v$VERSION"
-          fi
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
@@ -49,10 +40,10 @@ jobs:
             ghcr.io/${{ github.repository }}
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ github.event.repository.name }}
           tags: |
-            # 总是添加输入的版本标签
-            type=raw,value=${{ steps.set_version.outputs.version }}
-            # 只有当选择了also_latest时才添加latest标签
-            type=raw,value=latest,enable=${{ github.event.inputs.also_latest == 'true' }}
+            type=ref,event=release,tag=${{ github.event.release.tag_name }}
+            type=ref,value=release,tag=latest
+            type=raw,value=${{ github.event.inputs.version }},enable=${{ github.event_name == 'workflow_dispatch' }}
+            type=raw,value=latest,enable=${{ github.event_name == 'workflow_dispatch' && github.event.inputs.also_latest == 'true' }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -83,4 +74,4 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            VERSION=${{ steps.set_version.outputs.version }}
+            VERSION=${{ github.event.inputs.version }}

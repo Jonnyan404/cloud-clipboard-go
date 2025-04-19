@@ -17,8 +17,6 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.get_version.outputs.VERSION }}
     strategy:
       matrix:
         arch: [x86_64, i386, arm_cortex-a5, arm_cortex-a7, arm_cortex-a8, arm_cortex-a9, arm_cortex-a15_neon-vfpv4, aarch64, mips_24kc, mipsel_24kc]
@@ -37,21 +35,6 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Get version info
-        id: get_version
-        run: |
-          if [[ $GITHUB_REF == refs/tags/v* ]]; then
-            VERSION=${GITHUB_REF#refs/tags/v}
-          elif [[ "${{ github.event.inputs.version }}" != "" ]]; then
-            VERSION="${{ github.event.inputs.version }}"
-          else
-            VERSION=$(grep "server_version" cloud-clip/main.go | head -1 | cut -d '"' -f 2)
-            GIT_HASH=$(git rev-parse --short HEAD)
-            VERSION="${VERSION}-${GIT_HASH}"
-          fi
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-
       - name: Create directory structure
         run: |
           mkdir -p openwrt/build
@@ -59,24 +42,24 @@ jobs:
       - name: Build binary
         run: |
           chmod +x openwrt/scripts/build.sh
-          ./openwrt/scripts/build.sh ${{ env.VERSION }}
+          ./openwrt/scripts/build.sh ${{ github.event.inputs.version }}
 
       - name: Package IPK
         run: |
           chmod +x openwrt/scripts/package-openwrt.sh
-          ./openwrt/scripts/package-openwrt.sh ${{ env.VERSION }} ${{ matrix.arch }}
+          ./openwrt/scripts/package-openwrt.sh ${{ github.event.inputs.version }} ${{ matrix.arch }}
 
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4
         with:
-          name: cloud-clipboard-${{ env.VERSION }}-${{ matrix.arch }}
-          path: openwrt/build/cloud-clipboard-${{ env.VERSION }}-${{ matrix.arch }}
+          name: cloud-clipboard-${{ github.event.inputs.version }}-${{ matrix.arch }}
+          path: openwrt/build/cloud-clipboard-${{ github.event.inputs.version }}-${{ matrix.arch }}
 
       - name: Upload IPK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: cloud-clipboard_${{ env.VERSION }}_${{ matrix.arch }}.ipk
-          path: openwrt/build/cloud-clipboard_${{ env.VERSION }}_${{ matrix.arch }}.ipk
+          name: cloud-clipboard_${{ github.event.inputs.version }}_${{ matrix.arch }}.ipk
+          path: openwrt/build/cloud-clipboard_${{ github.event.inputs.version }}_${{ matrix.arch }}.ipk
 
   build-luci:
     runs-on: ubuntu-latest
@@ -99,13 +82,13 @@ jobs:
       - name: Package LuCI App
         run: |
           chmod +x openwrt/scripts/package-luci-app.sh
-          ./openwrt/scripts/package-luci-app.sh ${{ env.VERSION }}
+          ./openwrt/scripts/package-luci-app.sh ${{ github.event.inputs.version }}
       
       - name: Upload LuCI IPK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: luci-app-cloud-clipboard_${{ env.VERSION }}_all.ipk
-          path: openwrt/build/luci-app-cloud-clipboard_${{ env.VERSION }}_all.ipk
+          name: luci-app-cloud-clipboard_${{ github.event.inputs.version }}_all.ipk
+          path: openwrt/build/luci-app-cloud-clipboard_${{ github.event.inputs.version }}_all.ipk
 
   release:
     needs: [build, build-luci]

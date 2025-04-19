@@ -112,7 +112,7 @@ brew services restart cloud-clipboard-go
 
 查看所属架构命令: `opkg print-architecture` (最后一行第二列就是)
 
-去 https://github.com/Jonnyan404/cloud-clipboard-go/releases/tag/v1.3.2 下载对应系统的`*平台.ipk`文件和`*_all.ipk`文件
+去 https://github.com/Jonnyan404/cloud-clipboard-go/releases/tag/v1.3.3 下载对应系统的`*平台.ipk`文件和`*_all.ipk`文件
 
 然后在命令行执行下列命令
 ```
