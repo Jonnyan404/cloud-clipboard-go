@@ -9,7 +9,8 @@
                         <div class="title text-truncate text--primary" @click="expand = !expand">
                             文本消息<v-icon>{{expand ? mdiChevronUp : mdiChevronDown}}</v-icon>
                         </div>
-                        <div class="text-truncate" @click="expand = !expand" v-html="meta.content.trim()" v-linkified></div>
+                        <!-- Use textContent for preview to avoid potential XSS if content is not sanitized -->
+                        <div class="text-truncate" @click="expand = !expand">{{ decodedContentPreview }}</div>
                     </div>
 
                     <div class="align-self-center text-no-wrap">
@@ -42,7 +43,8 @@
                 <v-expand-transition>
                     <div v-show="expand">
                         <v-divider class="my-2"></v-divider>
-                        <div ref="content" v-html="meta.content.replace(/\n/g, '<br>')" v-linkified></div>
+                        <!-- Use v-text or properly sanitize if using v-html -->
+                        <div ref="content" style="white-space: pre-wrap; word-break: break-all;">{{ decodedContent }}</div>
                     </div>
                 </v-expand-transition>
             </v-card-text>
@@ -59,7 +61,12 @@ import {
     mdiLinkVariant,
 } from '@mdi/js';
 
-const dp = new DOMParser;
+// Helper function to decode HTML entities
+function decodeHtmlEntities(text) {
+    const textArea = document.createElement('textarea');
+    textArea.innerHTML = text;
+    return textArea.value;
+}
 
 export default {
     name: 'received-text',
@@ -81,16 +88,58 @@ export default {
             mdiLinkVariant,
         };
     },
+    computed: {
+        // Decode content for display, preventing potential XSS
+        decodedContent() {
+            return decodeHtmlEntities(this.meta.content || '');
+        },
+        // Decode content for preview
+        decodedContentPreview() {
+            // Limit preview length if needed
+            const decoded = decodeHtmlEntities(this.meta.content || '');
+            return decoded; // You might want to truncate this further
+        }
+    },
     methods: {
+        copyToClipboard(textToCopy, successMessage = '复制成功', errorMessage = '复制失败') {
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(textToCopy)
+                    .then(() => this.$toast(successMessage))
+                    .catch(err => {
+                        console.error('使用 navigator.clipboard 复制失败:', err);
+                        this.$toast(errorMessage);
+                    });
+            } else {
+                try {
+                    const textArea = document.createElement("textarea");
+                    textArea.value = textToCopy;
+                    textArea.style.position = "absolute";
+                    textArea.style.left = "-9999px";
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    const successful = document.execCommand('copy');
+                    document.body.removeChild(textArea);
+
+                    if (successful) {
+                        this.$toast(successMessage);
+                    } else {
+                        console.error('使用 document.execCommand 复制失败');
+                        this.$toast(errorMessage);
+                    }
+                } catch (err) {
+                    console.error('复制时发生错误:', err);
+                    this.$toast(errorMessage);
+                }
+            }
+        },
         copyText() {
-            navigator.clipboard
-                .writeText(dp.parseFromString(this.meta.content, 'text/html').documentElement.textContent)
-                .then(() => this.$toast('复制成功'));
+            // Decode HTML entities before copying
+            const textToCopy = decodeHtmlEntities(this.meta.content || '');
+            this.copyToClipboard(textToCopy, '文本复制成功');
         },
         copyLink() {
-            navigator.clipboard
-                .writeText(`${location.protocol}//${location.host}/content/${this.meta.id}${this.$root.room ? `?room=${this.$root.room}` : ''}`)
-                .then(() => this.$toast('复制成功'));
+            const linkToCopy = `${location.protocol}//${location.host}/content/${this.meta.id}${this.$root.room ? `?room=${this.$root.room}` : ''}`;
+            this.copyToClipboard(linkToCopy, '链接复制成功');
         },
         deleteItem() {
             this.$http.delete(`revoke/${this.meta.id}`, {
