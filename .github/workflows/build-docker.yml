@@ -40,8 +40,8 @@ jobs:
             ghcr.io/${{ github.repository }}
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ github.event.repository.name }}
           tags: |
-            type=ref,event=release,tag=${{ github.event.release.tag_name }}
-            type=ref,value=release,tag=latest
+            type=ref,event=release,tag=${{ github.event.release.tag_name }},enable=${{ github.event_name == 'release' && github.event.action == 'published' }}
+            type=ref,value=release,tag=latest,enable=${{ github.event_name == 'release' && github.event.action == 'published' }}
             type=raw,value=${{ github.event.inputs.version }},enable=${{ github.event_name == 'workflow_dispatch' }}
             type=raw,value=latest,enable=${{ github.event_name == 'workflow_dispatch' && github.event.inputs.also_latest == 'true' }}
 
