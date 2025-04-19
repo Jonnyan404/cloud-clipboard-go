@@ -41,7 +41,6 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ github.event.repository.name }}
           tags: |
             type=raw,value=${{ github.event_name == 'release' && github.event.release.tag_name || github.event.inputs.version }}
-            type=raw,value=${{ github.event.inputs.version }},enable=${{ github.event_name == 'workflow_dispatch' }}
             type=raw,value=latest,enable=${{ github.event_name == 'workflow_dispatch' && github.event.inputs.also_latest == 'true' }}
 
       - name: Set up QEMU
