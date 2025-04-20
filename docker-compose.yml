@@ -1,0 +1,19 @@
+
+services:
+    cloud-clipboard-go:
+        container_name: cloud-clipboard-go
+        restart: always
+        ports:
+            - "9501:9501"
+        environment:
+            - LISTEN_IP= #默认为0.0.0.0,可设置为 127.0.0.1 不懂勿动
+            - LISTEN_PORT= #默认为9501,可设置为其他端口
+            - PREFIX= #子路径,可配合nginx使用,格式: /cloud-clipboard
+            - MESSAGE_NUM= #历史记录的数量,默认为10
+            - AUTH_PASSWORD= #访问密码,默认为false,可自定义字符串密码
+            - TEXT_LIMIT= #文本长度限制,默认为4096(2048个汉字),可设置为其他长度
+            - FILE_EXPIRE= #文件过期时间,默认为3600(1小时),可设置为其他时间,单位为秒
+            - FILE_LIMIT= #文件大小限制,默认为104857600(100MB),可设置为其他大小,单位为字节
+        volumes:
+            - /path/your/dir/data:/app/server-node/data #请注意修改为你自己的目录
+        image: jonnyan404/cloud-clipboard-go:latest
