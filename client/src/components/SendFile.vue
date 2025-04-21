@@ -53,7 +53,7 @@
                     <div :title="$t('dragDropPasteTip')">
                         {{ $t('selectFileToSend') }}<span class="d-none d-xl-inline">{{ $t('dragDropPasteTip') }}</span>
                         <br>
-                        <small class="text--secondary">{{ $t('fileSizeLimit', { limit: $root.config.file.limit | prettyFileSize }) }}</small>
+                        <small class="text--secondary">{{ $t('fileSizeLimit', { limit: prettyFileSize($root.config.file.limit) }) }}</small>
                     </div>
                 </v-btn>
                 <input
@@ -78,8 +78,8 @@
 
 <script>
 import {
-    prettyFileSize,
-}from '@/util.js';
+    prettyFileSize, // Import the function
+} from '@/util.js';
 import {
     mdiClose,
 } from '@mdi/js';
@@ -110,6 +110,7 @@ export default {
         },
     },
     methods: {
+        prettyFileSize, // Make it available if you prefer this.$options.methods.prettyFileSize(...)
         focus() {
             this.$refs.selectFile.click();
         },
