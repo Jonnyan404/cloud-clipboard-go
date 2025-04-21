@@ -23,7 +23,7 @@
                             {{meta.size | prettyFileSize}}
                             <template v-if="$vuetify.breakpoint.smAndDown"><br></template>
                             <template v-else>|</template>
-                            {{expired ? '已' : '将'}}于 {{meta.expire | formatTimestamp}} 过期
+                            {{ expired ? $t('expiredAt', { time: meta.expire | formatTimestamp }) : $t('willExpireAt', { time: meta.expire | formatTimestamp }) }}
                         </div>
                     </div>
 
@@ -40,7 +40,7 @@
                                     <v-icon>{{expired ? mdiDownloadOff : mdiDownload}}</v-icon>
                                 </v-btn>
                             </template>
-                            <span>{{expired ? '已过期' : '下载'}}</span>
+                            <span>{{ expired ? $t('expired') : $t('download') }}</span>
                         </v-tooltip>
                         <template v-if="meta.thumbnail || isPreviewableVideo || isPreviewableAudio">
                             <v-progress-circular
@@ -54,7 +54,7 @@
                                         <v-icon>{{(isPreviewableVideo || isPreviewableAudio) ? mdiMovieSearchOutline : mdiImageSearchOutline}}</v-icon>
                                     </v-btn>
                                 </template>
-                                <span>预览</span>
+                                <span>{{ $t('preview') }}</span>
                             </v-tooltip>
                         </template>
                         <v-tooltip bottom>
@@ -63,7 +63,7 @@
                                     <v-icon>{{mdiLinkVariant}}</v-icon>
                                 </v-btn>
                             </template>
-                            <span>复制链接</span>
+                            <span>{{ $t('copyLink') }}</span>
                         </v-tooltip>
                         <v-tooltip bottom>
                             <template v-slot:activator="{ on }">
@@ -71,7 +71,7 @@
                                     <v-icon>{{mdiClose}}</v-icon>
                                 </v-btn>
                             </template>
-                            <span>删除</span>
+                            <span>{{ $t('delete') }}</span>
                         </v-tooltip>
                     </div>
                 </div>
@@ -176,9 +176,9 @@ export default {
                     this.srcPreview = URL.createObjectURL(new Blob([response.data]));
                 }).catch(error => {
                     if (error.response && error.response.data.msg) {
-                        this.$toast(`文件获取失败：${error.response.data.msg}`);
+                        this.$toast(this.$t('fileFetchFailedMsg', { msg: error.response.data.msg })); // Translate toast
                     } else {
-                        this.$toast('文件获取失败');
+                        this.$toast(this.$t('fileFetchFailed')); // Translate toast
                     }
                 }).finally(() => {
                     this.loadingPreview = false;
@@ -191,10 +191,10 @@ export default {
             // 优先使用 navigator.clipboard (需要安全上下文)
             if (navigator.clipboard && window.isSecureContext) {
                 navigator.clipboard.writeText(textToCopy)
-                    .then(() => this.$toast('复制成功'))
+                    .then(() => this.$toast(this.$t('copySuccess'))) // Translate toast
                     .catch(err => {
                         console.error('使用 navigator.clipboard 复制失败:', err);
-                        this.$toast('复制失败');
+                        this.$toast(this.$t('copyFailedGeneral')); // Translate toast
                     });
             } else {
                 // 后备方案：使用 document.execCommand (兼容性更好，但已不推荐)
@@ -210,14 +210,14 @@ export default {
                     document.body.removeChild(textArea);
 
                     if (successful) {
-                        this.$toast('复制成功');
+                        this.$toast(this.$t('copySuccess')); // Translate toast
                     } else {
                         console.error('使用 document.execCommand 复制失败');
-                        this.$toast('复制失败');
+                        this.$toast(this.$t('copyFailedGeneral')); // Translate toast
                     }
                 } catch (err) {
                     console.error('复制时发生错误:', err);
-                    this.$toast('复制失败');
+                    this.$toast(this.$t('copyFailedGeneral')); // Translate toast
                 }
             }
         },
@@ -227,19 +227,19 @@ export default {
             }).then(() => {
                 if (this.expired) return;
                 this.$http.delete(`file/${this.meta.cache}`).then(() => {
-                    this.$toast(`已删除文件 ${this.meta.name}`);
+                    this.$toast(this.$t('deleteSuccessFile', { name: this.meta.name })); // Translate toast
                 }).catch(error => {
                     if (error.response && error.response.data.msg) {
-                        this.$toast(`文件删除失败：${error.response.data.msg}`);
+                        this.$toast(this.$t('deleteFailedFileMsg', { msg: error.response.data.msg })); // Translate toast
                     } else {
-                        this.$toast('文件删除失败');
+                        this.$toast(this.$t('deleteFailedFile')); // Translate toast
                     }
                 });
             }).catch(error => {
                 if (error.response && error.response.data.msg) {
-                    this.$toast(`消息删除失败：${error.response.data.msg}`);
+                    this.$toast(this.$t('deleteFailedMessageMsg', { msg: error.response.data.msg })); // Translate toast
                 } else {
-                    this.$toast('消息删除失败');
+                    this.$toast(this.$t('deleteFailedMessage')); // Translate toast
                 }
             });
         },
