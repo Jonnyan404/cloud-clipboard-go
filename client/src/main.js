@@ -6,6 +6,7 @@ import websocket from './websocket';
 import axios from 'axios';
 import VueAxios from 'vue-axios';
 import linkify from 'vue-linkify';
+import i18n from './vue-i18n'; // 导入 i18n 实例
 
 import {
     prettyFileSize,
@@ -27,34 +28,40 @@ const app = new Vue({
     mixins: [websocket],
     data() {
         return {
-            date: new Date,
-            dark: null,
-            config: {
-                version: '',
-                text: {
-                    limit: 0,
-                },
-                file: {
-                    expire: 0,
-                    chunk: 0,
-                    limit: 0,
-                },
-            },
+            received: [],
+            device: [],
             send: {
                 text: '',
                 files: [],
             },
-            received: [],
-            device: [],
+            config: {
+                version: '',
+                text: { limit: 0 },
+                file: { expire: 0, chunk: 0, limit: 0 },
+            },
+            dark: localStorage.getItem('dark') || 'prefer',
+            authCode: localStorage.getItem('auth') || '',
+            authCodeDialog: false,
+            room: '',
+            roomInput: '',
+            roomDialog: false,
         };
     },
     router,
     vuetify,
+    i18n, // 将 i18n 实例添加到 Vue
     render: h => h(App),
     watch: {
         dark(newval) {
+            localStorage.setItem('dark', newval);
             this.$vuetify.theme.dark = this.useDark;
-            localStorage.setItem('darkmode', newval);
+        },
+        room(newVal, oldVal) {
+            if (this.websocket && newVal !== oldVal) {
+                // 如果房间改变，重新连接 WebSocket
+                this.websocket.close();
+                this.connect();
+            }
         },
     },
     computed: {
@@ -62,28 +69,36 @@ const app = new Vue({
             cache: false,
             get() {
                 switch (this.dark) {
+                    case 'time':
+                        const hour = new Date().getHours();
+                        return hour < 7 || hour >= 19;
+                    case 'prefer':
+                        return window.matchMedia('(prefers-color-scheme: dark)').matches;
                     case 'enable':
                         return true;
                     case 'disable':
-                        return false;
-                    case 'time':
-                        let hour = this.date.getHours();
-                        return hour >= 19 || hour < 7;
-                    case 'prefer':
-                        return matchMedia('(prefers-color-scheme:dark)').matches;
-                    default:
                         return false;
                 }
             },
         },
     },
-    mounted() {
-        this.dark = localStorage.getItem('darkmode') || 'prefer';
+    created() {
+        // 获取初始配置
+        this.$http.get('config').then(response => {
+            this.config = response.data;
+        });
+        // 初始化深色模式
         this.$vuetify.theme.dark = this.useDark;
-        setInterval(() => {
-            this.date = new Date;
-            this.$vuetify.theme.dark = this.useDark;
-        }, 1000);
+        // 连接 WebSocket
+        this.connect();
+    },
+    mounted() {
+        // 监听系统深色模式变化
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+            if (this.dark === 'prefer') {
+                this.$vuetify.theme.dark = e.matches;
+            }
+        });
     },
 })
 

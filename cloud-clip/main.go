@@ -28,7 +28,7 @@ var (
 	deviceConnected = make(map[string]string)
 )
 
-var server_version = "go-1.22.x"
+var server_version = "go版本-v4.3.1"
 var build_git_hash = show_bin_info()
 var config = load_config(config_path) // run before main()
 

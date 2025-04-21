@@ -7,7 +7,7 @@
                 <div class="d-flex flex-row align-center">
                     <div class="flex-grow-1 mr-2" style="min-width: 0">
                         <div class="title text-truncate text--primary" @click="expand = !expand">
-                            文本消息<v-icon>{{expand ? mdiChevronUp : mdiChevronDown}}</v-icon>
+                            {{ $t('textMessage') }}<v-icon>{{expand ? mdiChevronUp : mdiChevronDown}}</v-icon>
                         </div>
                         <!-- Use textContent for preview to avoid potential XSS if content is not sanitized -->
                         <div class="text-truncate" @click="expand = !expand">{{ decodedContentPreview }}</div>
@@ -20,7 +20,7 @@
                                     <v-icon>{{mdiContentCopy}}</v-icon>
                                 </v-btn>
                             </template>
-                            <span>复制文本</span>
+                            <span>{{ $t('copyText') }}</span>
                         </v-tooltip>
                         <v-tooltip bottom>
                             <template v-slot:activator="{ on }">
@@ -28,7 +28,7 @@
                                     <v-icon>{{mdiLinkVariant}}</v-icon>
                                 </v-btn>
                             </template>
-                            <span>复制链接</span>
+                            <span>{{ $t('copyLink') }}</span>
                         </v-tooltip>
                         <v-tooltip bottom>
                             <template v-slot:activator="{ on }">
@@ -36,7 +36,7 @@
                                     <v-icon>{{mdiClose}}</v-icon>
                                 </v-btn>
                             </template>
-                            <span>删除</span>
+                            <span>{{ $t('delete') }}</span>
                         </v-tooltip>
                     </div>
                 </div>
@@ -101,13 +101,13 @@ export default {
         }
     },
     methods: {
-        copyToClipboard(textToCopy, successMessage = '复制成功', errorMessage = '复制失败') {
+        copyToClipboard(textToCopy, successMessageKey = 'copySuccess', errorMessageKey = 'copyFailedGeneral') { // Use keys
             if (navigator.clipboard && window.isSecureContext) {
                 navigator.clipboard.writeText(textToCopy)
-                    .then(() => this.$toast(successMessage))
+                    .then(() => this.$toast(this.$t(successMessageKey))) // Translate toast
                     .catch(err => {
                         console.error('使用 navigator.clipboard 复制失败:', err);
-                        this.$toast(errorMessage);
+                        this.$toast(this.$t(errorMessageKey)); // Translate toast
                     });
             } else {
                 try {
@@ -121,36 +121,35 @@ export default {
                     document.body.removeChild(textArea);
 
                     if (successful) {
-                        this.$toast(successMessage);
+                        this.$toast(this.$t(successMessageKey)); // Translate toast
                     } else {
                         console.error('使用 document.execCommand 复制失败');
-                        this.$toast(errorMessage);
+                        this.$toast(this.$t(errorMessageKey)); // Translate toast
                     }
                 } catch (err) {
                     console.error('复制时发生错误:', err);
-                    this.$toast(errorMessage);
+                    this.$toast(this.$t(errorMessageKey)); // Translate toast
                 }
             }
         },
         copyText() {
-            // Decode HTML entities before copying
             const textToCopy = decodeHtmlEntities(this.meta.content || '');
-            this.copyToClipboard(textToCopy, '文本复制成功');
+            this.copyToClipboard(textToCopy, 'copySuccess'); // Pass key
         },
         copyLink() {
             const linkToCopy = `${location.protocol}//${location.host}/content/${this.meta.id}${this.$root.room ? `?room=${this.$root.room}` : ''}`;
-            this.copyToClipboard(linkToCopy, '链接复制成功');
+            this.copyToClipboard(linkToCopy, 'copySuccess'); // Pass key
         },
         deleteItem() {
             this.$http.delete(`revoke/${this.meta.id}`, {
                 params: new URLSearchParams([['room', this.$root.room]]),
             }).then(() => {
-                this.$toast('已删除文本消息');
+                this.$toast(this.$t('deleteSuccessText')); // Translate toast
             }).catch(error => {
                 if (error.response && error.response.data.msg) {
-                    this.$toast(`消息删除失败：${error.response.data.msg}`);
+                    this.$toast(this.$t('deleteFailedMessageMsg', { msg: error.response.data.msg })); // Translate toast
                 } else {
-                    this.$toast('消息删除失败');
+                    this.$toast(this.$t('deleteFailedMessage')); // Translate toast
                 }
             });
         },
