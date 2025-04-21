@@ -109,7 +109,7 @@ brew services restart cloud-clipboard-go
 
 Check your architecture with: `opkg print-architecture` (the second column of the last line)
 
-Go to https://github.com/Jonnyan404/cloud-clipboard-go/releases/latest and download the `*platform.ipk` file for your system and the `*_all.ipk` file.
+Go to the `pre-release` section of https://github.com/Jonnyan404/cloud-clipboard-go/releases and download the `*platform.ipk` file corresponding to your system and the `*_all.ipk` file.
 
 Then execute the following commands in the terminal:
 ```bash
