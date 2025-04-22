@@ -11,36 +11,29 @@ import (
 **/
 
 // ReceiveBase is the common structure for all receive types
-// type ReceiveBase struct {
-// 	ID   int    `json:"id"`
-// 	Type string `json:"type"`
-// 	Room string `json:"room"`
-// }
+type ReceiveBase struct {
+	ID           int               `json:"id"`
+	Type         string            `json:"type"`
+	Room         string            `json:"room"`
+	Timestamp    int64             `json:"timestamp"`    // Unix timestamp (seconds)
+	SenderIP     string            `json:"senderIP"`     // 发送者 IP 地址
+	SenderDevice map[string]string `json:"senderDevice"` // 发送者设备信息 (来自 User-Agent 解析)
+}
 
 // "text" type item in Receive[]
 type TextReceive struct {
-	// ReceiveBase
-	ID   int    `json:"id"`
-	Type string `json:"type"`
-	Room string `json:"room"`
-
-	Content string `json:"content"`
+	ReceiveBase        // 嵌入基础结构
+	Content     string `json:"content"`
 }
 
 // "file" type item in Receive[]
 type FileReceive struct {
-	// ReceiveBase
-	ID   int    `json:"id"`
-	Type string `json:"type"`
-	Room string `json:"room"`
-
-	Name      string `json:"name"`
-	UUID      string `json:"uuid"`
-	Size      int    `json:"size"`
-	Cache     string `json:"cache"`
-	Expire    int64  `json:"expire"`
-	Thumbnail string `json:"thumbnail"`
-	URL       string `json:"url,omitempty"`
+	ReceiveBase        // 嵌入基础结构
+	Name        string `json:"name"`
+	Size        int    `json:"size"`
+	Cache       string `json:"cache"` // Cache 通常就是 UUID
+	Expire      int64  `json:"expire"`
+	Thumbnail   string `json:"thumbnail"`
 }
 
 // holds either a TextReceive or a FileReceive
@@ -74,21 +67,35 @@ func (r *ReceiveHolder) UnmarshalJSON(data []byte) error {
 		}
 		r.FileReceive = &fileReceive
 	default:
-		return fmt.Errorf("unknown type: %v", raw["type"])
+		// Try unmarshalling into ReceiveBase just to check if it's a valid base structure
+		var base ReceiveBase
+		if errBase := json.Unmarshal(data, &base); errBase == nil && base.Type != "" {
+			// It might be a type we don't specifically handle here, but has the base fields.
+			// Decide if you want to allow this or return an error.
+			// For now, let's return an error for unknown specific types.
+			return fmt.Errorf("unknown specific message type: %v", raw["type"])
+		}
+		return fmt.Errorf("unknown message type or invalid structure: %v", raw["type"])
+
 	}
 
 	return nil
 }
 
-// Custom JSON marshaler for ReceiveBaseHolder
+// Custom JSON marshaler for ReceiveHolder
 func (r ReceiveHolder) MarshalJSON() ([]byte, error) {
 	if r.TextReceive != nil {
 		return json.Marshal(r.TextReceive)
 	} else if r.FileReceive != nil {
 		return json.Marshal(r.FileReceive)
 	}
-	return nil, fmt.Errorf("no valid receive type found in ReceiveBaseHolder")
+	// Return null or an empty object instead of an error if appropriate
+	// return []byte("null"), nil
+	return nil, fmt.Errorf("no valid receive type found in ReceiveHolder")
 }
+
+// --- Helper methods for ReceiveHolder ---
+
 func (r *ReceiveHolder) SetID(id int) int {
 	if r.TextReceive != nil {
 		r.TextReceive.ID = id
@@ -108,6 +115,7 @@ func (r *ReceiveHolder) ID() int {
 	}
 	return -1
 }
+
 func (r *ReceiveHolder) Type() string {
 	if r.TextReceive != nil {
 		return r.TextReceive.Type
@@ -116,6 +124,7 @@ func (r *ReceiveHolder) Type() string {
 	}
 	return ""
 }
+
 func (r *ReceiveHolder) Room() string {
 	if r.TextReceive != nil {
 		return r.TextReceive.Room
@@ -123,4 +132,32 @@ func (r *ReceiveHolder) Room() string {
 		return r.FileReceive.Room
 	}
 	return ""
+}
+
+// Add getters for the new fields if needed, accessing via the embedded ReceiveBase
+func (r *ReceiveHolder) Timestamp() int64 {
+	if r.TextReceive != nil {
+		return r.TextReceive.Timestamp
+	} else if r.FileReceive != nil {
+		return r.FileReceive.Timestamp
+	}
+	return 0
+}
+
+func (r *ReceiveHolder) SenderIP() string {
+	if r.TextReceive != nil {
+		return r.TextReceive.SenderIP
+	} else if r.FileReceive != nil {
+		return r.FileReceive.SenderIP
+	}
+	return ""
+}
+
+func (r *ReceiveHolder) SenderDevice() map[string]string {
+	if r.TextReceive != nil {
+		return r.TextReceive.SenderDevice
+	} else if r.FileReceive != nil {
+		return r.FileReceive.SenderDevice
+	}
+	return nil
 }

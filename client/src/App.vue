@@ -109,6 +109,56 @@
                     </v-list>
                 </v-menu>
 
+                <v-divider></v-divider>
+                <v-subheader>{{ $t('displaySettings') }}</v-subheader>
+
+                <v-list-item>
+                    <!-- Icon on the left -->
+                    <v-list-item-icon>
+                         <v-icon>{{ mdiClockOutline }}</v-icon>
+                    </v-list-item-icon>
+                    <!-- Content in the middle -->
+                    <v-list-item-content @click="$root.showTimestamp = !$root.showTimestamp" style="cursor: pointer;">
+                        <v-list-item-title>{{ $t('showTimestamp') }}</v-list-item-title>
+                    </v-list-item-content>
+                    <!-- Action (Switch) on the right -->
+                    <v-list-item-action>
+                        <v-switch v-model="$root.showTimestamp" color="primary" class="ma-0 pa-0" hide-details></v-switch>
+                    </v-list-item-action>
+                </v-list-item>
+
+                <v-list-item>
+                    <!-- Icon on the left -->
+                    <v-list-item-icon>
+                         <v-icon>{{ mdiDevices }}</v-icon>
+                    </v-list-item-icon>
+                    <!-- Content in the middle -->
+                    <v-list-item-content @click="$root.showDeviceInfo = !$root.showDeviceInfo" style="cursor: pointer;">
+                        <v-list-item-title>{{ $t('showDeviceInfo') }}</v-list-item-title>
+                    </v-list-item-content>
+                    <!-- Action (Switch) on the right -->
+                    <v-list-item-action>
+                        <v-switch v-model="$root.showDeviceInfo" color="primary" class="ma-0 pa-0" hide-details></v-switch>
+                    </v-list-item-action>
+                </v-list-item>
+
+                <v-list-item>
+                    <!-- Icon on the left -->
+                    <v-list-item-icon>
+                         <v-icon>{{ mdiIpNetworkOutline }}</v-icon>
+                    </v-list-item-icon>
+                    <!-- Content in the middle -->
+                    <v-list-item-content @click="$root.showSenderIP = !$root.showSenderIP" style="cursor: pointer;">
+                        <v-list-item-title>{{ $t('showSenderIP') }}</v-list-item-title>
+                    </v-list-item-content>
+                    <!-- Action (Switch) on the right -->
+                    <v-list-item-action>
+                        <v-switch v-model="$root.showSenderIP" color="primary" class="ma-0 pa-0" hide-details></v-switch>
+                    </v-list-item-action>
+                </v-list-item>
+
+                 <v-divider></v-divider>
+
                 <v-list-item link href="#/about">
                     <v-list-item-action>
                         <v-icon>{{mdiInformation}}</v-icon>
@@ -276,6 +326,8 @@ import {
     mdiPalette,
     mdiNotificationClearAll,
     mdiTranslate, // 添加图标
+    mdiClockOutline,      // Add icon
+    mdiIpNetworkOutline,  // Add icon
 } from '@mdi/js';
 
 export default {
@@ -296,6 +348,8 @@ export default {
             mdiPalette,
             mdiNotificationClearAll,
             mdiTranslate, // 添加图标
+            mdiClockOutline,      // Add icon
+            mdiIpNetworkOutline,  // Add icon
             navigator, // 使 navigator 可用
         };
     },
