@@ -89,5 +89,6 @@
     "displaySettings": "表示設定",
     "showTimestamp": "タイムスタンプを表示",
     "showDeviceInfo": "デバイス情報を表示",
-    "showSenderIP": "送信者IPを表示"
+    "showSenderIP": "送信者IPを表示",
+    "clipboardClearedRefresh": "クリップボードがクリアされました、ページを更新して有効にしてください"
   }
