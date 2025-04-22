@@ -85,5 +85,9 @@
     "connectingServer": "正在连接服务器……",
     "reconnectingServer": "未能连接到服务器，正在尝试第 {retry} 次重连……",
     "connectionSuccess": "连接服务器成功",
-    "connectionFailedRetry": "连接服务器失败，请点击工具栏上的“连接”图标重试"
-  }
+    "connectionFailedRetry": "连接服务器失败，请点击工具栏上的“连接”图标重试",
+    "displaySettings": "显示设置",
+    "showTimestamp": "显示时间戳",
+    "showDeviceInfo": "显示设备信息",
+    "showSenderIP": "显示发送者IP"
+}

@@ -45,6 +45,11 @@ const app = new Vue({
             room: '',
             roomInput: '',
             roomDialog: false,
+            // --- 新增显示设置 (默认 true) ---
+            showTimestamp: localStorage.getItem('showTimestamp') !== 'false',
+            showDeviceInfo: localStorage.getItem('showDeviceInfo') !== 'false',
+            showSenderIP: localStorage.getItem('showSenderIP') !== 'false',
+            // --- 结束新增 ---
         };
     },
     router,
@@ -63,6 +68,17 @@ const app = new Vue({
                 this.connect();
             }
         },
+        // --- 新增 Watchers ---
+        showTimestamp(newVal) {
+            localStorage.setItem('showTimestamp', newVal);
+        },
+        showDeviceInfo(newVal) {
+            localStorage.setItem('showDeviceInfo', newVal);
+        },
+        showSenderIP(newVal) {
+            localStorage.setItem('showSenderIP', newVal);
+        },
+        // --- 结束新增 ---
     },
     computed: {
         useDark: {
@@ -84,9 +100,9 @@ const app = new Vue({
     },
     created() {
         // 获取初始配置
-        this.$http.get('config').then(response => {
-            this.config = response.data;
-        });
+        // this.$http.get('config').then(response => {
+        //     this.config = response.data;
+        // });
         // 初始化深色模式
         this.$vuetify.theme.dark = this.useDark;
         // 连接 WebSocket
