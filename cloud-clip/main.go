@@ -30,7 +30,7 @@ var (
 	deviceConnected = make(map[string]string)
 )
 
-var server_version = "go-v4.3.3"
+var server_version = "go verion by Jonnyan404"
 var build_git_hash = show_bin_info()
 var config = load_config(config_path) // run before main()
 
