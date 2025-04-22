@@ -23,7 +23,7 @@
                             {{meta.size | prettyFileSize}}
                             <template v-if="$vuetify.breakpoint.smAndDown"><br></template>
                             <template v-else>|</template>
-                            {{ expired ? $t('expiredAt', { time: meta.expire | formatTimestamp }) : $t('willExpireAt', { time: meta.expire | formatTimestamp }) }}
+                            {{ expired ? $t('expiredAt', { time: formatTimestamp(meta.expire) }) : $t('willExpireAt', { time: formatTimestamp(meta.expire) }) }}
                         </div>
                     </div>
 
@@ -109,6 +109,11 @@
 
 <script>
 import {
+    prettyFileSize,
+    percentage,
+    formatTimestamp,
+} from '@/util.js';
+import {
     mdiContentCopy,
     mdiDownload,
     mdiDownloadOff,
@@ -155,6 +160,7 @@ export default {
         },
     },
     methods: {
+        formatTimestamp,
         previewFile() {
             if (this.expand) {
                 this.expand = false;
