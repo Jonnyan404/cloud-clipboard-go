@@ -1,8 +1,8 @@
 name: Docker Manual Build
 
 on:
-  release:
-    types: [published]
+  # release:
+  #   types: [published]
   workflow_dispatch:
     inputs:
       version:
@@ -71,4 +71,4 @@ jobs:
           platforms: ${{ github.event.inputs.platforms }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          no-cache: true
+          # no-cache: true
