@@ -85,5 +85,9 @@
     "connectingServer": "サーバーに接続中...",
     "reconnectingServer": "サーバーへの接続に失敗しました。{retry} 回目の再接続を試行中...",
     "connectionSuccess": "サーバーへの接続に成功しました",
-    "connectionFailedRetry": "サーバーへの接続に失敗しました。ツールバーの「接続」アイコンをクリックして再試行してください"
+    "connectionFailedRetry": "サーバーへの接続に失敗しました。ツールバーの「接続」アイコンをクリックして再試行してください",
+    "displaySettings": "表示設定",
+    "showTimestamp": "タイムスタンプを表示",
+    "showDeviceInfo": "デバイス情報を表示",
+    "showSenderIP": "送信者IPを表示"
   }
