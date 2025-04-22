@@ -176,7 +176,9 @@
             dark
         >
             <v-app-bar-nav-icon @click.stop="drawer = !drawer" />
-            <v-toolbar-title>{{ $t('cloudClipboard') }}<span class="d-none d-sm-inline" v-if="$root.room">（{{ $t('room') }}：<abbr :title="$t('copyRoomName')" style="cursor:pointer" @click="copyRoomName($root.room)">{{$root.room}}</abbr>）</span></v-toolbar-title>
+            <v-toolbar-title @click="goHome" style="cursor: pointer;">
+                {{ $t('cloudClipboard') }}<span class="d-none d-sm-inline" v-if="$root.room">（{{ $t('room') }}：<abbr :title="$t('copyRoomName')" style="cursor:pointer" @click.stop="copyRoomName($root.room)">{{$root.room}}</abbr>）</span>
+            </v-toolbar-title>
             <v-spacer></v-spacer>
             <v-tooltip left>
                 <template v-slot:activator="{ on }">
@@ -207,6 +209,17 @@
                 <span v-else>{{ $t('disconnected') }}</span>
             </v-tooltip>
         </v-app-bar>
+
+        <v-alert
+            v-model="clipboardClearedMessageVisible"
+            type="error"
+            dismissible
+            dense
+            class="ma-0 text-center"
+            style="position: sticky; top: 64px; z-index: 5;"
+        >
+            {{ $t('clipboardClearedRefresh') }}
+        </v-alert>
 
         <v-main>
             <template v-if="$route.meta.keepAlive">
@@ -298,7 +311,7 @@
                     <v-btn
                         color="primary darken-1"
                         text
-                        @click="clearAllDialog = false; clearAll()"
+                        @click="clearAllDialog = false; clearAll(); clipboardClearedMessageVisible = true;"  
                     >{{ $t('ok') }}</v-btn>
                 </v-card-actions>
             </v-card>
@@ -309,6 +322,13 @@
 <style scoped>
 .v-navigation-drawer >>> .v-navigation-drawer__border {
     pointer-events: none;
+}
+
+/* Ensure alert is above main content but below app bar */
+.v-alert {
+    /* Adjust top value if your app bar height is different */
+    top: 64px; /* Default Vuetify app bar height */
+    z-index: 5; /* Ensure it's above v-main but below v-app-bar */
 }
 </style>
 
@@ -336,6 +356,7 @@ export default {
             drawer: false,
             colorDialog: false,
             clearAllDialog: false,
+            clipboardClearedMessageVisible: false, // Add this line
             mdiContentPaste,
             mdiDevices,
             mdiInformation,
@@ -367,16 +388,22 @@ export default {
     },
     methods: {
         async clearAll() {
+            // Set message visible immediately on confirmation
+            // this.clipboardClearedMessageVisible = true; // Moved to button click for immediate feedback
+
             try {
                 const files = this.$root.received.filter(e => e.type === 'file');
                 await this.$http.delete('revoke/all', {
                     params: { room: this.$root.room },
                 });
-                for (const file of files) {
-                    await this.$http.delete(`file/${file.cache}`);
-                }
+                // No need to delete individual files if revoke/all works correctly
+                // for (const file of files) {
+                //     await this.$http.delete(`file/${file.cache}`);
+                // }
             } catch (error) {
                 console.log(error);
+                // Hide the generic success message if there's an error
+                this.clipboardClearedMessageVisible = false;
                 if (error.response && error.response.data.msg) {
                     this.$toast(this.$t('clearClipboardFailedMsg', { msg: error.response.data.msg }));
                 } else {
@@ -412,6 +439,17 @@ export default {
                 localStorage.setItem('locale', locale); // 保存用户选择
             }
         },
+        // Add goHome method
+        goHome() {
+            console.log('goHome triggered. Current route:', this.$route.fullPath); // Log full path for debugging
+            // Navigate to '/' if the current path is not '/' OR if there are query parameters
+            if (this.$route.path !== '/' || Object.keys(this.$route.query).length > 0) {
+                 console.log('Navigating to / (Public Room)');
+                 this.$router.push('/'); // Navigate to the root path, clearing query parameters
+            } else {
+                 console.log('Already on public room (/), not navigating.');
+            }
+        }
     },
     mounted() {
         // primary color <==> localStorage
@@ -433,5 +471,11 @@ export default {
             localStorage.setItem('lightPrimary', newVal);
         });
     },
+    watch: {
+        // Add watcher to hide the message when route changes
+        '$route'() {
+            this.clipboardClearedMessageVisible = false;
+        }
+    }
 };
 </script>

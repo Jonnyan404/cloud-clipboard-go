@@ -89,5 +89,6 @@
     "displaySettings": "Display Settings",
     "showTimestamp": "Show Timestamp",
     "showDeviceInfo": "Show Device Info",
-    "showSenderIP": "Show Sender IP"
+    "showSenderIP": "Show Sender IP",
+    "clipboardClearedRefresh": "Clipboard cleared, refresh the page to take effect"
 }
