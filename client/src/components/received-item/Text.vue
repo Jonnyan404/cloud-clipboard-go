@@ -1,18 +1,29 @@
 <template>
-    <v-hover
-        v-slot:default="{ hover }"
-    >
+    <v-hover v-slot:default="{ hover }">
         <v-card :elevation="hover ? 6 : 2" class="mb-2 transition-swing">
             <v-card-text>
                 <div class="d-flex flex-row align-center">
                     <div class="flex-grow-1 mr-2" style="min-width: 0">
+                        <!-- Info Line - Moved Here -->
+                        <div class="caption text--secondary mb-1" v-if="meta.timestamp && ($root.showTimestamp || $root.showDeviceInfo || $root.showSenderIP)">
+                            <template v-if="$root.showTimestamp">
+                                <v-icon small class="mr-1">{{ mdiClockOutline }}</v-icon>{{ formatTimestamp(meta.timestamp) }}
+                            </template>
+                            <template v-if="$root.showDeviceInfo && meta.senderDevice && meta.senderDevice.type">
+                                <v-icon small class="ml-2 mr-1">{{ deviceIcon(meta.senderDevice.type) }}</v-icon>{{ meta.senderDevice.os || meta.senderDevice.type }}
+                            </template>
+                            <template v-if="$root.showSenderIP && meta.senderIP">
+                                <v-icon small class="ml-2 mr-1">{{ mdiIpNetworkOutline }}</v-icon>{{ meta.senderIP }}
+                            </template>
+                        </div>
+                        <!-- Title -->
                         <div class="title text-truncate text--primary" @click="expand = !expand">
                             {{ $t('textMessage') }}<v-icon>{{expand ? mdiChevronUp : mdiChevronDown}}</v-icon>
                         </div>
-                        <!-- Use textContent for preview to avoid potential XSS if content is not sanitized -->
+                        <!-- Preview -->
                         <div class="text-truncate" @click="expand = !expand">{{ decodedContentPreview }}</div>
                     </div>
-
+                    <!-- Buttons -->
                     <div class="align-self-center text-no-wrap">
                         <v-tooltip bottom>
                             <template v-slot:activator="{ on }">
@@ -59,7 +70,12 @@ import {
     mdiContentCopy,
     mdiClose,
     mdiLinkVariant,
+    mdiClockOutline, // Add icon
+    mdiDesktopTower, // Add icon
+    mdiCellphone,    // Add icon
+    mdiIpNetworkOutline, // Add icon
 } from '@mdi/js';
+import { formatTimestamp } from '@/util.js'; // Import formatter
 
 // Helper function to decode HTML entities
 function decodeHtmlEntities(text) {
@@ -86,6 +102,10 @@ export default {
             mdiContentCopy,
             mdiClose,
             mdiLinkVariant,
+            mdiClockOutline, // Add icon
+            mdiDesktopTower, // Add icon
+            mdiCellphone,    // Add icon
+            mdiIpNetworkOutline, // Add icon
         };
     },
     computed: {
@@ -101,6 +121,14 @@ export default {
         }
     },
     methods: {
+        formatTimestamp, // Make formatter available
+        deviceIcon(type) {
+            const lowerType = type.toLowerCase();
+            if (lowerType.includes('mobile') || lowerType.includes('phone') || lowerType.includes('tablet') || lowerType.includes('ios') || lowerType.includes('android')) {
+                return mdiCellphone;
+            }
+            return mdiDesktopTower; // Default to desktop
+        },
         copyToClipboard(textToCopy, successMessageKey = 'copySuccess', errorMessageKey = 'copyFailedGeneral') { // Use keys
             if (navigator.clipboard && window.isSecureContext) {
                 navigator.clipboard.writeText(textToCopy)

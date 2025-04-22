@@ -1,9 +1,21 @@
 <template>
-    <v-hover
-        v-slot:default="{ hover }"
-    >
+    <v-hover v-slot:default="{ hover }">
         <v-card :elevation="hover ? 6 : 2" class="mb-2 transition-swing">
             <v-card-text>
+                <!-- New Info Line - Moved Here (Outside and Above the flex row) -->
+                <div class="caption text--secondary mb-1" v-if="meta.timestamp && ($root.showTimestamp || $root.showDeviceInfo || $root.showSenderIP)">
+                    <template v-if="$root.showTimestamp">
+                        <v-icon small class="mr-1">{{ mdiClockOutline }}</v-icon>{{ formatTimestamp(meta.timestamp) }}
+                    </template>
+                    <template v-if="$root.showDeviceInfo && meta.senderDevice && meta.senderDevice.type">
+                        <v-icon small class="ml-2 mr-1">{{ deviceIcon(meta.senderDevice.type) }}</v-icon>{{ meta.senderDevice.os || meta.senderDevice.type }}
+                    </template>
+                    <template v-if="$root.showSenderIP && meta.senderIP">
+                        <v-icon small class="ml-2 mr-1">{{ mdiIpNetworkOutline }}</v-icon>{{ meta.senderIP }}
+                    </template>
+                </div>
+
+                <!-- Row for Thumbnail, Title, Size/Expire, Buttons -->
                 <div class="d-flex flex-row align-center">
                     <v-img
                         v-if="meta.thumbnail"
@@ -14,11 +26,13 @@
                         style="border-radius: 3px"
                     ></v-img>
                     <div class="flex-grow-1 mr-2" style="min-width: 0">
+                        <!-- Title -->
                         <div
                             class="title text-truncate text--primary"
                             :style="{'text-decoration': expired ? 'line-through' : ''}"
                             :title="meta.name"
                         >{{meta.name}}</div>
+                        <!-- Original Info Line (Size/Expire) -->
                         <div class="caption">
                             {{meta.size | prettyFileSize}}
                             <template v-if="$vuetify.breakpoint.smAndDown"><br></template>
@@ -121,6 +135,10 @@ import {
     mdiImageSearchOutline,
     mdiLinkVariant,
     mdiMovieSearchOutline,
+    mdiClockOutline,
+    mdiDesktopTower,
+    mdiCellphone,
+    mdiIpNetworkOutline,
 } from '@mdi/js';
 
 export default {
@@ -146,6 +164,10 @@ export default {
             mdiImageSearchOutline,
             mdiLinkVariant,
             mdiMovieSearchOutline,
+            mdiClockOutline,
+            mdiDesktopTower,
+            mdiCellphone,
+            mdiIpNetworkOutline,
         };
     },
     computed: {
@@ -248,6 +270,13 @@ export default {
                     this.$toast(this.$t('deleteFailedMessage')); // Translate toast
                 }
             });
+        },
+        deviceIcon(type) {
+            const lowerType = type.toLowerCase();
+            if (lowerType.includes('mobile') || lowerType.includes('phone') || lowerType.includes('tablet') || lowerType.includes('ios') || lowerType.includes('android')) {
+                return mdiCellphone;
+            }
+            return mdiDesktopTower; // Default to desktop
         },
     },
 }

@@ -6,6 +6,7 @@ import (
 	"html"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/spaolacci/murmur3"
+	"github.com/ua-parser/uap-go/uaparser"
 )
 
 var (
@@ -28,7 +30,7 @@ var (
 	deviceConnected = make(map[string]string)
 )
 
-var server_version = "go版本-v4.3.1"
+var server_version = "go-v4.3.3"
 var build_git_hash = show_bin_info()
 var config = load_config(config_path) // run before main()
 
@@ -41,6 +43,40 @@ var deviceHashSeed = murmur3.Sum32(random_bytes(32)) & 0xffffffff
 type EventMsg struct {
 	Event string      `json:"event"`
 	Data  interface{} `json:"data"`
+}
+
+// Helper function to get IP (you might already have this or similar in auth.go)
+func get_remote_ip(r *http.Request) string {
+	ip := r.Header.Get("X-Forwarded-For")
+	if ip == "" {
+		ip = r.Header.Get("X-Real-IP")
+	}
+	if ip == "" {
+		remoteAddr := r.RemoteAddr
+		host, _, err := net.SplitHostPort(remoteAddr)
+		if err == nil {
+			ip = host
+		} else {
+			ip = remoteAddr // Fallback if SplitHostPort fails
+		}
+	}
+	// Handle potential multiple IPs in X-Forwarded-For
+	ips := strings.Split(ip, ",")
+	if len(ips) > 0 {
+		ip = strings.TrimSpace(ips[0])
+	}
+	return ip
+}
+
+// Helper function to parse User-Agent (similar to ws_send_devices)
+func parse_user_agent(uaString string) map[string]string {
+	parser := uaparser.NewFromSaved() // Consider creating parser once globally
+	client := parser.Parse(uaString)
+	return map[string]string{
+		"type":    client.Device.Family,                                                  // e.g., "Mac", "iPhone", "Other"
+		"os":      fmt.Sprintf("%s %s", client.Os.Family, client.Os.Major),               // e.g., "Mac OS X 10", "iOS 15"
+		"browser": fmt.Sprintf("%s %s", client.UserAgent.Family, client.UserAgent.Major), // e.g., "Chrome 100"
+	}
 }
 
 // --------------- route handles
@@ -68,19 +104,30 @@ func handle_text(w http.ResponseWriter, r *http.Request) {
 	// html encode & < > " '
 	bodyStr = html.EscapeString(bodyStr)
 
+	// --- Populate new fields ---
+	senderIP := get_remote_ip(r)
+	senderDevice := parse_user_agent(r.Header.Get("User-Agent"))
+	timestamp := time.Now().Unix()
+	// --- End populate ---
+
 	message := PostEvent{
 		Event: "receive",
 		Data: ReceiveHolder{
 			TextReceive: &TextReceive{
-				// ID:   messageQueue.nextid, // NOT thread-safe
-				Type: "text",
-				Room: room,
-
+				ReceiveBase: ReceiveBase{ // Populate base struct
+					// ID will be set by Append
+					Type:         "text",
+					Room:         room,
+					Timestamp:    timestamp,
+					SenderIP:     senderIP,
+					SenderDevice: senderDevice,
+				},
 				Content: bodyStr,
 			},
 		},
 	}
-	messageQueue.Append(&message)
+	messageQueue.Append(&message) // Append will set the ID
+	fmt.Printf("DEBUG: Sending message data: %+v\n", message.Data)
 	messageJSON, err := json.Marshal(message)
 	if err != nil {
 		http.Error(w, "无法编码消息", http.StatusInternalServerError)
@@ -89,7 +136,19 @@ func handle_text(w http.ResponseWriter, r *http.Request) {
 	messageStr := string(messageJSON)
 	broadcast_ws_msg(websockets, messageStr, room)
 	save_history()
-	json.NewEncoder(w).Encode(map[string]interface{}{})
+	// Enhance response to include URL (as done by enhanceHandleText)
+	nextID := message.Data.ID() // Get the ID assigned by Append
+	scheme := getScheme(r)
+	contentURL := fmt.Sprintf("%s://%s%s/content/%d", scheme, r.Host, config.Server.Prefix, nextID)
+	if room != "" {
+		contentURL += fmt.Sprintf("?room=%s", room)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"code":   200,
+		"msg":    "",
+		"result": map[string]interface{}{"url": contentURL},
+	})
 }
 
 // 修改 handle_upload 函数处理表单上传
@@ -140,13 +199,19 @@ func handle_upload(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// --- Populate new fields ---
+		senderIP := get_remote_ip(r)
+		senderDevice := parse_user_agent(r.Header.Get("User-Agent"))
+		timestamp := time.Now().Unix()
+		// --- End populate ---
+
 		// 创建文件信息
 		fileInfo := File{
 			Name:       fileHeader.Filename,
 			UUID:       uuid,
 			Size:       int(written),
-			UploadTime: time.Now().Unix(),
-			ExpireTime: time.Now().Unix() + int64(config.File.Expire),
+			UploadTime: timestamp, // Use the same timestamp
+			ExpireTime: timestamp + int64(config.File.Expire),
 		}
 		uploadFileMap[uuid] = fileInfo
 
@@ -158,12 +223,17 @@ func handle_upload(w http.ResponseWriter, r *http.Request) {
 			Event: "receive",
 			Data: ReceiveHolder{
 				FileReceive: &FileReceive{
-					ID:     nextID,
-					Type:   "file",
-					Room:   room,
-					Name:   fileHeader.Filename,
-					Size:   int(written),
-					Cache:  uuid,
+					ReceiveBase: ReceiveBase{ // Populate base struct
+						// ID will be set by Append
+						Type:         "file",
+						Room:         room,
+						Timestamp:    timestamp,
+						SenderIP:     senderIP,
+						SenderDevice: senderDevice,
+					},
+					Name:   fileInfo.Name,
+					Size:   fileInfo.Size,
+					Cache:  fileInfo.UUID,
 					Expire: fileInfo.ExpireTime,
 				},
 			},
@@ -270,14 +340,27 @@ func handle_finish(w http.ResponseWriter, r *http.Request) {
 	}
 	fileInfo := uploadFileMap[uuid]
 
+	// --- Populate new fields ---
+	senderIP := get_remote_ip(r)
+	senderDevice := parse_user_agent(r.Header.Get("User-Agent"))
+	timestamp := time.Now().Unix() // Use finish time as the message time
+	// Update expire time based on finish time if desired, or keep original
+	// fileInfo.ExpireTime = timestamp + int64(config.File.Expire)
+	// uploadFileMap[uuid] = fileInfo // Update map if ExpireTime changed
+	// --- End populate ---
+
 	message := PostEvent{
 		Event: "receive",
 		Data: ReceiveHolder{
 			FileReceive: &FileReceive{
-				// ID:   messageQueue.nextid, // NOT thread-safe
-				Type: "file",
-				Room: room,
-
+				ReceiveBase: ReceiveBase{ // Populate base struct
+					// ID will be set by Append
+					Type:         "file",
+					Room:         room,
+					Timestamp:    timestamp,
+					SenderIP:     senderIP,
+					SenderDevice: senderDevice,
+				},
 				Name:   fileInfo.Name,
 				Size:   fileInfo.Size,
 				Cache:  fileInfo.UUID,
@@ -564,11 +647,11 @@ func main() {
 	})
 
 	// 需要认证的路由
-	http.HandleFunc(prefix+"/text", authMiddleware(enhanceHandleText(handle_text)))
+	http.HandleFunc(prefix+"/text", authMiddleware(handle_text))
 	http.HandleFunc(prefix+"/upload", authMiddleware(handle_upload))
 	http.HandleFunc(prefix+"/upload/chunk", authMiddleware(handle_upload))
 	http.HandleFunc(prefix+"/upload/chunk/", authMiddleware(handle_chunk))
-	http.HandleFunc(prefix+"/upload/finish/", authMiddleware(enhanceHandleFinish(handle_finish)))
+	http.HandleFunc(prefix+"/upload/finish/", authMiddleware(handle_finish))
 	http.HandleFunc(prefix+"/revoke/", authMiddleware(handle_revoke))
 	http.HandleFunc(prefix+"/revoke/all", authMiddleware(handleClearAll))
 

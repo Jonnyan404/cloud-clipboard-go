@@ -85,5 +85,9 @@
     "connectingServer": "Connecting to server...",
     "reconnectingServer": "Failed to connect to server, trying to reconnect attempt {retry}...",
     "connectionSuccess": "Connected to server successfully",
-    "connectionFailedRetry": "Failed to connect to server, please click the 'Connect' icon in the toolbar to retry"
-  }
+    "connectionFailedRetry": "Failed to connect to server, please click the 'Connect' icon in the toolbar to retry",
+    "displaySettings": "Display Settings",
+    "showTimestamp": "Show Timestamp",
+    "showDeviceInfo": "Show Device Info",
+    "showSenderIP": "Show Sender IP"
+}
