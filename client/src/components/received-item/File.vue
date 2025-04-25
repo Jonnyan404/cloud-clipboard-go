@@ -193,11 +193,11 @@ export default {
             }
             this.expand = true;
             if (this.isPreviewableVideo || this.isPreviewableAudio) {
-                this.srcPreview = `file/${this.meta.cache}/${encodeURIComponent(meta.name)}`;
+                this.srcPreview = `file/${this.meta.cache}/${encodeURIComponent(this.meta.name)}`;
             } else {
                 this.loadingPreview = true;
                 this.loadedPreview = 0;
-                this.$http.get(`file/${this.meta.cache}/${encodeURIComponent(meta.name)}`, {
+                this.$http.get(`file/${this.meta.cache}/${encodeURIComponent(this.meta.name)}`, {
                     responseType: 'arraybuffer',
                     onDownloadProgress: e => {this.loadedPreview = e.loaded},
                 }).then(response => {
