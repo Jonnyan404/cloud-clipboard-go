@@ -48,7 +48,7 @@
                                     v-on="on"
                                     icon
                                     color="grey"
-                                    :href="expired ? null : `file/${meta.cache}`"
+                                    :href="expired ? null : `file/${meta.cache}/${encodeURIComponent(meta.name)}`"
                                     :download="expired ? null : meta.name"
                                 >
                                     <v-icon>{{expired ? mdiDownloadOff : mdiDownload}}</v-icon>
@@ -193,11 +193,11 @@ export default {
             }
             this.expand = true;
             if (this.isPreviewableVideo || this.isPreviewableAudio) {
-                this.srcPreview = `file/${this.meta.cache}`;
+                this.srcPreview = `file/${this.meta.cache}/${encodeURIComponent(meta.name)}`;
             } else {
                 this.loadingPreview = true;
                 this.loadedPreview = 0;
-                this.$http.get(`file/${this.meta.cache}`, {
+                this.$http.get(`file/${this.meta.cache}/${encodeURIComponent(meta.name)}`, {
                     responseType: 'arraybuffer',
                     onDownloadProgress: e => {this.loadedPreview = e.loaded},
                 }).then(response => {

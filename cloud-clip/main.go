@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"html"
 	"io"
-	"log" // 导入 mime 包用于 Content-Type
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -468,8 +468,14 @@ func handle_push(w http.ResponseWriter, r *http.Request) {
 }
 
 func handle_file(w http.ResponseWriter, r *http.Request) {
-	uuid := strings.TrimPrefix(r.URL.Path, config.Server.Prefix+"/file/")
-	fmt.Println("==file request:", uuid, r.Method)
+	// --- 修改 UUID 提取逻辑 ---
+	pathPart := strings.TrimPrefix(r.URL.Path, config.Server.Prefix+"/file/")
+	pathSegments := strings.SplitN(pathPart, "/", 2) // 最多分割成两部分
+	uuid := pathSegments[0]                          // 第一部分总是 UUID
+	// 可选的文件名部分 (pathSegments[1]) 在这里被忽略，因为实际文件名来自 fileInfo
+	// --- 结束修改 ---
+
+	fmt.Println("==file request:", uuid, r.Method) // 确认提取的 UUID
 
 	switch r.Method {
 	case http.MethodGet:
@@ -484,38 +490,30 @@ func handle_file(w http.ResponseWriter, r *http.Request) {
 		file, err := os.Open(filePath) // 打开文件以供 ServeContent 使用
 		if err != nil {
 			http.Error(w, "File not found on disk", http.StatusNotFound)
-			// 可选：如果磁盘上没有但 map 中有，清理 map
-			// delete(uploadFileMap, uuid)
-			// save_history()
 			return
 		}
 		defer file.Close()
 
-		// 获取文件状态信息，主要是为了获取 ModTime
 		stat, err := file.Stat()
 		if err != nil {
 			http.Error(w, "Cannot get file stat", http.StatusInternalServerError)
 			return
 		}
 
-		// --- 设置 Content-Disposition 头 ---
-		// 使用 fmt.Sprintf("%q", ...) 来为文件名添加必要的引号并转义特殊字符
-		disposition := fmt.Sprintf("attachment; filename=%q", fileInfo.Name)
+		// --- 将默认 Content-Disposition 改为 inline ---
+		dispositionType := "inline" // 默认改为内联显示
+		// 可选：如果将来需要强制下载，可以添加一个不同的参数检查，例如 ?download=true
+		if r.URL.Query().Get("download") == "true" {
+			dispositionType = "attachment"
+		}
+		disposition := fmt.Sprintf("%s; filename=%q", dispositionType, fileInfo.Name)
 		w.Header().Set("Content-Disposition", disposition)
 		// --- 结束设置 ---
 
-		// 可选：手动设置 Content-Type，如果 ServeContent 的自动检测不够准确
-		// contentType := mime.TypeByExtension(filepath.Ext(fileInfo.Name))
-		// if contentType != "" {
-		//     w.Header().Set("Content-Type", contentType)
-		// }
-
 		// 使用 http.ServeContent 提供文件内容
-		// 它需要文件名（用于 Content-Type 检测）、修改时间 和 io.ReadSeeker
 		http.ServeContent(w, r, fileInfo.Name, stat.ModTime(), file)
 
 	case http.MethodDelete:
-		// ... (DELETE 逻辑保持不变) ...
 		fmt.Println("==del file:", uuid)
 		if _, ok := uploadFileMap[uuid]; !ok {
 			http.Error(w, "File not found", http.StatusNotFound)
@@ -736,7 +734,7 @@ func main() {
 
 	// 启动多个监听器
 	for _, host := range hostList {
-		// IPv6 地址需要用方括号括起来
+		// IPv6 地址需要用方 brackets 括起来
 		formattedHost := host
 		if strings.Contains(host, ":") && !strings.HasPrefix(host, "[") {
 			formattedHost = "[" + host + "]"
