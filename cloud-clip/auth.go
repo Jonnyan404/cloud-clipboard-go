@@ -11,7 +11,6 @@ import (
 	"html"
 	"net/http"
 	"net/url"
-	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -115,21 +114,24 @@ func handleContent(w http.ResponseWriter, r *http.Request) {
 			if msg.Data.FileReceive != nil &&
 				msg.Data.FileReceive.ID == id &&
 				msg.Data.FileReceive.Room == room {
-				// 文件类型，重定向到文件URL
-				uuid := msg.Data.FileReceive.Cache
-
-				// 构建文件URL
+				// 文件类型，重定向到 /file/{cache_uuid}/{encoded_filename}
+				cacheUUID := msg.Data.FileReceive.Cache
+				filename := msg.Data.FileReceive.Name // 获取原始文件名
 				scheme := getScheme(r)
 
-				fileURL := fmt.Sprintf("%s://%s%s/file/%s",
+				// 对文件名进行 URL 编码
+				encodedFilename := url.PathEscape(filename)
+
+				fileURL := fmt.Sprintf("%s://%s%s/file/%s/%s", // 添加 /{encoded_filename}
 					scheme,
 					r.Host,
 					config.Server.Prefix,
-					uuid)
-
+					cacheUUID,
+					encodedFilename, // 使用编码后的文件名
+				)
 				http.Redirect(w, r, fileURL, http.StatusFound)
-				found = true
-				break
+				found = true // 确保标记为已找到
+				break        // 如果在循环中，需要 break
 			}
 		}
 	}
@@ -270,22 +272,25 @@ func handleLatestContent(w http.ResponseWriter, r *http.Request) {
 
 		if msg.Data.FileReceive != nil {
 			// 文件类型，与handle_file使用相同的逻辑
-			uuid := msg.Data.FileReceive.Cache
-
-			// 检查文件是否存在于上传映射中
-			if _, ok := uploadFileMap[uuid]; !ok {
-				http.Error(w, "File not found", http.StatusNotFound)
-				return
-			}
-
-			// 使用与handle_file相同的方式提供文件
+			cacheUUID := msg.Data.FileReceive.Cache
 			filename := msg.Data.FileReceive.Name
-			w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=%s",
-				url.QueryEscape(filename)))
+			scheme := getScheme(r)
+			encodedFilename := url.PathEscape(filename)
 
-			// 直接使用ServeFile，与handle_file函数相同
-			http.ServeFile(w, r, filepath.Join(storage_folder, uuid))
-			return
+			// --- 修改 Content-Disposition 为 inline ---
+			// disposition := fmt.Sprintf("inline; filename=%q", filename)
+			// w.Header().Set("Content-Disposition", disposition)
+			// --- 不再需要 ServeFile，改为重定向 ---
+
+			fileURL := fmt.Sprintf("%s://%s%s/file/%s/%s", // 添加 /{encoded_filename}
+				scheme,
+				r.Host,
+				config.Server.Prefix,
+				cacheUUID,
+				encodedFilename,
+			)
+			http.Redirect(w, r, fileURL, http.StatusFound)
+			return // 找到并重定向后返回
 		}
 	}
 
