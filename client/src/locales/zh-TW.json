@@ -90,5 +90,9 @@
     "showTimestamp": "顯示時間戳",
     "showDeviceInfo": "顯示裝置資訊",
     "showSenderIP": "顯示傳送者IP",
-    "clipboardClearedRefresh": "剪貼簿已清空，重新整理當前頁面生效"
+    "clipboardClearedRefresh": "剪貼簿已清空，重新整理當前頁面生效",
+    "showQrCode": "顯示二維碼",
+    "scanToAccess": "掃碼存取",
+    "close": "關閉",
+    "scanToAccessPage": "手機掃碼存取目前頁面"
   }
