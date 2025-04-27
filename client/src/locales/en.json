@@ -90,5 +90,9 @@
     "showTimestamp": "Show Timestamp",
     "showDeviceInfo": "Show Device Info",
     "showSenderIP": "Show Sender IP",
-    "clipboardClearedRefresh": "Clipboard cleared, refresh the page to take effect"
+    "clipboardClearedRefresh": "Clipboard cleared, refresh the page to take effect",
+    "showQrCode": "Show QR Code",
+    "scanToAccess": "Scan to Access",
+    "close": "Close",
+    "scanToAccessPage": "Scan with Mobile to Access Current Page"
 }

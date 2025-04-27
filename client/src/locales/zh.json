@@ -90,5 +90,9 @@
     "showTimestamp": "显示时间戳",
     "showDeviceInfo": "显示设备信息",
     "showSenderIP": "显示发送者IP",
-    "clipboardClearedRefresh": "剪贴板已清空，刷新当前页面生效"
+    "clipboardClearedRefresh": "剪贴板已清空，刷新当前页面生效",
+    "showQrCode": "显示二维码",
+    "scanToAccess": "扫码访问",
+    "close": "关闭",
+    "scanToAccessPage": "手机扫码访问当前页面"
 }
