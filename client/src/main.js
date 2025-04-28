@@ -28,23 +28,25 @@ const app = new Vue({
     mixins: [websocket],
     data() {
         return {
-            received: [],
-            device: [],
+            date: new Date,
+            dark: null,
+            config: {
+                version: '',
+                text: {
+                    limit: 0,
+                },
+                file: {
+                    expire: 0,
+                    chunk: 0,
+                    limit: 0,
+                },
+            },
             send: {
                 text: '',
                 files: [],
             },
-            config: {
-                version: '',
-                text: { limit: 0 },
-                file: { expire: 0, chunk: 0, limit: 0 },
-            },
-            dark: localStorage.getItem('dark') || 'prefer',
-            authCode: localStorage.getItem('auth') || '',
-            authCodeDialog: false,
-            room: '',
-            roomInput: '',
-            roomDialog: false,
+            received: [],
+            device: [],
             // --- 新增显示设置 (默认 true) ---
             showTimestamp: localStorage.getItem('showTimestamp') !== 'false',
             showDeviceInfo: localStorage.getItem('showDeviceInfo') !== 'false',
@@ -58,15 +60,8 @@ const app = new Vue({
     render: h => h(App),
     watch: {
         dark(newval) {
-            localStorage.setItem('dark', newval);
             this.$vuetify.theme.dark = this.useDark;
-        },
-        room(newVal, oldVal) {
-            if (this.websocket && newVal !== oldVal) {
-                // 如果房间改变，重新连接 WebSocket
-                this.websocket.close();
-                this.connect();
-            }
+            localStorage.setItem('darkmode', newval);
         },
         // --- 新增 Watchers ---
         showTimestamp(newVal) {
@@ -94,27 +89,19 @@ const app = new Vue({
                         return true;
                     case 'disable':
                         return false;
+                    default:
+                    return false;
                 }
             },
         },
     },
-    created() {
-        // 获取初始配置
-        // this.$http.get('config').then(response => {
-        //     this.config = response.data;
-        // });
-        // 初始化深色模式
-        this.$vuetify.theme.dark = this.useDark;
-        // 连接 WebSocket
-        this.connect();
-    },
     mounted() {
-        // 监听系统深色模式变化
-        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
-            if (this.dark === 'prefer') {
-                this.$vuetify.theme.dark = e.matches;
-            }
-        });
+        this.dark = localStorage.getItem('darkmode') || 'prefer';
+        this.$vuetify.theme.dark = this.useDark;
+        setInterval(() => {
+            this.date = new Date;
+            this.$vuetify.theme.dark = this.useDark;
+        }, 1000);
     },
 })
 
