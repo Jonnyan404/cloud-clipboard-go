@@ -48,15 +48,37 @@
                     dark
                     color="primary"
                 >
-                    <v-icon>{{mdiPlus}}</v-icon>
+                    <v-icon v-if="fab">{{ mdiClose }}</v-icon> <!-- Change icon when open -->
+                    <v-icon v-else>{{ mdiPlus }}</v-icon>
                 </v-btn>
             </template>
-            <v-btn fab dark small color="primary" @click="openDialog('file')">
-                <v-icon>{{mdiFileDocumentOutline}}</v-icon>
-            </v-btn>
-            <v-btn fab dark small color="primary" @click="openDialog('text')">
-                <v-icon>{{mdiText}}</v-icon>
-            </v-btn>
+            <!-- Show Page QR Code Button -->
+            <v-tooltip left>
+                 <template v-slot:activator="{ on }">
+                    <v-btn fab dark small color="indigo" v-on="on" @click="pageQrDialogVisible = true">
+                        <v-icon>{{ mdiQrcode }}</v-icon>
+                    </v-btn>
+                 </template>
+                 <span>{{ $t('showQrCode') }}</span>
+            </v-tooltip>
+            <!-- Send File Button -->
+            <v-tooltip left>
+                 <template v-slot:activator="{ on }">
+                    <v-btn fab dark small color="green" v-on="on" @click="openDialog('file')">
+                        <v-icon>{{ mdiFileDocumentOutline }}</v-icon>
+                    </v-btn>
+                 </template>
+                 <span>{{ $t('sendFile') }}</span>
+            </v-tooltip>
+            <!-- Send Text Button -->
+            <v-tooltip left>
+                 <template v-slot:activator="{ on }">
+                    <v-btn fab dark small color="red" v-on="on" @click="openDialog('text')">
+                        <v-icon>{{ mdiText }}</v-icon>
+                    </v-btn>
+                 </template>
+                 <span>{{ $t('sendText') }}</span>
+            </v-tooltip>
         </v-speed-dial>
 
         <!-- Fullscreen Dialog for Mobile Sending -->
@@ -84,11 +106,27 @@
                 </v-card-text>
             </v-card>
         </v-dialog>
+
+        <!-- Page QR Code Dialog -->
+        <v-dialog v-model="pageQrDialogVisible" max-width="250">
+            <v-card>
+                <v-card-title class="headline justify-center">{{ $t('scanToAccessPage') }}</v-card-title>
+                <v-card-text class="text-center pa-4">
+                    <qrcode-vue :value="currentPageUrl" :size="200" level="H" />
+                    <div class="text-caption mt-2" style="word-break: break-all;">{{ currentPageUrl }}</div>
+                </v-card-text>
+                <v-card-actions>
+                    <v-spacer></v-spacer>
+                    <v-btn color="primary" text @click="pageQrDialogVisible = false">{{ $t('close') }}</v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
+
     </v-container>
 </template>
 
 <script>
-import QrcodeVue from 'qrcode.vue'; // Import QR Code
+import QrcodeVue from 'qrcode.vue';
 import SendText from '@/components/SendText.vue';
 import SendFile from '@/components/SendFile.vue';
 import ReceivedText from '@/components/received-item/Text.vue';
@@ -98,12 +136,13 @@ import {
     mdiFileDocumentOutline,
     mdiText,
     mdiClose,
+    mdiQrcode, // <-- Import QR Code Icon
 } from '@mdi/js';
 
 export default {
-    name: 'home', // Added name
+    name: 'home',
     components: {
-        QrcodeVue, // Register QR Code
+        QrcodeVue,
         SendText,
         SendFile,
         ReceivedText,
@@ -114,32 +153,25 @@ export default {
             fab: false,
             dialog: false,
             mode: null,
+            pageQrDialogVisible: false, // <-- Add dialog visibility flag
             mdiPlus,
             mdiFileDocumentOutline,
             mdiText,
             mdiClose,
+            mdiQrcode, // <-- Add icon to data
         };
     },
     computed: {
         currentPageUrl() {
-            const origin = window.location.origin; // e.g., http://localhost:8080
-            const path = this.$route.fullPath;     // e.g., /?room=abc or /
-
-            // Check if the application is likely using hash mode by looking at the current URL
+            const origin = window.location.origin;
+            const path = this.$route.fullPath;
             const usingHash = window.location.href.includes('#');
-
             if (usingHash) {
-                // Construct URL with hash: origin + /# + path
-                // Ensure path starts with '/'
                 const formattedPath = path.startsWith('/') ? path : '/' + path;
                 return origin + '/#' + formattedPath;
-                // Example: http://localhost:8080/#/?room=abc
             } else {
-                // Assume history mode: origin + path
-                // Ensure path starts with '/'
                 const formattedPath = path.startsWith('/') ? path : '/' + path;
                 return origin + formattedPath;
-                // Example: http://localhost:8080/?room=abc
             }
         }
     },
@@ -167,7 +199,6 @@ export default {
                 this.closeDialog();
             }
         }
-        // Removed custom setTimeout
     },
     watch: {
         dialog(newval, oldval) {
@@ -190,7 +221,6 @@ export default {
             });
         },
     },
-    // Removed created hook, handlePopState defined in methods
     beforeDestroy() { // Added beforeDestroy for cleanup
         window.removeEventListener('popstate', this.handlePopState);
     },
