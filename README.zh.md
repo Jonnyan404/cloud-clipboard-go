@@ -76,6 +76,8 @@ services:
             - TEXT_LIMIT= #文本长度限制,默认为4096(2048个汉字),可设置为其他长度
             - FILE_EXPIRE= #文件过期时间,默认为3600(1小时),可设置为其他时间,单位为秒
             - FILE_LIMIT= #文件大小限制,默认为104857600(100MB),可设置为其他大小,单位为字节
+            - SSL_CERT_PATH= # SSL证书路径
+            - SSL_KEY_PATH= # SSL秘钥路径
         volumes:
             - /path/your/dir/data:/app/server-node/data #请注意修改为你自己的目录
         image: jonnyan404/cloud-clipboard-go:latest

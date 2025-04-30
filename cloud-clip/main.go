@@ -86,8 +86,14 @@ func handle_server(w http.ResponseWriter, r *http.Request) {
 		need_auth = true
 	}
 
+	// 根据请求协议确定 WebSocket 协议
+	wsProtocol := "ws"
+	if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
+		wsProtocol = "wss"
+	}
+
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"server": fmt.Sprintf("ws://%s%s/push", r.Host, config.Server.Prefix),
+		"server": fmt.Sprintf("%s://%s%s/push", wsProtocol, r.Host, config.Server.Prefix),
 		"auth":   need_auth,
 	})
 }
@@ -745,7 +751,19 @@ func main() {
 
 		// 使用 goroutine 启动服务器
 		go func(addr string) {
-			errChan <- http.ListenAndServe(addr, nil)
+			// 如果配置了证书和密钥文件，则使用 HTTPS
+			if config.Server.Cert != "" && config.Server.Key != "" {
+				fmt.Printf("启动 HTTPS 服务器在 %s\n", addr)
+				errChan <- http.ListenAndServeTLS(
+					addr,
+					config.Server.Cert,
+					config.Server.Key,
+					nil,
+				)
+			} else {
+				fmt.Printf("启动 HTTP 服务器在 %s\n", addr)
+				errChan <- http.ListenAndServe(addr, nil)
+			}
 		}(listen_addr)
 	}
 

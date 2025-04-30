@@ -75,6 +75,8 @@ services:
             - TEXT_LIMIT= # Text length limit, default is 4096 (2048 Chinese characters).
             - FILE_EXPIRE= # File expiration time, default is 3600 (1 hour), unit is seconds.
             - FILE_LIMIT= # File size limit, default is 104857600 (100MB), unit is bytes.
+            - SSL_CERT_PATH= # SSL certificate path, if ssl is enabled, certificate path must be specified
+            - SSL_KEY_PATH= # SSL key path, if ssl is enabled, key path must be specified
         volumes:
             - /path/your/dir/data:/app/server-node/data # Please change to your own directory
         image: jonnyan404/cloud-clipboard-go:latest # Or ghcr.io/jonnyan404/cloud-clipboard-go:latest
