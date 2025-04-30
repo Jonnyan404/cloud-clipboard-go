@@ -77,7 +77,7 @@ services:
             - TEXT_LIMIT= #文本长度限制,默认为4096(2048个汉字),可设置为其他长度
             - FILE_EXPIRE= #文件过期时间,默认为3600(1小时),可设置为其他时间,单位为秒
             - FILE_LIMIT= #文件大小限制,默认为104857600(100MB),可设置为其他大小,单位为字节
-            - MKCERT_DOMAIN_OR_IP= #mkcert域名或IP,默认为localhost,可设置为其他域名或IP,多个用空格分隔,仅域名支持通配符*
+            - MKCERT_DOMAIN_OR_IP= #mkcert域名或IP,默认为空,可设置为其他域名或IP,多个用空格分隔,仅域名支持通配符*
             - MANUAL_KEY_PATH= #手动设置证书路径,默认为空,该参数优先级高于MKCERT_DOMAIN_OR_IP
             - MANUAL_CERT_PATH= #手动设置证书路径,默认为空,该参数优先级高于MKCERT_DOMAIN_OR_IP
         volumes:
