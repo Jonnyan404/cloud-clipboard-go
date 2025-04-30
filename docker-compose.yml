@@ -7,6 +7,7 @@ services:
             - "9501:9501"
         environment:
             - LISTEN_IP= #默认为0.0.0.0,可设置为 127.0.0.1 不懂勿动
+            - LISTEN_IP6= #默认为::1,ipv6地址,可设置为::,不懂勿动
             - LISTEN_PORT= #默认为9501,可设置为其他端口
             - PREFIX= #子路径,可配合nginx使用,格式: /cloud-clipboard
             - MESSAGE_NUM= #历史记录的数量,默认为10
@@ -14,8 +15,9 @@ services:
             - TEXT_LIMIT= #文本长度限制,默认为4096(2048个汉字),可设置为其他长度
             - FILE_EXPIRE= #文件过期时间,默认为3600(1小时),可设置为其他时间,单位为秒
             - FILE_LIMIT= #文件大小限制,默认为104857600(100MB),可设置为其他大小,单位为字节
-            - SSL_CERT_PATH= # SSL证书路径
-            - SSL_KEY_PATH= # SSL秘钥路径
+            - MKCERT_DOMAIN_OR_IP= #mkcert域名或IP,默认为localhost,可设置为其他域名或IP,多个用空格分隔,仅域名支持通配符*
+            - MANUAL_KEY_PATH= #手动设置证书路径,默认为空,该参数优先级高于MKCERT_DOMAIN_OR_IP
+            - MANUAL_CERT_PATH= #手动设置证书路径,默认为空,该参数优先级高于MKCERT_DOMAIN_OR_IP
         volumes:
             - /path/your/dir/data:/app/server-node/data #请注意修改为你自己的目录
         image: jonnyan404/cloud-clipboard-go:latest
