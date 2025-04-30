@@ -12,12 +12,15 @@ cat>"${CONFIG_FILE}"<<EOF
         "port": ${LISTEN_PORT:-9501},
         "uds": "/var/run/cloud-clipboard.sock",
         "prefix": "${PREFIX}",
-        "key": "",
-        "cert": "",
         "history": ${MESSAGE_NUM:-10},
         "auth": ${AUTH_PASSWORD:-false},
         "historyFile": "/app/server-node/data/history.json",
-        "storageDir": "/app/server-node/data/"
+        "storageDir": "/app/server-node/data/",
+        "ssl": {
+            "enabled": ${SSL_ENABLED:-false},
+            "key": ${SSL_KEY_PATH},
+            "cert": ${SSL_CERT_PATH}
+        }
     },
     "text": {
         "limit": ${TEXT_LIMIT:-4096}
