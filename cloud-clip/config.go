@@ -23,6 +23,8 @@ type Config struct {
 		StorageDir  string      `json:"storageDir"`  // 添加存储目录路径
 		// Auth    string `json:"auth"`
 		Auth interface{} `json:"auth"` //done
+		Cert string      `json:"cert"`
+		Key  string      `json:"key"`
 	} `json:"server"`
 	Text struct {
 		Limit int `json:"limit"` //done
