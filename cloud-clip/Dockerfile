@@ -40,7 +40,8 @@ WORKDIR /app/server-node
 COPY --from=builder /app/cloud-clipboard-go .
 COPY cloud-clip/entrypoint.sh /app/
 RUN apk add --no-cache git tzdata \
-    && chmod +x /app/entrypoint.sh
+    && chmod +x /app/entrypoint.sh \
+    && apk add --repository=https://dl-cdn.alpinelinux.org/alpine/edge/testing mkcert
 # 暴露端口
 EXPOSE 9501
 
