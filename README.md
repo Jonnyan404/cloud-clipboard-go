@@ -76,7 +76,7 @@ services:
             - TEXT_LIMIT= # Text length limit, default is 4096 (2048 Chinese characters).
             - FILE_EXPIRE= # File expiration time, default is 3600 (1 hour), unit is seconds.
             - FILE_LIMIT= # File size limit, default is 104857600 (100MB), unit is bytes.
-            - MKCERT_DOMAIN_OR_IP= # The domain name or IP address for mkcert, defaults to localhost. You can set it to other domain names or IPs. Multiple values can be separated by spaces. Wildcards are supported for domain names only.
+            - MKCERT_DOMAIN_OR_IP= # The domain name or IP address for mkcert, defaults to empty. You can set it to other domain names or IPs. Multiple values can be separated by spaces. Wildcards are supported for domain names only.
             - MANUAL_KEY_PATH= # Manually set the path for the key. Defaults to empty. This parameter has higher priority than MKCERT_DOMAIN_OR_IP.
             - MANUAL_CERT_PATH= # Manually set the path for the certificate. Defaults to empty. This parameter has higher priority than MKCERT_DOMAIN_OR_IP.
         volumes:

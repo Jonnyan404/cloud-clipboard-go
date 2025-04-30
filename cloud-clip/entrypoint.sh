@@ -56,7 +56,7 @@ elif [ -n "${MKCERT_DOMAIN_OR_IP}" ]; then
     if [ "$REGENERATE_CERT" = true ]; then
         echo "##### Generating SSL certificate via mkcert #####"
         echo "##### Domain/IP: ${CURRENT_DOMAIN} #####"
-        mkcert -key-file "$MKCERT_KEY_PATH" -cert-file "$MKCERT_CERT_PATH" $CURRENT_DOMAIN
+        mkcert -key-file "$MKCERT_KEY_PATH" -cert-file "$MKCERT_CERT_PATH" "$CURRENT_DOMAIN"
         if [ $? -ne 0 ]; then
             echo "Error: Failed to generate SSL certificates with mkcert." >&2
             exit 1 # Exit on mkcert failure
