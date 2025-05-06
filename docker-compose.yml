@@ -7,7 +7,7 @@ services:
             - "9501:9501"
         environment:
             - LISTEN_IP= #默认为0.0.0.0,可设置为 127.0.0.1 不懂勿动
-            - LISTEN_IP6= #默认为::1,ipv6地址,可设置为::,不懂勿动
+            - LISTEN_IP6= #默认为空,ipv6地址,可设置为::,不懂勿动
             - LISTEN_PORT= #默认为9501,可设置为其他端口
             - PREFIX= #子路径,可配合nginx使用,格式: /cloud-clipboard
             - MESSAGE_NUM= #历史记录的数量,默认为10

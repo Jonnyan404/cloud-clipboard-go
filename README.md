@@ -68,7 +68,7 @@ services:
             - "9501:9501"
         environment:
             - LISTEN_IP= # Default is 0.0.0.0, can be set to 127.0.0.1. Don't change if unsure.
-            - LISTEN_IP6= # Default is ::1, can be set to ::. Don't change if unsure.
+            - LISTEN_IP6= # Default is empty, can be set to ::. Don't change if unsure.
             - LISTEN_PORT= # Default is 9501, can be set to other ports.
             - PREFIX= # Subpath, can be used with nginx, format: /cloud-clipboard
             - MESSAGE_NUM= # Number of history records, default is 10.
