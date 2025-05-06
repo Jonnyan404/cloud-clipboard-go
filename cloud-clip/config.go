@@ -88,23 +88,32 @@ func load_config(config_path string) *Config {
 		switch host := config.Server.Host.(type) {
 		case string:
 			// 如果是字符串，转换为单元素数组
-			fmt.Printf("Host is string: %s\n", host)
-			config.Server.Host = []string{host}
+			if host == "" { // <-- 新增：检查单个字符串是否为空
+				fmt.Printf("Host is an empty string, using default: 0.0.0.0\n")
+				config.Server.Host = []string{"0.0.0.0"}
+			} else {
+				fmt.Printf("Host is string: %s\n", host)
+				config.Server.Host = []string{host}
+			}
 		case []interface{}:
 			// 如果是接口数组，转换为字符串数组
 			hostList := make([]string, 0, len(host))
 			for i, h := range host {
 				if hostStr, ok := h.(string); ok {
+					if hostStr == "" { // <-- 新增：检查数组中的字符串是否为空
+						fmt.Printf("Warning: Host[%d] is an empty string, skipping.\n", i)
+						continue // 跳过空字符串
+					}
 					hostList = append(hostList, hostStr)
 					fmt.Printf("Host[%d]: %s\n", i, hostStr)
 				} else {
-					fmt.Printf("Warning: Host[%d] is not a string: %T\n", i, h)
+					fmt.Printf("Warning: Host[%d] is not a string: %T, skipping.\n", i, h)
 					// 跳过无效元素
 				}
 			}
-			if len(hostList) == 0 {
+			if len(hostList) == 0 { // 如果处理后列表为空，使用默认值
 				hostList = []string{"0.0.0.0"}
-				fmt.Printf("No valid hosts in array, using default: 0.0.0.0\n")
+				fmt.Printf("No valid hosts in array after filtering, using default: 0.0.0.0\n")
 			}
 			config.Server.Host = hostList
 		default:
@@ -113,6 +122,7 @@ func load_config(config_path string) *Config {
 		}
 	} else {
 		// 如果未提供，设置默认值
+		fmt.Println("Host field is not provided, using default: 0.0.0.0")
 		config.Server.Host = []string{"0.0.0.0"}
 	}
 
