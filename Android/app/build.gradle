@@ -34,6 +34,11 @@ android {
     buildFeatures {
         compose true
     }
+    sourceSets {
+        main {
+            jniLibs.srcDirs = ['src/main/jniLibs'] // 确保这行存在或 Gradle 默认行为正确
+        }
+    }
 }
 
 dependencies {
@@ -53,4 +58,6 @@ dependencies {
     androidTestImplementation libs.androidx.ui.test.junit4
     debugImplementation libs.androidx.ui.tooling
     debugImplementation libs.androidx.ui.test.manifest
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+    implementation 'com.google.android.material:material:1.12.0' 
 }
