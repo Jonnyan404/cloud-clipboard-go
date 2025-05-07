@@ -6,7 +6,7 @@ plugins {
     // id("org.jetbrains.kotlin.android") version "1.9.0" apply false // 示例版本
 }
 android {
-    namespace = "com.yourdomain.cloudclipboard" // 替换为你的实际包名
+    namespace = "com.jonnyan404.cloudclipboard" // 替换为你的实际包名
     compileSdk = 34 // 或者你项目使用的 SDK 版本
 
     defaultConfig {
