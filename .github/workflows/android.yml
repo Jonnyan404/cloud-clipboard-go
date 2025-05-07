@@ -2,10 +2,10 @@ name: Build Android APK
 
 on:
 #   push:
-#     branches: [ main ] # 或者你的默认分支，例如 master
+#     branches: [ main ]
 #   pull_request:
-#     branches: [ main ] # 或者你的默认分支
-  workflow_dispatch: # 允许手动触发
+#     branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build-apk:
@@ -16,10 +16,36 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Set up Node.js for frontend build
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Build frontend static assets
+        run: |
+          echo "Building frontend static assets..."
+          cd client
+          npm install
+          npm run build
+          cd ..
+          echo "Frontend build complete."
+          echo "Listing contents of client/dist:"
+          ls -Rla client/dist
+
+      - name: Prepare Go embed directory
+        run: |
+          echo "Preparing directory for Go embed..."
+          rm -rf cloud-clip/static
+          mkdir -p cloud-clip/static
+          cp -r client/dist/* cloud-clip/static/
+          echo "Frontend assets copied to cloud-clip/static."
+          echo "Listing contents of cloud-clip/static:"
+          ls -Rla cloud-clip/static
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22' # 请确认与你项目使用的 Go 版本一致
+          go-version: '1.22'
 
       - name: Get short commit SHA for version
         id: vars
@@ -29,16 +55,19 @@ jobs:
         run: |
           echo "Building Go binary with version: ci-${{ steps.vars.outputs.sha_short }}"
           cd cloud-clip
-          # 使用与 .goreleaser.yaml 和 openwrt/scripts/build.sh 类似的标志
-          # 确保 main.server_version 和 main.useEmbedded 在你的 Go main 包中定义
-          GOOS=android GOARCH=arm64 go build -trimpath -tags=embed \
+          
+          echo "--- Listing contents of cloud-clip directory before Go build ---"
+          pwd
+          ls -Rla # 确认 cloud-clip/static 存在且有内容
+          echo "-------------------------------------------------------------"
+          
+          GOOS=android GOARCH=arm64 go build -v -trimpath -tags=embed \
             -ldflags="-s -w -X main.server_version=ci-${{ steps.vars.outputs.sha_short }} -X main.useEmbedded=true" \
             -o cloudclip_android_arm64 .
           
           echo "Go binary compiled."
           ls -l cloudclip_android_arm64
 
-          # 确保 Android assets 目录存在
           mkdir -p ../Android/app/src/main/assets/
           mv cloudclip_android_arm64 ../Android/app/src/main/assets/
           echo "Go binary moved to Android assets directory."
@@ -52,7 +81,7 @@ jobs:
           distribution: 'temurin'
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3 # 此 action 会处理 Gradle 缓存和环境
+        uses: gradle/actions/setup-gradle@v3
 
       - name: Make gradlew executable
         run: chmod +x ./Android/gradlew
@@ -62,10 +91,6 @@ jobs:
           cd Android
           ./gradlew assembleDebug --stacktrace
           cd ..
-        # env:
-          # 如果你的项目需要特定的 JVM 选项给 Gradle
-          # GRADLE_OPTS: "-Xmx2048m"
-          # ANDROID_SDK_ROOT: ${{ env.ANDROID_HOME }} # setup-gradle 可能会设置 ANDROID_HOME
 
       - name: List generated APK files
         run: |
@@ -79,4 +104,4 @@ jobs:
         with:
           name: cloud-clipboard-debug-apk
           path: Android/app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error # 如果没有找到 APK 文件，则工作流失败
+          if-no-files-found: error
