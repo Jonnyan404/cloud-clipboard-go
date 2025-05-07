@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 主色调 - 蓝色 -->
+    <color name="blue_200">#FF90CAF9</color> <!-- 浅蓝色，可用于次要元素或高亮 -->
+    <color name="blue_500">#FF2196F3</color> <!-- 标准蓝色，用作 primaryColor -->
+    <color name="blue_700">#FF1976D2</color> <!-- 深蓝色，用作 primaryColorVariant 或状态栏颜色 -->
+
+    <!-- 次要色调 - 可以选择一个对比鲜明的颜色或蓝色的变体 -->
+    <color name="light_blue_A200">#FF40C4FF</color> <!-- 亮蓝色，可用于 FAB 或强调色 -->
+    <color name="light_blue_A400">#FF00B0FF</color> <!-- 更亮的蓝色 -->
+
+
+    <!-- 标准颜色 -->
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="gray_100">#FFF5F5F5</color> <!-- 浅灰色，可用于背景 -->
+    <color name="gray_300">#FFE0E0E0</color> <!-- 稍深的灰色，可用于分隔线 -->
+
+
+    <!-- 替换 themes.xml 中使用的颜色 -->
+    <color name="purple_500">@color/blue_500</color>         <!-- 将 purple_500 映射到 blue_500 -->
+    <color name="purple_700">@color/blue_700</color>         <!-- 将 purple_700 映射到 blue_700 -->
+    <color name="teal_200">@color/light_blue_A200</color>    <!-- 将 teal_200 映射到 light_blue_A200 -->
+    <color name="teal_700">@color/light_blue_A400</color>    <!-- 将 teal_700 映射到 light_blue_A400 -->
+
+</resources>
