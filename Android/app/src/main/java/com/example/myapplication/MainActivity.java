@@ -1,4 +1,4 @@
-package com.jonnyan404.cloudclipboard; // 请替换为你的包名
+package com.example.myapplication; // 请替换为你的包名
 
 import androidx.appcompat.app.AppCompatActivity;
 import android.content.Context;
@@ -29,7 +29,7 @@ import java.util.concurrent.Executors;
 public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "CloudClipApp";
-    private static final String GO_EXECUTABLE_NAME = "cloudclip_android_arm64"; // 确保与assets中的文件名一致
+    private static final String GO_EXECUTABLE_NAME = "libgoexecutable.so"; // 确保与assets中的文件名一致
     private static final String PREFS_NAME = "CloudClipPrefs";
     private static final String KEY_HOST = "host";
     private static final String KEY_PORT = "port";
@@ -93,8 +93,17 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    private String getGoExecutablePath() {
-        return new File(getFilesDir(), GO_EXECUTABLE_NAME).getAbsolutePath();
+    private String getGoExecutablePathFromNativeLibs() { // 新的方法
+        try {
+            String nativeLibraryDir = getApplicationInfo().nativeLibraryDir;
+            File executable = new File(nativeLibraryDir, GO_EXECUTABLE_NAME);
+            Log.d(TAG, "可执行文件路径 (from nativeLibraryDir): " + executable.getAbsolutePath());
+            return executable.getAbsolutePath();
+        } catch (Exception e) {
+            Log.e(TAG, "获取 nativeLibraryDir 失败", e);
+            // 可以考虑一个回退机制或抛出错误
+            return null; // 或者返回一个指示错误的路径
+        }
     }
 
     private boolean copyAssetToFilesDir(String assetName, File targetFile) {
@@ -130,27 +139,36 @@ public class MainActivity extends AppCompatActivity {
         }
 
         mainHandler.post(() -> updateStatus("正在准备启动服务..."));
-        File goExecutable = new File(getGoExecutablePath());
 
-        if (!copyAssetToFilesDir(GO_EXECUTABLE_NAME, goExecutable)) {
-            mainHandler.post(() -> updateStatus("启动失败: 无法准备可执行文件。"));
+        String executablePath = getGoExecutablePathFromNativeLibs();
+        if (executablePath == null) {
+            mainHandler.post(() -> updateStatus("启动失败: 无法获取可执行文件路径。"));
+            Log.e(TAG, "可执行文件路径为 null");
             return;
         }
+        File goExecutable = new File(executablePath);
+
+        // 不再需要 copyAssetToFilesDir(GO_EXECUTABLE_NAME, goExecutable)
 
         if (!goExecutable.exists()) {
-            mainHandler.post(() -> updateStatus("错误：找不到 Go 可执行文件。"));
-            Log.e(TAG, "Go executable not found after copy attempt.");
+            mainHandler.post(() -> updateStatus("错误：在原生库目录中找不到 Go 可执行文件。"));
+            Log.e(TAG, "Go 可执行文件未在 " + executablePath + " 中找到。请确保已正确放置在 jniLibs 目录并重命名为 .so 文件。");
             return;
         }
 
+        // 检查可执行权限，并尝试设置（尽管在 nativeLibraryDir 中设置权限可能因只读文件系统而失败）
+        // 主要依赖于系统安装时是否已正确设置权限（因为文件名为 .so）
         if (!goExecutable.canExecute()) {
-            if (!goExecutable.setExecutable(true, true)) {
-                mainHandler.post(() -> updateStatus("错误：无法设置可执行权限。"));
-                Log.e(TAG, "Failed to set executable permission.");
-                return;
+            Log.w(TAG, "文件 " + executablePath + " 不可执行。尝试设置权限...");
+            if (goExecutable.setExecutable(true, true)) {
+                Log.d(TAG, "成功为 " + goExecutable.getName() + " 设置可执行权限。");
+            } else {
+                Log.w(TAG, "警告：无法为 " + goExecutable.getName() + " 设置可执行权限。依赖系统安装时的权限。");
+                // 不要在这里返回，继续尝试执行，看是否能成功
             }
-            Log.d(TAG, "已为 " + goExecutable.getName() + " 设置可执行权限");
         }
+        Log.d(TAG, "最终检查可执行权限 " + executablePath + " canExecute(): " + goExecutable.canExecute());
+
 
         File internalStorageDir = getFilesDir();
         String storagePath = new File(internalStorageDir, "clipboard_data").getAbsolutePath();
@@ -298,10 +316,10 @@ public class MainActivity extends AppCompatActivity {
         if (textViewLog != null) {
             textViewLog.append(message + "\n");
             // 自动滚动到底部 (可选)
-            final ScrollView scrollView = findViewById(R.id.logScrollView); // 假设你的TextView在ScrollView内
-            if (scrollView != null) {
-                scrollView.post(() -> scrollView.fullScroll(View.FOCUS_DOWN));
-            }
+            // final ScrollView scrollView = findViewById(R.id.logScrollView); // 假设你的TextView在ScrollView内
+            // if (scrollView != null) {
+            //     scrollView.post(() -> scrollView.fullScroll(View.FOCUS_DOWN));
+            // }
         }
     }
 
@@ -310,10 +328,10 @@ public class MainActivity extends AppCompatActivity {
         buttonStart.setEnabled(!isRunning);
         buttonStop.setEnabled(isRunning);
         // 可以在服务运行时禁用设置编辑，或提示重启生效
-        editTextHost.setEnabled(!isRunning);
-        editTextPort.setEnabled(!isRunning);
-        editTextAuthPassword.setEnabled(!isRunning);
-        buttonSaveSettings.setEnabled(!isRunning);
+        // editTextHost.setEnabled(!isRunning);
+        // editTextPort.setEnabled(!isRunning);
+        // editTextAuthPassword.setEnabled(!isRunning);
+        // buttonSaveSettings.setEnabled(!isRunning);
     }
 
 
