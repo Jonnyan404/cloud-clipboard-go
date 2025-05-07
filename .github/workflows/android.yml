@@ -1,0 +1,82 @@
+name: Build Android APK
+
+on:
+#   push:
+#     branches: [ main ] # 或者你的默认分支，例如 master
+#   pull_request:
+#     branches: [ main ] # 或者你的默认分支
+  workflow_dispatch: # 允许手动触发
+
+jobs:
+  build-apk:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22' # 请确认与你项目使用的 Go 版本一致
+
+      - name: Get short commit SHA for version
+        id: vars
+        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Build Go executable for Android
+        run: |
+          echo "Building Go binary with version: ci-${{ steps.vars.outputs.sha_short }}"
+          cd cloud-clip
+          # 使用与 .goreleaser.yaml 和 openwrt/scripts/build.sh 类似的标志
+          # 确保 main.server_version 和 main.useEmbedded 在你的 Go main 包中定义
+          GOOS=android GOARCH=arm64 go build -trimpath -tags=embed \
+            -ldflags="-s -w -X main.server_version=ci-${{ steps.vars.outputs.sha_short }} -X main.useEmbedded=true" \
+            -o cloudclip_android_arm64 .
+          
+          echo "Go binary compiled."
+          ls -l cloudclip_android_arm64
+
+          # 确保 Android assets 目录存在
+          mkdir -p ../Android/app/src/main/assets/
+          mv cloudclip_android_arm64 ../Android/app/src/main/assets/
+          echo "Go binary moved to Android assets directory."
+          ls -l ../Android/app/src/main/assets/
+          cd ..
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3 # 此 action 会处理 Gradle 缓存和环境
+
+      - name: Make gradlew executable
+        run: chmod +x ./Android/gradlew
+
+      - name: Build Android APK (Debug)
+        run: |
+          cd Android
+          ./gradlew assembleDebug --stacktrace
+          cd ..
+        # env:
+          # 如果你的项目需要特定的 JVM 选项给 Gradle
+          # GRADLE_OPTS: "-Xmx2048m"
+          # ANDROID_SDK_ROOT: ${{ env.ANDROID_HOME }} # setup-gradle 可能会设置 ANDROID_HOME
+
+      - name: List generated APK files
+        run: |
+          echo "Listing files in Android/app/build/outputs/apk/debug/"
+          ls -R Android/app/build/outputs/apk/debug/
+          echo "Listing files in Android/app/build/outputs/apk/"
+          ls -R Android/app/build/outputs/apk/
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloud-clipboard-debug-apk
+          path: Android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error # 如果没有找到 APK 文件，则工作流失败
