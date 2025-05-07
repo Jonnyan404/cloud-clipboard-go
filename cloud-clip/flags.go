@@ -10,12 +10,14 @@ import (
 // 定义所有命令行参数
 var (
 	// flg_external_static = flag.String("static", "./static", "Path to external static files")
-	flg_config  = flag.String("config", "config.json", "指定配置文件路径")
-	flg_version = flag.Bool("v", false, "显示版本信息并退出")
-	flg_host    = flag.String("host", "", "指定监听主机地址，如果设置则覆盖配置文件")
-	flg_port    = flag.Int("port", 0, "指定监听端口，如果设置则覆盖配置文件")
-	flg_auth    = flag.String("auth", "", "指定访问密码,如果设置则覆盖配置文件")
-	flg_help    = flag.Bool("h", false, "显示帮助信息")
+	flg_config       = flag.String("config", "config.json", "指定配置文件路径")
+	flg_version      = flag.Bool("v", false, "显示版本信息并退出")
+	flg_host         = flag.String("host", "", "指定监听主机地址，如果设置则覆盖配置文件")
+	flg_port         = flag.Int("port", 0, "指定监听端口，如果设置则覆盖配置文件")
+	flg_auth         = flag.String("auth", "", "指定访问密码,如果设置则覆盖配置文件")
+	flg_storage_dir  = flag.String("storage", "", "指定文件存储目录，如果设置则覆盖配置文件")
+	flg_history_file = flag.String("historyfile", "", "指定历史记录文件路径，如果设置则覆盖配置文件")
+	flg_help         = flag.Bool("h", false, "显示帮助信息")
 )
 
 // 自定义帮助信息，格式更美观
@@ -29,6 +31,8 @@ func printHelp() {
 	fmt.Printf("  %s -port 9502                  # 在端口9502上启动服务\n", appName)
 	fmt.Printf("  %s -host 127.0.0.1 -port 9502  # 在127.0.0.1:9502上启动服务\n", appName)
 	fmt.Printf("  %s -config myconfig.json       # 使用指定的配置文件\n", appName)
+	fmt.Printf("  %s -auth abcdefg      		 # 使用指定的字符串作为网站访问密码\n", appName)
+
 }
 
 func init() {
@@ -96,5 +100,13 @@ func applyCommandLineArgs() {
 	if *flg_auth != "" {
 		fmt.Printf("使用命令行指定的访问密码: %s\n", *flg_auth)
 		config.Server.Auth = *flg_auth
+	}
+	if *flg_storage_dir != "" {
+		fmt.Printf("使用命令行指定的存储目录: %s\n", *flg_storage_dir)
+		config.Server.StorageDir = *flg_storage_dir
+	}
+	if *flg_history_file != "" {
+		fmt.Printf("使用命令行指定的历史文件: %s\n", *flg_history_file)
+		config.Server.HistoryFile = *flg_history_file
 	}
 }
