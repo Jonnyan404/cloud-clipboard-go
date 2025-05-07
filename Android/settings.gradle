@@ -19,5 +19,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "CloudClipboardGoAndroid"
-include(":app") 
+rootProject.name = "My Application"
+include ':app'
