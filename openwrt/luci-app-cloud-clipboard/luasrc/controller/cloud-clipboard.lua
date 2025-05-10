@@ -31,14 +31,16 @@ function act_status()
 end
 
 -- 日志读取函数
-function get_log()
-    local logfile = "/var/log/cloud-clipboard.log"
-    local ldata = nixio.fs.readfile(logfile) or ""
-    if #ldata == 0 then
-        ldata = "日志为空"
+function getlog()
+    local cmd = "logread | grep 'cloud-clipboard'"
+    local logtext = luci.sys.exec(cmd) or ""
+    
+    if logtext == "" then
+        logtext = _("No related logs found")
     end
-    luci.http.prepare_content("text/plain; charset=utf-8")
-    luci.http.write(ldata)
+    
+    luci.http.prepare_content("text/plain")
+    luci.http.write(logtext)
 end
 
 -- 日志清除函数
