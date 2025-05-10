@@ -154,7 +154,7 @@ npm run build
 # Run backend
 cd ../cloud-clip
 go mod tidy
-go run .
+go run -tags embed .
 ```
 
 ### Configuration File Description

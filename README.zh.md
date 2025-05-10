@@ -160,7 +160,7 @@ npm run build
 # 运行服务端
 cd ../cloud-clip
 go mod tidy
-go run .
+go run -tags embed .
 ```
 
 

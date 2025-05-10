@@ -7,7 +7,7 @@ RUN npm install
 RUN npm run build
 
 # 后端构建阶段
-FROM golang:1.22-alpine AS builder
+FROM golang:1.23-alpine AS builder
 
 # 设置工作目录
 WORKDIR /app
@@ -16,16 +16,16 @@ COPY cloud-clip/go.mod cloud-clip/go.sum ./
 RUN go mod download
 
 # 复制源代码
-COPY cloud-clip/*.go ./
+COPY cloud-clip/ ./
 
 # 创建静态文件目录
-RUN mkdir -p ./static
+RUN mkdir -p lib/static
 
 # 复制前端构建结果
-COPY --from=frontend /app/dist ./static/
+COPY --from=frontend /app/dist lib/static/
 
 # 编译应用，启用嵌入式静态文件
-RUN CGO_ENABLED=0 GOOS=linux go build -tags=embed -ldflags="-s -w -X main.useEmbedded=true" -o cloud-clipboard-go .
+RUN CGO_ENABLED=0 GOOS=linux go build -tags=embed -ldflags="-s -w -X lib.UseEmbeddedStr=true" -o cloud-clipboard-go .
 
 # 最终镜像
 FROM alpine:latest

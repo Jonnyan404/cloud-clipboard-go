@@ -62,7 +62,7 @@ jobs:
           echo "-------------------------------------------------------------"
           
           GOOS=android GOARCH=arm64 go build -v -trimpath -tags=embed \
-            -ldflags="-s -w -X main.server_version=ci-${{ steps.vars.outputs.sha_short }} -X main.useEmbedded=true" \
+            -ldflags="-s -w -X main.server_version=ci-${{ steps.vars.outputs.sha_short }} -X main.useEmbeddedStr=true" \
             -o cloudclip_android_arm64 .
           
           echo "Go binary compiled."

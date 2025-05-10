@@ -18,13 +18,28 @@
                 <!-- Row for Thumbnail, Title, Size/Expire, Buttons -->
                 <div class="d-flex flex-row align-center">
                     <v-img
-                        v-if="meta.thumbnail"
+                        v-if="meta.thumbnail && (!isPreviewableVideo && !isPreviewableAudio)"
                         :src="meta.thumbnail"
                         class="mr-3 flex-grow-0 hidden-sm-and-down"
                         width="2.5rem"
                         height="2.5rem"
                         style="border-radius: 3px"
                     ></v-img>
+                        <!-- 为音频文件添加专门的图标 -->
+                    <v-icon
+                        v-else-if="isPreviewableAudio"
+                        class="mr-3 flex-grow-0 hidden-sm-and-down"
+                        size="2.5rem"
+                        color="grey"
+                    >{{ mdiMusicNote }}</v-icon>
+                    <!-- 为视频文件添加专门的图标 -->
+                    <v-icon
+                        v-else-if="isPreviewableVideo"
+                        class="mr-3 flex-grow-0 hidden-sm-and-down"
+                        size="2.5rem"
+                        color="grey"
+                    >{{ mdiMovie }}</v-icon>
+                    <!-- ... -->
                     <div class="flex-grow-1 mr-2" style="min-width: 0">
                         <!-- Title -->
                         <div
@@ -174,7 +189,9 @@ import {
     mdiDesktopTower,
     mdiCellphone,
     mdiIpNetworkOutline,
-    mdiQrcode, // <-- Import QR Code Icon
+    mdiQrcode,
+    mdiMusicNote,
+    mdiMovie,
 } from '@mdi/js';
 
 export default {
@@ -206,7 +223,9 @@ export default {
             mdiDesktopTower,
             mdiCellphone,
             mdiIpNetworkOutline,
-            mdiQrcode, // <-- Add icon to data
+            mdiQrcode,
+            mdiMusicNote,
+            mdiMovie,
         };
     },
     computed: {
@@ -217,7 +236,7 @@ export default {
             return this.meta.name.match(/\.(mp4|webm|ogv)$/gi);
         },
         isPreviewableAudio() {
-            return this.meta.name.match(/\.(wav|ogg|opus|m4a|flac)$/gi);
+            return this.meta.name.match(/\.(mp3|wav|ogg|opus|m4a|flac)$/gi);
         },
         contentUrl() {
             const protocol = window.location.protocol;
