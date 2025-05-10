@@ -105,6 +105,7 @@ const app = new Vue({
     },
 })
 
+
 axios.interceptors.request.use(config => {
     if (app.authCode) {
         config.headers.Authorization = `Bearer ${app.authCode}`;

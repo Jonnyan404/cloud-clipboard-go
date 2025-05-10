@@ -53,7 +53,6 @@ export default {
     },
     methods: {
         connect() {
-            if (this.websocket || this.websocketConnecting) return;
             this.websocketConnecting = true;
             this.$toast(this.$t('connectingServer')); // Translate toast
             this.$http.get('server').then(response => {
@@ -116,6 +115,7 @@ export default {
             this.$root.device = [];
         },
         failure() {
+            localStorage.removeItem('auth');
             this.websocket = null;
             this.$root.device = [];
             if (this.retry++ < 3) {
