@@ -1,7 +1,7 @@
 version: 2
 before:
   hooks:
-    - sh -c 'cd $GITHUB_WORKSPACE/client && npm install && npm run build && mkdir -p $GITHUB_WORKSPACE/cloud-clip/static && cp -r $GITHUB_WORKSPACE/client/dist/* $GITHUB_WORKSPACE/cloud-clip/static/ && ls -la $GITHUB_WORKSPACE/cloud-clip/static/'
+    - sh -c 'cd $GITHUB_WORKSPACE/client && npm install && npm run build && mkdir -p $GITHUB_WORKSPACE/cloud-clip/lib/static && cp -r $GITHUB_WORKSPACE/client/dist/* $GITHUB_WORKSPACE/cloud-clip/lib/static/ && ls -la $GITHUB_WORKSPACE/cloud-clip/lib/static/'
     # Go 依赖管理
     - sh -c 'cd $GITHUB_WORKSPACE/cloud-clip && go mod tidy'
 
@@ -42,9 +42,9 @@ builds:
       - -tags=embed
     ldflags:
       - -s -w
-      - -X main.version={{ .Version }}
+      # - -X main.version={{ .Version }}
       # 增加一个标记告诉程序使用嵌入式静态资源
-      - -X main.useEmbedded=true
+      - -X lib.UseEmbeddedStr=true
 
 archives:
   - formats: [ 'tar.gz' ]

@@ -1,0 +1,111 @@
+package lib
+
+/**
+*** FILE: config.go
+***   handle config.json <===> Config
+**/
+
+import (
+	"encoding/json"
+	"log"
+	"os"
+	// "github.com/sanity-io/litter"
+)
+
+type Config struct {
+	Server struct {
+		Host        interface{} `json:"host"`        //done
+		Port        int         `json:"port"`        //done
+		Prefix      string      `json:"prefix"`      //done
+		History     int         `json:"history"`     //done
+		HistoryFile string      `json:"historyFile"` // 添加历史文件路径
+		StorageDir  string      `json:"storageDir"`  // 添加存储目录路径
+		// Auth    string `json:"auth"`
+		Auth interface{} `json:"auth"` //done
+		Cert string      `json:"cert"`
+		Key  string      `json:"key"`
+	} `json:"server"`
+	Text struct {
+		Limit int `json:"limit"` //done
+	} `json:"text"`
+	File struct {
+		Expire int `json:"expire"` //done
+		Chunk  int `json:"chunk"`  //done, but no limit
+		Limit  int `json:"limit"`  //done
+	} `json:"file"`
+}
+
+// var config_path = "config.json"
+
+func load_config(configPath string) (*Config, error) {
+	if configPath == "" {
+		configPath = "config.json" // 默认配置文件名
+	}
+	log.Printf("尝试从以下路径加载配置文件: %s\n", configPath)
+
+	defaultConf := defaultConfig()
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		log.Printf("无法读取配置文件 '%s': %v. 将使用默认配置.\n", configPath, err)
+		// 将默认配置写入文件，如果它不存在或无法读取
+		defaultData, marshalErr := json.MarshalIndent(defaultConf, "", "  ")
+		if marshalErr == nil {
+			if writeErr := os.WriteFile(configPath, defaultData, 0644); writeErr == nil {
+				log.Printf("已将默认配置写入: %s\n", configPath)
+			} else {
+				log.Printf("无法写入默认配置文件 '%s': %v\n", configPath, writeErr)
+			}
+		}
+		return defaultConf, nil // 返回默认配置，不视为致命错误
+	}
+
+	// 使用默认配置作为基础，然后用文件中的值覆盖它
+	conf := defaultConfig()
+	if err := json.Unmarshal(data, conf); err != nil {
+		log.Printf("无法解析配置文件 '%s': %v. 将使用默认配置.\n", configPath, err)
+		return defaultConf, nil // 返回默认配置，不视为致命错误
+	}
+
+	log.Printf("配置文件 %s 加载成功。\n", configPath)
+	return conf, nil
+}
+
+func defaultConfig() *Config {
+	return &Config{
+		Server: struct {
+			Host        interface{} `json:"host"`
+			Port        int         `json:"port"`
+			Prefix      string      `json:"prefix"`
+			History     int         `json:"history"`
+			HistoryFile string      `json:"historyFile"`
+			StorageDir  string      `json:"storageDir"`
+			Auth        interface{} `json:"auth"`
+			Cert        string      `json:"cert"`
+			Key         string      `json:"key"`
+		}{
+			Host:        []string{"0.0.0.0"},
+			Port:        9501,
+			Prefix:      "",
+			History:     100,
+			HistoryFile: "history.json",
+			StorageDir:  "./uploads",
+			Auth:        false,
+			Cert:        "",
+			Key:         "",
+		},
+		Text: struct {
+			Limit int `json:"limit"`
+		}{
+			Limit: 4096,
+		},
+		File: struct {
+			Expire int `json:"expire"`
+			Chunk  int `json:"chunk"`
+			Limit  int `json:"limit"`
+		}{
+			Expire: 3600,
+			Chunk:  2 * _MB,
+			Limit:  256 * _MB,
+		},
+	}
+}

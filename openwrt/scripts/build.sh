@@ -31,27 +31,27 @@ if [ -d "client" ]; then
         npm run build
         
         # 创建static目录并复制前端文件
-        mkdir -p "../cloud-clip/static"
-        cp -r dist/* "../cloud-clip/static/"
+        mkdir -p "../cloud-clip/lib/static"
+        cp -r dist/* "../cloud-clip/lib/static/"
         
-        echo "✓ 前端文件构建完成并复制到 cloud-clip/static"
+        echo "✓ 前端文件构建完成并复制到 cloud-clip/lib/static"
         
         # 返回项目根目录
         cd ..
     else
         echo "! 警告: 未找到Node.js，跳过前端构建"
         # 检查是否有预构建的静态文件
-        if [ ! -d "cloud-clip/static" ] || [ -z "$(ls -A cloud-clip/static 2>/dev/null)" ]; then
+        if [ ! -d "cloud-clip/lib/static" ] || [ -z "$(ls -A cloud-clip/lib/static 2>/dev/null)" ]; then
             echo "! 错误: 静态文件不存在且无法构建前端"
-            echo "! 请先在本地构建前端文件并复制到 cloud-clip/static 目录"
+            echo "! 请先在本地构建前端文件并复制到 cloud-clip/lib/static 目录"
             exit 1
         fi
     fi
 else
     echo "! 未找到前端代码目录，检查是否已有静态文件"
     # 检查是否有预构建的静态文件
-    if [ ! -d "cloud-clip/static" ] || [ -z "$(ls -A cloud-clip/static 2>/dev/null)" ]; then
-        echo "! 错误: 找不到静态文件目录 cloud-clip/static"
+    if [ ! -d "cloud-clip/lib/static" ] || [ -z "$(ls -A cloud-clip/lib/static 2>/dev/null)" ]; then
+        echo "! 错误: 找不到静态文件目录 cloud-clip/lib/static"
         echo "! 请先创建该目录并添加静态文件"
         exit 1
     fi
@@ -92,7 +92,7 @@ build() {
     [ -n "$MIPS" ] && BUILD_CMD="$BUILD_CMD GOMIPS=$MIPS"
     
     # 添加 -tags=embed 参数和 -X main.useEmbedded=true 标记
-    eval "$BUILD_CMD go build -trimpath -tags=embed -ldflags=\"-s -w -X main.server_version=$VERSION -X main.useEmbedded=true\" -o \"$OUTPUT\" ."
+    eval "$BUILD_CMD go build -trimpath -tags=embed -ldflags=\"-s -w -X main.server_version=$VERSION -X lib.UseEmbeddedStr=true\" -o \"$OUTPUT\" ."
     
     echo "✓ 完成: $OUTPUT"
 }
