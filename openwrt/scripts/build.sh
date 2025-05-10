@@ -69,7 +69,7 @@ if [ ! -f "go.mod" ]; then
 fi
 
 # 在编译前检查是否有static目录
-if [ ! -d "static" ]; then
+if [ ! -d "lib/static" ]; then
     echo "错误: 找不到static目录，无法嵌入静态文件"
     exit 1
 fi
