@@ -31,9 +31,9 @@ function act_status()
 end
 
 -- 日志读取函数
-function getlog()
+function get_log()
     local cmd = "logread | grep 'cloud-clipboard'"
-    local logtext = luci.sys.call(cmd) or ""
+    local logtext = luci.sys.exec(cmd) or ""
     
     if logtext == "" then
         logtext = _("No related logs found")
