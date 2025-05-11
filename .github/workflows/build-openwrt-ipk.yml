@@ -9,7 +9,7 @@ on:
       version:
         description: '版本号 (不含v前缀)'
         required: true
-        default: '4.4.0'
+        default: '4.5.10'
 
 permissions:
   contents: write
