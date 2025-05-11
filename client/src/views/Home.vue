@@ -97,6 +97,18 @@
                     <v-toolbar-title v-if="mode === 'text'">{{ $t('sendText') }}</v-toolbar-title>
                     <v-toolbar-title v-if="mode === 'file'">{{ $t('sendFile') }}</v-toolbar-title>
                     <v-spacer></v-spacer>
+                    <v-tooltip bottom>
+                        <template v-slot:activator="{ on }">
+                            <v-btn icon v-on="on" @click="reconnect">
+                                <v-icon v-if="$root.websocket">{{mdiLanConnect}}</v-icon>
+                                <v-icon v-else-if="$root.websocketConnecting">{{mdiLanPending}}</v-icon>
+                                <v-icon v-else>{{mdiLanDisconnect}}</v-icon>
+                            </v-btn>
+                        </template>
+                        <span v-if="$root.websocket">{{ $t('connected') }}</span>
+                        <span v-else-if="$root.websocketConnecting">{{ $t('connecting') }}</span>
+                        <span v-else>{{ $t('disconnected') }}</span>
+                    </v-tooltip>
                 </v-toolbar>
                 <v-card-text class="px-4">
                     <div class="my-4">
@@ -136,7 +148,10 @@ import {
     mdiFileDocumentOutline,
     mdiText,
     mdiClose,
-    mdiQrcode, // <-- Import QR Code Icon
+    mdiQrcode,
+    mdiLanConnect,
+    mdiLanPending,
+    mdiLanDisconnect,
 } from '@mdi/js';
 
 export default {
@@ -158,7 +173,10 @@ export default {
             mdiFileDocumentOutline,
             mdiText,
             mdiClose,
-            mdiQrcode, // <-- Add icon to data
+            mdiQrcode,
+            mdiLanConnect,
+            mdiLanPending,
+            mdiLanDisconnect,
         };
     },
     computed: {
@@ -176,6 +194,12 @@ export default {
         }
     },
     methods: {
+        reconnect() {
+            if (!this.$root.websocket && !this.$root.websocketConnecting) {
+                this.$root.retry = 0;
+                this.$root.connect();
+            }
+        },
         openDialog(type) {
             this.mode = type;
             this.dialog = true;
