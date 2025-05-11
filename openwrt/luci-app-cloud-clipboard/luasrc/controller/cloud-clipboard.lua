@@ -33,7 +33,7 @@ end
 -- 日志读取函数
 function getlog()
     local cmd = "logread | grep 'cloud-clipboard'"
-    local logtext = luci.sys.exec(cmd) or ""
+    local logtext = luci.sys.call(cmd) or ""
     
     if logtext == "" then
         logtext = _("No related logs found")
