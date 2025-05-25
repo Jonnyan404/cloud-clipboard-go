@@ -38,6 +38,8 @@
 这里是 go 版服务端
 ### Android 端快捷方式(模仿iOS快捷方式)
 
+- 要求: 服务端版本 ≥ v4.5.10
+
 1. [下载 http-shortcuts](https://github.com/Waboodoo/HTTP-Shortcuts/releases)
 2. [下载 cloud-clipboard-shortcuts.zip](https://raw.githubusercontent.com/Jonnyan404/cloud-clipboard-go/refs/heads/main/shortcuts/cloud-clipboard-shortcuts.zip)
 3. 打开`http-shortcuts`,点击右上角三个点菜单-->导入/导出-->从文件导入-->选择第2步下载的文件
