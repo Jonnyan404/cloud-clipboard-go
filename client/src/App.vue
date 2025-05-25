@@ -247,7 +247,10 @@
                 <v-card-title class="headline">{{ $t('authRequired') }}</v-card-title>
                 <v-card-text>
                     <p>{{ $t('authPrompt') }}</p>
-                    <v-text-field v-model="$root.authCode" :label="$t('password')"></v-text-field>
+                    <v-text-field v-model="$root.authCode" :label="$t('password')"
+                    @keyup.enter="$root.authCodeDialog = false; $root.connect();"
+                    autofocus
+                    ></v-text-field>
                 </v-card-text>
                 <v-card-actions>
                     <v-spacer></v-spacer>
@@ -274,6 +277,8 @@
                         :label="$t('roomName')"
                         :append-icon="mdiDiceMultiple"
                         @click:append="$root.roomInput = ['reimu', 'marisa', 'rumia', 'cirno', 'meiling', 'patchouli', 'sakuya', 'remilia', 'flandre', 'letty', 'chen', 'lyrica', 'lunasa', 'merlin', 'youmu', 'yuyuko', 'ran', 'yukari', 'suika', 'mystia', 'keine', 'tewi', 'reisen', 'eirin', 'kaguya', 'mokou'][Math.floor(Math.random() * 26)] + '-' + Math.random().toString(16).substring(2, 6)"
+                        @keyup.enter="$router.push({ path: '/', query: { room: $root.roomInput }}); $root.roomDialog = false;"
+                        autofocus
                     ></v-text-field>
                 </v-card-text>
                 <v-card-actions>

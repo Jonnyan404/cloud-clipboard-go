@@ -2,7 +2,7 @@
     <v-hover v-slot:default="{ hover }">
         <v-card :elevation="hover ? 6 : 2" class="mb-2 transition-swing">
             <v-card-text>
-                <!-- Info Line -->
+                <!-- Info Line - 移除ID部分 -->
                 <div class="caption text--secondary mb-1" v-if="meta.timestamp && ($root.showTimestamp || $root.showDeviceInfo || $root.showSenderIP)">
                     <template v-if="$root.showTimestamp">
                         <v-icon small class="mr-1">{{ mdiClockOutline }}</v-icon>{{ formatTimestamp(meta.timestamp) }}
@@ -56,70 +56,78 @@
                         </div>
                     </div>
 
-                    <div class="align-self-center text-no-wrap">
-                        <!-- Download Button -->
-                        <v-tooltip bottom>
-                            <template v-slot:activator="{ on }">
-                                <v-btn
-                                    v-on="on"
-                                    icon
-                                    color="grey"
-                                    :href="expired ? null : fileUrl"
-                                    :download="expired ? null : meta.name"
-                                    :disabled="expired"
-                                >
-                                    <v-icon>{{ expired ? mdiDownloadOff : mdiDownload }}</v-icon>
-                                </v-btn>
-                            </template>
-                            <span>{{ expired ? $t('expired') : $t('download') }}</span>
-                        </v-tooltip>
-
-                        <!-- Preview Button -->
-                        <template v-if="meta.thumbnail || isPreviewableVideo || isPreviewableAudio">
-                            <v-progress-circular
-                                v-if="loadingPreview"
-                                indeterminate
-                                color="grey"
-                            >{{loadedPreview / meta.size | percentage(0)}}</v-progress-circular>
+                    <!-- Buttons + ID -->
+                    <div class="align-self-start text-no-wrap d-flex flex-column align-end">
+                        <!-- ID显示在按钮上方 -->
+                        <div v-if="meta.id" class="caption grey--text text--darken-1 mb-1">
+                            <v-icon small class="mr-1">{{ mdiPound }}</v-icon>{{ meta.id }}
+                        </div>
+                        <!-- 按钮组 -->
+                        <div class="align-self-center text-no-wrap">
+                            <!-- Download Button -->
                             <v-tooltip bottom>
                                 <template v-slot:activator="{ on }">
-                                    <v-btn v-on="on" icon color="grey" @click="!expired && previewFile()">
-                                        <v-icon>{{(isPreviewableVideo || isPreviewableAudio) ? mdiMovieSearchOutline : mdiImageSearchOutline}}</v-icon>
+                                    <v-btn
+                                        v-on="on"
+                                        icon
+                                        color="grey"
+                                        :href="expired ? null : fileUrl"
+                                        :download="expired ? null : meta.name"
+                                        :disabled="expired"
+                                    >
+                                        <v-icon>{{ expired ? mdiDownloadOff : mdiDownload }}</v-icon>
                                     </v-btn>
                                 </template>
-                                <span>{{ $t('preview') }}</span>
+                                <span>{{ expired ? $t('expired') : $t('download') }}</span>
                             </v-tooltip>
-                        </template>
 
-                        <!-- Copy Link Button -->
-                        <v-tooltip bottom>
-                            <template v-slot:activator="{ on }">
-                                <v-btn v-on="on" icon color="grey" @click="copyLink">
-                                    <v-icon>{{ mdiLinkVariant }}</v-icon>
-                                </v-btn>
+                            <!-- Preview Button -->
+                            <template v-if="meta.thumbnail || isPreviewableVideo || isPreviewableAudio">
+                                <v-progress-circular
+                                    v-if="loadingPreview"
+                                    indeterminate
+                                    color="grey"
+                                >{{loadedPreview / meta.size | percentage(0)}}</v-progress-circular>
+                                <v-tooltip bottom>
+                                    <template v-slot:activator="{ on }">
+                                        <v-btn v-on="on" icon color="grey" @click="!expired && previewFile()">
+                                            <v-icon>{{(isPreviewableVideo || isPreviewableAudio) ? mdiMovieSearchOutline : mdiImageSearchOutline}}</v-icon>
+                                        </v-btn>
+                                    </template>
+                                    <span>{{ $t('preview') }}</span>
+                                </v-tooltip>
                             </template>
-                            <span>{{ $t('copyLink') }}</span>
-                        </v-tooltip>
 
-                        <!-- Show QR Code Button -->
-                        <v-tooltip bottom>
-                            <template v-slot:activator="{ on }">
-                                <v-btn v-on="on" icon color="grey" @click="qrDialogVisible = true">
-                                    <v-icon>{{ mdiQrcode }}</v-icon>
-                                </v-btn>
-                            </template>
-                            <span>{{ $t('showQrCode') }}</span>
-                        </v-tooltip>
+                            <!-- Copy Link Button -->
+                            <v-tooltip bottom>
+                                <template v-slot:activator="{ on }">
+                                    <v-btn v-on="on" icon color="grey" @click="copyLink">
+                                        <v-icon>{{ mdiLinkVariant }}</v-icon>
+                                    </v-btn>
+                                </template>
+                                <span>{{ $t('copyLink') }}</span>
+                            </v-tooltip>
 
-                        <!-- Delete Button -->
-                        <v-tooltip bottom>
-                            <template v-slot:activator="{ on }">
-                                <v-btn v-on="on" icon color="grey" @click="deleteItem" :disabled="loadingPreview">
-                                    <v-icon>{{mdiClose}}</v-icon>
-                                </v-btn>
-                            </template>
-                            <span>{{ $t('delete') }}</span>
-                        </v-tooltip>
+                            <!-- Show QR Code Button -->
+                            <v-tooltip bottom>
+                                <template v-slot:activator="{ on }">
+                                    <v-btn v-on="on" icon color="grey" @click="qrDialogVisible = true">
+                                        <v-icon>{{ mdiQrcode }}</v-icon>
+                                    </v-btn>
+                                </template>
+                                <span>{{ $t('showQrCode') }}</span>
+                            </v-tooltip>
+
+                            <!-- Delete Button -->
+                            <v-tooltip bottom>
+                                <template v-slot:activator="{ on }">
+                                    <v-btn v-on="on" icon color="grey" @click="deleteItem" :disabled="loadingPreview">
+                                        <v-icon>{{mdiClose}}</v-icon>
+                                    </v-btn>
+                                </template>
+                                <span>{{ $t('delete') }}</span>
+                            </v-tooltip>
+                        </div>
                     </div>
                 </div>
                 <v-expand-transition v-if="meta.thumbnail || isPreviewableVideo || isPreviewableAudio">
@@ -192,6 +200,7 @@ import {
     mdiQrcode,
     mdiMusicNote,
     mdiMovie,
+    mdiPound, // <-- Import Message ID icon
 } from '@mdi/js';
 
 export default {
@@ -226,6 +235,7 @@ export default {
             mdiQrcode,
             mdiMusicNote,
             mdiMovie,
+            mdiPound, // <-- Add Message ID icon
         };
     },
     computed: {

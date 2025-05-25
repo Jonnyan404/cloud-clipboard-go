@@ -48,9 +48,16 @@ const app = new Vue({
             received: [],
             device: [],
             // --- 新增显示设置 (默认 true) ---
-            showTimestamp: localStorage.getItem('showTimestamp') !== 'false',
-            showDeviceInfo: localStorage.getItem('showDeviceInfo') !== 'false',
-            showSenderIP: localStorage.getItem('showSenderIP') !== 'false',
+            // --- 修改显示设置初始化逻辑 ---
+            showTimestamp: localStorage.getItem('showTimestamp') !== null 
+                ? localStorage.getItem('showTimestamp') === 'true' 
+                : true,  // 默认显示时间戳
+            showDeviceInfo: localStorage.getItem('showDeviceInfo') !== null 
+                ? localStorage.getItem('showDeviceInfo') === 'true' 
+                : false, // 默认不显示设备信息
+            showSenderIP: localStorage.getItem('showSenderIP') !== null 
+                ? localStorage.getItem('showSenderIP') === 'true' 
+                : false, // 默认不显示发送者IP
             // --- 结束新增 ---
         };
     },

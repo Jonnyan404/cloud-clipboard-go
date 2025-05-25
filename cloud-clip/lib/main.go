@@ -292,9 +292,15 @@ func (s *ClipboardServer) setupRoutes() {
 	s.logger.Println("正在设置路由...")
 	prefix := s.config.Server.Prefix
 	mux := http.NewServeMux()
-
-	// 使用在 main() 中根据构建标志设置的 effectiveUseEmbedded
-	if effectiveUseEmbedded {
+	if *flg_static_dir != "" { // 检查配置中的外部静态目录
+		s.logger.Printf("从外部目录提供静态文件: %s", *flg_static_dir)
+		if _, statErr := os.Stat(*flg_static_dir); os.IsNotExist(statErr) {
+			s.logger.Printf("警告: 配置的外部静态目录 %s 不存在。将不提供前端服务。", *flg_static_dir)
+		} else {
+			mux.Handle(prefix+"/", http.StripPrefix(prefix, compressionMiddleware(http.FileServer(http.Dir(*flg_static_dir)))))
+		}
+		// 使用在 main() 中根据构建标志设置的 effectiveUseEmbedded
+	} else if effectiveUseEmbedded {
 		s.logger.Println("使用嵌入式静态文件。")
 		// 检查 embed_static_fs 是否真的包含内容
 		if _, err := embed_static_fs.Open("static"); err != nil && effectiveUseEmbedded {
@@ -306,13 +312,7 @@ func (s *ClipboardServer) setupRoutes() {
 			s.logger.Fatalf("错误: 无法从 embed_static_fs 获取 'static' 子目录: %v", err)
 		}
 		mux.Handle(prefix+"/", http.StripPrefix(prefix, compressionMiddleware(http.FileServer(http.FS(fsys)))))
-	} else if *flg_static_dir != "" { // 检查配置中的外部静态目录
-		s.logger.Printf("从外部目录提供静态文件: %s", *flg_static_dir)
-		if _, statErr := os.Stat(*flg_static_dir); os.IsNotExist(statErr) {
-			s.logger.Printf("警告: 配置的外部静态目录 %s 不存在。将不提供前端服务。", *flg_static_dir)
-		} else {
-			mux.Handle(prefix+"/", http.StripPrefix(prefix, compressionMiddleware(http.FileServer(http.Dir(*flg_static_dir)))))
-		}
+
 	} else {
 		s.logger.Println("警告: 未使用嵌入式静态文件，也未配置外部静态目录。将不提供前端服务。")
 	}
@@ -336,7 +336,6 @@ func (s *ClipboardServer) setupRoutes() {
 	mux.HandleFunc(prefix+"/revoke/", s.authMiddleware(s.handle_revoke))
 	mux.HandleFunc(prefix+"/revoke/all", s.authMiddleware(s.handleClearAll))
 	mux.HandleFunc(prefix+"/content/", s.authMiddleware(s.handleContent))
-	// mux.HandleFunc(prefix+"/content/latest", s.authMiddleware(s.handleLatestContent))
 
 	s.httpServer = &http.Server{
 		Handler: mux,
@@ -1071,7 +1070,11 @@ func (s *ClipboardServer) handle_text(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"url": contentURL, "id": strconv.Itoa(event.Data.ID())}) // [!code word]
+	json.NewEncoder(w).Encode(map[string]string{
+		"url":  contentURL,
+		"id":   strconv.Itoa(event.Data.ID()),
+		"type": "text", // 添加 type 参数
+	})
 }
 
 func (s *ClipboardServer) handle_upload(w http.ResponseWriter, r *http.Request) {
@@ -1213,8 +1216,13 @@ func (s *ClipboardServer) handle_upload(w http.ResponseWriter, r *http.Request) 
 	if room != "default" {
 		contentURL += fmt.Sprintf("?room=%s", room)
 	}
+	responseType := DetermineResponseType(fileInfo.Name)
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"url": contentURL, "id": strconv.Itoa(event.Data.ID())})
+	json.NewEncoder(w).Encode(map[string]string{
+		"url":  contentURL,
+		"id":   strconv.Itoa(event.Data.ID()),
+		"type": responseType,
+	})
 }
 
 func (s *ClipboardServer) handle_chunk(w http.ResponseWriter, r *http.Request) {
@@ -1350,9 +1358,13 @@ func (s *ClipboardServer) handle_finish(w http.ResponseWriter, r *http.Request) 
 	if room != "default" {
 		contentURL += fmt.Sprintf("?room=%s", room)
 	}
-
+	responseType := DetermineResponseType(fileInfo.Name)
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"url": contentURL, "id": strconv.Itoa(event.Data.ID())})
+	json.NewEncoder(w).Encode(map[string]string{
+		"url":  contentURL,
+		"id":   strconv.Itoa(event.Data.ID()),
+		"type": responseType,
+	})
 }
 
 func (s *ClipboardServer) handle_revoke(w http.ResponseWriter, r *http.Request) {
@@ -1499,20 +1511,32 @@ func (s *ClipboardServer) handleContent(w http.ResponseWriter, r *http.Request) 
 	idStr := parts[len(parts)-1]
 
 	// 检查是否是访问 "latest"，如果是，让专用处理函数处理
-	if idStr == "latest" {
+	if idStr == "latest" || idStr == "latest.json" {
 		s.handleLatestContent(w, r)
 		return
 	}
+	// 检查是否请求 JSON 格式的响应
+	// 1. 通过 URL 后缀判断
+	isJSONRequest := strings.HasSuffix(idStr, ".json")
+	// 如果 idStr 带有 .json 后缀，需要去除后缀再转换为整数
+	if isJSONRequest {
+		idStr = strings.TrimSuffix(idStr, ".json")
+	}
+	// 2. 通过查询参数判断 (json=true 或 json=1)
+	jsonParam := r.URL.Query().Get("json")
+	if jsonParam == "true" || jsonParam == "1" {
+		isJSONRequest = true
+	}
+	// 3. 通过 Accept 头判断 (会在特定情况下检查)
 
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
+		s.logger.Printf("无效的内容 ID: %s, 错误: %v", idStr, err)
 		http.Error(w, "无效的内容 ID", http.StatusBadRequest)
 		return
 	}
-
 	room := r.URL.Query().Get("room") // 可选的房间参数
-
-	s.logger.Printf("处理内容请求, ID: %d, 房间: '%s'", id, room)
+	s.logger.Printf("处理内容请求, ID: %d, 房间: '%s', JSON请求: %t", id, room, isJSONRequest)
 
 	s.messageQueue.Lock()
 	defer s.messageQueue.Unlock()
@@ -1527,31 +1551,58 @@ func (s *ClipboardServer) handleContent(w http.ResponseWriter, r *http.Request) 
 				switch msg.Data.Type() {
 				case "file":
 					if msg.Data.FileReceive != nil {
-						// 文件类型，重定向到文件URL
-						cacheUUID := msg.Data.FileReceive.Cache
-						filename := msg.Data.FileReceive.Name
-						scheme := getScheme(r)
-						encodedFilename := url.PathEscape(filename)
+						if isJSONRequest {
+							// 返回JSON格式的文件信息
+							fileReceive := msg.Data.FileReceive
+							responseType := DetermineResponseType(fileReceive.Name)
 
-						fileURL := fmt.Sprintf("%s://%s%s/file/%s/%s",
-							scheme,
-							r.Host,
-							s.config.Server.Prefix,
-							cacheUUID,
-							encodedFilename,
-						)
-						s.logger.Printf("找到文件内容, 重定向到: %s", fileURL)
-						http.Redirect(w, r, fileURL, http.StatusFound)
-						return
+							responseData := map[string]interface{}{
+								"type":      responseType,
+								"name":      fileReceive.Name,
+								"size":      fileReceive.Size,
+								"uuid":      fileReceive.Cache,
+								"url":       fileReceive.URL,
+								"id":        strconv.Itoa(msg.Data.ID()),
+								"timestamp": fileReceive.Timestamp,
+							}
+
+							w.Header().Set("Content-Type", "application/json")
+							json.NewEncoder(w).Encode(responseData)
+							s.logger.Printf("以JSON格式返回文件信息, ID: %d", id)
+							return
+						} else {
+							// 文件类型，重定向到文件URL
+							cacheUUID := msg.Data.FileReceive.Cache
+							filename := msg.Data.FileReceive.Name
+							scheme := getScheme(r)
+							encodedFilename := url.PathEscape(filename)
+
+							fileURL := fmt.Sprintf("%s://%s%s/file/%s/%s",
+								scheme,
+								r.Host,
+								s.config.Server.Prefix,
+								cacheUUID,
+								encodedFilename,
+							)
+							s.logger.Printf("找到文件内容, 重定向到: %s", fileURL)
+							http.Redirect(w, r, fileURL, http.StatusFound)
+							return
+						}
 					}
 				case "text":
 					if msg.Data.TextReceive != nil {
-						// 检查Accept头，判断返回格式
-						acceptHeader := r.Header.Get("Accept")
-						if strings.Contains(acceptHeader, "application/json") {
-							// 客户端请求JSON格式
+						// 返回格式判断优先级：1. isJSONRequest参数 2. Accept头
+						if isJSONRequest || strings.Contains(r.Header.Get("Accept"), "application/json") {
+							// JSON格式响应
+							responseData := map[string]interface{}{
+								"type":      "text",
+								"content":   msg.Data.TextReceive.Content,
+								"id":        strconv.Itoa(msg.Data.ID()),
+								"timestamp": msg.Data.TextReceive.Timestamp,
+							}
+
 							w.Header().Set("Content-Type", "application/json")
-							json.NewEncoder(w).Encode(msg)
+							json.NewEncoder(w).Encode(responseData)
 							s.logger.Printf("以JSON格式返回文本内容, ID: %d", id)
 							return
 						} else {
@@ -1571,13 +1622,28 @@ func (s *ClipboardServer) handleContent(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
+	// 内容未找到时的响应格式也遵循JSON请求参数
 	s.logger.Printf("未找到内容 ID: %d (房间: '%s')", id, room)
-	http.Error(w, "内容未找到", http.StatusNotFound)
+	if isJSONRequest {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "内容未找到"})
+	} else {
+		http.Error(w, "内容未找到", http.StatusNotFound)
+	}
 }
 
 func (s *ClipboardServer) handleLatestContent(w http.ResponseWriter, r *http.Request) {
 	room := r.URL.Query().Get("room")
-	s.logger.Printf("处理最新内容请求 (房间: '%s')", room)
+
+	// // 检查是否是 latest.json 请求
+	isJSONRequest := strings.HasSuffix(r.URL.Path, "latest.json")
+	jsonParam := r.URL.Query().Get("json")
+	if jsonParam == "true" || jsonParam == "1" {
+		isJSONRequest = true
+	}
+
+	s.logger.Printf("处理最新内容请求 (房间: '%s', JSON请求: %t)", room, isJSONRequest)
 
 	s.messageQueue.Lock()
 	defer s.messageQueue.Unlock()
@@ -1585,7 +1651,15 @@ func (s *ClipboardServer) handleLatestContent(w http.ResponseWriter, r *http.Req
 	// 检查消息队列是否为空
 	if len(s.messageQueue.List) == 0 {
 		s.logger.Printf("没有可用的内容 (房间: '%s')", room)
-		http.Error(w, "没有可用的内容", http.StatusNotFound)
+		if isJSONRequest {
+			// 如果是JSON请求，返回JSON格式的404响应
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusNotFound)
+			json.NewEncoder(w).Encode(map[string]string{"error": "内容未找到"})
+		} else {
+			// 普通请求，返回普通404
+			http.Error(w, "没有可用的内容", http.StatusNotFound)
+		}
 		return
 	}
 
@@ -1598,7 +1672,52 @@ func (s *ClipboardServer) handleLatestContent(w http.ResponseWriter, r *http.Req
 			continue
 		}
 
-		// 检测消息类型并相应处理
+		// 如果是JSON请求，始终以JSON格式返回
+		if isJSONRequest {
+			w.Header().Set("Content-Type", "application/json")
+
+			var responseType string
+			var responseData map[string]interface{}
+
+			if msg.Data.Type() == "file" && msg.Data.FileReceive != nil {
+				// 确定文件类型
+				fileReceive := msg.Data.FileReceive
+				responseType = DetermineResponseType(fileReceive.Name)
+
+				// 构建JSON响应
+				responseData = map[string]interface{}{
+					"type":      responseType,
+					"name":      fileReceive.Name,
+					"size":      fileReceive.Size,
+					"uuid":      fileReceive.Cache,
+					"url":       filepath.Join(fileReceive.URL, fileReceive.Name),
+					"id":        strconv.Itoa(msg.Data.ID()),
+					"timestamp": fileReceive.Timestamp,
+				}
+			} else if msg.Data.Type() == "text" && msg.Data.TextReceive != nil {
+				responseType = "text"
+				responseData = map[string]interface{}{
+					"type":      responseType,
+					"content":   msg.Data.TextReceive.Content,
+					"id":        strconv.Itoa(msg.Data.ID()),
+					"timestamp": msg.Data.TextReceive.Timestamp,
+				}
+			} else {
+				// 未知类型，提供基本信息
+				responseType = "unknown"
+				responseData = map[string]interface{}{
+					"type":  responseType,
+					"id":    strconv.Itoa(msg.Data.ID()),
+					"error": "不支持的内容类型",
+				}
+			}
+
+			json.NewEncoder(w).Encode(responseData)
+			s.logger.Printf("以JSON格式返回最新内容 (类型: %s, 房间: '%s')", responseType, room)
+			return
+		}
+
+		// 非JSON请求，按原有逻辑处理
 		if msg.Data.Type() == "file" && msg.Data.FileReceive != nil {
 			// 文件类型，直接提供文件内容而不是重定向
 			cacheUUID := msg.Data.FileReceive.Cache
@@ -1643,7 +1762,7 @@ func (s *ClipboardServer) handleLatestContent(w http.ResponseWriter, r *http.Req
 			return
 
 		} else if msg.Data.Type() == "text" && msg.Data.TextReceive != nil {
-			// 文本类型处理保持不变，因为它已经是直接返回内容而不是重定向
+			// 文本类型，检查Accept头决定是否返回JSON
 			acceptHeader := r.Header.Get("Accept")
 			if strings.Contains(acceptHeader, "application/json") {
 				// 客户端请求JSON格式
@@ -1666,7 +1785,13 @@ func (s *ClipboardServer) handleLatestContent(w http.ResponseWriter, r *http.Req
 	}
 
 	s.logger.Printf("未找到匹配的最新内容 (房间: '%s')", room)
-	http.Error(w, "未找到匹配的内容", http.StatusNotFound)
+	if isJSONRequest {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "内容未找到"})
+	} else {
+		http.Error(w, "未找到匹配的内容", http.StatusNotFound)
+	}
 }
 
 func (s *ClipboardServer) authMiddleware(next http.HandlerFunc) http.HandlerFunc {
