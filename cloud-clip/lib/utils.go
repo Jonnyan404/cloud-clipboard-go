@@ -22,6 +22,10 @@ import (
 
 	"os"
 
+	"mime"
+	"path/filepath"
+	"strings"
+
 	"github.com/google/uuid"
 	"golang.org/x/image/draw"
 )
@@ -137,16 +141,37 @@ func pathExists(path string) bool {
 	return err == nil || !os.IsNotExist(err)
 }
 
-// func get_all_msg(history *History) []interface{} {
-// 	var msg_list []interface{}
+func DetermineResponseType(filename string) string {
+	responseType := "file" // Default type
+	fileExtension := filepath.Ext(filename)
+	mimeType := mime.TypeByExtension(fileExtension)
 
-// 	for _, receiveItem := range history.Receive {
-// 		if receiveItem.TextReceive != nil {
-// 			msg_list = append(msg_list, *receiveItem.TextReceive)
-// 		} else if receiveItem.FileReceive != nil {
-// 			msg_list = append(msg_list, *receiveItem.FileReceive)
-// 		}
-// 	}
-
-// 	return msg_list
-// }
+	if mimeType != "" {
+		if strings.HasPrefix(mimeType, "image/") {
+			responseType = "image"
+		} else if strings.HasPrefix(mimeType, "text/") {
+			responseType = "text" // e.g., text/plain, text/html, text/css
+		} else if strings.HasPrefix(mimeType, "audio/") {
+			responseType = "audio"
+		} else if strings.HasPrefix(mimeType, "video/") {
+			responseType = "video"
+		} else if strings.HasPrefix(mimeType, "application/pdf") {
+			responseType = "document"
+		} else if strings.HasPrefix(mimeType, "application/zip") ||
+			strings.HasPrefix(mimeType, "application/x-rar-compressed") ||
+			strings.HasPrefix(mimeType, "application/x-tar") ||
+			strings.HasPrefix(mimeType, "application/x-7z-compressed") ||
+			strings.HasPrefix(mimeType, "application/gzip") {
+			responseType = "archive"
+		} else if strings.Contains(mimeType, "word") || // application/msword, application/vnd.openxmlformats-officedocument.wordprocessingml.document
+			strings.Contains(mimeType, "excel") || // application/vnd.ms-excel, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+			strings.Contains(mimeType, "powerpoint") || // application/vnd.ms-powerpoint, application/vnd.openxmlformats-officedocument.presentationml.presentation
+			strings.Contains(mimeType, "opendocument.text") || // odt
+			strings.Contains(mimeType, "opendocument.spreadsheet") || // ods
+			strings.Contains(mimeType, "opendocument.presentation") { // odp
+			responseType = "document"
+		}
+		// Add more MIME type to category mappings as needed
+	}
+	return responseType
+}

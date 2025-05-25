@@ -1,7 +1,6 @@
 /server-node/
 /server-go-ai/
 /server/
-/cloud-clip/static/
 /cloud-clip/uploads/
 /cloud-clip/config.json
 /cloud-clip/history.json
