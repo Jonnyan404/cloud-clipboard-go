@@ -4,20 +4,17 @@
             <v-card-text>
                 <div class="d-flex flex-row align-center">
                     <div class="flex-grow-1 mr-2" style="min-width: 0">
-                        <!-- Info Line -->
+                        <!-- Info Line - 移除ID部分 -->
                         <div class="caption text--secondary mb-1" v-if="meta.timestamp && ($root.showTimestamp || $root.showDeviceInfo || $root.showSenderIP)">
-                            <!-- Timestamp -->
-                            <span v-if="$root.showTimestamp">
+                            <template v-if="$root.showTimestamp">
                                 <v-icon small class="mr-1">{{ mdiClockOutline }}</v-icon>{{ formatTimestamp(meta.timestamp) }}
-                            </span>
-                            <!-- Device Info -->
-                            <span v-if="$root.showDeviceInfo && meta.senderDevice?.type" :class="{ 'ml-2': $root.showTimestamp }">
-                                <v-icon small class="mr-1">{{ deviceIcon(meta.senderDevice.type) }}</v-icon>{{ meta.senderDevice.os || meta.senderDevice.type }}
-                            </span>
-                            <!-- Sender IP -->
-                            <span v-if="$root.showSenderIP && meta.senderIP" :class="{ 'ml-2': $root.showTimestamp || ($root.showDeviceInfo && meta.senderDevice?.type) }">
-                                <v-icon small class="mr-1">{{ mdiIpNetworkOutline }}</v-icon>{{ meta.senderIP }}
-                            </span>
+                            </template>
+                            <template v-if="$root.showDeviceInfo && meta.senderDevice?.type">
+                                <v-icon small class="ml-2 mr-1">{{ deviceIcon(meta.senderDevice.type) }}</v-icon>{{ meta.senderDevice.os || meta.senderDevice.type }}
+                            </template>
+                            <template v-if="$root.showSenderIP && meta.senderIP">
+                                <v-icon small class="ml-2 mr-1">{{ mdiIpNetworkOutline }}</v-icon>{{ meta.senderIP }}
+                            </template>
                         </div>
                         <!-- Title -->
                         <div class="title text-truncate text--primary" @click="expand = !expand">
@@ -26,47 +23,54 @@
                         <!-- Preview -->
                         <div class="text-truncate" @click="expand = !expand">{{ decodedContentPreview }}</div>
                     </div>
-                    <!-- Buttons -->
-                    <div class="align-self-center text-no-wrap">
-                        <!-- Copy Text Button -->
-                        <v-tooltip bottom>
-                            <template v-slot:activator="{ on }">
-                                <v-btn v-on="on" icon color="grey" @click="copyText">
-                                    <v-icon>{{mdiContentCopy}}</v-icon>
-                                </v-btn>
-                            </template>
-                            <span>{{ $t('copyText') }}</span>
-                        </v-tooltip>
+                    <!-- Buttons + ID -->
+                    <div class="align-self-start text-no-wrap d-flex flex-column align-end">
+                        <!-- ID显示在按钮上方 -->
+                        <div v-if="meta.id" class="caption grey--text text--darken-1 mb-1">
+                            <v-icon small class="mr-1">{{ mdiPound }}</v-icon>{{ meta.id }}
+                        </div>
+                        <!-- 按钮组 -->
+                        <div>
+                            <!-- Copy Text Button -->
+                            <v-tooltip bottom>
+                                <template v-slot:activator="{ on }">
+                                    <v-btn v-on="on" icon color="grey" @click="copyText">
+                                        <v-icon>{{mdiContentCopy}}</v-icon>
+                                    </v-btn>
+                                </template>
+                                <span>{{ $t('copyText') }}</span>
+                            </v-tooltip>
 
-                        <!-- Copy Link Button -->
-                        <v-tooltip bottom>
-                            <template v-slot:activator="{ on }">
-                                <v-btn v-on="on" icon color="grey" @click="copyLink">
-                                    <v-icon>{{ mdiLinkVariant }}</v-icon>
-                                </v-btn>
-                            </template>
-                            <span>{{ $t('copyLink') }}</span>
-                        </v-tooltip>
+                            <!-- Copy Link Button -->
+                            <v-tooltip bottom>
+                                <template v-slot:activator="{ on }">
+                                    <v-btn v-on="on" icon color="grey" @click="copyLink">
+                                        <v-icon>{{ mdiLinkVariant }}</v-icon>
+                                    </v-btn>
+                                </template>
+                                <span>{{ $t('copyLink') }}</span>
+                            </v-tooltip>
 
-                        <!-- Show QR Code Button -->
-                        <v-tooltip bottom>
-                            <template v-slot:activator="{ on }">
-                                <v-btn v-on="on" icon color="grey" @click="qrDialogVisible = true">
-                                    <v-icon>{{ mdiQrcode }}</v-icon>
-                                </v-btn>
-                            </template>
-                            <span>{{ $t('showQrCode') }}</span>
-                        </v-tooltip>
+                            <!-- Show QR Code Button -->
+                            <v-tooltip bottom>
+                                <template v-slot:activator="{ on }">
+                                    <v-btn v-on="on" icon color="grey" @click="qrDialogVisible = true">
+                                        <v-icon>{{ mdiQrcode }}</v-icon>
+                                    </v-btn>
+                                </template>
+                                <span>{{ $t('showQrCode') }}</span>
+                            </v-tooltip>
 
-                        <!-- Delete Button -->
-                        <v-tooltip bottom>
-                            <template v-slot:activator="{ on }">
-                                <v-btn v-on="on" icon color="grey" @click="deleteItem">
-                                    <v-icon>{{mdiClose}}</v-icon>
-                                </v-btn>
-                            </template>
-                            <span>{{ $t('delete') }}</span>
-                        </v-tooltip>
+                            <!-- Delete Button -->
+                            <v-tooltip bottom>
+                                <template v-slot:activator="{ on }">
+                                    <v-btn v-on="on" icon color="grey" @click="deleteItem">
+                                        <v-icon>{{mdiClose}}</v-icon>
+                                    </v-btn>
+                                </template>
+                                <span>{{ $t('delete') }}</span>
+                            </v-tooltip>
+                        </div>
                     </div>
                 </div>
                 <v-expand-transition>
@@ -98,7 +102,7 @@
 </template>
 
 <script>
-import QrcodeVue from 'qrcode.vue'; // <-- Import
+import QrcodeVue from 'qrcode.vue';
 import {
     mdiChevronUp,
     mdiChevronDown,
@@ -109,7 +113,8 @@ import {
     mdiDesktopTower,
     mdiCellphone,
     mdiIpNetworkOutline,
-    mdiQrcode, // <-- Import QR Code Icon
+    mdiQrcode,
+    mdiPound, // 添加ID图标
 } from '@mdi/js';
 import { formatTimestamp } from '@/util.js';
 
@@ -122,7 +127,7 @@ function decodeHtmlEntities(text) {
 
 export default {
     name: 'received-text',
-    components: { QrcodeVue }, // <-- Register
+    components: { QrcodeVue },
     props: {
         meta: {
             type: Object,
@@ -134,7 +139,7 @@ export default {
     data() {
         return {
             expand: false,
-            qrDialogVisible: false, // <-- Add dialog visibility flag
+            qrDialogVisible: false,
             mdiChevronUp,
             mdiChevronDown,
             mdiContentCopy,
@@ -144,7 +149,8 @@ export default {
             mdiDesktopTower,
             mdiCellphone,
             mdiIpNetworkOutline,
-            mdiQrcode, // <-- Add icon to data
+            mdiQrcode,
+            mdiPound, // 添加ID图标
         };
     },
     computed: {

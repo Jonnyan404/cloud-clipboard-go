@@ -1,7 +1,7 @@
 # cloud-clipboard-go
 
 <p>
-  <a href="README.zh.md"><img src="https://img.shields.io/badge/lang-简体中文-blue.svg" alt="中文 Readme"></a>
+  <a href="README.en.md"><img src="https://img.shields.io/badge/lang-English-blue.svg" alt="English Readme"></a>
   <a href="https://raw.githubusercontent.com/jonnyan404/cloud-clipboard-go-launcher/main/LICENSE">
     <img src="https://img.shields.io/github/license/jonnyan404/cloud-clipboard-go-launcher?color=brightgreen" alt="license">
   </a>
@@ -13,53 +13,60 @@
   </a>
 </p>
 
-A Go remake based on the [TransparentLC/cloud-clipboard](https://github.com/TransparentLC/cloud-clipboard) project.
+基于 [TransparentLC](https://github.com/TransparentLC/cloud-clipboard) 项目,用go复刻了一个
 
-Added some features based on [yurenchen000/cloud-clipboard](https://github.com/yurenchen000/cloud-clipboard).
+在 [yurenchen000](https://github.com/yurenchen000/cloud-clipboard) 基础上增加一些功能
 
-## Screenshots
+## 截图
 
 <details>
-<summary>Desktop</summary>
+<summary>桌面端</summary>
 
 ![](https://ae01.alicdn.com/kf/Hfce3a9b69b3d404c8e3073ab0fffa913v.png)
 
 </details>
 
 <details>
-<summary>Mobile</summary>
+<summary>移动端</summary>
 
 ![](https://ae01.alicdn.com/kf/Hbf859dd0e42c4406bf94a6b6f2f4658cf.png)
 
 </details>
 
-## Usage
+## 使用方法
 
-This is the Go version of the server.
+这里是 go 版服务端
+### Android 端快捷方式(模仿iOS快捷方式)
 
-### Easy Run (UI Launcher, Recommended for Beginners)
+1. [下载 http-shortcuts](https://github.com/Waboodoo/HTTP-Shortcuts/releases)
+2. [下载 cloud-clipboard-shortcuts.zip](https://raw.githubusercontent.com/Jonnyan404/cloud-clipboard-go/refs/heads/main/shortcuts/cloud-clipboard-shortcuts.zip)
+3. 打开`http-shortcuts`,点击右上角三个点菜单-->导入/导出-->从文件导入-->选择第2步下载的文件
+4. 点击右上角三个点菜单-->变量-->修改`url`值为你的服务器IP和端口;`room`可选,默认值为空;`auth`可选,默认值为空;其它勿动
+
+### 傻瓜式运行(UI辅助器,推荐小白用户们)
 
 <details>
-    <summary>Click to view preview</summary>
+    <summary>点击查看预览图</summary>
 
 ![](https://github.com/Jonnyan404/cloud-clipboard-go-launcher/blob/main/demo.png)
 
 </details>
 
-Go to [UI Launcher Releases](https://github.com/Jonnyan404/cloud-clipboard-go-launcher/releases), download, and double-click to use.
+去 [UI辅助器](https://github.com/Jonnyan404/cloud-clipboard-go-launcher/releases) 下载后,双击使用
 
-### Run with Docker
+### 使用 Docker 运行
 
 ```sh
-# Docker Hub Image (choose one)
+# dockerhub镜像(二选一)
 docker run -d --name=cloud-clipboard-go -p 9501:9501 -v /path/your/dir/data:/app/server-node/data jonnyan404/cloud-clipboard-go
-# GitHub Container Registry Image (choose one)
+# github镜像(二选一)
 docker run -d --name=cloud-clipboard-go -p 9501:9501 -v /path/your/dir/data:/app/server-node/data ghcr.io/jonnyan404/cloud-clipboard-go
 ```
 
-- `vi docker-compose.yml`
+- vi docker-compose.yml
 
-```yaml
+```
+
 services:
     cloud-clipboard-go:
         container_name: cloud-clipboard-go
@@ -67,104 +74,113 @@ services:
         ports:
             - "9501:9501"
         environment:
-            - LISTEN_IP= # Default is 0.0.0.0, can be set to 127.0.0.1. Don't change if unsure.
-            - LISTEN_IP6= # Default is empty, can be set to ::. Don't change if unsure.
-            - LISTEN_PORT= # Default is 9501, can be set to other ports.
-            - PREFIX= # Subpath, can be used with nginx, format: /cloud-clipboard
-            - MESSAGE_NUM= # Number of history records, default is 10.
-            - AUTH_PASSWORD= # Access password, default is false, can be a custom string password.
-            - TEXT_LIMIT= # Text length limit, default is 4096 (2048 Chinese characters).
-            - FILE_EXPIRE= # File expiration time, default is 3600 (1 hour), unit is seconds.
-            - FILE_LIMIT= # File size limit, default is 104857600 (100MB), unit is bytes.
-            - MKCERT_DOMAIN_OR_IP= # The domain name or IP address for mkcert, defaults to empty. You can set it to other domain names or IPs. Multiple values can be separated by spaces. Wildcards are supported for domain names only.
-            - MANUAL_KEY_PATH= # Manually set the path for the key. Defaults to empty. This parameter has higher priority than MKCERT_DOMAIN_OR_IP.
-            - MANUAL_CERT_PATH= # Manually set the path for the certificate. Defaults to empty. This parameter has higher priority than MKCERT_DOMAIN_OR_IP.
+            - LISTEN_IP= #默认为0.0.0.0,可设置为 127.0.0.1 不懂勿动
+            - LISTEN_IP6= #默认为空,ipv6地址,可设置为::,不懂勿动
+            - LISTEN_PORT= #默认为9501,可设置为其他端口
+            - PREFIX= #子路径,可配合nginx使用,格式: /cloud-clipboard
+            - MESSAGE_NUM= #历史记录的数量,默认为10
+            - AUTH_PASSWORD= #访问密码,默认为false,可自定义字符串密码
+            - TEXT_LIMIT= #文本长度限制,默认为4096(2048个汉字),可设置为其他长度
+            - FILE_EXPIRE= #文件过期时间,默认为3600(1小时),可设置为其他时间,单位为秒
+            - FILE_LIMIT= #文件大小限制,默认为104857600(100MB),可设置为其他大小,单位为字节
+            - MKCERT_DOMAIN_OR_IP= #mkcert域名或IP,默认为空,可设置为其他域名或IP,多个用空格分隔,仅域名支持通配符*
+            - MANUAL_KEY_PATH= #手动设置证书路径,默认为空,该参数优先级高于MKCERT_DOMAIN_OR_IP
+            - MANUAL_CERT_PATH= #手动设置证书路径,默认为空,该参数优先级高于MKCERT_DOMAIN_OR_IP
         volumes:
-            - /path/your/dir/data:/app/server-node/data # Please change to your own directory
-        image: jonnyan404/cloud-clipboard-go:latest # Or ghcr.io/jonnyan404/cloud-clipboard-go:latest
+            - /path/your/dir/data:/app/server-node/data #请注意修改为你自己的目录
+        image: jonnyan404/cloud-clipboard-go:latest
+
 ```
 
-- Access homepage: http://127.0.0.1:9501
-- Accessing http://127.0.0.1:9501/content/latest will always return the latest content. You can add the room parameter `?room=xxx`.
+- 访问主页: http://127.0.0.1:9501
+- 访问 http://127.0.0.1:9501/content/latest 将永远返回最新的一条内容,可添加房间参数`?room=xxx`
 
-### Run with Homebrew
 
-> Known Issue: `brew services` tab completion doesn't work. Reference: https://github.com/orgs/Homebrew/discussions/6047#discussioncomment-12668536
+### 使用 homebrew 运行
 
-Default configuration files are located in the `etc/cloud-clipboard-go` and `var` directories under the `homebrew` root directory.
+> 已知问题:brew services 无法tab补全,参考:https://github.com/orgs/Homebrew/discussions/6047#discussioncomment-12668536
 
-```bash
+默认配置文件分别在`homebrew`根目录下的`etc/cloud-clipboard-go`和`var`目录
+
+```
 brew update
-# Install
+#安装
 brew install Jonnyan404/tap/cloud-clipboard-go
-# Start the service
+# 启动服务
 brew services start cloud-clipboard-go
-# Check service status
+# 查看服务状态
 brew services info cloud-clipboard-go
-# Stop the service
+# 停止服务
 brew services stop cloud-clipboard-go
-# Restart the service
+# 重启服务
 brew services restart cloud-clipboard-go
 ```
 
-### Run on OpenWrt
+### 使用 OpenWrt 运行
 
-✅ Tested on OpenWrt 24.10.0
 
-Check your architecture with: `opkg print-architecture` (the second column of the last line)
+✅ OpenWrt 24.10.0 测试通过
 
-Go to the `pre-release` section of https://github.com/Jonnyan404/cloud-clipboard-go/releases and download the `*platform.ipk` file corresponding to your system and the `*_all.ipk` file.
+查看所属架构命令: `opkg print-architecture` (最后一行第二列就是)
 
-Then execute the following commands in the terminal:
-```bash
-opkg install *platform.ipk
+去 https://github.com/Jonnyan404/cloud-clipboard-go/releases 的`pre-release`下载对应系统的`*平台.ipk`文件和`*_all.ipk`文件
+
+然后在命令行执行下列命令
+```
+opkg install *平台.ipk
 opkg install *_all.ipk
 ```
 
 <details>
-    <summary>Click to preview LuCI interface</summary>
+    <summary>点击预览luci界面</summary>
 
 ![](https://github.com/Jonnyan404/cloud-clipboard-go/blob/main/openwrt/demo.png)
 
 </details>
 
-### Run with Binary File
 
-Go to the project [Releases](https://github.com/Jonnyan404/cloud-clipboard-go/releases), download the file corresponding to your system, and run it.
+### 使用二进制文件运行
 
-> Parameter priority: Command-line arguments > Configuration file
+去项目 [release](https://github.com/Jonnyan404/cloud-clipboard-go/releases) 下载对应系统文件运行即可
 
-- Command-line argument: `-host` to customize the server listening address.
-- Command-line argument: `-port` to customize the server listening port.
-- Command-line argument: `-auth` to customize the password.
-- Command-line argument: `-config` to load a custom configuration file.
-- Command-line argument: `-static` to load custom external frontend files.
+> 参数优先级: 命令行参数 > 配置文件
 
-### Run from Source Code
+- 命令行参数: `-host` 用来自定义服务器监听地址
+- 命令行参数: `-port` 用来自定义服务器监听端口
+- 命令行参数: `-auth` 用来自定义密码
+- 命令行参数: `-config` 用来加载自定义配置文件
+- 命令行参数: `-static` 用来加载自定义外部前端文件
 
-- Requires [Node.js>=22.12](https://nodejs.org).
-- Requires [Go>=1.22](https://go.dev/).
+
+
+### 使用源代码运行
+
+- 需要安装 [Node.js>=22.12](https://nodejs.org)。
+- 需要安装 [go>=1.22](https://go.dev/)
 
 ```bash
-# Build frontend
 cd client
 npm install
 npm run build
 
-# Run backend
+# 运行服务端
 cd ../cloud-clip
 go mod tidy
 go run -tags embed .
 ```
 
-### Configuration File Description
 
-- Please see: https://github.com/Jonnyan404/cloud-clipboard-go/blob/main/cloud-clip/config.md
+
+### 配置文件说明
+
+- 请查看: https://github.com/Jonnyan404/cloud-clipboard-go/blob/main/cloud-clip/config.md
 
 ### HTTP API
 
-- Please see: https://github.com/Jonnyan404/cloud-clipboard-go/blob/main/cloud-clip/config.md
+- 请查看: https://github.com/Jonnyan404/cloud-clipboard-go/blob/main/cloud-clip/config.md
 
-## Derivative Projects
+## 衍生项目
 
-- A launcher made for cloud-clipboard-go, convenient for users who don't want to or can't use the terminal: [cloud-clipboard-go-launcher](https://github.com/Jonnyan404/cloud-clipboard-go-launcher)
+- 为 cloud-clipboard-go 制作的启动器,方便不想或不会使用终端的用户,[cloud-clipboard-go-launcher](https://github.com/Jonnyan404/cloud-clipboard-go-launcher)
+
+
