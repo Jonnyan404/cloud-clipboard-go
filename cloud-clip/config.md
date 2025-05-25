@@ -57,10 +57,13 @@ http://localhost:9501/content/1?room=test   指定房间
 
 ```console
 $ curl -H "Content-Type: text/plain" --data-binary "foobar" http://localhost:9501/text
-{"code":200,"msg":"","result":{"url":"http://localhost:9501/content/1"}}
+{"id":"1","type":"text","url":"http://localhost:9501/content/1"}
 
 $ curl http://localhost:9501/content/1
-foobar
+123
+
+$ curl http://localhost:9501/content/1?json=true
+{"content":"123","id":"1","timestamp":1748143093,"type":"text"}
 ```
 
 注意：请求头中不能缺少 `Content-Type: text/plain`
@@ -69,10 +72,14 @@ foobar
 
 ```console
 $ curl -F file=@image.png http://localhost:9501/upload
-{"code":200,"msg":"","result":{"url":"http://localhost:9501/content/2"}}
+{"id":"2","type":"image","url":"http://localhost:9501/content/2"}
 
 $ curl http://localhost:9501/content/2
-Redirecting to <a href="http://localhost:9501/file/xxxx">http://localhost:9501/file/xxxx</a>.
+<a href="http://localhost:9501/file/530a16de-07cb-4835-ba26-64f5e8e1f300/image.png">Found</a>.
+
+$ curl http://localhost:9501/content/2?json=true
+{"id":"2","name":"image.png","size":11361,"timestamp":1748175032,"type":"image","url":"http://localhost:9501/file/530a16de-07cb-4835-ba26-64f5e8e1f300","uuid":"530a16de-07cb-4835-ba26-64f5e8e1f300"}
+
 
 $ curl -L http://localhost:9501/content/2
 Warning: Binary output can mess up your terminal. Use "--output -" to tell curl to output it to your terminal anyway,
@@ -83,7 +90,7 @@ Warning: or consider "--output <FILE>" to save to a file.
 
 ```console
 $ curl -H "Content-Type: text/plain" --data-binary @package.json http://localhost:9501/text?room=reisen-8fce
-{"code":200,"msg":"","result":{"url":"http://localhost:9501/content/3?room=reisen-8fce"}}
+{"id":"3","type":"text","url":"http://localhost:9501/content/46?room=reisen-8fce"}
 
 $ curl http://localhost:9501/content/3
 Not Found
@@ -102,14 +109,17 @@ $ curl http://localhost:9501/content/3?room=reisen-8fce
 
 ```console
 $ curl -H "Content-Type: text/plain" --data-binary "foobar" http://localhost:9501/text
-Forbidden
+{"error":"Unauthorized","message":"需要认证令牌"}
 
 $ curl -H "Authorization: Bearer xxxx" -H "Content-Type: text/plain" --data-binary "foobar" http://localhost:9501/text
-{"code":200,"msg":"","result":{"url":"http://localhost:9501/content/1"}}
+{"id":"7","type":"text","url":"http://localhost:9501/content/7"}
 
 $ curl http://localhost:9501/content/1
-Forbidden
+{"error":"Unauthorized","message":"需要认证令牌"}
 
 $ curl -H "Authorization: Bearer xxxx" http://localhost:9501/content/1
+foobar
+
+$ curl  http://localhost:9501/content/1?auth=xxx
 foobar
 ```
