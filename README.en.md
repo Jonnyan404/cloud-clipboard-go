@@ -39,6 +39,8 @@ This is the Go version of the server.
 
 ### Android Shortcuts (Imitating iOS Shortcuts)
 
+- quire: server version ≥ v4.5.10
+
 1. [Download http-shortcuts](https://github.com/Waboodoo/HTTP-Shortcuts/releases)
 2. [Download cloud-clipboard-shortcuts.zip](https://raw.githubusercontent.com/Jonnyan404/cloud-clipboard-go/refs/heads/main/shortcuts/cloud-clipboard-shortcuts.zip)
 3. Open `http-shortcuts`, click the three-dot menu in the top right corner --> Import/Export --> Import from file --> Select the file downloaded in step 2.
