@@ -43,7 +43,7 @@
 1. [下载 http-shortcuts](https://github.com/Waboodoo/HTTP-Shortcuts/releases)
 2. [下载 cloud-clipboard-shortcuts.zip](https://raw.githubusercontent.com/Jonnyan404/cloud-clipboard-go/refs/heads/main/shortcuts/cloud-clipboard-shortcuts.zip)
 3. 打开`http-shortcuts`,点击右上角三个点菜单-->导入/导出-->从文件导入-->选择第2步下载的文件
-4. 点击右上角三个点菜单-->变量-->修改`url`值为你的服务器IP和端口;`room`可选,默认值为空;`auth`可选,默认值为空;其它勿动
+4. 点击右上角三个点菜单-->变量-->修改`url`值为你的服务器IP和端口(如果有prefix参数,需添加在端口后);`room`可选,默认值为空;`auth`可选,默认值为空;其它勿动
 
 ### 傻瓜式运行(UI辅助器,推荐小白用户们)
 
