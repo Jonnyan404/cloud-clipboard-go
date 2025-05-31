@@ -44,7 +44,7 @@ This is the Go version of the server.
 1. [Download http-shortcuts](https://github.com/Waboodoo/HTTP-Shortcuts/releases)
 2. [Download cloud-clipboard-shortcuts.zip](https://raw.githubusercontent.com/Jonnyan404/cloud-clipboard-go/refs/heads/main/shortcuts/cloud-clipboard-shortcuts.zip)
 3. Open `http-shortcuts`, click the three-dot menu in the top right corner --> Import/Export --> Import from file --> Select the file downloaded in step 2.
-4. Click the three-dot menu in the top right corner --> Variables --> Modify the `url` value to your server's IP and port; `room` is optional, default value is empty; `auth` is optional, default value is empty; do not change anything else.
+4. Click the three-dot menu in the top right corner --> Variables --> Modify the `url` value to your server's IP and port (If there is a prefix parameter, it needs to be added after the port.); `room` is optional, default value is empty; `auth` is optional, default value is empty; do not change anything else.
 
 
 ### Easy Run (UI Launcher, Recommended for Beginners)
