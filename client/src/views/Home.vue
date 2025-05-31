@@ -181,16 +181,7 @@ export default {
     },
     computed: {
         currentPageUrl() {
-            const origin = window.location.origin;
-            const path = this.$route.fullPath;
-            const usingHash = window.location.href.includes('#');
-            if (usingHash) {
-                const formattedPath = path.startsWith('/') ? path : '/' + path;
-                return origin + '/#' + formattedPath;
-            } else {
-                const formattedPath = path.startsWith('/') ? path : '/' + path;
-                return origin + formattedPath;
-            }
+            return window.location.href;
         }
     },
     methods: {

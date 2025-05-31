@@ -817,7 +817,10 @@ func (s *ClipboardServer) handle_push(w http.ResponseWriter, r *http.Request) {
 	// 发送配置信息给新连接的客户端
 	clientConfigData := struct {
 		Version string `json:"version"`
-		Text    struct {
+		Server  struct {
+			Prefix string `json:"prefix"`
+		} `json:"server"`
+		Text struct {
 			Limit int `json:"limit"`
 		} `json:"text"` // [!code ++]
 		File struct { // [!code ++]
@@ -828,9 +831,14 @@ func (s *ClipboardServer) handle_push(w http.ResponseWriter, r *http.Request) {
 		Auth bool `json:"auth"` // [!code ++]
 	}{
 		Version: server_version,
-		Text:    s.config.Text,
-		File:    s.config.File,
-		Auth:    authNeeded, // 基于之前的 authNeeded 判断
+		Server: struct {
+			Prefix string `json:"prefix"`
+		}{
+			Prefix: s.config.Server.Prefix, // 确保发送 prefix
+		},
+		Text: s.config.Text,
+		File: s.config.File,
+		Auth: authNeeded, // 基于之前的 authNeeded 判断
 	}
 
 	configWsMsg := WebSocketMessage{
