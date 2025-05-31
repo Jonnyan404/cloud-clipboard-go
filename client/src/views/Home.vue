@@ -181,7 +181,13 @@ export default {
     },
     computed: {
         currentPageUrl() {
-            return window.location.href;
+            const currentUrl = window.location.href;
+            if (this.$root.room) {
+                return currentUrl;
+            }
+            else {
+                return currentUrl;
+            }
         }
     },
     methods: {
