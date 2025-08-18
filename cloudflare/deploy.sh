@@ -193,7 +193,7 @@ deploy_frontend() {
         info "前端部署成功: $PAGES_URL"
         
         # 保存 Pages URL 到临时文件
-        echo "$PAGES_URL" > ../../../.pages_url
+        echo "$PAGES_URL" > ../../.pages_url
     else
         warn "无法自动获取 Pages URL，请手动检查"
         echo "$PAGES_OUTPUT"
