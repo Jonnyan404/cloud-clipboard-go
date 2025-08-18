@@ -1,0 +1,23 @@
+// 环境检测
+const isCloudflarePages = window.location.hostname.includes('pages.dev') || 
+                         window.location.hostname.includes('your-custom-domain.com');
+
+const isDevelopment = process.env.NODE_ENV === 'development';
+
+export const config = {
+    // API 基础路径 (将被自动更新)
+    apiBaseURL: isDevelopment ? '' : 
+                isCloudflarePages ? 'https://your-worker.your-subdomain.workers.dev/api' : '',
+    
+    // WebSocket 基础路径 (将被自动更新)
+    wsBaseURL: isDevelopment ? '' : 
+               isCloudflarePages ? 'https://your-worker.your-subdomain.workers.dev/api' : '',
+    
+    // 环境标识
+    isCloudflarePages: isCloudflarePages,
+    isDevelopment: isDevelopment,
+    
+    // 其他配置
+    name: 'Cloud Clipboard',
+    version: '1.0.0'
+};

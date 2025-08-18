@@ -9,3 +9,6 @@
 /Android/.idea/
 /Android/.gradle/
 .vscode/
+cloudflare/workers/.wrangler
+cloudflare/workers/node_modules
+cloudflare/pages/server*
