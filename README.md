@@ -45,6 +45,21 @@
 3. 打开`http-shortcuts`,点击右上角三个点菜单-->导入/导出-->从文件导入-->选择第2步下载的文件
 4. 点击右上角三个点菜单-->变量-->修改`url`值为你的服务器IP和端口(如果有prefix参数,需添加在端口后);`room`可选,默认值为空;`auth`可选,默认值为空;其它勿动
 
+### 使用 cloudflare workers+pages+D1+R2 运行
+
+必要条件: 
+- 具有 cloudflare 账号
+- Linux 环境
+- 需要安装 [Node.js>=22.12](https://nodejs.org)。
+
+
+```
+git clone https://github.com/Jonnyan404/cloud-clipboard-go
+cd cloud-clipboard-go/cloudflare
+vim workers/wrangler.toml.template
+bash deploy.sh
+```
+
 ### 傻瓜式运行(UI辅助器,推荐小白用户们)
 
 <details>

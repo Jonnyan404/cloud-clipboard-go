@@ -1,0 +1,5 @@
+name = "cloud-clipboard-pages"
+compatibility_date = "2024-01-15"
+
+[env.production]
+# 生产环境配置
