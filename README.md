@@ -13,9 +13,7 @@
   </a>
 </p>
 
-基于 [TransparentLC](https://github.com/TransparentLC/cloud-clipboard) 项目,用go复刻了一个
 
-在 [yurenchen000](https://github.com/yurenchen000/cloud-clipboard) 基础上增加一些功能
 
 ## 截图
 
@@ -36,16 +34,12 @@
 ## 使用方法
 
 这里是 go 版服务端
-### Android 端快捷方式(仿iOS快捷方式)
-
-- 要求: 服务端版本 ≥ v4.5.10
-
-1. [下载 http-shortcuts](https://github.com/Waboodoo/HTTP-Shortcuts/releases)
-2. [下载 cloud-clipboard-shortcuts.zip](https://raw.githubusercontent.com/Jonnyan404/cloud-clipboard-go/refs/heads/main/shortcuts/cloud-clipboard-shortcuts.zip)
-3. 打开`http-shortcuts`,点击右上角三个点菜单-->导入/导出-->从文件导入-->选择第2步下载的文件
-4. 点击右上角三个点菜单-->变量-->修改`url`值为你的服务器IP和端口(如果有prefix参数,需添加在端口后);`room`可选,默认值为空;`auth`可选,默认值为空;其它勿动
 
 ### 使用 cloudflare workers+pages+D1+R2 运行
+
+> 不支持Android快捷指令;
+> 不支持 content 的 API 访问,例如 二维码/单链接预览 功能无效;
+> 其它基础功能正常
 
 必要条件: 
 - 具有 cloudflare 账号
@@ -59,6 +53,15 @@ cd cloud-clipboard-go/cloudflare
 vim workers/wrangler.toml.template
 bash deploy.sh
 ```
+
+### Android 端快捷指令(仿iOS快捷指令)
+
+- 要求: 服务端版本 ≥ v4.5.10
+
+1. [下载 http-shortcuts](https://github.com/Waboodoo/HTTP-Shortcuts/releases)
+2. [下载 cloud-clipboard-shortcuts.zip](https://raw.githubusercontent.com/Jonnyan404/cloud-clipboard-go/refs/heads/main/shortcuts/cloud-clipboard-shortcuts.zip)
+3. 打开`http-shortcuts`,点击右上角三个点菜单-->导入/导出-->从文件导入-->选择第2步下载的文件
+4. 点击右上角三个点菜单-->变量-->修改`url`值为你的服务器IP和端口(如果有prefix参数,需添加在端口后);`room`可选,默认值为空;`auth`可选,默认值为空;其它勿动
 
 ### 傻瓜式运行(UI辅助器,推荐小白用户们)
 
@@ -201,3 +204,7 @@ go run -tags embed .
 - 为 cloud-clipboard-go 制作的启动器,方便不想或不会使用终端的用户,[cloud-clipboard-go-launcher](https://github.com/Jonnyan404/cloud-clipboard-go-launcher)
 
 
+# 致谢
+
+- [TransparentLC](https://github.com/TransparentLC/cloud-clipboard)
+- [yurenchen000](https://github.com/yurenchen000/cloud-clipboard)
