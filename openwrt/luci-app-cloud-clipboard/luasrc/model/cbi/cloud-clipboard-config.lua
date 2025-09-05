@@ -70,7 +70,9 @@ else
                         history = 100,
                         historyFile = "",
                         storageDir = "",
-                        auth = auth ~= ""
+                        auth = auth ~= "",
+                        roomList = false,
+                        roomCleanup = 3600
                     },
                     text = {
                         limit = 4096
@@ -100,7 +102,9 @@ else
                 "history": 100,
                 "historyFile": "",
                 "storageDir": "",
-                "auth": ]] .. (auth ~= "" and "true" or "false") .. [[
+                "auth": ]] .. (auth ~= "" and "true" or "false") .. [[,
+                "roomList": false,
+                "roomCleanup": 3600
         },
         "text": {
                 "limit": 4096
@@ -166,7 +170,9 @@ json_help.value = [[
         "history": 100,            // 历史记录数量
         "historyFile": "",         // 历史记录文件路径
         "storageDir": "",          // 文件存储目录
-        "auth": false              // 是否启用认证，true时需在UCI设置中配置密码
+        "auth": false,              // 是否启用认证，true时需在UCI设置中配置密码
+        "roomList": false,          // 是否启用房间列表功能
+        "roomCleanup": 3600        // 房间清理周期(秒)，清理消息数为0的房间
     },
     "text": {
         "limit": 4096              // 文本大小限制(字节)

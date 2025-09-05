@@ -1,11 +1,10 @@
 package lib
 
 import (
-	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/ua-parser/uap-go/uaparser"
@@ -73,6 +72,11 @@ type ClipboardServer struct {
 	runMutex        sync.Mutex
 	parser          *uaparser.Parser // UA解析器实例
 	deviceHashSeed  uint32           // 将 deviceHashSeed 添加到服务器实例
+
+	// 添加房间管理相关字段
+	roomStats       map[string]*RoomStat `json:"-"` // 房间统计信息，不序列化
+	roomStatsMutex  sync.RWMutex         `json:"-"` // 房间统计读写锁
+	roomCleanupTicker *time.Ticker       `json:"-"` // 房间清理定时器
 }
 
 // file item in File[]
@@ -130,122 +134,24 @@ type ReceiveHolder struct {
 	FileReceive *FileReceive
 }
 
-// ----------------- json enc/dec
-
-// custom unmarshalling for ReceiveBaseHolder
-func (r *ReceiveHolder) UnmarshalJSON(data []byte) error {
-	// unmarshall for type field
-	var raw map[string]interface{}
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return err
-	}
-
-	// "type" field decide TextReceive or FileReceive
-	switch raw["type"] {
-	case "text":
-		var textReceive TextReceive
-		if err := json.Unmarshal(data, &textReceive); err != nil {
-			return err
-		}
-		r.TextReceive = &textReceive
-	case "file":
-		var fileReceive FileReceive
-		if err := json.Unmarshal(data, &fileReceive); err != nil {
-			return err
-		}
-		r.FileReceive = &fileReceive
-	default:
-		// Try unmarshalling into ReceiveBase just to check if it's a valid base structure
-		var base ReceiveBase
-		if errBase := json.Unmarshal(data, &base); errBase == nil && base.Type != "" {
-			// It might be a type we don't specifically handle here, but has the base fields.
-			// Decide if you want to allow this or return an error.
-			// For now, let's return an error for unknown specific types.
-			return fmt.Errorf("unknown specific message type: %v", raw["type"])
-		}
-		return fmt.Errorf("unknown message type or invalid structure: %v", raw["type"])
-
-	}
-
-	return nil
+// 房间列表
+// RoomInfo 房间信息结构体
+type RoomInfo struct {
+    Name         string `json:"name"`         // 房间名称（空字符串表示公共房间）
+    MessageCount int    `json:"messageCount"` // 消息数量
+    DeviceCount  int    `json:"deviceCount"`  // 设备数量
+    LastActive   int64  `json:"lastActive"`   // 最后活跃时间（Unix时间戳）
+    IsActive     bool   `json:"isActive"`     // 是否活跃（有设备连接）
 }
 
-// Custom JSON marshaler for ReceiveHolder
-func (r ReceiveHolder) MarshalJSON() ([]byte, error) {
-	if r.TextReceive != nil {
-		return json.Marshal(r.TextReceive)
-	} else if r.FileReceive != nil {
-		return json.Marshal(r.FileReceive)
-	}
-	// Return null or an empty object instead of an error if appropriate
-	// return []byte("null"), nil
-	return nil, fmt.Errorf("no valid receive type found in ReceiveHolder")
+// RoomListResponse 房间列表响应结构体
+type RoomListResponse struct {
+    Rooms []RoomInfo `json:"rooms"`
 }
 
-// --- Helper methods for ReceiveHolder ---
-
-func (r *ReceiveHolder) SetID(id int) int {
-	if r.TextReceive != nil {
-		r.TextReceive.ID = id
-		return id
-	} else if r.FileReceive != nil {
-		r.FileReceive.ID = id
-		return id
-	}
-	return -1
-}
-
-func (r *ReceiveHolder) ID() int {
-	if r.TextReceive != nil {
-		return r.TextReceive.ID
-	} else if r.FileReceive != nil {
-		return r.FileReceive.ID
-	}
-	return -1
-}
-
-func (r *ReceiveHolder) Type() string {
-	if r.TextReceive != nil {
-		return r.TextReceive.Type
-	} else if r.FileReceive != nil {
-		return r.FileReceive.Type
-	}
-	return ""
-}
-
-func (r *ReceiveHolder) Room() string {
-	if r.TextReceive != nil {
-		return r.TextReceive.Room
-	} else if r.FileReceive != nil {
-		return r.FileReceive.Room
-	}
-	return ""
-}
-
-// Add getters for the new fields if needed, accessing via the embedded ReceiveBase
-func (r *ReceiveHolder) Timestamp() int64 {
-	if r.TextReceive != nil {
-		return r.TextReceive.Timestamp
-	} else if r.FileReceive != nil {
-		return r.FileReceive.Timestamp
-	}
-	return 0
-}
-
-func (r *ReceiveHolder) SenderIP() string {
-	if r.TextReceive != nil {
-		return r.TextReceive.SenderIP
-	} else if r.FileReceive != nil {
-		return r.FileReceive.SenderIP
-	}
-	return ""
-}
-
-func (r *ReceiveHolder) SenderDevice() map[string]string {
-	if r.TextReceive != nil {
-		return r.TextReceive.SenderDevice
-	} else if r.FileReceive != nil {
-		return r.FileReceive.SenderDevice
-	}
-	return nil
+// RoomStat 房间统计信息（内部使用）
+type RoomStat struct {
+    MessageCount int                `json:"messageCount"`
+    LastActive   int64              `json:"lastActive"`
+    DeviceIDs    map[string]bool    `json:"-"` // 当前连接的设备ID集合
 }

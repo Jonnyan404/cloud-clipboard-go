@@ -89,6 +89,7 @@ services:
             - MKCERT_DOMAIN_OR_IP= # The domain name or IP address for mkcert, defaults to empty. You can set it to other domain names or IPs. Multiple values can be separated by spaces. Wildcards are supported for domain names only.
             - MANUAL_KEY_PATH= # Manually set the path for the key. Defaults to empty. This parameter has higher priority than MKCERT_DOMAIN_OR_IP.
             - MANUAL_CERT_PATH= # Manually set the path for the certificate. Defaults to empty. This parameter has higher priority than MKCERT_DOMAIN_OR_IP.
+            - ROOM_LIST= #是否启用房间列表展示功能,默认false
         volumes:
             - /path/your/dir/data:/app/server-node/data # Please change to your own directory
         image: jonnyan404/cloud-clipboard-go:latest # Or ghcr.io/jonnyan404/cloud-clipboard-go:latest

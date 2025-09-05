@@ -180,6 +180,24 @@
                 {{ $t('cloudClipboard') }}<span class="d-none d-sm-inline" v-if="$root.room">（{{ $t('room') }}：<abbr :title="$t('copyRoomName')" style="cursor:pointer" @click.stop="copyRoomName($root.room)">{{$root.room}}</abbr>）</span>
             </v-toolbar-title>
             <v-spacer></v-spacer>
+            
+            <!-- Room List Button (only show if roomList is enabled) -->
+            <v-tooltip left v-if="$root.config && $root.config.server && $root.config.server.roomList">
+                <template v-slot:activator="{ on }">
+                    <v-btn icon v-on="on" @click="roomSheet = true; fetchRoomList();">
+                        <v-badge
+                            :content="availableRooms.length"
+                            :value="availableRooms.length > 0"
+                            color="accent"
+                            overlap
+                        >
+                            <v-icon>{{mdiViewGrid}}</v-icon>
+                        </v-badge>
+                    </v-btn>
+                </template>
+                <span>{{ $t('roomList') }} ({{ availableRooms.length }})</span>
+            </v-tooltip>
+
             <v-tooltip left>
                 <template v-slot:activator="{ on }">
                     <v-btn icon v-on="on" @click="clearAllDialog = true">
@@ -321,6 +339,116 @@
                 </v-card-actions>
             </v-card>
         </v-dialog>
+
+        <!-- Room List Bottom Sheet -->
+        <v-bottom-sheet v-model="roomSheet" scrollable max-width="800">
+            <v-card>
+                <v-card-title class="d-flex align-center">
+                    <v-icon left>{{ mdiViewGrid }}</v-icon>
+                    {{ $t('roomList') }}
+                    <v-chip class="ml-2" small outlined>{{ availableRooms.length }} {{ $t('rooms') }}</v-chip>
+                    <v-spacer></v-spacer>
+                    <!-- 移除刷新按钮 -->
+                    <v-btn icon @click="roomSheet = false">
+                        <v-icon>{{ mdiClose }}</v-icon>
+                    </v-btn>
+                </v-card-title>
+                
+                <v-divider></v-divider>
+                
+                <v-card-text style="max-height: 60vh;">
+                    <!-- Search Box -->
+                    <v-text-field
+                        v-model="roomSearch"
+                        :placeholder="$t('searchRooms')"
+                        :prepend-inner-icon="mdiMagnify"
+                        outlined
+                        dense
+                        clearable
+                        class="mb-4"
+                    ></v-text-field>
+                    
+                    <!-- Loading State -->
+                    <div v-if="roomsLoading" class="text-center py-4">
+                        <v-progress-circular indeterminate color="primary"></v-progress-circular>
+                        <div class="mt-2">{{ $t('loadingRooms') }}</div>
+                    </div>
+                    
+                    <!-- Empty State -->
+                    <div v-else-if="filteredRooms.length === 0" class="text-center py-8">
+                        <v-icon size="64" color="grey lighten-1">{{ mdiHomeOutline }}</v-icon>
+                        <div class="mt-2 grey--text">{{ $t('noRoomsFound') }}</div>
+                    </div>
+                    
+                    <!-- Room Grid -->
+                    <v-row v-else>
+                        <v-col
+                            v-for="room in filteredRooms"
+                            :key="room.name"
+                            cols="12"
+                            sm="6"
+                            md="4"
+                        >
+                            <v-card
+                                outlined
+                                hover
+                                :color="$root.room === room.name ? 'primary' : ''"
+                                :dark="$root.room === room.name"
+                                @click="switchRoom(room.name)"
+                                style="cursor: pointer; transition: all 0.3s ease;"
+                                :elevation="$root.room === room.name ? 4 : 0"
+                            >
+                                <v-card-text>
+                                    <div class="d-flex justify-space-between align-center mb-3">
+                                        <v-icon :color="$root.room === room.name ? 'white' : 'primary'">
+                                            {{ room.name === '' ? mdiHomeOutline : mdiHome }}
+                                        </v-icon>
+                                        <v-chip
+                                            x-small
+                                            :color="room.isActive ? 'success' : 'grey'"
+                                            :text-color="room.isActive ? 'white' : 'grey darken-2'"
+                                        >
+                                            {{ room.isActive ? $t('active') : $t('inactive') }}
+                                        </v-chip>
+                                    </div>
+                                    
+                                    <div class="subtitle-1 font-weight-bold mb-2" style="word-break: break-word;">
+                                        {{ room.name || $t('publicRoom') }}
+                                    </div>
+                                    
+                                    <div class="caption mb-3" :class="$root.room === room.name ? 'white--text' : 'grey--text'">
+                                        {{ $t('messages') }}: {{ room.messageCount }}<br>
+                                        {{ $t('lastActive') }}: {{ formatTime(room.lastActive) }}
+                                    </div>
+                                    
+                                    <div class="d-flex justify-space-between align-center">
+                                        <v-chip 
+                                            x-small 
+                                            :outlined="$root.room !== room.name"
+                                            :color="$root.room === room.name ? 'white' : 'primary'"
+                                            :text-color="$root.room === room.name ? 'primary' : 'white'"
+                                        >
+                                            {{ room.deviceCount }} {{ $t('devices') }}
+                                        </v-chip>
+                                        <v-btn
+                                            x-small
+                                            icon
+                                            @click.stop="toggleFavoriteRoom(room.name)"
+                                            :color="$root.room === room.name ? 'white' : 'grey'"
+                                        >
+                                            <v-icon small>
+                                                {{ room.isFavorite ? mdiHeart : mdiHeartOutline }}
+                                            </v-icon>
+                                        </v-btn>
+                                    </div>
+                                </v-card-text>
+                            </v-card>
+                        </v-col>
+                    </v-row>
+                </v-card-text>
+            </v-card>
+        </v-bottom-sheet>
+
     </v-app>
 </template>
 
@@ -350,9 +478,16 @@ import {
     mdiDiceMultiple,
     mdiPalette,
     mdiNotificationClearAll,
-    mdiTranslate, // 添加图标
-    mdiClockOutline,      // Add icon
-    mdiIpNetworkOutline,  // Add icon
+    mdiTranslate,
+    mdiClockOutline,
+    mdiIpNetworkOutline,
+    mdiViewGrid,
+    mdiClose,
+    mdiMagnify,
+    mdiHome,
+    mdiHomeOutline,
+    mdiHeart,
+    mdiHeartOutline,
 } from '@mdi/js';
 
 export default {
@@ -361,7 +496,12 @@ export default {
             drawer: false,
             colorDialog: false,
             clearAllDialog: false,
-            clipboardClearedMessageVisible: false, // Add this line
+            clipboardClearedMessageVisible: false,
+            roomSheet: false,
+            roomSearch: '',
+            availableRooms: [],
+            roomsLoading: false,
+            // 图标
             mdiContentPaste,
             mdiDevices,
             mdiInformation,
@@ -373,15 +513,21 @@ export default {
             mdiDiceMultiple,
             mdiPalette,
             mdiNotificationClearAll,
-            mdiTranslate, // 添加图标
-            mdiClockOutline,      // Add icon
-            mdiIpNetworkOutline,  // Add icon
-            navigator, // 使 navigator 可用
+            mdiTranslate,
+            mdiClockOutline,
+            mdiIpNetworkOutline,
+            mdiViewGrid,
+            mdiClose,
+            mdiMagnify,
+            mdiHome,
+            mdiHomeOutline,
+            mdiHeart,
+            mdiHeartOutline,
+            navigator,
         };
     },
     computed: {
         currentLanguageName() {
-            // 根据当前语言环境返回名称
             switch (this.$i18n.locale) {
                 case 'zh': return '简体中文';
                 case 'zh-TW': return '繁體中文';
@@ -389,7 +535,28 @@ export default {
                 case 'en':
                 default: return 'English';
             }
-        }
+        },
+        filteredRooms() {
+            let rooms = this.availableRooms;
+            
+            // 先按搜索条件过滤
+            if (this.roomSearch) {
+                rooms = rooms.filter(room => 
+                    (room.name || this.$t('publicRoom')).toLowerCase().includes(this.roomSearch.toLowerCase())
+                );
+            }
+            
+            // 按收藏状态排序：收藏的房间在前，未收藏的在后
+            // 在每个分组内保持原有顺序（可能是按活跃度或其他后端逻辑排序的）
+            return rooms.sort((a, b) => {
+                // 如果收藏状态不同，收藏的排在前面
+                if (a.isFavorite !== b.isFavorite) {
+                    return b.isFavorite - a.isFavorite; // true = 1, false = 0，所以收藏的(1)排在前面
+                }
+                // 如果收藏状态相同，保持原有顺序（返回0表示不改变相对位置）
+                return 0;
+            });
+        },
     },
     methods: {
         async clearAll() {
@@ -454,11 +621,117 @@ export default {
             } else {
                  console.log('Already on public room (/), not navigating.');
             }
-        }
+        },
+
+        // 简化的房间列表获取方法 - 添加更严格的检查
+        async fetchRoomList() {
+            // 添加更严格的配置检查
+            if (!this.$root.config || 
+                !this.$root.config.server || 
+                !this.$root.config.server.roomList) {
+                console.log('房间列表功能未启用或配置未完成加载');
+                return;
+            }
+            
+            // 如果正在加载中，避免重复请求
+            if (this.roomsLoading) {
+                console.log('房间列表正在加载中，跳过重复请求');
+                return;
+            }
+            
+            this.roomsLoading = true;
+            console.log('获取房间列表');
+            
+            try {
+                const response = await this.$http.get('rooms');
+                const favoriteRooms = this.getFavoriteRooms();
+                this.availableRooms = response.data.rooms.map(room => ({
+                    ...room,
+                    isFavorite: favoriteRooms.includes(room.name)
+                }));
+                console.log(`房间列表更新成功，共 ${this.availableRooms.length} 个房间`);
+            } catch (error) {
+                console.error('Failed to fetch room list:', error);
+                this.$toast(this.$t('failedToLoadRooms'));
+            } finally {
+                this.roomsLoading = false;
+            }
+        },
+
+        // 切换房间
+        switchRoom(roomName) {
+            this.roomSheet = false;
+            if (roomName === '') {
+                // 公共房间
+                this.$router.push('/');
+            } else {
+                this.$router.push({ path: '/', query: { room: roomName } });
+            }
+        },
+
+        // 获取收藏房间列表
+        getFavoriteRooms() {
+            try {
+                return JSON.parse(localStorage.getItem('favoriteRooms') || '[]');
+            } catch {
+                return [];
+            }
+        },
+
+        // 切换房间收藏状态
+        toggleFavoriteRoom(roomName) {
+            const favorites = this.getFavoriteRooms();
+            const index = favorites.indexOf(roomName);
+            
+            if (index > -1) {
+                favorites.splice(index, 1);
+                this.$toast(this.$t('removedFromFavorites', { room: roomName || this.$t('publicRoom') }));
+            } else {
+                favorites.push(roomName);
+                this.$toast(this.$t('addedToFavorites', { room: roomName || this.$t('publicRoom') }));
+            }
+            
+            localStorage.setItem('favoriteRooms', JSON.stringify(favorites));
+            
+            // 更新当前房间列表的收藏状态
+            const room = this.availableRooms.find(r => r.name === roomName);
+            if (room) {
+                room.isFavorite = !room.isFavorite;
+            }
+            
+            // 注意：由于使用了计算属性 filteredRooms，收藏状态改变后会自动重新排序
+        },
+
+        // 修复格式化时间方法
+        formatTime(timestamp) {
+            if (!timestamp || timestamp === 0) return this.$t('never');
+            
+            const now = Math.floor(Date.now() / 1000); // 当前时间（秒）
+            const messageTime = timestamp; // 后端返回的已经是秒
+            const diff = now - messageTime;
+            
+            // 如果时间戳是未来时间（可能是错误数据），返回 "刚刚"
+            if (diff < 0) {
+                return this.$t('justNow');
+            }
+            
+            if (diff < 60) { // 1分钟内
+                return this.$t('justNow');
+            } else if (diff < 3600) { // 1小时内
+                return this.$t('minutesAgo', { minutes: Math.floor(diff / 60) });
+            } else if (diff < 86400) { // 24小时内
+                return this.$t('hoursAgo', { hours: Math.floor(diff / 3600) });
+            } else {
+                return this.$t('daysAgo', { days: Math.floor(diff / 86400) });
+            }
+        },
+
+        // 移除自动刷新相关方法
+        // startRoomRefresh() - 已删除
+        // stopRoomRefresh() - 已删除
     },
     mounted() {
         // primary color <==> localStorage
-        // theme colors <== localStorage
         const darkPrimary = localStorage.getItem('darkPrimary');
         const lightPrimary = localStorage.getItem('lightPrimary');
         if (darkPrimary) {
@@ -475,9 +748,10 @@ export default {
         this.$watch('$vuetify.theme.themes.light.primary', (newVal) => {
             localStorage.setItem('lightPrimary', newVal);
         });
+
+        console.log('App.vue mounted - 房间列表将在用户点击时获取');
     },
     watch: {
-        // Add watcher to hide the message when route changes
         '$route'() {
             this.clipboardClearedMessageVisible = false;
         }
