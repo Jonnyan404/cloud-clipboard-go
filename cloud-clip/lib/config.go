@@ -24,6 +24,10 @@ type Config struct {
 		Auth interface{} `json:"auth"` //done
 		Cert string      `json:"cert"`
 		Key  string      `json:"key"`
+
+		// 添加房间相关配置
+		RoomList    bool `json:"roomList"`    // 是否启用房间列表功能
+		RoomCleanup int  `json:"roomCleanup"` // 房间清理间隔（秒）
 	} `json:"server"`
 	Text struct {
 		Limit int `json:"limit"` //done
@@ -82,6 +86,8 @@ func defaultConfig() *Config {
 			Auth        interface{} `json:"auth"`
 			Cert        string      `json:"cert"`
 			Key         string      `json:"key"`
+			RoomList    bool        `json:"roomList"`
+			RoomCleanup int         `json:"roomCleanup"`
 		}{
 			Host:        []string{"0.0.0.0"},
 			Port:        9501,
@@ -92,6 +98,8 @@ func defaultConfig() *Config {
 			Auth:        false,
 			Cert:        "",
 			Key:         "",
+			RoomList:    false,       // 默认关闭房间列表功能
+			RoomCleanup: 3600,        // 默认1小时清理一次空房间
 		},
 		Text: struct {
 			Limit int `json:"limit"`
