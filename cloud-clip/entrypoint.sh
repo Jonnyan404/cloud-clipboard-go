@@ -94,7 +94,9 @@ cat>"${CONFIG_FILE}"<<EOF
         "history": ${MESSAGE_NUM:-10},
         "auth": ${AUTH_PASSWORD:-false},
         "historyFile": "/app/server-node/data/history.json",
-        "storageDir": "/app/server-node/data/"
+        "storageDir": "/app/server-node/data/",
+        "roomList": ${ROOM_LIST:-false},
+        "roomCleanup": 3600
     },
     "text": {
         "limit": ${TEXT_LIMIT:-4096}

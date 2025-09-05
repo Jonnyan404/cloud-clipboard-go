@@ -16,7 +16,9 @@
         "history": 10, // 消息历史记录的数量
         "auth": false, // 是否在连接时要求使用密码认证，falsy 值表示不使用
         "historyFile": null, // 自定义历史记录存储路径，默认为当前目录的 history.json
-        "storageDir": null // 自定义文件存储目录，默认为临时文件夹的.cloud-clipboard-storage目录
+        "storageDir": null, // 自定义文件存储目录，默认为临时文件夹的.cloud-clipboard-storage目录
+        "roomList": false, // 房间列表开关,默认false
+        "roomCleanup": 3600 //房间清理周期(秒)，清理消息数0的房间
     },
     "text": {
         "limit": 4096 // 文本的长度限制
