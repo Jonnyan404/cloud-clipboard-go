@@ -15,7 +15,7 @@ echo "Using NDK: $ANDROID_NDK_HOME"
 echo "Binding package..."
 
 gomobile bind -tags embed -androidapi 24 -o cloudclipservice.aar -target=android \
-  -ldflags="-s -w -X lib.ServerVersion=android-1.0.0 -X lib.UseEmbeddedStr=true"
+  -ldflags="-s -w -X lib.ServerVersion=android-1.0.0"
 
 if [ $? -eq 0 ]; then
   echo "Build successful. AAR file generated: cloud-clip/mobile/cloudclipservice.aar"
