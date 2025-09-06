@@ -92,7 +92,7 @@ build() {
     [ -n "$MIPS" ] && BUILD_CMD="$BUILD_CMD GOMIPS=$MIPS"
     
     # 添加 -tags=embed 参数和 -X main.useEmbedded=true 标记
-    eval "$BUILD_CMD go build -trimpath -tags=embed -ldflags=\"-s -w -X main.server_version=$VERSION -X lib.UseEmbeddedStr=true\" -o \"$OUTPUT\" ."
+    eval "$BUILD_CMD go build -trimpath -tags=embed -ldflags=\"-s -w -X main.server_version=$VERSION\" -o \"$OUTPUT\" ."
     
     echo "✓ 完成: $OUTPUT"
 }

@@ -7,8 +7,8 @@ import (
 	"sync"
 	"flag"
 	"fmt"
-	"io"
 	"io/fs"
+	"io"
 	"log"
 	"math/big"
 	"mime"
@@ -37,14 +37,6 @@ var (
 
 var server_version = "go verion by Jonnyan404"
 var build_git_hash = show_bin_info()
-
-// UseEmbeddedStr 由 ldflags 在构建时设置 (例如 -X main.UseEmbeddedStr=true)
-var UseEmbeddedStr = "false"   // 默认为 "false"
-var effectiveUseEmbedded bool // 在 main() 中根据 UseEmbeddedStr 设置
-
-// embed_static_fs 将由 static_embed.go 在使用 'embed' 标签编译时填充。
-// 如果未使用 'embed' 标签，static_embed.go 不会编译，此变量将保持其零值。
-// var embed_static_fs embed.FS // 全局声明，static_embed.go 会填充它
 
 // NewClipboardServer 构造函数
 func NewClipboardServer(cfg *Config) (*ClipboardServer, error) {
@@ -170,24 +162,11 @@ func (s *ClipboardServer) loadHistoryData() error {
 	// 将 loadedHist.Receive ([]ReceiveHolder) 转换为 []PostEvent
 	s.messageQueue.List = make([]PostEvent, 0, len(loadedHist.Receive))
 	for _, rh := range loadedHist.Receive {
-		// 假设 ReceiveHolder 中的 Type 字段可以用来填充 PostEvent 的 Event 字段
-		// 或者 PostEvent 的 Event 字段需要根据 rh.Type() 来设置
-		// 这里我们假设 PostEvent 的 Event 字段就是 rh.Type()
 		s.messageQueue.List = append(s.messageQueue.List, PostEvent{
 			Event: rh.Type(), // 从 ReceiveHolder 获取事件类型
 			Data:  rh,        // ReceiveHolder 赋值给 PostEvent.Data
 		})
 	}
-
-	// s.messageQueue.nextid = loadedHist.NextID // History 结构体没有 NextID 字段
-	// nextid 应该从 PostList 自身管理，或者如果 History 也保存它，则需要添加到 History 结构
-	// 假设 nextid 由 PostList 内部逻辑或通过遍历加载的消息ID来确定
-	// 如果 History 结构中没有 NextID，可以考虑从加载的消息中推断，或者让 PostList 的 Append 逻辑处理
-	// 为了简单起见，如果 History 应该存储 NextID，请将其添加到 History 结构体中。
-	// 否则，PostList 的 nextid 将在 AppendMessage 时更新。
-	// 如果 loadedHist 应该有 NextID，请在 type.go 的 History 结构中添加它，
-	// 例如: NextID int `json:"nextId"`
-	// 然后在这里取消注释: s.messageQueue.nextid = loadedHist.NextID
 
 	// 确保 nextid 至少是加载的最后一个消息的 ID + 1
 	if len(s.messageQueue.List) > 0 {
@@ -298,6 +277,14 @@ func (s *ClipboardServer) filterHistoryMessages() {
 	s.messageQueue.Unlock()
 }
 
+func hasEmbeddedStatic() bool {
+    // 尝试打开 static 目录，如果成功说明有嵌入的文件
+    if _, err := embed_static_fs.Open("static"); err == nil {
+        return true
+    }
+    return false
+}
+
 func (s *ClipboardServer) setupRoutes() {
 	s.logger.Println("正在设置路由...")
 	prefix := s.config.Server.Prefix
@@ -309,23 +296,16 @@ func (s *ClipboardServer) setupRoutes() {
 		} else {
 			mux.Handle(prefix+"/", http.StripPrefix(prefix, compressionMiddleware(http.FileServer(http.Dir(*flg_static_dir)))))
 		}
-		// 使用在 main() 中根据构建标志设置的 effectiveUseEmbedded
-	} else if effectiveUseEmbedded {
-		s.logger.Println("使用嵌入式静态文件。")
-		// 检查 embed_static_fs 是否真的包含内容
-		if _, err := embed_static_fs.Open("static"); err != nil && effectiveUseEmbedded {
-			s.logger.Printf("严重警告: 配置为使用嵌入式静态文件 (UseEmbeddedStr=true)，但 embed_static_fs 似乎无效或未包含 'static' 目录: %v。请检查构建过程和 static_embed.go。", err)
-			// 即使有警告，也尝试继续，如果 fs.Sub 失败则会 panic 或记录致命错误
-		}
-		fsys, err := fs.Sub(embed_static_fs, "static")
-		if err != nil {
-			s.logger.Fatalf("错误: 无法从 embed_static_fs 获取 'static' 子目录: %v", err)
-		}
-		mux.Handle(prefix+"/", http.StripPrefix(prefix, compressionMiddleware(http.FileServer(http.FS(fsys)))))
-
-	} else {
-		s.logger.Println("警告: 未使用嵌入式静态文件，也未配置外部静态目录。将不提供前端服务。")
-	}
+    } else if hasEmbeddedStatic() { // 直接检测是否有嵌入的静态文件
+        s.logger.Println("使用嵌入式静态文件。")
+        fsys, err := fs.Sub(embed_static_fs, "static")
+        if err != nil {
+            s.logger.Fatalf("错误: 无法从 embed_static_fs 获取 'static' 子目录: %v", err)
+        }
+        mux.Handle(prefix+"/", http.StripPrefix(prefix, compressionMiddleware(http.FileServer(http.FS(fsys)))))
+    } else {
+        s.logger.Println("警告: 未使用嵌入式静态文件，也未配置外部静态目录。将不提供前端服务。")
+    }
 
 	// HTTP 路由
 	mux.HandleFunc(prefix+"/server", s.handle_server)
@@ -558,9 +538,6 @@ func (s *ClipboardServer) performCleanExpiredFiles() {
 	}
 }
 
-// --- 辅助函数 (部分需要从全局移到 ClipboardServer 或作为参数传入 s) ---
-// get_remote_ip, parse_user_agent, get_UA, get_remote, broadcast_ws_msg, getScheme
-// 这些函数如果依赖 config 或其他 server 状态，也需要重构。
 // parse_user_agent 现在使用 s.parser
 func (s *ClipboardServer) parse_user_agent(uaString string) map[string]string {
 	client := s.parser.Parse(uaString) // 使用实例化的解析器
@@ -609,19 +586,6 @@ func Main() {
 		flag.Parse()
 	}
 
-	var errParseBool error
-	effectiveUseEmbedded, errParseBool = strconv.ParseBool(UseEmbeddedStr)
-	if errParseBool != nil {
-		log.Printf("警告: 解析 useEmbedded 构建标志 '%s' 失败: %v。默认为 false。", UseEmbeddedStr, errParseBool)
-		effectiveUseEmbedded = false // 安全默认值
-	}
-
-	if effectiveUseEmbedded {
-		log.Println("程序配置为尝试使用嵌入式静态文件 (通过构建标志 UseEmbeddedStr=true 设置)。")
-	} else {
-		log.Println("程序配置为不使用嵌入式静态文件 (UseEmbeddedStr 未设置为 true 或解析失败)。")
-	}
-
 	initialCfg, err := load_config(*flg_config) // flg_config 来自 flags.go
 	if err != nil {
 		log.Printf("警告: 加载初始配置失败: %v。将使用默认值继续。", err)
@@ -666,7 +630,6 @@ func show_bin_info() string {
 	return gitHash
 }
 
-// --- 旧的 HTTP 处理器，它们都需要被重构为 ClipboardServer 的方法 ---
 
 func (s *ClipboardServer) handle_server(w http.ResponseWriter, r *http.Request) {
 	s.logger.Printf("处理 /server 请求，来自: %s", get_remote_ip(r))
@@ -990,13 +953,6 @@ func hash_murmur3(data []byte, seed uint32) uint32 {
 	h.Write(data)
 	return h.Sum32()
 }
-
-// random_bytes 函数 (假设在 NewClipboardServer 中可用)
-// func random_bytes(n int) []byte { ... }
-// random_uuid 函数 (假设在文件上传中可用)
-// func random_uuid() string { ... }
-
-// ... (ClipboardServer 的其余方法，如 handle_file, handle_text 等)
 
 func (s *ClipboardServer) handle_file(w http.ResponseWriter, r *http.Request) {
 	// 修改 UUID 提取逻辑
