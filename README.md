@@ -209,3 +209,7 @@ go run -tags embed .
 
 - [TransparentLC](https://github.com/TransparentLC/cloud-clipboard)
 - [yurenchen000](https://github.com/yurenchen000/cloud-clipboard)
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=Jonnyan404/cloud-clipboard-go&type=Date)](https://www.star-history.com/#Jonnyan404/cloud-clipboard-go&Date)
