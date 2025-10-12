@@ -4,11 +4,10 @@ import (
 	"context" // 确保导入 embed 包
 	"crypto/rand"
 	"encoding/json"
-	"sync"
 	"flag"
 	"fmt"
-	"io/fs"
 	"io"
+	"io/fs"
 	"log"
 	"math/big"
 	"mime"
@@ -20,6 +19,7 @@ import (
 	"runtime/debug"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -278,11 +278,11 @@ func (s *ClipboardServer) filterHistoryMessages() {
 }
 
 func hasEmbeddedStatic() bool {
-    // 尝试打开 static 目录，如果成功说明有嵌入的文件
-    if _, err := embed_static_fs.Open("static"); err == nil {
-        return true
-    }
-    return false
+	// 尝试打开 static 目录，如果成功说明有嵌入的文件
+	if _, err := embed_static_fs.Open("static"); err == nil {
+		return true
+	}
+	return false
 }
 
 func (s *ClipboardServer) setupRoutes() {
@@ -296,21 +296,21 @@ func (s *ClipboardServer) setupRoutes() {
 		} else {
 			mux.Handle(prefix+"/", http.StripPrefix(prefix, compressionMiddleware(http.FileServer(http.Dir(*flg_static_dir)))))
 		}
-    } else if hasEmbeddedStatic() { // 直接检测是否有嵌入的静态文件
-        s.logger.Println("使用嵌入式静态文件。")
-        fsys, err := fs.Sub(embed_static_fs, "static")
-        if err != nil {
-            s.logger.Fatalf("错误: 无法从 embed_static_fs 获取 'static' 子目录: %v", err)
-        }
-        mux.Handle(prefix+"/", http.StripPrefix(prefix, compressionMiddleware(http.FileServer(http.FS(fsys)))))
-    } else {
-        s.logger.Println("警告: 未使用嵌入式静态文件，也未配置外部静态目录。将不提供前端服务。")
-    }
+	} else if hasEmbeddedStatic() { // 直接检测是否有嵌入的静态文件
+		s.logger.Println("使用嵌入式静态文件。")
+		fsys, err := fs.Sub(embed_static_fs, "static")
+		if err != nil {
+			s.logger.Fatalf("错误: 无法从 embed_static_fs 获取 'static' 子目录: %v", err)
+		}
+		mux.Handle(prefix+"/", http.StripPrefix(prefix, compressionMiddleware(http.FileServer(http.FS(fsys)))))
+	} else {
+		s.logger.Println("警告: 未使用嵌入式静态文件，也未配置外部静态目录。将不提供前端服务。")
+	}
 
 	// HTTP 路由
 	mux.HandleFunc(prefix+"/server", s.handle_server)
 	mux.HandleFunc(prefix+"/push", s.handle_push)
-	mux.HandleFunc(prefix+"/rooms", s.handleRooms) 
+	mux.HandleFunc(prefix+"/rooms", s.handleRooms)
 	mux.HandleFunc(prefix+"/file/", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			s.handle_file(w, r)
@@ -463,8 +463,8 @@ func (s *ClipboardServer) Stop() error {
 		s.logger.Println("服务器未运行或未初始化。")
 		return fmt.Errorf("服务器未运行")
 	}
-    // 停止房间清理任务
-    s.stopRoomCleanup()
+	// 停止房间清理任务
+	s.stopRoomCleanup()
 	s.logger.Println("正在停止服务器...")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -548,7 +548,7 @@ func (s *ClipboardServer) parse_user_agent(uaString string) map[string]string {
 	}
 }
 
-// get_remote_ip (保持不变)
+// get_remote_ip(r *http.Request) (保持不变)
 func get_remote_ip(r *http.Request) string {
 	ip := r.Header.Get("X-Forwarded-For")
 	if ip == "" {
@@ -630,7 +630,6 @@ func show_bin_info() string {
 	return gitHash
 }
 
-
 func (s *ClipboardServer) handle_server(w http.ResponseWriter, r *http.Request) {
 	s.logger.Printf("处理 /server 请求，来自: %s", get_remote_ip(r))
 	authNeeded := false
@@ -647,15 +646,15 @@ func (s *ClipboardServer) handle_server(w http.ResponseWriter, r *http.Request) 
 		wsProtocol = "wss"
 	}
 
-    response := map[string]interface{}{
-        "server": fmt.Sprintf("%s://%s%s/push", wsProtocol, r.Host, s.config.Server.Prefix),
-        "auth":   authNeeded,
-        "config": map[string]interface{}{
-            "server": map[string]interface{}{
-                "roomList": s.config.Server.RoomList,
-            },
-        },
-    }
+	response := map[string]interface{}{
+		"server": fmt.Sprintf("%s://%s%s/push", wsProtocol, r.Host, s.config.Server.Prefix),
+		"auth":   authNeeded,
+		"config": map[string]interface{}{
+			"server": map[string]interface{}{
+				"roomList": s.config.Server.RoomList,
+			},
+		},
+	}
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		s.logger.Printf("错误: 编码 /server 响应失败: %v", err)
@@ -663,197 +662,196 @@ func (s *ClipboardServer) handle_server(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
-
 func (s *ClipboardServer) handle_push(w http.ResponseWriter, r *http.Request) {
-    ip := get_remote_ip(r)
-    room := r.URL.Query().Get("room")
-    if room == "" {
-        room = "default" // 默认房间
-    }
-    s.logger.Printf("处理 /push WebSocket 连接请求，来自: %s, 房间: %s", ip, room)
+	ip := get_remote_ip(r)
+	room := r.URL.Query().Get("room")
+	if room == "" {
+		room = "default" // 默认房间
+	}
+	s.logger.Printf("处理 /push WebSocket 连接请求，来自: %s, 房间: %s", ip, room)
 
-    authNeeded := false
-    var expectedPassword string
-    // 从 s.config.Server.Auth 获取期望的密码（可能是随机生成的或配置的）
-    if authStr, ok := s.config.Server.Auth.(string); ok && authStr != "" {
-        authNeeded = true
-        expectedPassword = authStr
-    }
-    // 注意：布尔型 true 的情况已在 NewClipboardServer 中处理并转换为字符串密码或空字符串
+	authNeeded := false
+	var expectedPassword string
+	// 从 s.config.Server.Auth 获取期望的密码（可能是随机生成的或配置的）
+	if authStr, ok := s.config.Server.Auth.(string); ok && authStr != "" {
+		authNeeded = true
+		expectedPassword = authStr
+	}
+	// 注意：布尔型 true 的情况已在 NewClipboardServer 中处理并转换为字符串密码或空字符串
 
-    if authNeeded {
-        token := r.URL.Query().Get("auth")
-        if expectedPassword == "" { // 这种情况理论上不应发生，因为 NewClipboardServer 会处理
-            s.logger.Printf("WebSocket 认证失败: 服务器端未配置有效密码，但需要认证。来自 IP: %s, 房间: %s", ip, room)
-            http.Error(w, "Unauthorized: Server authentication misconfiguration", http.StatusUnauthorized)
-            return
-        }
-        if token == "" {
-            s.logger.Printf("WebSocket 认证失败: 未提供 token。来自 IP: %s, 房间: %s", ip, room)
-            http.Error(w, "Unauthorized: Missing token", http.StatusUnauthorized)
-            return
-        }
-        if token != expectedPassword {
-            s.logger.Printf("WebSocket 认证失败: 提供的 token '%s' 与期望的 '%s' 不匹配。来自 IP: %s, 房间: %s", token, expectedPassword, ip, room)
-            http.Error(w, "Unauthorized: Invalid token", http.StatusUnauthorized)
-            return
-        }
-        s.logger.Printf("WebSocket 认证成功。来自 IP: %s, 房间: %s", ip, room)
-    }
+	if authNeeded {
+		token := r.URL.Query().Get("auth")
+		if expectedPassword == "" { // 这种情况理论上不应发生，因为 NewClipboardServer 会处理
+			s.logger.Printf("WebSocket 认证失败: 服务器端未配置有效密码，但需要认证。来自 IP: %s, 房间: %s", ip, room)
+			http.Error(w, "Unauthorized: Server authentication misconfiguration", http.StatusUnauthorized)
+			return
+		}
+		if token == "" {
+			s.logger.Printf("WebSocket 认证失败: 未提供 token。来自 IP: %s, 房间: %s", ip, room)
+			http.Error(w, "Unauthorized: Missing token", http.StatusUnauthorized)
+			return
+		}
+		if token != expectedPassword {
+			s.logger.Printf("WebSocket 认证失败: 提供的 token '%s' 与期望的 '%s' 不匹配。来自 IP: %s, 房间: %s", token, expectedPassword, ip, room)
+			http.Error(w, "Unauthorized: Invalid token", http.StatusUnauthorized)
+			return
+		}
+		s.logger.Printf("WebSocket 认证成功。来自 IP: %s, 房间: %s", ip, room)
+	}
 
-    conn, err := upgrader.Upgrade(w, r, nil)
-    if err != nil {
-        s.logger.Printf("错误: WebSocket 升级失败: %v", err)
-        return
-    }
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		s.logger.Printf("错误: WebSocket 升级失败: %v", err)
+		return
+	}
 
-    // 生成设备 ID 和元数据
-    userAgent := r.Header.Get("User-Agent")
-    deviceID := fmt.Sprintf("%d", hash_murmur3([]byte(fmt.Sprintf("%s %s", r.RemoteAddr, userAgent)), s.deviceHashSeed))
+	// 生成设备 ID 和元数据
+	userAgent := r.Header.Get("User-Agent")
+	deviceID := fmt.Sprintf("%d", hash_murmur3([]byte(fmt.Sprintf("%s %s", r.RemoteAddr, userAgent)), s.deviceHashSeed))
 
-    clientUA := s.parser.Parse(userAgent)
-    deviceMeta := DeviceMeta{
-        ID:      deviceID,
-        Type:    clientUA.Device.Family,
-        Device:  strings.TrimSpace(fmt.Sprintf("%s %s %s", clientUA.Device.Brand, clientUA.Device.Model, clientUA.Os.Family)),
-        OS:      fmt.Sprintf("%s %s", clientUA.Os.Family, clientUA.Os.Major),
-        Browser: fmt.Sprintf("%s %s", clientUA.UserAgent.Family, clientUA.UserAgent.Major),
-    }
+	clientUA := s.parser.Parse(userAgent)
+	deviceMeta := DeviceMeta{
+		ID:      deviceID,
+		Type:    clientUA.Device.Family,
+		Device:  strings.TrimSpace(fmt.Sprintf("%s %s %s", clientUA.Device.Brand, clientUA.Device.Model, clientUA.Os.Family)),
+		OS:      fmt.Sprintf("%s %s", clientUA.Os.Family, clientUA.Os.Major),
+		Browser: fmt.Sprintf("%s %s", clientUA.UserAgent.Family, clientUA.UserAgent.Major),
+	}
 
-    // 第一次加锁：注册连接和获取当前房间内的设备列表
-    var devicesInRoom []DeviceMeta
-    s.runMutex.Lock()
-    s.websockets[conn] = true
-    s.room_ws[conn] = room
-    s.deviceConnected[deviceID] = deviceMeta
-    s.connDeviceIDMap[conn] = deviceID
-    s.updateRoomDeviceCount(room, deviceID, true)
-    
-    s.logger.Printf("新 WebSocket 客户端连接: %s (ID: %s), 房间: %s. 当前连接数: %d, 设备数: %d", 
-        conn.RemoteAddr(), deviceID, room, len(s.websockets), len(s.deviceConnected))
+	// 第一次加锁：注册连接和获取当前房间内的设备列表
+	var devicesInRoom []DeviceMeta
+	s.runMutex.Lock()
+	s.websockets[conn] = true
+	s.room_ws[conn] = room
+	s.deviceConnected[deviceID] = deviceMeta
+	s.connDeviceIDMap[conn] = deviceID
+	s.updateRoomDeviceCount(room, deviceID, true)
 
-    // 获取房间内现有设备列表（排除当前设备）
-    for _, existingDeviceID := range s.getDeviceIDsInRoomLocked(room, deviceID) {
-        if devMeta, ok := s.deviceConnected[existingDeviceID]; ok {
-            devicesInRoom = append(devicesInRoom, devMeta)
-        }
-    }
-    s.runMutex.Unlock() // 尽早释放锁
+	s.logger.Printf("新 WebSocket 客户端连接: %s (ID: %s), 房间: %s. 当前连接数: %d, 设备数: %d",
+		conn.RemoteAddr(), deviceID, room, len(s.websockets), len(s.deviceConnected))
 
-    // 向新客户端发送房间内当前连接的设备列表（在锁外执行）
-    for _, devMeta := range devicesInRoom {
-        wsMsg := WebSocketMessage{
-            Event: "connect",
-            Data:  devMeta,
-        }
-        if err := conn.WriteJSON(wsMsg); err != nil {
-            s.logger.Printf("错误: 发送现有设备 %s 信息到新客户端 %s 失败: %v", devMeta.ID, conn.RemoteAddr(), err)
-            // 如果发送失败，清理连接并返回
-            s.cleanupWebSocketConnection(conn, deviceID, room)
-            return
-        }
-    }
+	// 获取房间内现有设备列表（排除当前设备）
+	for _, existingDeviceID := range s.getDeviceIDsInRoomLocked(room, deviceID) {
+		if devMeta, ok := s.deviceConnected[existingDeviceID]; ok {
+			devicesInRoom = append(devicesInRoom, devMeta)
+		}
+	}
+	s.runMutex.Unlock() // 尽早释放锁
 
-    // 向房间内的其他客户端广播新设备连接（此函数内部会处理锁）
-    newDeviceClientMsg := WebSocketMessage{
-        Event: "connect",
-        Data:  deviceMeta,
-    }
-    s.broadcastWebSocketMessageToRoomExcept(newDeviceClientMsg, room, conn)
+	// 向新客户端发送房间内当前连接的设备列表（在锁外执行）
+	for _, devMeta := range devicesInRoom {
+		wsMsg := WebSocketMessage{
+			Event: "connect",
+			Data:  devMeta,
+		}
+		if err := conn.WriteJSON(wsMsg); err != nil {
+			s.logger.Printf("错误: 发送现有设备 %s 信息到新客户端 %s 失败: %v", devMeta.ID, conn.RemoteAddr(), err)
+			// 如果发送失败，清理连接并返回
+			s.cleanupWebSocketConnection(conn, deviceID, room)
+			return
+		}
+	}
 
-    // 第二次加锁：获取历史消息（短时间持锁）
-    var historyMessages []PostEvent
-    s.messageQueue.Lock()
-    for _, msg := range s.messageQueue.List {
-        if msg.Data.Room() == "" || msg.Data.Room() == room {
-            historyMessages = append(historyMessages, msg)
-        }
-    }
-    s.messageQueue.Unlock() // 立即释放消息队列锁
+	// 向房间内的其他客户端广播新设备连接（此函数内部会处理锁）
+	newDeviceClientMsg := WebSocketMessage{
+		Event: "connect",
+		Data:  deviceMeta,
+	}
+	s.broadcastWebSocketMessageToRoomExcept(newDeviceClientMsg, room, conn)
 
-    // 发送历史消息（在锁外执行）
-    for _, msg := range historyMessages {
-        var clientPayload interface{}
-        if msg.Data.TextReceive != nil {
-            clientPayload = msg.Data.TextReceive
-        } else if msg.Data.FileReceive != nil {
-            clientPayload = msg.Data.FileReceive
-        } else {
-            continue
-        }
+	// 第二次加锁：获取历史消息（短时间持锁）
+	var historyMessages []PostEvent
+	s.messageQueue.Lock()
+	for _, msg := range s.messageQueue.List {
+		if msg.Data.Room() == "" || msg.Data.Room() == room {
+			historyMessages = append(historyMessages, msg)
+		}
+	}
+	s.messageQueue.Unlock() // 立即释放消息队列锁
 
-        wsMsg := WebSocketMessage{
-            Event: "receive",
-            Data:  clientPayload,
-        }
-        if err := conn.WriteJSON(wsMsg); err != nil {
-            s.logger.Printf("错误: 发送历史消息到客户端 %s 失败: %v", conn.RemoteAddr(), err)
-            s.cleanupWebSocketConnection(conn, deviceID, room)
-            return
-        }
-    }
-    s.logger.Printf("已发送 %d 条历史消息到客户端 %s (房间: %s)", len(historyMessages), conn.RemoteAddr(), room)
+	// 发送历史消息（在锁外执行）
+	for _, msg := range historyMessages {
+		var clientPayload interface{}
+		if msg.Data.TextReceive != nil {
+			clientPayload = msg.Data.TextReceive
+		} else if msg.Data.FileReceive != nil {
+			clientPayload = msg.Data.FileReceive
+		} else {
+			continue
+		}
 
-    // 发送配置信息给新连接的客户端
-    clientConfigData := struct {
-        Version string `json:"version"`
-        Server  struct {
-            Prefix   string `json:"prefix"`
-            RoomList bool   `json:"roomList"`
-        } `json:"server"`
-        Text struct {
-            Limit int `json:"limit"`
-        } `json:"text"`
-        File struct {
-            Expire int `json:"expire"`
-            Chunk  int `json:"chunk"`
-            Limit  int `json:"limit"`
-        } `json:"file"`
-        Auth bool `json:"auth"`
-    }{
-        Version: server_version,
-        Server: struct {
-            Prefix   string `json:"prefix"`
-            RoomList bool   `json:"roomList"`
-        }{
-            Prefix:   s.config.Server.Prefix,
-            RoomList: s.config.Server.RoomList,
-        },
-        Text: s.config.Text,
-        File: s.config.File,
-        Auth: authNeeded,
-    }
+		wsMsg := WebSocketMessage{
+			Event: "receive",
+			Data:  clientPayload,
+		}
+		if err := conn.WriteJSON(wsMsg); err != nil {
+			s.logger.Printf("错误: 发送历史消息到客户端 %s 失败: %v", conn.RemoteAddr(), err)
+			s.cleanupWebSocketConnection(conn, deviceID, room)
+			return
+		}
+	}
+	s.logger.Printf("已发送 %d 条历史消息到客户端 %s (房间: %s)", len(historyMessages), conn.RemoteAddr(), room)
 
-    configWsMsg := WebSocketMessage{
-        Event: "config",
-        Data:  clientConfigData,
-    }
-    if err := conn.WriteJSON(configWsMsg); err != nil {
-        s.logger.Printf("错误: 发送配置信息到客户端 %s 失败: %v", conn.RemoteAddr(), err)
-    } else {
-        s.logger.Printf("已发送配置信息到客户端 %s", conn.RemoteAddr())
-    }
+	// 发送配置信息给新连接的客户端
+	clientConfigData := struct {
+		Version string `json:"version"`
+		Server  struct {
+			Prefix   string `json:"prefix"`
+			RoomList bool   `json:"roomList"`
+		} `json:"server"`
+		Text struct {
+			Limit int `json:"limit"`
+		} `json:"text"`
+		File struct {
+			Expire int `json:"expire"`
+			Chunk  int `json:"chunk"`
+			Limit  int `json:"limit"`
+		} `json:"file"`
+		Auth bool `json:"auth"`
+	}{
+		Version: server_version,
+		Server: struct {
+			Prefix   string `json:"prefix"`
+			RoomList bool   `json:"roomList"`
+		}{
+			Prefix:   s.config.Server.Prefix,
+			RoomList: s.config.Server.RoomList,
+		},
+		Text: s.config.Text,
+		File: s.config.File,
+		Auth: authNeeded,
+	}
 
-    // 启动 WebSocket 消息读取 goroutine
-    go func() {
-        defer s.cleanupWebSocketConnection(conn, deviceID, room)
+	configWsMsg := WebSocketMessage{
+		Event: "config",
+		Data:  clientConfigData,
+	}
+	if err := conn.WriteJSON(configWsMsg); err != nil {
+		s.logger.Printf("错误: 发送配置信息到客户端 %s 失败: %v", conn.RemoteAddr(), err)
+	} else {
+		s.logger.Printf("已发送配置信息到客户端 %s", conn.RemoteAddr())
+	}
 
-        for {
-            messageType, p, err := conn.ReadMessage()
-            if err != nil {
-                if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-                    s.logger.Printf("错误: WebSocket 读取错误 (客户端: %s, ID: %s): %v", conn.RemoteAddr(), deviceID, err)
-                } else {
-                    s.logger.Printf("WebSocket 连接正常关闭 (客户端: %s, ID: %s)", conn.RemoteAddr(), deviceID)
-                }
-                break
-            }
-            if len(p) > 0 {
-                s.logger.Printf("收到来自 %s (ID: %s) 的 WebSocket 心跳消息: 类型 %d, 内容: %s",
-                    conn.RemoteAddr(), deviceID, messageType, string(p))
-            }
-        }
-    }()
+	// 启动 WebSocket 消息读取 goroutine
+	go func() {
+		defer s.cleanupWebSocketConnection(conn, deviceID, room)
+
+		for {
+			messageType, p, err := conn.ReadMessage()
+			if err != nil {
+				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+					s.logger.Printf("错误: WebSocket 读取错误 (客户端: %s, ID: %s): %v", conn.RemoteAddr(), deviceID, err)
+				} else {
+					s.logger.Printf("WebSocket 连接正常关闭 (客户端: %s, ID: %s)", conn.RemoteAddr(), deviceID)
+				}
+				break
+			}
+			if len(p) > 0 {
+				s.logger.Printf("收到来自 %s (ID: %s) 的 WebSocket 心跳消息: 类型 %d, 内容: %s",
+					conn.RemoteAddr(), deviceID, messageType, string(p))
+			}
+		}
+	}()
 }
 
 // 辅助函数：获取特定房间内的设备ID，排除某个设备
@@ -874,76 +872,76 @@ func (s *ClipboardServer) getDeviceIDsInRoomLocked(room string, excludeDeviceID 
 
 // 辅助函数：清理 WebSocket 连接并通知其他人
 func (s *ClipboardServer) cleanupWebSocketConnection(conn *websocket.Conn, deviceID string, room string) {
-    // 第一步：在锁内进行状态清理，但不关闭连接
-    var shouldBroadcast bool
-    s.runMutex.Lock()
-    delete(s.websockets, conn)
-    delete(s.room_ws, conn)
-    delete(s.connDeviceIDMap, conn)
-    
-    if deviceID != "" {
-        delete(s.deviceConnected, deviceID)
-        s.updateRoomDeviceCount(room, deviceID, false)
-        shouldBroadcast = true
-        s.logger.Printf("WebSocket 客户端断开连接: %s (ID: %s), 房间: %s. 当前连接数: %d, 设备数: %d", 
-            conn.RemoteAddr(), deviceID, room, len(s.websockets), len(s.deviceConnected))
-    } else {
-        s.logger.Printf("WebSocket 客户端断开连接 (无有效DeviceID): %s, 房间: %s. 当前连接数: %d", 
-            conn.RemoteAddr(), room, len(s.websockets))
-    }
-    s.runMutex.Unlock()
+	// 第一步：在锁内进行状态清理，但不关闭连接
+	var shouldBroadcast bool
+	s.runMutex.Lock()
+	delete(s.websockets, conn)
+	delete(s.room_ws, conn)
+	delete(s.connDeviceIDMap, conn)
 
-    // 第二步：在锁外关闭连接
-    conn.Close()
+	if deviceID != "" {
+		delete(s.deviceConnected, deviceID)
+		s.updateRoomDeviceCount(room, deviceID, false)
+		shouldBroadcast = true
+		s.logger.Printf("WebSocket 客户端断开连接: %s (ID: %s), 房间: %s. 当前连接数: %d, 设备数: %d",
+			conn.RemoteAddr(), deviceID, room, len(s.websockets), len(s.deviceConnected))
+	} else {
+		s.logger.Printf("WebSocket 客户端断开连接 (无有效DeviceID): %s, 房间: %s. 当前连接数: %d",
+			conn.RemoteAddr(), room, len(s.websockets))
+	}
+	s.runMutex.Unlock()
 
-    // 第三步：广播断开连接事件
-    if shouldBroadcast {
-        disconnectWsMsg := WebSocketMessage{
-            Event: "disconnect",
-            Data:  map[string]string{"id": deviceID},
-        }
-        s.broadcastWebSocketMessage(disconnectWsMsg, room)
-    }
+	// 第二步：在锁外关闭连接
+	conn.Close()
+
+	// 第三步：广播断开连接事件
+	if shouldBroadcast {
+		disconnectWsMsg := WebSocketMessage{
+			Event: "disconnect",
+			Data:  map[string]string{"id": deviceID},
+		}
+		s.broadcastWebSocketMessage(disconnectWsMsg, room)
+	}
 }
 
 // broadcastMessageToRoomExcept 将消息广播到房间中的所有客户端，除了一个特定的连接。
 func (s *ClipboardServer) broadcastMessageToRoomExcept(message PostEvent, room string, exceptConn *websocket.Conn) {
-    // 第一步：在锁内收集需要发送的连接
-    var targetConnections []*websocket.Conn
-    s.runMutex.Lock()
-    for client, clientRoom := range s.room_ws {
-        if client == exceptConn {
-            continue
-        }
-        if room == "" || clientRoom == room {
-            targetConnections = append(targetConnections, client)
-        }
-    }
-    s.runMutex.Unlock()
+	// 第一步：在锁内收集需要发送的连接
+	var targetConnections []*websocket.Conn
+	s.runMutex.Lock()
+	for client, clientRoom := range s.room_ws {
+		if client == exceptConn {
+			continue
+		}
+		if room == "" || clientRoom == room {
+			targetConnections = append(targetConnections, client)
+		}
+	}
+	s.runMutex.Unlock()
 
-    // 第二步：在锁外进行网络操作
-    var failedConnections []*websocket.Conn
-    for _, client := range targetConnections {
-        if err := client.WriteJSON(message); err != nil {
-            s.logger.Printf("错误: 写入消息到 WebSocket 客户端 %s 失败: %v。计划移除客户端。", client.RemoteAddr(), err)
-            failedConnections = append(failedConnections, client)
-        }
-    }
+	// 第二步：在锁外进行网络操作
+	var failedConnections []*websocket.Conn
+	for _, client := range targetConnections {
+		if err := client.WriteJSON(message); err != nil {
+			s.logger.Printf("错误: 写入消息到 WebSocket 客户端 %s 失败: %v。计划移除客户端。", client.RemoteAddr(), err)
+			failedConnections = append(failedConnections, client)
+		}
+	}
 
-    // 第三步：清理失败的连接
-    if len(failedConnections) > 0 {
-        s.runMutex.Lock()
-        for _, client := range failedConnections {
-            client.Close()
-            delete(s.websockets, client)
-            delete(s.room_ws, client)
-            if deviceID, ok := s.connDeviceIDMap[client]; ok {
-                delete(s.connDeviceIDMap, client)
-                delete(s.deviceConnected, deviceID)
-            }
-        }
-        s.runMutex.Unlock()
-    }
+	// 第三步：清理失败的连接
+	if len(failedConnections) > 0 {
+		s.runMutex.Lock()
+		for _, client := range failedConnections {
+			client.Close()
+			delete(s.websockets, client)
+			delete(s.room_ws, client)
+			if deviceID, ok := s.connDeviceIDMap[client]; ok {
+				delete(s.connDeviceIDMap, client)
+				delete(s.deviceConnected, deviceID)
+			}
+		}
+		s.runMutex.Unlock()
+	}
 }
 
 // hash_murmur3 函数 (假设可用，例如来自 random.go 或工具文件)
@@ -1445,26 +1443,24 @@ func (s *ClipboardServer) handle_revoke(w http.ResponseWriter, r *http.Request) 
 }
 
 func (s *ClipboardServer) handleClearAll(w http.ResponseWriter, r *http.Request) {
-	room := r.URL.Query().Get("room") // 可选，如果只想清空特定房间
+	room := r.URL.Query().Get("room")
+	normalizedRoom := normalizeRoomName(room) // 应用规范化：空字符串 -> "default"
 
-	s.logger.Printf("处理 /revoke/all 请求 (房间: '%s')", room)
+	s.logger.Printf("处理 /revoke/all 请求 (房间: '%s', 规范化后: '%s')", room, normalizedRoom)
 
 	s.messageQueue.Lock()
 	var newMsgList []PostEvent
 	var revokedIDs []int
-	if room == "" { // 清空所有房间
-		s.messageQueue.List = []PostEvent{}
-		// nextid 可以不清零，或者根据需求决定是否重置
-	} else { // 只清空指定房间的消息
-		for _, msg := range s.messageQueue.List {
-			if msg.Data.Room() != room {
-				newMsgList = append(newMsgList, msg)
-			} else {
-				revokedIDs = append(revokedIDs, msg.Data.ID())
-			}
+
+	// 始终只清空指定房间（规范化后的房间名），不再支持通过空字符串清空所有
+	for _, msg := range s.messageQueue.List {
+		if normalizeRoomName(msg.Data.Room()) != normalizedRoom {
+			newMsgList = append(newMsgList, msg)
+		} else {
+			revokedIDs = append(revokedIDs, msg.Data.ID())
 		}
-		s.messageQueue.List = newMsgList
 	}
+	s.messageQueue.List = newMsgList
 	s.messageQueue.Unlock()
 
 	// 删除关联的文件
@@ -1929,41 +1925,41 @@ func generateRandomString(length int) (string, error) {
 // broadcastMessage 向所有连接的 WebSocket 客户端（可选地，特定房间）广播消息。
 // 这个方法需要是线程安全的，因为它会被多个 goroutine 调用。
 func (s *ClipboardServer) broadcastMessage(message PostEvent, room string) {
-    s.logger.Printf("广播消息 (ID: %d, 类型: %s) 到房间 '%s'", message.Data.ID(), message.Event, room)
-    
-    // 第一步：在锁内收集需要发送的连接
-    var targetConnections []*websocket.Conn
-    s.runMutex.Lock()
-    for client, clientRoom := range s.room_ws {
-        if room == "" || clientRoom == room {
-            targetConnections = append(targetConnections, client)
-        }
-    }
-    s.runMutex.Unlock()
+	s.logger.Printf("广播消息 (ID: %d, 类型: %s) 到房间 '%s'", message.Data.ID(), message.Event, room)
 
-    // 第二步：在锁外进行网络操作
-    var failedConnections []*websocket.Conn
-    for _, client := range targetConnections {
-        if err := client.WriteJSON(message); err != nil {
-            s.logger.Printf("错误: 写入消息到 WebSocket 客户端 %s 失败: %v。移除客户端。", client.RemoteAddr(), err)
-            failedConnections = append(failedConnections, client)
-        }
-    }
+	// 第一步：在锁内收集需要发送的连接
+	var targetConnections []*websocket.Conn
+	s.runMutex.Lock()
+	for client, clientRoom := range s.room_ws {
+		if room == "" || clientRoom == room {
+			targetConnections = append(targetConnections, client)
+		}
+	}
+	s.runMutex.Unlock()
 
-    // 第三步：清理失败的连接
-    if len(failedConnections) > 0 {
-        s.runMutex.Lock()
-        for _, client := range failedConnections {
-            client.Close()
-            delete(s.websockets, client)
-            delete(s.room_ws, client)
-            if deviceID, ok := s.connDeviceIDMap[client]; ok {
-                delete(s.connDeviceIDMap, client)
-                delete(s.deviceConnected, deviceID)
-            }
-        }
-        s.runMutex.Unlock()
-    }
+	// 第二步：在锁外进行网络操作
+	var failedConnections []*websocket.Conn
+	for _, client := range targetConnections {
+		if err := client.WriteJSON(message); err != nil {
+			s.logger.Printf("错误: 写入消息到 WebSocket 客户端 %s 失败: %v。移除客户端。", client.RemoteAddr(), err)
+			failedConnections = append(failedConnections, client)
+		}
+	}
+
+	// 第三步：清理失败的连接
+	if len(failedConnections) > 0 {
+		s.runMutex.Lock()
+		for _, client := range failedConnections {
+			client.Close()
+			delete(s.websockets, client)
+			delete(s.room_ws, client)
+			if deviceID, ok := s.connDeviceIDMap[client]; ok {
+				delete(s.connDeviceIDMap, client)
+				delete(s.deviceConnected, deviceID)
+			}
+		}
+		s.runMutex.Unlock()
+	}
 }
 
 // addMessageToQueueAndBroadcast 添加消息到队列并广播
@@ -2011,8 +2007,8 @@ func (s *ClipboardServer) addMessageToQueueAndBroadcast(dataType string, data in
 		Data:  rh,       // ReceiveHolder
 	}
 	s.messageQueue.Append(&storeEvent) // msg.go 处理这个 PostEvent
-    // 更新房间消息统计
-    s.updateRoomStats(room, 1)
+	// 更新房间消息统计
+	s.updateRoomStats(room, 1)
 	// 准备发送给客户端的 WebSocket 消息
 	var clientPayload interface{}
 	if rh.TextReceive != nil {
@@ -2035,401 +2031,401 @@ func (s *ClipboardServer) addMessageToQueueAndBroadcast(dataType string, data in
 
 // broadcastWebSocketMessage 向所有连接的 WebSocket 客户端（可选地，特定房间）广播 WebSocketMessage。
 func (s *ClipboardServer) broadcastWebSocketMessage(message WebSocketMessage, room string) {
-    s.logger.Printf("广播 WebSocket 消息 (类型: %s) 到房间 '%s'", message.Event, room)
-    
-    // 第一步：在锁内收集需要发送的连接
-    var targetConnections []*websocket.Conn
-    s.runMutex.Lock()
-    for client, clientRoom := range s.room_ws {
-        if room == "" || clientRoom == room {
-            targetConnections = append(targetConnections, client)
-        }
-    }
-    s.runMutex.Unlock()
+	s.logger.Printf("广播 WebSocket 消消息 (类型: %s) 到房间 '%s'", message.Event, room)
 
-    // 第二步：在锁外进行网络操作
-    var failedConnections []*websocket.Conn
-    for _, client := range targetConnections {
-        if err := client.WriteJSON(message); err != nil {
-            s.logger.Printf("错误: 写入 WebSocketMessage 到客户端 %s 失败: %v。计划移除客户端。", client.RemoteAddr(), err)
-            failedConnections = append(failedConnections, client)
-        }
-    }
+	// 第一步：在锁内收集需要发送的连接
+	var targetConnections []*websocket.Conn
+	s.runMutex.Lock()
+	for client, clientRoom := range s.room_ws {
+		if room == "" || clientRoom == room {
+			targetConnections = append(targetConnections, client)
+		}
+	}
+	s.runMutex.Unlock()
 
-    // 第三步：清理失败的连接
-    if len(failedConnections) > 0 {
-        s.runMutex.Lock()
-        for _, client := range failedConnections {
-            client.Close()
-            delete(s.websockets, client)
-            delete(s.room_ws, client)
-            // 从 connDeviceIDMap 中查找并删除对应的设备ID
-            if deviceID, ok := s.connDeviceIDMap[client]; ok {
-                delete(s.connDeviceIDMap, client)
-                delete(s.deviceConnected, deviceID)
-            }
-        }
-        s.runMutex.Unlock()
-    }
+	// 第二步：在锁外进行网络操作
+	var failedConnections []*websocket.Conn
+	for _, client := range targetConnections {
+		if err := client.WriteJSON(message); err != nil {
+			s.logger.Printf("错误: 写入 WebSocketMessage 到客户端 %s 失败: %v。计划移除客户端。", client.RemoteAddr(), err)
+			failedConnections = append(failedConnections, client)
+		}
+	}
+
+	// 第三步：清理失败的连接
+	if len(failedConnections) > 0 {
+		s.runMutex.Lock()
+		for _, client := range failedConnections {
+			client.Close()
+			delete(s.websockets, client)
+			delete(s.room_ws, client)
+			// 从 connDeviceIDMap 中查找并删除对应的设备ID
+			if deviceID, ok := s.connDeviceIDMap[client]; ok {
+				delete(s.connDeviceIDMap, client)
+				delete(s.deviceConnected, deviceID)
+			}
+		}
+		s.runMutex.Unlock()
+	}
 }
 
 // broadcastWebSocketMessageToRoomExcept 将 WebSocketMessage 广播到房间中的所有客户端，除了一个特定的连接。
 func (s *ClipboardServer) broadcastWebSocketMessageToRoomExcept(message WebSocketMessage, room string, exceptConn *websocket.Conn) {
-    // 第一步：在锁内收集需要发送的连接
-    var targetConnections []*websocket.Conn
-    s.runMutex.Lock()
-    for client, clientRoom := range s.room_ws {
-        if client == exceptConn {
-            continue
-        }
-        if room == "" || clientRoom == room {
-            targetConnections = append(targetConnections, client)
-        }
-    }
-    s.runMutex.Unlock()
+	// 第一步：在锁内收集需要发送的连接
+	var targetConnections []*websocket.Conn
+	s.runMutex.Lock()
+	for client, clientRoom := range s.room_ws {
+		if client == exceptConn {
+			continue
+		}
+		if room == "" || clientRoom == room {
+			targetConnections = append(targetConnections, client)
+		}
+	}
+	s.runMutex.Unlock()
 
-    // 第二步：在锁外进行网络操作
-    var failedConnections []*websocket.Conn
-    for _, client := range targetConnections {
-        if err := client.WriteJSON(message); err != nil {
-            s.logger.Printf("错误: 写入 WebSocketMessage (except) 到客户端 %s 失败: %v。", client.RemoteAddr(), err)
-            failedConnections = append(failedConnections, client)
-        }
-    }
+	// 第二步：在锁外进行网络操作
+	var failedConnections []*websocket.Conn
+	for _, client := range targetConnections {
+		if err := client.WriteJSON(message); err != nil {
+			s.logger.Printf("错误: 写入 WebSocketMessage (except) 到客户端 %s 失败: %v。", client.RemoteAddr(), err)
+			failedConnections = append(failedConnections, client)
+		}
+	}
 
-    // 第三步：清理失败的连接
-    if len(failedConnections) > 0 {
-        s.runMutex.Lock()
-        for _, client := range failedConnections {
-            client.Close()
-            delete(s.websockets, client)
-            delete(s.room_ws, client)
-            if deviceID, ok := s.connDeviceIDMap[client]; ok {
-                delete(s.connDeviceIDMap, client)
-                delete(s.deviceConnected, deviceID)
-            }
-        }
-        s.runMutex.Unlock()
-    }
+	// 第三步：清理失败的连接
+	if len(failedConnections) > 0 {
+		s.runMutex.Lock()
+		for _, client := range failedConnections {
+			client.Close()
+			delete(s.websockets, client)
+			delete(s.room_ws, client)
+			if deviceID, ok := s.connDeviceIDMap[client]; ok {
+				delete(s.connDeviceIDMap, client)
+				delete(s.deviceConnected, deviceID)
+			}
+		}
+		s.runMutex.Unlock()
+	}
 }
+
 // --- 房间管理相关方法 ---
 
 // updateRoomStats 更新房间统计信息
 func (s *ClipboardServer) updateRoomStats(room string, messageCount int) {
-    if !s.config.Server.RoomList {
-        return // 如果没有启用房间列表功能，不统计
-    }
+	if !s.config.Server.RoomList {
+		return // 如果没有启用房间列表功能，不统计
+	}
 
-    // 统一房间名称
-    normalizedRoom := normalizeRoomName(room)
+	// 统一房间名称
+	normalizedRoom := normalizeRoomName(room)
 
-    s.roomStatsMutex.Lock()
-    defer s.roomStatsMutex.Unlock()
+	s.roomStatsMutex.Lock()
+	defer s.roomStatsMutex.Unlock()
 
-    if s.roomStats[normalizedRoom] == nil {
-        s.roomStats[normalizedRoom] = &RoomStat{
-            MessageCount: 0,
-            LastActive:   time.Now().Unix(),
-            DeviceIDs:    make(map[string]bool),
-        }
-    }
+	if s.roomStats[normalizedRoom] == nil {
+		s.roomStats[normalizedRoom] = &RoomStat{
+			MessageCount: 0,
+			LastActive:   time.Now().Unix(),
+			DeviceIDs:    make(map[string]bool),
+		}
+	}
 
-    stat := s.roomStats[normalizedRoom]
-    if messageCount > 0 {
-        stat.MessageCount += messageCount
-    }
-    stat.LastActive = time.Now().Unix()
+	stat := s.roomStats[normalizedRoom]
+	if messageCount > 0 {
+		stat.MessageCount += messageCount
+	}
+	stat.LastActive = time.Now().Unix()
 }
 
 // updateRoomDeviceCount 更新房间设备数量
 func (s *ClipboardServer) updateRoomDeviceCount(room string, deviceID string, connected bool) {
-    if !s.config.Server.RoomList {
-        return
-    }
+	if !s.config.Server.RoomList {
+		return
+	}
 
-    // 统一房间名称
-    normalizedRoom := normalizeRoomName(room)
+	// 统一房间名称
+	normalizedRoom := normalizeRoomName(room)
 
-    s.roomStatsMutex.Lock()
-    defer s.roomStatsMutex.Unlock()
+	s.roomStatsMutex.Lock()
+	defer s.roomStatsMutex.Unlock()
 
-    if s.roomStats[normalizedRoom] == nil {
-        s.roomStats[normalizedRoom] = &RoomStat{
-            MessageCount: 0,
-            LastActive:   time.Now().Unix(),
-            DeviceIDs:    make(map[string]bool),
-        }
-    }
+	if s.roomStats[normalizedRoom] == nil {
+		s.roomStats[normalizedRoom] = &RoomStat{
+			MessageCount: 0,
+			LastActive:   time.Now().Unix(),
+			DeviceIDs:    make(map[string]bool),
+		}
+	}
 
-    stat := s.roomStats[normalizedRoom]
-    if connected {
-        stat.DeviceIDs[deviceID] = true
-    } else {
-        delete(stat.DeviceIDs, deviceID)
-    }
-    stat.LastActive = time.Now().Unix()
+	stat := s.roomStats[normalizedRoom]
+	if connected {
+		stat.DeviceIDs[deviceID] = true
+	} else {
+		delete(stat.DeviceIDs, deviceID)
+	}
+	stat.LastActive = time.Now().Unix()
 }
-
 
 // getRoomList 获取房间列表
 func (s *ClipboardServer) getRoomList() []RoomInfo {
-    if !s.config.Server.RoomList {
-        return []RoomInfo{}
-    }
+	if !s.config.Server.RoomList {
+		return []RoomInfo{}
+	}
 
-    // 第一步：快速收集当前连接信息
-    currentRooms := make(map[string]map[string]bool)
-    s.runMutex.Lock()
-    for conn, room := range s.room_ws {
-        if deviceID, ok := s.connDeviceIDMap[conn]; ok {
-            normalizedRoom := normalizeRoomName(room)
-            if currentRooms[normalizedRoom] == nil {
-                currentRooms[normalizedRoom] = make(map[string]bool)
-            }
-            currentRooms[normalizedRoom][deviceID] = true
-        }
-    }
-    s.runMutex.Unlock()
+	// 第一步：快速收集当前连接信息
+	currentRooms := make(map[string]map[string]bool)
+	s.runMutex.Lock()
+	for conn, room := range s.room_ws {
+		if deviceID, ok := s.connDeviceIDMap[conn]; ok {
+			normalizedRoom := normalizeRoomName(room)
+			if currentRooms[normalizedRoom] == nil {
+				currentRooms[normalizedRoom] = make(map[string]bool)
+			}
+			currentRooms[normalizedRoom][deviceID] = true
+		}
+	}
+	s.runMutex.Unlock()
 
-    // 第二步：快速收集消息信息
-    roomMessageCounts := make(map[string]int)
-    s.messageQueue.Lock()
-    for _, msg := range s.messageQueue.List {
-        normalizedRoom := normalizeRoomName(msg.Data.Room())
-        roomMessageCounts[normalizedRoom]++
-    }
-    s.messageQueue.Unlock()
+	// 第二步：快速收集消息信息
+	roomMessageCounts := make(map[string]int)
+	s.messageQueue.Lock()
+	for _, msg := range s.messageQueue.List {
+		normalizedRoom := normalizeRoomName(msg.Data.Room())
+		roomMessageCounts[normalizedRoom]++
+	}
+	s.messageQueue.Unlock()
 
-    // 第三步：快速收集房间统计信息
-    roomStatsSnapshot := make(map[string]RoomStat)
-    s.roomStatsMutex.RLock()
-    for room, stat := range s.roomStats {
-        // 创建副本，避免长时间持有锁
-        roomStatsSnapshot[room] = RoomStat{
-            MessageCount: stat.MessageCount,
-            LastActive:   stat.LastActive,
-            DeviceIDs:    make(map[string]bool),
-        }
-        // 复制 DeviceIDs
-        for deviceID, active := range stat.DeviceIDs {
-            roomStatsSnapshot[room].DeviceIDs[deviceID] = active
-        }
-    }
-    s.roomStatsMutex.RUnlock()
+	// 第三步：快速收集房间统计信息
+	roomStatsSnapshot := make(map[string]RoomStat)
+	s.roomStatsMutex.RLock()
+	for room, stat := range s.roomStats {
+		// 创建副本，避免长时间持有锁
+		roomStatsSnapshot[room] = RoomStat{
+			MessageCount: stat.MessageCount,
+			LastActive:   stat.LastActive,
+			DeviceIDs:    make(map[string]bool),
+		}
+		// 复制 DeviceIDs
+		for deviceID, active := range stat.DeviceIDs {
+			roomStatsSnapshot[room].DeviceIDs[deviceID] = active
+		}
+	}
+	s.roomStatsMutex.RUnlock()
 
-    // 第四步：在无锁状态下处理数据
-    allRooms := make(map[string]bool)
-    
-    // 添加有消息的房间
-    for room := range roomMessageCounts {
-        allRooms[room] = true
-    }
-    
-    // 添加有连接的房间
-    for room := range currentRooms {
-        allRooms[room] = true
-    }
-    
-    // 添加统计中的房间
-    for room := range roomStatsSnapshot {
-        allRooms[room] = true
-    }
+	// 第四步：在无锁状态下处理数据
+	allRooms := make(map[string]bool)
 
-    var roomList []RoomInfo
-    for room := range allRooms {
-        // 显示时转换：default 显示为空字符串
-        displayRoom := room
-        if room == "default" {
-            displayRoom = ""
-        }
+	// 添加有消息的房间
+	for room := range roomMessageCounts {
+		allRooms[room] = true
+	}
 
-        deviceCount := 0
-        if devices, ok := currentRooms[room]; ok {
-            deviceCount = len(devices)
-        }
+	// 添加有连接的房间
+	for room := range currentRooms {
+		allRooms[room] = true
+	}
 
-        messageCount := roomMessageCounts[room]
+	// 添加统计中的房间
+	for room := range roomStatsSnapshot {
+		allRooms[room] = true
+	}
 
-        var lastActive int64
-        if stat, ok := roomStatsSnapshot[room]; ok {
-            lastActive = stat.LastActive
-        }
+	var roomList []RoomInfo
+	for room := range allRooms {
+		// 显示时转换：default 显示为空字符串
+		displayRoom := room
+		if room == "default" {
+			displayRoom = ""
+		}
 
-        // 如果有活跃连接，更新最后活跃时间
-        if deviceCount > 0 {
-            lastActive = time.Now().Unix()
-        }
+		deviceCount := 0
+		if devices, ok := currentRooms[room]; ok {
+			deviceCount = len(devices)
+		}
 
-        roomInfo := RoomInfo{
-            Name:         displayRoom,
-            MessageCount: messageCount,
-            DeviceCount:  deviceCount,
-            LastActive:   lastActive,
-            IsActive:     deviceCount > 0,
-        }
+		messageCount := roomMessageCounts[room]
 
-        roomList = append(roomList, roomInfo)
-    }
+		var lastActive int64
+		if stat, ok := roomStatsSnapshot[room]; ok {
+			lastActive = stat.LastActive
+		}
 
-    // 排序：活跃房间优先，然后按最后活跃时间排序
-    for i := 0; i < len(roomList)-1; i++ {
-        for j := i + 1; j < len(roomList); j++ {
-            if roomList[i].IsActive != roomList[j].IsActive {
-                if roomList[j].IsActive {
-                    roomList[i], roomList[j] = roomList[j], roomList[i]
-                }
-            } else {
-                if roomList[i].LastActive < roomList[j].LastActive {
-                    roomList[i], roomList[j] = roomList[j], roomList[i]
-                }
-            }
-        }
-    }
+		// 如果有活跃连接，更新最后活跃时间
+		if deviceCount > 0 {
+			lastActive = time.Now().Unix()
+		}
 
-    return roomList
+		roomInfo := RoomInfo{
+			Name:         displayRoom,
+			MessageCount: messageCount,
+			DeviceCount:  deviceCount,
+			LastActive:   lastActive,
+			IsActive:     deviceCount > 0,
+		}
+
+		roomList = append(roomList, roomInfo)
+	}
+
+	// 排序：活跃房间优先，然后按最后活跃时间排序
+	for i := 0; i < len(roomList)-1; i++ {
+		for j := i + 1; j < len(roomList); j++ {
+			if roomList[i].IsActive != roomList[j].IsActive {
+				if roomList[j].IsActive {
+					roomList[i], roomList[j] = roomList[j], roomList[i]
+				}
+			} else {
+				if roomList[i].LastActive < roomList[j].LastActive {
+					roomList[i], roomList[j] = roomList[j], roomList[i]
+				}
+			}
+		}
+	}
+
+	return roomList
 }
 
 // handleRooms 处理房间列表请求
 func (s *ClipboardServer) handleRooms(w http.ResponseWriter, r *http.Request) {
-    // 添加 CORS 头
-    w.Header().Set("Access-Control-Allow-Origin", "*")
-    w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
-    w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	// 添加 CORS 头
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
-    // 处理预检请求
-    if r.Method == "OPTIONS" {
-        w.WriteHeader(http.StatusOK)
-        return
-    }
+	// 处理预检请求
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 
-    if r.Method != http.MethodGet {
-        http.Error(w, "仅允许 GET 请求", http.StatusMethodNotAllowed)
-        return
-    }
+	if r.Method != http.MethodGet {
+		http.Error(w, "仅允许 GET 请求", http.StatusMethodNotAllowed)
+		return
+	}
 
-    // 检查是否启用房间列表功能
-    if !s.config.Server.RoomList {
-        w.Header().Set("Content-Type", "application/json")
-        w.WriteHeader(http.StatusForbidden)
-        json.NewEncoder(w).Encode(map[string]string{
-            "error":   "Forbidden",
-            "message": "房间列表功能未启用",
-        })
-        return
-    }
+	// 检查是否启用房间列表功能
+	if !s.config.Server.RoomList {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error":   "Forbidden",
+			"message": "房间列表功能未启用",
+		})
+		return
+	}
 
-    s.logger.Printf("处理房间列表请求，来自: %s", get_remote_ip(r))
+	s.logger.Printf("处理房间列表请求，来自: %s", get_remote_ip(r))
 
-    roomList := s.getRoomList()
-    
-    response := RoomListResponse{
-        Rooms: roomList,
-    }
+	roomList := s.getRoomList()
 
-    w.Header().Set("Content-Type", "application/json")
-    if err := json.NewEncoder(w).Encode(response); err != nil {
-        s.logger.Printf("错误: 编码房间列表响应失败: %v", err)
-        http.Error(w, "编码响应失败", http.StatusInternalServerError)
-        return
-    }
+	response := RoomListResponse{
+		Rooms: roomList,
+	}
 
-    s.logger.Printf("返回房间列表，包含 %d 个房间", len(roomList))
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		s.logger.Printf("错误: 编码房间列表响应失败: %v", err)
+		http.Error(w, "编码响应失败", http.StatusInternalServerError)
+		return
+	}
+
+	s.logger.Printf("返回房间列表，包含 %d 个房间", len(roomList))
 }
 
 // startRoomCleanup 启动房间清理任务
 func (s *ClipboardServer) startRoomCleanup() {
-    if s.config.Server.RoomCleanup <= 0 {
-        s.logger.Println("房间清理间隔设置为0或负数，不启动房间清理任务")
-        return
-    }
+	if s.config.Server.RoomCleanup <= 0 {
+		s.logger.Println("房间清理间隔设置为0或负数，不启动房间清理任务")
+		return
+	}
 
-    interval := time.Duration(s.config.Server.RoomCleanup) * time.Second
-    s.roomCleanupTicker = time.NewTicker(interval)
-    s.logger.Printf("房间清理任务已启动，清理间隔: %v", interval)
+	interval := time.Duration(s.config.Server.RoomCleanup) * time.Second
+	s.roomCleanupTicker = time.NewTicker(interval)
+	s.logger.Printf("房间清理任务已启动，清理间隔: %v", interval)
 
-    go func() {
-        for range s.roomCleanupTicker.C {
-            s.cleanupEmptyRooms()
-        }
-    }()
+	go func() {
+		for range s.roomCleanupTicker.C {
+			s.cleanupEmptyRooms()
+		}
+	}()
 }
 
 // stopRoomCleanup 停止房间清理任务
 func (s *ClipboardServer) stopRoomCleanup() {
-    if s.roomCleanupTicker != nil {
-        s.roomCleanupTicker.Stop()
-        s.roomCleanupTicker = nil
-        s.logger.Println("房间清理任务已停止")
-    }
+	if s.roomCleanupTicker != nil {
+		s.roomCleanupTicker.Stop()
+		s.roomCleanupTicker = nil
+		s.logger.Println("房间清理任务已停止")
+	}
 }
 
 // cleanupEmptyRooms 清理空房间
 func (s *ClipboardServer) cleanupEmptyRooms() {
-    if !s.config.Server.RoomList {
-        return
-    }
+	if !s.config.Server.RoomList {
+		return
+	}
 
-    s.logger.Println("开始清理空房间...")
+	s.logger.Println("开始清理空房间...")
 
-    // 第一步：快速收集活跃房间信息
-    activeRooms := make(map[string]bool)
-    s.runMutex.Lock()
-    for _, room := range s.room_ws {
-        normalizedRoom := normalizeRoomName(room)
-        activeRooms[normalizedRoom] = true
-    }
-    s.runMutex.Unlock()
+	// 第一步：快速收集活跃房间信息
+	activeRooms := make(map[string]bool)
+	s.runMutex.Lock()
+	for _, room := range s.room_ws {
+		normalizedRoom := normalizeRoomName(room)
+		activeRooms[normalizedRoom] = true
+	}
+	s.runMutex.Unlock()
 
-    // 第二步：快速收集有消息的房间
-    roomsWithMessages := make(map[string]bool)
-    s.messageQueue.Lock()
-    for _, msg := range s.messageQueue.List {
-        normalizedRoom := normalizeRoomName(msg.Data.Room())
-        roomsWithMessages[normalizedRoom] = true
-    }
-    s.messageQueue.Unlock()
+	// 第二步：快速收集有消息的房间
+	roomsWithMessages := make(map[string]bool)
+	s.messageQueue.Lock()
+	for _, msg := range s.messageQueue.List {
+		normalizedRoom := normalizeRoomName(msg.Data.Room())
+		roomsWithMessages[normalizedRoom] = true
+	}
+	s.messageQueue.Unlock()
 
-    // 第三步：确定要删除的房间
-    var roomsToDelete []string
-    currentTime := time.Now().Unix()
-    
-    s.roomStatsMutex.Lock()
-    for room, stat := range s.roomStats {
-        hasConnections := activeRooms[room]
-        hasMessages := roomsWithMessages[room]
-        
-        // 不要删除默认房间的统计
-        if room == "default" {
-            continue
-        }
-        
-        if !hasConnections && !hasMessages {
-            timeSinceLastActive := currentTime - stat.LastActive
-            if timeSinceLastActive > int64(s.config.Server.RoomCleanup) {
-                roomsToDelete = append(roomsToDelete, room)
-            }
-        }
-    }
+	// 第三步：确定要删除的房间
+	var roomsToDelete []string
+	currentTime := time.Now().Unix()
 
-    // 第四步：删除房间统计
-    for _, room := range roomsToDelete {
-        delete(s.roomStats, room)
-        s.logger.Printf("已清理空房间统计: %s", room)
-    }
-    s.roomStatsMutex.Unlock()
+	s.roomStatsMutex.Lock()
+	for room, stat := range s.roomStats {
+		hasConnections := activeRooms[room]
+		hasMessages := roomsWithMessages[room]
 
-    if len(roomsToDelete) > 0 {
-        s.logger.Printf("房间清理完成，共清理 %d 个空房间", len(roomsToDelete))
-    } else {
-        s.logger.Println("房间清理完成，没有发现需要清理的空房间")
-    }
+		// 不要删除默认房间的统计
+		if room == "default" {
+			continue
+		}
+
+		if !hasConnections && !hasMessages {
+			timeSinceLastActive := currentTime - stat.LastActive
+			if timeSinceLastActive > int64(s.config.Server.RoomCleanup) {
+				roomsToDelete = append(roomsToDelete, room)
+			}
+		}
+	}
+
+	// 第四步：删除房间统计
+	for _, room := range roomsToDelete {
+		delete(s.roomStats, room)
+		s.logger.Printf("已清理空房间统计: %s", room)
+	}
+	s.roomStatsMutex.Unlock()
+
+	if len(roomsToDelete) > 0 {
+		s.logger.Printf("房间清理完成，共清理 %d 个空房间", len(roomsToDelete))
+	} else {
+		s.logger.Println("房间清理完成，没有发现需要清理的空房间")
+	}
 }
 
 // normalizeRoomName 统一房间名称处理
 // 空字符串和"default"都转换为"default"，其他保持不变
 func normalizeRoomName(room string) string {
-    if room == "" {
-        return "default"
-    }
-    return room
+	if room == "" {
+		return "default"
+	}
+	return room
 }
