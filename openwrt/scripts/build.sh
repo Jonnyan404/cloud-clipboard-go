@@ -87,7 +87,7 @@ build() {
     
     echo "构建 $ARCH_NAME 架构..."
     
-    BUILD_CMD="GOOS=$GOOS GOARCH=$GOARCH"
+    BUILD_CMD="CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH"
     [ -n "$ARM" ] && BUILD_CMD="$BUILD_CMD GOARM=$ARM"
     [ -n "$MIPS" ] && BUILD_CMD="$BUILD_CMD GOMIPS=$MIPS"
     
