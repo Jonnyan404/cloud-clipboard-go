@@ -121,6 +121,7 @@ brew services restart cloud-clipboard-go
 ### Run on OpenWrt
 
 ✅ Tested on OpenWrt 24.10.0
+✅ Tested on istore 22.03.x
 
 Check your architecture with: `opkg print-architecture` (the second column of the last line)
 
