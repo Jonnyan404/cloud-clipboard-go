@@ -141,6 +141,7 @@ brew services restart cloud-clipboard-go
 
 
 ✅ OpenWrt 24.10.0 测试通过
+✅ istore 22.03.x 测试通过
 
 查看所属架构命令: `opkg print-architecture` (最后一行第二列就是)
 
