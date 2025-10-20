@@ -20,14 +20,46 @@ start_service() {
     config_get host main host "0.0.0.0"
     config_get port main port "9501"
     config_get auth main auth ""
-    config_get config main config ""
+    config_get config main config "/etc/cloud-clipboard/config.json"
 
+    # 创建必要的目录结构
+    mkdir -p /etc/cloud-clipboard/data
+    mkdir -p /etc/cloud-clipboard/data/upload
     mkdir -p /tmp/cloud-clipboard
+
+    # 如果配置文件不存在，创建默认配置
+    if [ ! -f "$config" ]; then
+        cat > "$config" <<EOF
+{
+    "server": {
+        "host": "",
+        "port": 9501,
+        "prefix": "",
+        "history": 100,
+        "historyFile": "/etc/cloud-clipboard/data/history.json",
+        "storageDir": "/etc/cloud-clipboard/data/upload",
+        "auth": false,
+        "roomList": false,
+        "roomCleanup": 3600
+    },
+    "text": {
+        "limit": 4096
+    },
+    "file": {
+        "expire": 3600,
+        "chunk": 2097152,
+        "limit": 268435456
+    }
+}
+EOF
+        log "已创建默认配置文件: $config"
+    fi
+
     touch "$LOG_FILE"
     chmod 666 "$LOG_FILE"
 
     procd_open_instance
-    procd_set_param command  $PROG -host "$host" -port "$port" -auth "$auth" -config "$config"
+    procd_set_param command $PROG -host "$host" -port "$port" -auth "$auth" -config "$config"
     
     procd_set_param stdout 1
     procd_set_param stderr 1
@@ -35,7 +67,7 @@ start_service() {
     
     procd_close_instance
     
-    echo "$(date): Cloud Clipboard started on $host:$port" >> "$LOG_FILE"
+    echo "$(date): Cloud Clipboard started on $host:$port with config $config" >> "$LOG_FILE"
 }
 
 service_triggers() {
