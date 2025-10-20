@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"log"
 	"os"
-	// "github.com/sanity-io/litter"
 )
 
 type Config struct {
@@ -75,6 +74,16 @@ func load_config(configPath string) (*Config, error) {
 }
 
 func defaultConfig() *Config {
+	// 检测是否在 OpenWrt 环境中运行
+	historyFile := "history.json"
+	storageDir := "./uploads"
+
+	// 如果配置文件路径包含 /etc/cloud-clipboard，则认为是 OpenWrt 环境
+	if isOpenWrtEnv() {
+		historyFile = "/etc/cloud-clipboard/data/history.json"
+		storageDir = "/etc/cloud-clipboard/data/upload"
+	}
+
 	return &Config{
 		Server: struct {
 			Host        interface{} `json:"host"`
@@ -93,13 +102,13 @@ func defaultConfig() *Config {
 			Port:        9501,
 			Prefix:      "",
 			History:     100,
-			HistoryFile: "history.json",
-			StorageDir:  "./uploads",
+			HistoryFile: historyFile,
+			StorageDir:  storageDir,
 			Auth:        false,
 			Cert:        "",
 			Key:         "",
-			RoomList:    false,       // 默认关闭房间列表功能
-			RoomCleanup: 3600,        // 默认1小时清理一次空房间
+			RoomList:    false, // 默认关闭房间列表功能
+			RoomCleanup: 3600,  // 默认1小时清理一次空房间
 		},
 		Text: struct {
 			Limit int `json:"limit"`
@@ -116,4 +125,24 @@ func defaultConfig() *Config {
 			Limit:  256 * _MB,
 		},
 	}
+}
+
+// 检测是否在 OpenWrt 环境
+func isOpenWrtEnv() bool {
+	// 方法1: 检查特定文件是否存在
+	if _, err := os.Stat("/etc/openwrt_release"); err == nil {
+		return true
+	}
+
+	// 方法2: 检查环境变量
+	if os.Getenv("OPENWRT_ENV") == "1" {
+		return true
+	}
+
+	// 方法3: 检查是否从标准路径启动
+	if _, err := os.Stat("/etc/config/cloud-clipboard"); err == nil {
+		return true
+	}
+
+	return false
 }
