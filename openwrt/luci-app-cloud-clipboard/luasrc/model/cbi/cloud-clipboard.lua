@@ -1,7 +1,7 @@
 local m, s, o
 
 m = Map("cloud-clipboard", translate("Cloud Clipboard"), 
-    translate("Cloud Clipboard是一个文本和文件传输工具，可在多个设备之间共享剪贴板内容。"))
+    translate("Cloud Clipboard是一个文本和文件传输工具,可在多个设备之间共享剪贴板内容。"))
 
 s = m:section(TypedSection, "cloud-clipboard", translate("基本设置"))
 s.anonymous = true
@@ -22,13 +22,13 @@ o.rmempty = false
 o = s:option(Value, "auth", translate("访问密码"))
 o.password = true
 o.rmempty = true
-o.description = translate("如果设置，访问时需要输入此密码。留空表示不需要密码。")
+o.description = translate("如果设置,访问时需要输入此密码。留空表示不需要密码。")
 
 -- 添加配置文件路径设置
 o = s:option(Value, "config", translate("配置文件路径"))
-o.default = ""
-o.rmempty = true
-o.description = translate("高级选项：自定义配置文件路径。留空表示使用默认路径。") .. 
+o.default = "/etc/cloud-clipboard/config.json"
+o.rmempty = false
+o.description = translate("高级选项：配置文件路径。") .. 
                 ' <a href="' .. 
                 luci.dispatcher.build_url("admin", "services", "cloud-clipboard", "config") .. 
                 '" class="cbi-button cbi-button-apply">' .. translate("编辑配置文件") .. '</a>'

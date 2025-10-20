@@ -46,12 +46,20 @@ func NewClipboardServer(cfg *Config) (*ClipboardServer, error) {
 	if cfg.Server.StorageDir != "" {
 		storageFolder = cfg.Server.StorageDir
 	}
+
+	// 转换为绝对路径用于日志显示
+	absStorageFolder, err := filepath.Abs(storageFolder)
+	if err != nil {
+		logger.Printf("警告: 无法获取存储目录的绝对路径: %v，使用原始路径: %s", err, storageFolder)
+		absStorageFolder = storageFolder
+	}
+
 	if err := os.MkdirAll(storageFolder, 0755); err != nil {
-		logger.Printf("无法创建存储目录 %s: %v", storageFolder, err)
+		logger.Printf("无法创建存储目录 %s: %v", absStorageFolder, err)
 		// 根据需求，这里可以是致命错误
-		// return nil, fmt.Errorf("无法创建存储目录 %s: %w", storageFolder, err)
+		// return nil, fmt.Errorf("无法创建存储目录 %s: %w", absStorageFolder, err)
 	} else {
-		logger.Printf("存储目录设置为: %s", storageFolder)
+		logger.Printf("存储目录设置为: %s", absStorageFolder)
 	}
 
 	historyFilePath := filepath.Join(storageFolder, "history.json")
@@ -61,7 +69,14 @@ func NewClipboardServer(cfg *Config) (*ClipboardServer, error) {
 		cfg.Server.HistoryFile = historyFilePath // 更新配置对象中的路径
 		logger.Printf("历史文件路径未指定，使用默认: %s", historyFilePath)
 	}
-	logger.Printf("历史文件路径设置为: %s", historyFilePath)
+
+	// 转换为绝对路径用于日志显示
+	absHistoryFilePath, err := filepath.Abs(historyFilePath)
+	if err != nil {
+		logger.Printf("警告: 无法获取历史文件的绝对路径: %v，使用原始路径: %s", err, historyFilePath)
+		absHistoryFilePath = historyFilePath
+	}
+	logger.Printf("历史文件路径设置为: %s", absHistoryFilePath)
 
 	mqHistoryLen := 100 // 默认历史长度
 	if cfg.Server.History > 0 {
@@ -361,8 +376,19 @@ func (s *ClipboardServer) Start() error {
 	}
 
 	s.logger.Printf("===== Cloud Clipboard Server %s =====", server_version)
-	s.logger.Printf("存储目录: %s", s.storageFolder)
-	s.logger.Printf("历史文件: %s", s.historyFilePath)
+
+	// 显示绝对路径
+	absStorageFolder, err1 := filepath.Abs(s.storageFolder)
+	if err1 != nil {
+		absStorageFolder = s.storageFolder
+	}
+	s.logger.Printf("存储目录: %s", absStorageFolder)
+
+	absHistoryFilePath, err2 := filepath.Abs(s.historyFilePath)
+	if err2 != nil {
+		absHistoryFilePath = s.historyFilePath
+	}
+	s.logger.Printf("历史文件: %s", absHistoryFilePath)
 
 	// 显示所有将要监听的地址
 	s.logger.Printf("将监听以下地址: %v", hostList)
