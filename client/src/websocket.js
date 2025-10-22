@@ -38,6 +38,14 @@ export default {
                     if (index === -1) return;
                     this.$root.device.splice(index, 1);
                 },
+                update: data => {
+                    // 处理文本消息更新事件
+                    let index = this.$root.received.findIndex(e => e.id === data.id);
+                    if (index !== -1) {
+                        // 更新消息内容，保留其他属性
+                        this.$root.received.splice(index, 1, { ...this.$root.received[index], ...data });
+                    }
+                },
                 forbidden: () => {
                     this.authCode = '';
                     localStorage.removeItem('auth');
