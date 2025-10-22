@@ -6,11 +6,13 @@ package lib
 **/
 
 import (
-	"encoding/json"
 	"bytes"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"net"
+	"net/http"
 
 	"image"
 	"image/jpeg"
@@ -293,4 +295,44 @@ func (r *ReceiveHolder) SenderDevice() map[string]string {
 		return r.FileReceive.SenderDevice
 	}
 	return nil
+}
+
+// parse_user_agent 现在使用 s.parser
+func (s *ClipboardServer) parse_user_agent(uaString string) map[string]string {
+	client := s.parser.Parse(uaString) // 使用实例化的解析器
+	return map[string]string{
+		"type":    client.Device.Family,
+		"os":      fmt.Sprintf("%s %s", client.Os.Family, client.Os.Major),
+		"browser": fmt.Sprintf("%s %s", client.UserAgent.Family, client.UserAgent.Major),
+	}
+}
+
+// get_remote_ip(r *http.Request) (保持不变)
+func get_remote_ip(r *http.Request) string {
+	ip := r.Header.Get("X-Forwarded-For")
+	if ip == "" {
+		ip = r.Header.Get("X-Real-IP")
+	}
+	if ip == "" {
+		remoteAddr := r.RemoteAddr
+		host, _, err := net.SplitHostPort(remoteAddr)
+		if err == nil {
+			ip = host
+		} else {
+			ip = remoteAddr
+		}
+	}
+	ips := strings.Split(ip, ",")
+	if len(ips) > 0 {
+		ip = strings.TrimSpace(ips[0])
+	}
+	return ip
+}
+
+// getScheme (保持不变)
+func getScheme(r *http.Request) string {
+	if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
+		return "https"
+	}
+	return "http"
 }
