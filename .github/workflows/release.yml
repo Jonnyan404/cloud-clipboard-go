@@ -66,7 +66,7 @@ jobs:
         with:
           distribution: goreleaser
           version: '~> v2'
-          args: release --clean --skip-publish
+          args: release --clean --skip=publish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
@@ -125,8 +125,22 @@ jobs:
             -Psigning.store.file=app/my-release-key.keystore \
             -Psigning.store.password=${{ secrets.SIGNING_KEY_STORE_PASSWORD }} \
             --stacktrace
-      - name: Rename APK
-        run: mv android/app/build/outputs/apk/release/app-${{ matrix.arch }}-release.apk cloud-clipboard-go-${{ github.ref_name }}-${{ matrix.arch }}.apk
+
+      - name: List build outputs for debugging
+        run: |
+          echo "Listing contents of android/app/build/outputs/apk/ ..."
+          ls -R android/app/build/outputs/apk/
+
+      - name: Find and Rename APK
+        run: |
+          APK_PATH=$(find android/app/build/outputs/apk -type f -name "app-${{ matrix.arch }}-release.apk")
+          if [ -z "$APK_PATH" ]; then
+            echo "::error::APK file not found!"
+            exit 1
+          fi
+          echo "Found APK at: $APK_PATH"
+          mv "$APK_PATH" "cloud-clipboard-go-${{ github.ref_name }}-${{ matrix.arch }}.apk"
+
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
