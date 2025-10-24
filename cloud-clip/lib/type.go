@@ -74,9 +74,9 @@ type ClipboardServer struct {
 	deviceHashSeed  uint32           // 将 deviceHashSeed 添加到服务器实例
 
 	// 添加房间管理相关字段
-	roomStats       map[string]*RoomStat `json:"-"` // 房间统计信息，不序列化
-	roomStatsMutex  sync.RWMutex         `json:"-"` // 房间统计读写锁
-	roomCleanupTicker *time.Ticker       `json:"-"` // 房间清理定时器
+	roomStats         map[string]*RoomStat `json:"-"` // 房间统计信息，不序列化
+	roomStatsMutex    sync.RWMutex         `json:"-"` // 房间统计读写锁
+	roomCleanupTicker *time.Ticker         `json:"-"` // 房间清理定时器
 }
 
 // file item in File[]
@@ -137,21 +137,21 @@ type ReceiveHolder struct {
 // 房间列表
 // RoomInfo 房间信息结构体
 type RoomInfo struct {
-    Name         string `json:"name"`         // 房间名称（空字符串表示公共房间）
-    MessageCount int    `json:"messageCount"` // 消息数量
-    DeviceCount  int    `json:"deviceCount"`  // 设备数量
-    LastActive   int64  `json:"lastActive"`   // 最后活跃时间（Unix时间戳）
-    IsActive     bool   `json:"isActive"`     // 是否活跃（有设备连接）
+	Name         string `json:"name"`         // 房间名称（空字符串表示公共房间）
+	MessageCount int    `json:"messageCount"` // 消息数量
+	DeviceCount  int    `json:"deviceCount"`  // 设备数量
+	LastActive   int64  `json:"lastActive"`   // 最后活跃时间（Unix时间戳）
+	IsActive     bool   `json:"isActive"`     // 是否活跃（有设备连接）
 }
 
 // RoomListResponse 房间列表响应结构体
 type RoomListResponse struct {
-    Rooms []RoomInfo `json:"rooms"`
+	Rooms []RoomInfo `json:"rooms"`
 }
 
 // RoomStat 房间统计信息（内部使用）
 type RoomStat struct {
-    MessageCount int                `json:"messageCount"`
-    LastActive   int64              `json:"lastActive"`
-    DeviceIDs    map[string]bool    `json:"-"` // 当前连接的设备ID集合
+	MessageCount int             `json:"messageCount"`
+	LastActive   int64           `json:"lastActive"`
+	DeviceIDs    map[string]bool `json:"-"` // 当前连接的设备ID集合
 }
