@@ -2,8 +2,8 @@ name: Build and Update Android Release
 
 on:
   # 1. 当一个 Release 被发布时触发
-  release:
-    types: [published]
+  # release:
+  #   types: [published]
   
   # 2. 允许手动触发，并要求输入一个目标 tag
   workflow_dispatch:
@@ -72,12 +72,21 @@ jobs:
           export PATH=$PATH:$(go env GOPATH)/bin
           gomobile init
 
+
+      # - name: List files for debugging
+      #   run: |
+      #     echo "--- Listing root directory contents: ---"
+      #     ls -la
+      #     echo "--- Listing android/ directory contents: ---"
+      #     ls -la android/ || echo "android/ directory not found."
+
       - name: Build Go AAR package for ${{ matrix.arch }}
         run: |
           export PATH=$PATH:$(go env GOPATH)/bin
           TARGET_ARCH=$([ "${{ matrix.arch }}" == "arm64-v8a" ] && echo "android/arm64" || echo "android/arm")
           cd cloud-clip/mobile
           gomobile bind -v -tags embed -androidapi 24 -o cloudclipservice.aar -target=$TARGET_ARCH -ldflags="-s -w" github.com/jonnyan404/cloud-clipboard-go/cloud-clip/mobile
+          mkdir -p ../../android/app/libs
           cp cloudclipservice.aar ../../android/app/libs/
 
       - name: Setup Gradle
@@ -85,13 +94,6 @@ jobs:
 
       - name: Decode Signing Key
         run: echo "${{ secrets.SIGNING_KEY_STORE_BASE64 }}" | base64 --decode > $GITHUB_WORKSPACE/android/app/my-release-key.keystore
-
-      - name: List files for debugging
-        run: |
-          echo "--- Listing root directory contents: ---"
-          ls -la
-          echo "--- Listing android/ directory contents: ---"
-          ls -la android/ || echo "android/ directory not found."
 
       - name: Make gradlew executable
         run: chmod +x ./android/gradlew

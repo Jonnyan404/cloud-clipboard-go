@@ -1,100 +1,197 @@
-name: Release
+name: Unified Release
 
 on:
-  release: # 修改触发器为 release
-    types: [published] # 只在 Release 被发布时触发
+  release:
+    types: [published]
   workflow_dispatch:
-    inputs:
-      version:
-        description: '版本号 (例如: v1.0.0)'
-        required: true
-        default: 'v1.0'
-      also_latest:
-        description: '同时推送为latest标签'
-        type: boolean
-        required: true
-        default: true
 
 permissions:
   contents: write
   packages: write
 
 jobs:
-  release:
+  # ====================================================================
+  # Job 1: Build Frontend Assets (只构建一次)
+  # ====================================================================
+  build-frontend:
+    name: Build Frontend Assets
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
-      - name: Setup Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: stable
-
+        uses: actions/checkout@v4
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: client/package.json
+      - name: Build frontend static assets
+        run: |
+          cd client
+          npm install
+          npm run build
+      - name: Upload frontend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: client/dist
 
-      - name: Release
-        uses: goreleaser/goreleaser-action@v4
+  # ====================================================================
+  # Job 2: Build Desktop Binaries using GoReleaser
+  # ====================================================================
+  build-desktop:
+    name: Build Desktop Binaries
+    runs-on: ubuntu-latest
+    needs: build-frontend # 等待前端构建完成
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - name: Download frontend artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: client/dist
+      - name: Prepare Go embed directory
+        run: |
+          mkdir -p cloud-clip/static
+          cp -r client/dist/* cloud-clip/static/
+      - name: Run GoReleaser (build only)
+        uses: goreleaser/goreleaser-action@v5
         with:
           distribution: goreleaser
           version: latest
-          args: release --clean
+          args: release --clean --skip-publish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+      - name: Upload GoReleaser artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: goreleaser-dist
+          path: dist/*
 
-  docker:
+  # ====================================================================
+  # Job 3: Build Android APKs
+  # ====================================================================
+  build-apk:
+    name: Build Android APK (${{ matrix.arch }})
     runs-on: ubuntu-latest
-    needs: release
-    # 只在 release 发布时运行，或手动触发且选择推送时运行
-    if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch')
+    needs: build-frontend # 等待前端构建完成
+    strategy:
+      matrix:
+        arch: [arm64-v8a, armeabi-v7a]
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+      - name: Setup Go, JDK
+        uses: actions/setup-go@v5
+        with: { go-version: '1.22' }
+      - uses: actions/setup-java@v4
+        with: { java-version: '17', distribution: 'temurin' }
+      - name: Download frontend artifact
+        uses: actions/download-artifact@v4
         with:
-          fetch-depth: 0
+          name: frontend-dist
+          path: client/dist
+      - name: Prepare Go embed directory
+        run: |
+          mkdir -p cloud-clip/static
+          cp -r client/dist/* cloud-clip/static/
+      - name: Install gomobile and Build AAR
+        run: |
+          go install golang.org/x/mobile/cmd/gomobile@latest
+          export PATH=$PATH:$(go env GOPATH)/bin
+          gomobile init
+          TARGET_ARCH=$([ "${{ matrix.arch }}" == "arm64-v8a" ] && echo "android/arm64" || echo "android/arm")
+          cd cloud-clip/mobile
+          gomobile bind -v -tags embed -androidapi 24 -o cloudclipservice.aar -target=$TARGET_ARCH -ldflags="-s -w" github.com/jonnyan404/cloud-clipboard-go/cloud-clip/mobile
+          mkdir -p ../../android/app/libs
+          cp cloudclipservice.aar ../../android/app/libs/
+      - name: Decode Signing Key and Build APK
+        run: |
+          echo "${{ secrets.SIGNING_KEY_STORE_BASE64 }}" | base64 --decode > $GITHUB_WORKSPACE/android/app/my-release-key.keystore
+          chmod +x ./android/gradlew
+          cd android
+          ./gradlew assembleRelease \
+            -PabiFilters=${{ matrix.arch }} \
+            -Psigning.key.alias=${{ secrets.SIGNING_KEY_ALIAS }} \
+            -Psigning.key.password=${{ secrets.SIGNING_KEY_PASSWORD }} \
+            -Psigning.store.file=app/my-release-key.keystore \
+            -Psigning.store.password=${{ secrets.SIGNING_KEY_STORE_PASSWORD }} \
+            --stacktrace
+      - name: Rename APK
+        run: mv android/app/build/outputs/apk/release/app-release.apk cloud-clipboard-go-${{ github.ref_name }}-${{ matrix.arch }}.apk
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk-artifacts
+          path: cloud-clipboard-go-${{ github.ref_name }}-${{ matrix.arch }}.apk
 
-      - name: Docker meta (Debian)
-        id: meta-debian
+  # ====================================================================
+  # Job 4: Create Release and Upload All Assets
+  # ====================================================================
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [build-desktop, build-apk]
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Create Release and Upload Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/goreleaser-dist/*
+            artifacts/apk-artifacts/*
+          body_path: "artifacts/goreleaser-dist/release-notes.md"
+
+  # ====================================================================
+  # Job 5: Build and Push Docker Images
+  # ====================================================================
+  docker:
+    name: Build and Push Docker
+    runs-on: ubuntu-latest
+    needs: release
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Docker meta
+        id: meta
         uses: docker/metadata-action@v5
         with:
           images: |
             ghcr.io/${{ github.repository }}
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ github.event.repository.name }}
           tags: |
-            type=raw,value=${{ github.event_name == 'release' && github.event.release.tag_name || github.event.inputs.version }}
-            type=raw,value=latest,enable=${{ github.event_name == 'release' || github.event.inputs.also_latest == 'true' }}
-
-      - name: Set up QEMU
+            type=raw,value=${{ github.ref_name }}
+            type=raw,value=latest,enable={{is_default_branch}}
+      - name: Set up QEMU and Docker Buildx
         uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to GitHub Container Registry
+      - uses: docker/setup-buildx-action@v3
+      - name: Login to Registries
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
+      - uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Build and push (Debian)
+      - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           file: cloud-clip/Dockerfile
           push: true
           platforms: linux/amd64,linux/arm64,linux/arm/v7
-          tags: ${{ steps.meta-debian.outputs.tags }}
-          labels: ${{ steps.meta-debian.outputs.labels }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
