@@ -108,7 +108,7 @@ jobs:
           go install golang.org/x/mobile/cmd/gomobile@latest
           export PATH=$PATH:$(go env GOPATH)/bin
           gomobile init
-          TARGET_ARCH=$([ "${{ matrix.arch }}" == "arm64-v8a" ] && echo "android/arm64" || echo "android/arm")
+          TARGET_ARCH=$([ "${{ matrix.arch }}" == "arm64-v8a" ]&&echo "android/arm64"||echo "android/arm")
           cd cloud-clip/mobile
           gomobile bind -v -tags embed -androidapi 24 -o cloudclipservice.aar -target=$TARGET_ARCH -ldflags="-s -w" github.com/jonnyan404/cloud-clipboard-go/cloud-clip/mobile
           mkdir -p ../../android/app/libs
@@ -126,7 +126,7 @@ jobs:
             -Psigning.store.password=${{ secrets.SIGNING_KEY_STORE_PASSWORD }} \
             --stacktrace
       - name: Rename APK
-        run: mv android/app/build/outputs/apk/release/app-release.apk cloud-clipboard-go-${{ github.ref_name }}-${{ matrix.arch }}.apk
+        run: mv android/app/build/outputs/apk/release/app-${{ matrix.arch }}-release.apk cloud-clipboard-go-${{ github.ref_name }}-${{ matrix.arch }}.apk
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
