@@ -35,6 +35,10 @@
 
 这里是 go 版服务端
 
+### 使用安卓设备运行
+
+去项目 [release](https://github.com/Jonnyan404/cloud-clipboard-go/releases) 下载对应平台APK运行即可
+
 ### 使用 cloudflare workers+pages+D1+R2 运行
 
 > 不支持Android快捷指令;

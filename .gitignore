@@ -13,3 +13,4 @@ cloudflare/workers/.wrangler
 cloudflare/workers/node_modules
 cloudflare/pages/server*
 .kotlin/
+*.keystore
