@@ -1,16 +1,40 @@
-name: Build Android APK
+name: Build and Update Android Release
 
 on:
+  # 1. 当一个 Release 被发布时触发
+  release:
+    types: [published]
+  
+  # 2. 允许手动触发，并要求输入一个目标 tag
   workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'The existing tag to build for and update the release (e.g., v1.0.0)'
+        required: true
+        default: 'v4.5.26'
 
 jobs:
   build-apk:
-    name: Build Android APK
+    name: Build APK for ${{ matrix.arch }}
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [arm64-v8a, armeabi-v7a]
 
     steps:
-      - name: Checkout repository
+      - name: Determine Tag Name
+        id: get_tag
+        run: |
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "tag=${{ github.event.inputs.tag_name }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Checkout repository at the specified tag
         uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.get_tag.outputs.tag }}
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -48,34 +72,63 @@ jobs:
           export PATH=$PATH:$(go env GOPATH)/bin
           gomobile init
 
-      - name: Build Go AAR package
+      - name: Build Go AAR package for ${{ matrix.arch }}
         run: |
           export PATH=$PATH:$(go env GOPATH)/bin
+          TARGET_ARCH=$([ "${{ matrix.arch }}" == "arm64-v8a" ] && echo "android/arm64" || echo "android/arm")
           cd cloud-clip/mobile
-          gomobile bind -v -tags embed -androidapi 24 -o cloudclipservice.aar -target=android -ldflags="-s -w" github.com/jonnyan404/cloud-clipboard-go/cloud-clip/mobile
-          
-          # Copy AAR to Android project
+          gomobile bind -v -tags embed -androidapi 24 -o cloudclipservice.aar -target=$TARGET_ARCH -ldflags="-s -w" github.com/jonnyan404/cloud-clipboard-go/cloud-clip/mobile
           mkdir -p ../../android/app/libs
           cp cloudclipservice.aar ../../android/app/libs/
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
+      - name: Decode Signing Key
+        run: echo "${{ secrets.SIGNING_KEY_STORE_BASE64 }}" | base64 --decode > $GITHUB_WORKSPACE/android/app/my-release-key.keystore
+
       - name: Make gradlew executable
         run: chmod +x ./android/gradlew
 
-      - name: Build Android APK (Debug)
+      - name: Build Android Release APK
         run: |
           cd android
-          ./gradlew assembleDebug --stacktrace
+          ./gradlew assembleRelease \
+            -PabiFilters=${{ matrix.arch }} \
+            -Psigning.key.alias=${{ secrets.SIGNING_KEY_ALIAS }} \
+            -Psigning.key.password=${{ secrets.SIGNING_KEY_PASSWORD }} \
+            -Psigning.store.file=app/my-release-key.keystore \
+            -Psigning.store.password=${{ secrets.SIGNING_KEY_STORE_PASSWORD }} \
+            --stacktrace
+      
+      - name: Rename APK
+        run: |
+          mv android/app/build/outputs/apk/release/app-release.apk cloud-clipboard-go-${{ steps.get_tag.outputs.tag }}-${{ matrix.arch }}.apk
 
-      - name: Get short commit SHA for artifact name
-        id: vars
-        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-
-      - name: Upload APK artifact
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: cloud-clipboard-go-debug-${{ steps.vars.outputs.sha_short }}
-          path: android/app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
+          name: apk-artifacts
+          path: cloud-clipboard-go-${{ steps.get_tag.outputs.tag }}-${{ matrix.arch }}.apk
+
+  # 单独的 job 用于更新 Release
+  update-release:
+    name: Update GitHub Release
+    needs: build-apk
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download all APK artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: apk-artifacts
+          path: apks
+
+      - name: Update Release with APKs
+        uses: softprops/action-gh-release@v2
+        with:
+          # 查找所有下载的 APK 文件并上传
+          files: apks/*.apk
+          # 关键：设置为 true 以更新现有 Release，而不是创建新的
+          prerelease: false
+          draft: false
