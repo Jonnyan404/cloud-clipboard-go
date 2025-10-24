@@ -42,7 +42,7 @@ jobs:
   build-desktop:
     name: Build Desktop Binaries
     runs-on: ubuntu-latest
-    needs: build-frontend # 等待前端构建完成
+    needs: build-frontend
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -52,15 +52,22 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.22'
-      - name: Download frontend artifact
-        uses: actions/download-artifact@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          name: frontend-dist
-          path: client/dist
-      - name: Prepare Go embed directory
-        run: |
-          mkdir -p cloud-clip/static
-          cp -r client/dist/* cloud-clip/static/
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: client/package.json
+      # - name: Download frontend artifact
+      #   uses: actions/download-artifact@v4
+      #   with:
+      #     name: frontend-dist
+      #     path: client/dist
+      # - name: Prepare Go embed directory
+      #   run: |
+      #     mkdir -p cloud-clip/static
+      #     cp -r client/dist/* cloud-clip/static/
       - name: Run GoReleaser (build only)
         uses: goreleaser/goreleaser-action@v5
         with:
@@ -77,12 +84,12 @@ jobs:
           path: dist/*
 
   # ====================================================================
-  # Job 3: Build Android APKs
+  # Job 3: Build Per-Architecture Android APKs
   # ====================================================================
   build-apk:
     name: Build Android APK (${{ matrix.arch }})
     runs-on: ubuntu-latest
-    needs: build-frontend # 等待前端构建完成
+    needs: build-frontend
     strategy:
       matrix:
         arch: [arm64-v8a, armeabi-v7a]
@@ -134,26 +141,79 @@ jobs:
       - name: Find and Rename APK
         run: |
           APK_PATH=$(find android/app/build/outputs/apk -type f -name "app-${{ matrix.arch }}-release.apk")
-          if [ -z "$APK_PATH" ]; then
-            echo "::error::APK file not found!"
-            exit 1
-          fi
+          if [ -z "$APK_PATH" ]; then echo "::error::Per-arch APK file not found!" && exit 1; fi
           echo "Found APK at: $APK_PATH"
           mv "$APK_PATH" "cloud-clipboard-go-${{ github.ref_name }}-${{ matrix.arch }}.apk"
-
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: apk-artifacts
+          name: apk-per-arch-artifacts
           path: cloud-clipboard-go-${{ github.ref_name }}-${{ matrix.arch }}.apk
 
   # ====================================================================
-  # Job 4: Create Release and Upload All Assets
+  # Job 4: Build Universal Android APK (新添加的 Job)
+  # ====================================================================
+  build-universal-apk:
+    name: Build Universal Android APK
+    runs-on: ubuntu-latest
+    needs: build-frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Go, JDK
+        uses: actions/setup-go@v5
+        with: { go-version: '1.22' }
+      - uses: actions/setup-java@v4
+        with: { java-version: '17', distribution: 'temurin' }
+      - name: Download frontend artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: client/dist
+      - name: Prepare Go embed directory
+        run: |
+          mkdir -p cloud-clip/static
+          cp -r client/dist/* cloud-clip/static/
+      - name: Install gomobile and Build AAR (for arm64)
+        run: |
+          go install golang.org/x/mobile/cmd/gomobile@latest
+          export PATH=$PATH:$(go env GOPATH)/bin
+          gomobile init
+          cd cloud-clip/mobile
+          gomobile bind -v -tags embed -androidapi 24 -o cloudclipservice.aar -target=android/arm64 -ldflags="-s -w" github.com/jonnyan404/cloud-clipboard-go/cloud-clip/mobile
+          mkdir -p ../../android/app/libs
+          cp cloudclipservice.aar ../../android/app/libs/
+      - name: Decode Signing Key and Build Universal APK
+        run: |
+          echo "${{ secrets.SIGNING_KEY_STORE_BASE64 }}" | base64 --decode > $GITHUB_WORKSPACE/android/app/my-release-key.keystore
+          chmod +x ./android/gradlew
+          cd android
+          # 注意：这里不传递 -PabiFilters 参数
+          ./gradlew assembleRelease \
+            -Psigning.key.alias=${{ secrets.SIGNING_KEY_ALIAS }} \
+            -Psigning.key.password=${{ secrets.SIGNING_KEY_PASSWORD }} \
+            -Psigning.store.file=app/my-release-key.keystore \
+            -Psigning.store.password=${{ secrets.SIGNING_KEY_STORE_PASSWORD }} \
+            --stacktrace
+      - name: Find and Rename Universal APK
+        run: |
+          APK_PATH=$(find android/app/build/outputs/apk -type f -name "app-universal-release.apk")
+          if [ -z "$APK_PATH" ]; then echo "::error::Universal APK file not found!" && exit 1; fi
+          echo "Found Universal APK at: $APK_PATH"
+          mv "$APK_PATH" "cloud-clipboard-go-${{ github.ref_name }}-universal.apk"
+      - name: Upload Universal APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk-universal-artifact
+          path: cloud-clipboard-go-${{ github.ref_name }}-universal.apk
+
+  # ====================================================================
+  # Job 5: Create Release and Upload All Assets
   # ====================================================================
   release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: [build-desktop, build-apk]
+    needs: [build-desktop, build-apk, build-universal-apk] # 添加对新 Job 的依赖
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -164,11 +224,12 @@ jobs:
         with:
           files: |
             artifacts/goreleaser-dist/*
-            artifacts/apk-artifacts/*
+            artifacts/apk-per-arch-artifacts/*
+            artifacts/apk-universal-artifact/*
           body_path: "artifacts/goreleaser-dist/release-notes.md"
 
   # ====================================================================
-  # Job 5: Build and Push Docker Images
+  # Job 6: Build and Push Docker Images
   # ====================================================================
   docker:
     name: Build and Push Docker
