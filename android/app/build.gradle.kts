@@ -12,17 +12,18 @@ android {
     signingConfigs {
         create("release") {
             // 从命令行 (-P) 或 gradle.properties 文件读取签名信息
-            val storeFile = project.findProperty("signing.store.file")?.let { file(it) }
-            val storePassword = project.findProperty("signing.store.password") as String?
-            val keyAlias = project.findProperty("signing.key.alias") as String?
-            val keyPassword = project.findProperty("signing.key.password") as String?
+            val storeFileProp = project.findProperty("signing.store.file")?.let { file(it) }
+            val storePasswordProp = project.findProperty("signing.store.password") as String?
+            val keyAliasProp = project.findProperty("signing.key.alias") as String?
+            val keyPasswordProp = project.findProperty("signing.key.password") as String?
 
             // 仅当所有签名信息都存在时才配置签名
-            if (storeFile != null && storeFile.exists() && storePassword != null && keyAlias != null && keyPassword != null) {
-                storeFile(storeFile)
-                storePassword(storePassword)
-                keyAlias(keyAlias)
-                keyPassword(keyPassword)
+            if (storeFileProp != null && storeFileProp.exists() && storePasswordProp != null && keyAliasProp != null && keyPasswordProp != null) {
+                // 使用 Kotlin DSL 的赋值语法 (=)
+                storeFile = storeFileProp
+                storePassword = storePasswordProp
+                keyAlias = keyAliasProp
+                keyPassword = keyPasswordProp
             }
         }
     }
