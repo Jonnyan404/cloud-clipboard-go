@@ -87,6 +87,13 @@ jobs:
       - name: Decode Signing Key
         run: echo "${{ secrets.SIGNING_KEY_STORE_BASE64 }}" | base64 --decode > $GITHUB_WORKSPACE/android/app/my-release-key.keystore
 
+      - name: List files for debugging
+        run: |
+          echo "--- Listing root directory contents: ---"
+          ls -la
+          echo "--- Listing android/ directory contents: ---"
+          ls -la android/ || echo "android/ directory not found."
+
       - name: Make gradlew executable
         run: chmod +x ./android/gradlew
 
