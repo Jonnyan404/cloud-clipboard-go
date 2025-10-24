@@ -6,8 +6,8 @@
 /cloud-clip/history.json
 /cloud-clip/mobile/*.aar
 /cloud-clip/mobile/*.jar
-/Android/.idea/
-/Android/.gradle/
+/android/.idea/
+/android/.gradle/
 .vscode/
 cloudflare/workers/.wrangler
 cloudflare/workers/node_modules

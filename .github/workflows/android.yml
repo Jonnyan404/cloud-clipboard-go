@@ -78,7 +78,6 @@ jobs:
           TARGET_ARCH=$([ "${{ matrix.arch }}" == "arm64-v8a" ] && echo "android/arm64" || echo "android/arm")
           cd cloud-clip/mobile
           gomobile bind -v -tags embed -androidapi 24 -o cloudclipservice.aar -target=$TARGET_ARCH -ldflags="-s -w" github.com/jonnyan404/cloud-clipboard-go/cloud-clip/mobile
-          mkdir -p ../../android/app/libs
           cp cloudclipservice.aar ../../android/app/libs/
 
       - name: Setup Gradle
