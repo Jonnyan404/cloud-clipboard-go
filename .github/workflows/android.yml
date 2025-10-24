@@ -1,10 +1,6 @@
 name: Build Android APK
 
 on:
-#   push:
-#     branches: [ main ]
-#   pull_request:
-#     branches: [ main ]
   workflow_dispatch:
 
 jobs:
@@ -16,63 +12,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js for frontend build
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - name: Build frontend static assets
-        run: |
-          echo "Building frontend static assets..."
-          cd client
-          npm install
-          npm run build
-          cd ..
-          echo "Frontend build complete."
-          echo "Listing contents of client/dist:"
-          ls -Rla client/dist
-
-      - name: Prepare Go embed directory
-        run: |
-          echo "Preparing directory for Go embed..."
-          rm -rf cloud-clip/static
-          mkdir -p cloud-clip/static
-          cp -r client/dist/* cloud-clip/static/
-          echo "Frontend assets copied to cloud-clip/static."
-          echo "Listing contents of cloud-clip/static:"
-          ls -Rla cloud-clip/static
-
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: '1.22'
-
-      - name: Get short commit SHA for version
-        id: vars
-        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-
-      - name: Build Go executable for Android
-        run: |
-          echo "Building Go binary with version: ci-${{ steps.vars.outputs.sha_short }}"
-          cd cloud-clip
-          
-          echo "--- Listing contents of cloud-clip directory before Go build ---"
-          pwd
-          ls -Rla # 确认 cloud-clip/static 存在且有内容
-          echo "-------------------------------------------------------------"
-          
-          GOOS=android GOARCH=arm64 go build -v -trimpath -tags=embed \
-            -ldflags="-s -w -X main.server_version=ci-${{ steps.vars.outputs.sha_short }} -X main.useEmbeddedStr=true" \
-            -o cloudclip_android_arm64 .
-          
-          echo "Go binary compiled."
-          ls -l cloudclip_android_arm64
-
-          mkdir -p ../Android/app/src/main/assets/
-          mv cloudclip_android_arm64 ../Android/app/src/main/assets/
-          echo "Go binary moved to Android assets directory."
-          ls -l ../Android/app/src/main/assets/
-          cd ..
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -80,28 +23,59 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: Set up Node.js for frontend build
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: client/package-lock.json
+
+      - name: Build frontend static assets
+        run: |
+          cd client
+          npm install
+          npm run build
+
+      - name: Prepare Go embed directory
+        run: |
+          rm -rf cloud-clip/static
+          mkdir -p cloud-clip/static
+          cp -r client/dist/* cloud-clip/static/
+
+      - name: Install and initialize gomobile
+        run: |
+          go install golang.org/x/mobile/cmd/gomobile@latest
+          export PATH=$PATH:$(go env GOPATH)/bin
+          gomobile init
+
+      - name: Build Go AAR package
+        run: |
+          export PATH=$PATH:$(go env GOPATH)/bin
+          cd cloud-clip/mobile
+          gomobile bind -v -tags embed -androidapi 24 -o cloudclipservice.aar -target=android -ldflags="-s -w" github.com/jonnyan404/cloud-clipboard-go/cloud-clip/mobile
+          
+          # Copy AAR to Android project
+          mkdir -p ../../android/app/libs
+          cp cloudclipservice.aar ../../android/app/libs/
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
       - name: Make gradlew executable
-        run: chmod +x ./Android/gradlew
+        run: chmod +x ./android/gradlew
 
       - name: Build Android APK (Debug)
         run: |
-          cd Android
+          cd android
           ./gradlew assembleDebug --stacktrace
-          cd ..
 
-      - name: List generated APK files
-        run: |
-          echo "Listing files in Android/app/build/outputs/apk/debug/"
-          ls -R Android/app/build/outputs/apk/debug/
-          echo "Listing files in Android/app/build/outputs/apk/"
-          ls -R Android/app/build/outputs/apk/
+      - name: Get short commit SHA for artifact name
+        id: vars
+        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: cloud-clipboard-debug-apk
-          path: Android/app/build/outputs/apk/debug/app-debug.apk
+          name: cloud-clipboard-go-debug-${{ steps.vars.outputs.sha_short }}
+          path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error

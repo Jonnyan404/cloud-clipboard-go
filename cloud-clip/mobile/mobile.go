@@ -18,9 +18,9 @@ func NewService() *Service {
 
 // StartServer 启动云剪贴板服务器
 // 返回空字符串表示成功，否则返回错误信息
-func (s *Service) StartServer(host string, port int, authPassword string,
+func (s *Service) StartServer(configPath string, host string, port int, authPassword string,
 	storageDir string, historyFile string) string {
-	return s.service.StartServer(host, port, authPassword, storageDir, historyFile)
+	return s.service.StartServer(configPath, host, port, authPassword, storageDir, historyFile)
 }
 
 // StopServer 停止云剪贴板服务器
