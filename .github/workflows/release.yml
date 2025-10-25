@@ -92,7 +92,8 @@ jobs:
     needs: build-frontend
     strategy:
       matrix:
-        arch: [arm64-v8a, armeabi-v7a]
+        # 1. 添加 x86_64 平台
+        arch: [arm64-v8a, armeabi-v7a, x86_64]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -115,7 +116,13 @@ jobs:
           go install golang.org/x/mobile/cmd/gomobile@latest
           export PATH=$PATH:$(go env GOPATH)/bin
           gomobile init
-          TARGET_ARCH=$([ "${{ matrix.arch }}" == "arm64-v8a" ]&&echo "android/arm64"||echo "android/arm")
+          # 2. 使用 case 语句支持多个架构
+          TARGET_ARCH=""
+          case "${{ matrix.arch }}" in
+            "arm64-v8a") TARGET_ARCH="android/arm64" ;;
+            "armeabi-v7a") TARGET_ARCH="android/arm" ;;
+            "x86_64") TARGET_ARCH="android/amd64" ;;
+          esac
           cd cloud-clip/mobile
           gomobile bind -v -tags embed -androidapi 24 -o cloudclipservice.aar -target=$TARGET_ARCH -ldflags="-s -w" github.com/jonnyan404/cloud-clipboard-go/cloud-clip/mobile
           mkdir -p ../../android/app/libs
@@ -174,13 +181,16 @@ jobs:
         run: |
           mkdir -p cloud-clip/static
           cp -r client/dist/* cloud-clip/static/
-      - name: Install gomobile and Build AAR (for arm64)
+      - name: Install gomobile and Build Universal AAR
         run: |
           go install golang.org/x/mobile/cmd/gomobile@latest
           export PATH=$PATH:$(go env GOPATH)/bin
           gomobile init
           cd cloud-clip/mobile
-          gomobile bind -v -tags embed -androidapi 24 -o cloudclipservice.aar -target=android/arm64 -ldflags="-s -w" github.com/jonnyan404/cloud-clipboard-go/cloud-clip/mobile
+          # 3. 同时为所有目标平台构建和合并 AAR
+          gomobile bind -v -tags embed -androidapi 24 -o cloudclipservice.aar \
+            -target=android/arm,android/arm64,android/amd64 \
+            -ldflags="-s -w" github.com/jonnyan404/cloud-clipboard-go/cloud-clip/mobile
           mkdir -p ../../android/app/libs
           cp cloudclipservice.aar ../../android/app/libs/
       - name: Decode Signing Key and Build Universal APK
