@@ -81,7 +81,14 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: goreleaser-dist
-          path: dist/*
+          # 1. 修正：只上传需要的发布文件，排除元数据文件
+          path: |
+            dist/*.zip
+            dist/*.tar.gz
+            dist/*.deb
+            dist/*.rpm
+            dist/checksums.txt
+            dist/CHANGELOG.md
 
   # ====================================================================
   # Job 3: Build Per-Architecture Android APKs
@@ -226,20 +233,25 @@ jobs:
   release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: [build-desktop, build-apk, build-universal-apk] # 添加对新 Job 的依赖
+    needs: [build-desktop, build-apk, build-universal-apk]
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+      - name: Display downloaded artifacts structure for debugging
+        run: ls -R artifacts
       - name: Create Release and Upload Assets
         uses: softprops/action-gh-release@v2
         with:
+          # 2. 修正：使用更简单、更可靠的 glob 模式来匹配所有 APK
           files: |
             artifacts/goreleaser-dist/*
-            artifacts/apk-per-arch-artifacts-*/\*
-            artifacts/apk-universal-artifact/*
-          body_path: "artifacts/goreleaser-dist/release-notes.md"
+            artifacts/apk-per-arch-artifacts-*/*.apk
+            artifacts/apk-universal-artifact/*.apk
+          # 注意：GoReleaser 在 --skip-publish 模式下可能不生成 release-notes.md
+          # 我们暂时使用 CHANGELOG.md 作为 body
+          body_path: "artifacts/goreleaser-dist/CHANGELOG.md"
 
   # ====================================================================
   # Job 6: Build and Push Docker Images
