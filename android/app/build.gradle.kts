@@ -61,7 +61,7 @@ android {
                 // 如果没有指定，则包含所有支持的架构
                 include("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
             }
-            isUniversalApk = true // 生成通用的 universal APK
+            isUniversalApk = false // 不生成通用的 universal APK
         }
     }
 
