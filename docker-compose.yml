@@ -18,6 +18,7 @@ services:
             - MKCERT_DOMAIN_OR_IP= #mkcert域名或IP,默认为空,可设置为其他域名或IP,多个用空格分隔,仅域名支持通配符*
             - MANUAL_KEY_PATH= #手动设置证书路径,默认为空,该参数优先级高于MKCERT_DOMAIN_OR_IP
             - MANUAL_CERT_PATH= #手动设置证书路径,默认为空,该参数优先级高于MKCERT_DOMAIN_OR_IP
+            - ROOM_LIST= #是否启用房间列表展示功能,默认false
         volumes:
             - /path/your/dir/data:/app/server-node/data #请注意修改为你自己的目录
         image: jonnyan404/cloud-clipboard-go:latest
