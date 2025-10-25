@@ -149,16 +149,15 @@ jobs:
           APK_PATH=$(find android/app/build/outputs/apk -type f -name "app-${{ matrix.arch }}-release.apk")
           if [ -z "$APK_PATH" ]; then echo "::error::Per-arch APK file not found!" && exit 1; fi
           echo "Found APK at: $APK_PATH"
-          # 创建一个按架构命名的目录来存放 APK，避免文件名冲突
-          mkdir -p ${{ matrix.arch }}
-          mv "$APK_PATH" "${{ matrix.arch }}/cloud-clipboard-go-${{ github.ref_name }}-${{ matrix.arch }}.apk"
+          # 重命名 APK 到根目录，避免嵌套目录
+          mv "$APK_PATH" "cloud-clipboard-go-${{ github.ref_name }}-${{ matrix.arch }}.apk"
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          # 所有矩阵任务都上传到同一个工件名
-          name: apk-per-arch-artifacts
-          # 上传包含重命名后 APK 的架构目录
-          path: ${{ matrix.arch }}/
+          # 使用矩阵变量使 artifact 名称唯一，避免冲突
+          name: apk-per-arch-artifacts-${{ matrix.arch }}
+          # 直接上传重命名后的 APK 文件
+          path: cloud-clipboard-go-${{ github.ref_name }}-${{ matrix.arch }}.apk
 
   # ====================================================================
   # Job 4: Build Universal Android APK (新添加的 Job)
@@ -238,7 +237,7 @@ jobs:
         with:
           files: |
             artifacts/goreleaser-dist/*
-            artifacts/apk-per-arch-artifacts/*
+            artifacts/apk-per-arch-artifacts-*/\*
             artifacts/apk-universal-artifact/*
           body_path: "artifacts/goreleaser-dist/release-notes.md"
 
