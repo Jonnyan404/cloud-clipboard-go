@@ -129,7 +129,7 @@ jobs:
             -PabiFilters=${{ matrix.arch }} \
             -Psigning.key.alias=${{ secrets.SIGNING_KEY_ALIAS }} \
             -Psigning.key.password=${{ secrets.SIGNING_KEY_PASSWORD }} \
-            -Psigning.store.file=app/my-release-key.keystore \
+            -Psigning.store.file=$GITHUB_WORKSPACE/android/app/my-release-key.keystore \
             -Psigning.store.password=${{ secrets.SIGNING_KEY_STORE_PASSWORD }} \
             --stacktrace
 
@@ -192,7 +192,7 @@ jobs:
           ./gradlew assembleRelease \
             -Psigning.key.alias=${{ secrets.SIGNING_KEY_ALIAS }} \
             -Psigning.key.password=${{ secrets.SIGNING_KEY_PASSWORD }} \
-            -Psigning.store.file=app/my-release-key.keystore \
+            -Psigning.store.file=$GITHUB_WORKSPACE/android/app/my-release-key.keystore \
             -Psigning.store.password=${{ secrets.SIGNING_KEY_STORE_PASSWORD }} \
             --stacktrace
       - name: Find and Rename Universal APK
