@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>配置</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif; background-color: #f0f2f5; color: #333; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #1a73e8; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input[type="text"], input[type="number"], textarea { width: 95%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif; box-sizing: border-box; }
+        textarea { resize: vertical; min-height: 80px; }
+        input[type="checkbox"] { margin-right: 10px; cursor: pointer; }
+        label.checkbox-label { display: flex; align-items: center; font-weight: normal; }
+        button { background-color: #1a73e8; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; display: block; width: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif; margin-top: 10px; }
+        button:hover { background-color: #155ab6; }
+        .status { text-align: center; margin-top: 15px; font-weight: bold; padding: 10px; border-radius: 4px; }
+        .status.success { color: green; background-color: #e8f5e9; }
+        .status.error { color: red; background-color: #ffebee; }
+        .loading { text-align: center; color: #666; padding: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>配置</h1>
+        <div id="loading" class="loading">正在加载配置...</div>
+        <form id="config-form" style="display: none;">
+            <div class="form-group">
+                <label for="text_urls">文本上传地址 (每行一个)</label>
+                <textarea id="text_urls" name="text_urls" placeholder="http://example.com/text&#10;http://example.com/upload"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="file_urls">文件上传地址 (每行一个)</label>
+                <textarea id="file_urls" name="file_urls" placeholder="http://example.com/upload&#10;http://example.com/file"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="auth_token">认证令牌 (可选)</label>
+                <input type="text" id="auth_token" name="auth_token" placeholder="输入认证令牌" />
+            </div>
+            <div class="form-group">
+                <label for="max_file_size_mb">最大文件大小 (MB)</label>
+                <input type="number" id="max_file_size_mb" name="max_file_size_mb" value="50" min="1" />
+            </div>
+            <div class="form-group">
+                <label class="checkbox-label"><input type="checkbox" id="enable_text" name="enable_text" /> 启用文本上传</label>
+            </div>
+            <div class="form-group">
+                <label class="checkbox-label"><input type="checkbox" id="enable_file" name="enable_file" /> 启用文件上传</label>
+            </div>
+            <div class="form-group">
+                <label class="checkbox-label"><input type="checkbox" id="enable_monitoring" name="enable_monitoring" /> 启用监控</label>
+            </div>
+            <button type="submit">保存配置</button>
+        </form>
+        <div id="status" class="status" style="display: none;"></div>
+    </div>
+
+    <script type="module">
+        // 从本地文件导入 invoke
+        import { invoke } from './js/node_modules/@tauri-apps/api/core.js';
+
+        const form = document.getElementById('config-form');
+        const statusDiv = document.getElementById('status');
+        const loadingDiv = document.getElementById('loading');
+
+        // 页面加载时，从后端获取配置并填充表单
+        async function loadConfig() {
+            try {
+                console.log('正在加载配置...');
+                const config = await invoke('get_config');
+                console.log('加载的配置:', config);
+                
+                // 填充表单
+                document.getElementById('text_urls').value = config.text_urls ? config.text_urls.join('\n') : '';
+                document.getElementById('file_urls').value = config.file_urls ? config.file_urls.join('\n') : '';
+                document.getElementById('auth_token').value = config.auth_token || '';
+                document.getElementById('max_file_size_mb').value = config.max_file_size_mb || 50;
+                document.getElementById('enable_text').checked = config.enable_text !== false;
+                document.getElementById('enable_file').checked = config.enable_file !== false;
+                document.getElementById('enable_monitoring').checked = config.enable_monitoring !== false;
+                
+                // 隐藏加载提示，显示表单
+                loadingDiv.style.display = 'none';
+                form.style.display = 'block';
+                
+                console.log('配置加载成功');
+            } catch (e) {
+                console.error('加载配置出错:', e);
+                loadingDiv.textContent = `加载配置出错: ${e.message || e}`;
+                loadingDiv.style.color = 'red';
+            }
+        }
+
+        // 提交表单时，将数据发送到后端
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            statusDiv.textContent = '正在保存配置...';
+            statusDiv.className = 'status';
+            statusDiv.style.display = 'block';
+            
+            const newConfig = {
+                text_urls: document.getElementById('text_urls').value.split('\n').map(url => url.trim()).filter(url => url),
+                file_urls: document.getElementById('file_urls').value.split('\n').map(url => url.trim()).filter(url => url),
+                auth_token: document.getElementById('auth_token').value.trim() || null,
+                max_file_size_mb: parseInt(document.getElementById('max_file_size_mb').value, 10) || 50,
+                enable_text: document.getElementById('enable_text').checked,
+                enable_file: document.getElementById('enable_file').checked,
+                enable_monitoring: document.getElementById('enable_monitoring').checked,
+                log_level: "info"
+            };
+
+            console.log('保存的配置:', newConfig);
+
+            try {
+                await invoke('save_config', { config: newConfig });
+                statusDiv.textContent = '✓ 配置保存成功!';
+                statusDiv.className = 'status success';
+                
+                setTimeout(() => { statusDiv.style.display = 'none'; }, 3000);
+                
+                console.log('配置保存成功');
+            } catch (e) {
+                console.error('保存配置出错:', e);
+                statusDiv.textContent = `✗ 保存配置出错: ${e.message || e}`;
+                statusDiv.className = 'status error';
+            }
+        });
+
+        // 立即加载配置
+        loadConfig();
+    </script>
+</body>
+</html>

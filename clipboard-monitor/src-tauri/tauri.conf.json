@@ -1,0 +1,53 @@
+{
+  "productName": "Clipboard Monitor",
+  "version": "0.1.0",
+  "identifier": "com.clipboard.monitor",
+  "build": {
+    "frontendDist": "static"
+  },
+  "plugins": {
+    "shell": {
+      "open": true
+    },
+    "fs": {
+      "requireLiteralLeadingDot": false
+    },
+    "dialog": null,
+    "os": null
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "visible": false,
+        "fullscreen": false,
+        "resizable": true,
+        "title": "Clipboard Monitor"
+      },
+      {
+        "label": "config_window",
+        "url": "config.html",
+        "title": "Configuration",
+        "width": 700,
+        "height": 750,
+        "resizable": true,
+        "visible": false,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/favicon-16x16.png",
+      "icons/favicon-32x32.png",
+      "icons/android-chrome-192x192.png",
+      "icons/android-chrome-512x512.png",
+      "icons/favicon.ico"
+    ]
+  }
+}

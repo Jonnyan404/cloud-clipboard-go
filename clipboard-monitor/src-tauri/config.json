@@ -1,0 +1,14 @@
+{
+  "text_urls": [
+    "http://localhost:9501/text"
+  ],
+  "file_urls": [
+    "http://localhost:9501/upload"
+  ],
+  "enable_text": true,
+  "enable_file": true,
+  "enable_monitoring": true,
+  "max_file_size_mb": 50,
+  "log_level": "info",
+  "auth_token": null
+}
