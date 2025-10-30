@@ -35,18 +35,21 @@
 
 </details>
 
+
 ---
 
-## ✨ Key Features
+## 🎯 Advantages
 
-- 🔄 **Real-time Sync** - Clipboard content syncs to cloud in real-time
-- 📝 **Multi-format Support** - Text, images, and files upload
-- 🌐 **Cross-platform** - Windows, macOS, Linux, Android, iOS
-- 🔐 **Secure Authentication** - Password and Token authentication
-- 🚀 **Flexible Deployment** - Docker, Binary, Source code, Homebrew, OpenWrt
-- 📦 **Multiple Endpoints** - Configure multiple upload addresses
-- 💾 **History Records** - Configurable history message retention
-- 🔍 **Shortcuts** - Android/iOS shortcuts support
+| Feature | Description |
+|---------|-------------|
+| 🔒 **Privacy** | Deploy locally or on your own server, full data control |
+| 📦 **Easy Deploy** | Docker, Binary, Source code, Homebrew, OpenWrt, and more options |
+| 🌍 **Cross-platform** | Windows, macOS, Linux, Android, iOS |
+| ⚡ **Fast Sync** | Real-time synchronization, zero delay |
+| 🔐 **Security** | Password and Token authentication support |
+| 💾 **Flexible Storage** | Configurable history and file expiration |
+| 🚀 **Lightweight** | Low resource usage, runs smoothly on low-end devices |
+| 🔍 **Shortcuts** | Android/iOS shortcuts support |
 
 ---
 
@@ -321,21 +324,7 @@ docker restart cloud-clipboard-go
 
 Full Guide: [Troubleshooting](./docs/troubleshooting.md)
 
----
 
-## 🎯 Advantages
-
-| Feature | Description |
-|---------|-------------|
-| 🔒 **Privacy** | Deploy locally or on your own server, full data control |
-| 📦 **Easy Deploy** | Docker, binary, source code, and more options |
-| 🌍 **Cross-platform** | Windows, macOS, Linux, Android, iOS |
-| ⚡ **Fast Sync** | Real-time synchronization, zero delay |
-| 🔐 **Security** | Password and Token authentication support |
-| 💾 **Flexible Storage** | Configurable history and file expiration |
-| 🚀 **Lightweight** | Low resource usage, runs smoothly on low-end devices |
-
----
 
 ## 📦 Related Projects
 
