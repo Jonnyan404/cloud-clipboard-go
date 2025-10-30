@@ -286,7 +286,7 @@ docker pull jonnyan404/cloud-clipboard-go:latest
 | Linux | ✅ | ✅ | ✅ | Primary support |
 | macOS | ✅ | ✅ | ✅ | Intel/Apple Silicon |
 | Windows | ✅ | ✅ | ✅ | Requires Visual C++ Build Tools |
-| Android | ✅ | - | - | APK/Shortcuts |
+| Android | ✅ | - | ✅ | Server APK/Shortcuts |
 | iOS | - | - | - | Shortcuts |
 | OpenWrt | ✅ | - | ✅ | Router systems |
 
