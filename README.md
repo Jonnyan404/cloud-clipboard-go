@@ -301,36 +301,6 @@ docker pull jonnyan404/cloud-clipboard-go:latest
 
 ---
 
-## 🐛 故障排除
-
-### Docker 容器无法启动
-
-```bash
-# 查看日志
-docker logs cloud-clipboard-go
-
-# 检查端口是否被占用
-netstat -tuln | grep 9501
-
-# 重启容器
-docker restart cloud-clipboard-go
-```
-
-### 无法访问 Web 界面
-
-- 检查防火墙是否阻止了 9501 端口
-- 确认容器正在运行：`docker ps | grep cloud-clipboard-go`
-- 尝试本地访问：`http://localhost:9501`
-
-### 文件上传失败
-
-- 检查磁盘空间是否充足
-- 检查 `FILE_LIMIT` 环境变量设置
-- 确保数据目录有写入权限：`chmod 777 ./data`
-
-详见：[完整故障排除指南](./docs/troubleshooting.md)
-
----
 
 ## 📦 衍生项目
 
