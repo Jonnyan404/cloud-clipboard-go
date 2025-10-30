@@ -1,6 +1,6 @@
-# cloud-clipboard-go
+# Cloud Clipboard Go
 
-<p>
+<p align="center">
   <a href="README.md"><img src="https://img.shields.io/badge/lang-简体中文-blue.svg" alt="中文 Readme"></a>
   <a href="https://raw.githubusercontent.com/jonnyan404/cloud-clipboard-go-launcher/main/LICENSE">
     <img src="https://img.shields.io/github/license/jonnyan404/cloud-clipboard-go-launcher?color=brightgreen" alt="license">
@@ -9,174 +9,369 @@
     <img src="https://img.shields.io/github/v/release/jonnyan404/cloud-clipboard-go?color=brightgreen&include_prereleases" alt="release">
   </a>
   <a href="https://github.com/jonnyan404/cloud-clipboard-go/releases/latest">
-    <img src="https://img.shields.io/github/downloads/jonnyan404/cloud-clipboard-go/total?color=brightgreen&include_prereleases" alt="release">
+    <img src="https://img.shields.io/github/downloads/jonnyan404/cloud-clipboard-go/total?color=brightgreen&include_prereleases" alt="downloads">
   </a>
 </p>
 
-A Go remake based on the [TransparentLC/cloud-clipboard](https://github.com/TransparentLC/cloud-clipboard) project.
+<p align="center">
+  <strong>A cross-platform cloud clipboard synchronization tool that supports real-time synchronization of text, images, and files to cloud or local servers.</strong>
+</p>
 
-Added some features based on [yurenchen000/cloud-clipboard](https://github.com/yurenchen000/cloud-clipboard).
+---
 
-## Screenshots
+## 📸 Screenshots
 
 <details>
-<summary>Desktop</summary>
+<summary><b>💻 Desktop</b></summary>
 
-![](https://ae01.alicdn.com/kf/Hfce3a9b69b3d404c8e3073ab0fffa913v.png)
+![Desktop Preview](https://ae01.alicdn.com/kf/Hfce3a9b69b3d404c8e3073ab0fffa913v.png)
 
 </details>
 
 <details>
-<summary>Mobile</summary>
+<summary><b>📱 Mobile</b></summary>
 
-![](https://ae01.alicdn.com/kf/Hbf859dd0e42c4406bf94a6b6f2f4658cf.png)
-
-</details>
-
-## Usage
-
-This is the Go version of the server.
-
-### Android Shortcuts (Imitating iOS Shortcuts)
-
-- quire: server version ≥ v4.5.10
-
-1. [Download http-shortcuts](https://github.com/Waboodoo/HTTP-Shortcuts/releases)
-2. [Download cloud-clipboard-shortcuts.zip](https://raw.githubusercontent.com/Jonnyan404/cloud-clipboard-go/refs/heads/main/shortcuts/cloud-clipboard-shortcuts.zip)
-3. Open `http-shortcuts`, click the three-dot menu in the top right corner --> Import/Export --> Import from file --> Select the file downloaded in step 2.
-4. Click the three-dot menu in the top right corner --> Variables --> Modify the `url` value to your server's IP and port (If there is a prefix parameter, it needs to be added after the port.); `room` is optional, default value is empty; `auth` is optional, default value is empty; do not change anything else.
-
-
-### Easy Run (UI Launcher, Recommended for Beginners)
-
-<details>
-    <summary>Click to view preview</summary>
-
-![](https://github.com/Jonnyan404/cloud-clipboard-go-launcher/blob/main/demo.png)
+![Mobile Preview](https://ae01.alicdn.com/kf/Hbf859dd0e42c4406bf94a6b6f2f4658cf.png)
 
 </details>
 
-Go to [UI Launcher Releases](https://github.com/Jonnyan404/cloud-clipboard-go-launcher/releases), download, and double-click to use.
+---
 
-### Run with Docker
+## ✨ Key Features
 
-```sh
-# Docker Hub Image (choose one)
-docker run -d --name=cloud-clipboard-go -p 9501:9501 -v /path/your/dir/data:/app/server-node/data jonnyan404/cloud-clipboard-go
-# GitHub Container Registry Image (choose one)
-docker run -d --name=cloud-clipboard-go -p 9501:9501 -v /path/your/dir/data:/app/server-node/data ghcr.io/jonnyan404/cloud-clipboard-go
-```
+- 🔄 **Real-time Sync** - Clipboard content syncs to cloud in real-time
+- 📝 **Multi-format Support** - Text, images, and files upload
+- 🌐 **Cross-platform** - Windows, macOS, Linux, Android, iOS
+- 🔐 **Secure Authentication** - Password and Token authentication
+- 🚀 **Flexible Deployment** - Docker, Binary, Source code, Homebrew, OpenWrt
+- 📦 **Multiple Endpoints** - Configure multiple upload addresses
+- 💾 **History Records** - Configurable history message retention
+- 🔍 **Shortcuts** - Android/iOS shortcuts support
 
-- `vi docker-compose.yml`
+---
 
-```yaml
-services:
-    cloud-clipboard-go:
-        container_name: cloud-clipboard-go
-        restart: always
-        ports:
-            - "9501:9501"
-        environment:
-            - LISTEN_IP= # Default is 0.0.0.0, can be set to 127.0.0.1. Don't change if unsure.
-            - LISTEN_IP6= # Default is empty, can be set to ::. Don't change if unsure.
-            - LISTEN_PORT= # Default is 9501, can be set to other ports.
-            - PREFIX= # Subpath, can be used with nginx, format: /cloud-clipboard
-            - MESSAGE_NUM= # Number of history records, default is 10.
-            - AUTH_PASSWORD= # Access password, default is false, can be a custom string password.
-            - TEXT_LIMIT= # Text length limit, default is 4096 (2048 Chinese characters).
-            - FILE_EXPIRE= # File expiration time, default is 3600 (1 hour), unit is seconds.
-            - FILE_LIMIT= # File size limit, default is 104857600 (100MB), unit is bytes.
-            - MKCERT_DOMAIN_OR_IP= # The domain name or IP address for mkcert, defaults to empty. You can set it to other domain names or IPs. Multiple values can be separated by spaces. Wildcards are supported for domain names only.
-            - MANUAL_KEY_PATH= # Manually set the path for the key. Defaults to empty. This parameter has higher priority than MKCERT_DOMAIN_OR_IP.
-            - MANUAL_CERT_PATH= # Manually set the path for the certificate. Defaults to empty. This parameter has higher priority than MKCERT_DOMAIN_OR_IP.
-            - ROOM_LIST= #是否启用房间列表展示功能,默认false
-        volumes:
-            - /path/your/dir/data:/app/server-node/data # Please change to your own directory
-        image: jonnyan404/cloud-clipboard-go:latest # Or ghcr.io/jonnyan404/cloud-clipboard-go:latest
-```
+## 🚀 Quick Start
 
-- Access homepage: http://127.0.0.1:9501
-- Accessing http://127.0.0.1:9501/content/latest will always return the latest content. You can add the room parameter `?room=xxx`.
-
-### Run with Homebrew
-
-> Known Issue: `brew services` tab completion doesn't work. Reference: https://github.com/orgs/Homebrew/discussions/6047#discussioncomment-12668536
-
-Default configuration files are located in the `etc/cloud-clipboard-go` and `var` directories under the `homebrew` root directory.
+### 1️⃣ Docker (Recommended)
 
 ```bash
-brew update
-# Install
+# Option 1: Docker Compose (Recommended)
+docker-compose up -d
+
+# Option 2: Docker CLI
+docker run -d \
+  --name=cloud-clipboard-go \
+  -p 9501:9501 \
+  -v /path/to/data:/app/server-node/data \
+  jonnyan404/cloud-clipboard-go
+```
+
+Then visit: `http://localhost:9501`
+
+### 2️⃣ Binary Files
+
+Download from [Releases](https://github.com/jonnyan404/cloud-clipboard-go/releases):
+
+```bash
+# Linux/macOS
+./cloud-clipboard-go -port 9501
+
+# Windows
+cloud-clipboard-go.exe -port 9501
+```
+
+### 3️⃣ Homebrew (macOS)
+
+```bash
 brew install Jonnyan404/tap/cloud-clipboard-go
-# Start the service
 brew services start cloud-clipboard-go
-# Check service status
-brew services info cloud-clipboard-go
-# Stop the service
-brew services stop cloud-clipboard-go
-# Restart the service
-brew services restart cloud-clipboard-go
 ```
 
-### Run on OpenWrt
+### 4️⃣ OpenWrt (Router)
 
-✅ Tested on OpenWrt 24.10.0
-✅ Tested on istore 22.03.x
+- Testd on openwrt 24.x
+- Testd on istore 23.03.x
 
-Check your architecture with: `opkg print-architecture` (the second column of the last line)
-
-Go to the `pre-release` section of https://github.com/Jonnyan404/cloud-clipboard-go/releases and download the `*platform.ipk` file corresponding to your system and the `*_all.ipk` file.
-
-Then execute the following commands in the terminal:
 ```bash
-opkg install *platform.ipk
-opkg install *_all.ipk
+opkg update
+opkg install cloud-clipboard-go_*_platform.ipk
+opkg install cloud-clipboard-go_*_all.ipk
 ```
 
-<details>
-    <summary>Click to preview LuCI interface</summary>
-
-![](https://github.com/Jonnyan404/cloud-clipboard-go/blob/main/openwrt/demo.png)
-
-</details>
-
-### Run with Binary File
-
-Go to the project [Releases](https://github.com/Jonnyan404/cloud-clipboard-go/releases), download the file corresponding to your system, and run it.
-
-> Parameter priority: Command-line arguments > Configuration file
-
-- Command-line argument: `-host` to customize the server listening address.
-- Command-line argument: `-port` to customize the server listening port.
-- Command-line argument: `-auth` to customize the password.
-- Command-line argument: `-config` to load a custom configuration file.
-- Command-line argument: `-static` to load custom external frontend files.
-
-### Run from Source Code
-
-- Requires [Node.js>=22.12](https://nodejs.org).
-- Requires [Go>=1.22](https://go.dev/).
+### 5️⃣ Build from Source
 
 ```bash
-# Build frontend
+# Requirements: Node.js >= 22.12, Go >= 1.22
+
+# 1. Build frontend
 cd client
 npm install
 npm run build
 
-# Run backend
+# 2. Run backend
 cd ../cloud-clip
 go mod tidy
 go run -tags embed .
 ```
 
-### Configuration File Description
+---
 
-- Please see: https://github.com/Jonnyan404/cloud-clipboard-go/blob/main/cloud-clip/config.md
+## 📋 Deployment Guide
 
-### HTTP API
+### Docker Compose Configuration
 
-- Please see: https://github.com/Jonnyan404/cloud-clipboard-go/blob/main/cloud-clip/config.md
+Create `docker-compose.yml`:
 
-## Derivative Projects
+```yaml
+version: '3.8'
 
-- A launcher made for cloud-clipboard-go, convenient for users who don't want to or can't use the terminal: [cloud-clipboard-go-launcher](https://github.com/Jonnyan404/cloud-clipboard-go-launcher)
+services:
+  cloud-clipboard-go:
+    image: jonnyan404/cloud-clipboard-go:latest
+    container_name: cloud-clipboard-go
+    restart: always
+    ports:
+      - "9501:9501"
+    environment:
+      - LISTEN_IP=0.0.0.0           # Listening address
+      - LISTEN_PORT=9501             # Listening port
+      - PREFIX=                       # URL subpath (e.g., /clipboard)
+      - MESSAGE_NUM=10                # History records count
+      - AUTH_PASSWORD=                # Access password (leave empty for no password)
+      - TEXT_LIMIT=4096               # Text length limit
+      - FILE_EXPIRE=3600              # File expiration time (seconds)
+      - FILE_LIMIT=104857600          # File size limit (bytes)
+    volumes:
+      - ./data:/app/server-node/data  # Data persistence
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9501"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+```
+
+Run:
+
+```bash
+docker-compose up -d
+```
+
+### Binary Command-line Parameters
+
+```bash
+# Priority: Command-line > Config file > Default values
+
+-host string
+    Server listening address (default "0.0.0.0")
+
+-port int
+    Server listening port (default 9501)
+
+-auth string
+    Access password
+
+-config string
+    Configuration file path
+
+-static string
+    External frontend file path
+```
+
+Example:
+
+```bash
+./cloud-clipboard-go -host 127.0.0.1 -port 8080 -auth mypassword123
+```
+
+---
+
+## 🔧 Configuration
+
+### Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `LISTEN_IP` | Listening address | `0.0.0.0` |
+| `LISTEN_PORT` | Listening port | `9501` |
+| `PREFIX` | URL subpath | Empty |
+| `MESSAGE_NUM` | History records count | `10` |
+| `AUTH_PASSWORD` | Access password | Empty (no password) |
+| `TEXT_LIMIT` | Text length limit | `4096` |
+| `FILE_EXPIRE` | File expiration time (seconds) | `3600` |
+| `FILE_LIMIT` | File size limit (bytes) | `104857600` |
+| `ROOM_LIST` | Enable room list display | `false` |
+
+Full Configuration: [config.md](./cloud-clip/config.md)
+
+---
+
+## 📱 Client Usage
+
+### 📲 Android Shortcuts
+
+1. Download [HTTP Shortcuts](https://github.com/Waboodoo/HTTP-Shortcuts/releases)
+2. Download [Shortcuts file](https://raw.githubusercontent.com/jonnyan404/cloud-clipboard-go/refs/heads/main/shortcuts/cloud-clipboard-shortcuts.zip)
+3. Import into HTTP Shortcuts
+4. Configure variables:
+   - `url`: Your server address (e.g., `http://192.168.1.100:9501`)
+   - `room`: Room name (optional)
+   - `auth`: Authentication password (optional)
+
+### 🖥️ Desktop Application
+
+- **Clipboard Monitor** (Recommended)
+  - Auto clipboard monitoring
+  - Supports Windows/macOS/Linux
+  - See: [Clipboard Monitor Documentation](./clipboard-monitor/README.md)
+
+### 💻 UI Launcher Tool
+
+Download [Cloud Clipboard Go Launcher](https://github.com/jonnyan404/cloud-clipboard-go-launcher/releases) - no command line needed.
+
+---
+
+## 🌐 API Endpoints
+
+### Get Latest Content
+
+```bash
+GET /content/latest
+```
+
+Returns the latest clipboard content.
+
+**Parameters**:
+- `room` (optional): Room name
+
+**Examples**:
+
+```bash
+curl http://localhost:9501/content/latest
+curl http://localhost:9501/content/latest?room=work
+```
+
+Full API Documentation: [API.md](./cloud-clip/config.md)
+
+---
+
+## 🐳 Docker Images
+
+### Image Sources
+
+| Source | Repository |
+|--------|------------|
+| Docker Hub | `jonnyan404/cloud-clipboard-go` |
+| GitHub Container Registry | `ghcr.io/jonnyan404/cloud-clipboard-go` |
+
+### Pull Latest Image
+
+```bash
+docker pull jonnyan404/cloud-clipboard-go:latest
+```
+
+---
+
+## 📚 Documentation
+
+- 📖 [Configuration Guide](./cloud-clip/config.md)
+- 🔌 [HTTP API Documentation](./cloud-clip/config.md)
+- 🖥️ [Clipboard Monitor Guide](./clipboard-monitor/README.md)
+- 📱 [Client Deployment](#-client-usage)
+
+---
+
+## 🔄 Supported Platforms
+
+| Platform | Binary | Docker | Source | Notes |
+|----------|--------|--------|--------|-------|
+| Linux | ✅ | ✅ | ✅ | Primary support |
+| macOS | ✅ | ✅ | ✅ | Intel/Apple Silicon |
+| Windows | ✅ | ✅ | ✅ | Requires Visual C++ Build Tools |
+| Android | ✅ | - | - | APK/Shortcuts |
+| iOS | - | - | - | Shortcuts |
+| OpenWrt | ✅ | - | ✅ | Router systems |
+
+---
+
+## 🐛 Troubleshooting
+
+### Docker Container Won't Start
+
+```bash
+# Check logs
+docker logs cloud-clipboard-go
+
+# Check if port is in use
+netstat -tuln | grep 9501
+
+# Restart container
+docker restart cloud-clipboard-go
+```
+
+### Can't Access Web Interface
+
+- Check firewall isn't blocking port 9501
+- Verify container is running: `docker ps | grep cloud-clipboard-go`
+- Try local access: `http://localhost:9501`
+
+### File Upload Fails
+
+- Check disk space availability
+- Verify `FILE_LIMIT` environment variable setting
+- Ensure data directory is writable: `chmod 777 ./data`
+
+Full Guide: [Troubleshooting](./docs/troubleshooting.md)
+
+---
+
+## 🎯 Advantages
+
+| Feature | Description |
+|---------|-------------|
+| 🔒 **Privacy** | Deploy locally or on your own server, full data control |
+| 📦 **Easy Deploy** | Docker, binary, source code, and more options |
+| 🌍 **Cross-platform** | Windows, macOS, Linux, Android, iOS |
+| ⚡ **Fast Sync** | Real-time synchronization, zero delay |
+| 🔐 **Security** | Password and Token authentication support |
+| 💾 **Flexible Storage** | Configurable history and file expiration |
+| 🚀 **Lightweight** | Low resource usage, runs smoothly on low-end devices |
+
+---
+
+## 📦 Related Projects
+
+- **[Cloud Clipboard Go Launcher](https://github.com/jonnyan404/cloud-clipboard-go-launcher)** - UI launcher tool for easier usage
+- **[Clipboard Monitor](./clipboard-monitor/)** - Desktop monitoring application
+
+---
+
+## 🙏 Acknowledgments
+
+This project is based on:
+
+- [TransparentLC/cloud-clipboard](https://github.com/TransparentLC/cloud-clipboard)
+- [yurenchen000/cloud-clipboard](https://github.com/yurenchen000/cloud-clipboard)
+
+---
+
+## 📊 Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=Jonnyan404/cloud-clipboard-go&type=Date)](https://www.star-history.com/#Jonnyan404/cloud-clipboard-go&Date)
+
+---
+
+## 📄 License
+
+MIT License - See [LICENSE](LICENSE) for details
+
+---
+
+## 💬 Community
+
+- 📝 Report [Issues](https://github.com/jonnyan404/cloud-clipboard-go/issues)
+- 🔀 Submit [Pull Requests](https://github.com/jonnyan404/cloud-clipboard-go/pulls)
+- 💡 Join [Discussions](https://github.com/jonnyan404/cloud-clipboard-go/discussions)
+
+---
+
+**Last Updated**: October 30, 2025 | 📖 [中文版本](README.md)
