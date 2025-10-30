@@ -1,4 +1,4 @@
-# Cloud Clipboard Go
+<h1 align="center"> Cloud Clipboard Go </h1>
 
 <p align="center">
   <a href="README.en.md"><img src="https://img.shields.io/badge/lang-English-blue.svg" alt="English Readme"></a>
@@ -90,7 +90,7 @@ brew services start cloud-clipboard-go
 ### 4️⃣ 使用 OpenWrt（路由器）
 
 - openwrt 24.x 测试通过
-- istore 22.03.c 测试通过
+- istore 22.03.x 测试通过
 
 ```bash
 opkg update
@@ -133,14 +133,19 @@ services:
     ports:
       - "9501:9501"
     environment:
-      - LISTEN_IP=0.0.0.0           # 监听地址
-      - LISTEN_PORT=9501             # 监听端口
-      - PREFIX=                       # 子路径（如：/clipboard）
-      - MESSAGE_NUM=10                # 历史记录数量
-      - AUTH_PASSWORD=                # 访问密码（留空为无密码）
-      - TEXT_LIMIT=4096               # 文本长度限制
-      - FILE_EXPIRE=3600              # 文件过期时间（秒）
-      - FILE_LIMIT=104857600          # 文件大小限制（字节）
+      - LISTEN_IP= #默认为0.0.0.0,可设置为 127.0.0.1 不懂勿动
+      - LISTEN_IP6= #默认为空,ipv6地址,可设置为::,不懂勿动
+      - LISTEN_PORT= #默认为9501,可设置为其他端口
+      - PREFIX= #子路径,可配合nginx使用,格式: /cloud-clipboard
+      - MESSAGE_NUM= #历史记录的数量,默认为10
+      - AUTH_PASSWORD= #访问密码,默认为false,可自定义字符串密码
+      - TEXT_LIMIT= #文本长度限制,默认为4096(2048个汉字),可设置为其他长度
+      - FILE_EXPIRE= #文件过期时间,默认为3600(1小时),可设置为其他时间,单位为秒
+      - FILE_LIMIT= #文件大小限制,默认为104857600(100MB),可设置为其他大小,单位为字节
+      - MKCERT_DOMAIN_OR_IP= #mkcert域名或IP,默认为空,可设置为其他域名或IP,多个用空格分隔,仅域名支持通配符*
+      - MANUAL_KEY_PATH= #手动设置证书路径,默认为空,该参数优先级高于MKCERT_DOMAIN_OR_IP
+      - MANUAL_CERT_PATH= #手动设置证书路径,默认为空,该参数优先级高于MKCERT_DOMAIN_OR_IP
+      - ROOM_LIST= #是否启用房间列表展示功能,默认false
     volumes:
       - ./data:/app/server-node/data  # 数据持久化
     healthcheck:
@@ -182,26 +187,6 @@ docker-compose up -d
 ```bash
 ./cloud-clipboard-go -host 127.0.0.1 -port 8080 -auth mypassword123
 ```
-
----
-
-## 🔧 配置说明
-
-### 环境变量
-
-| 变量名 | 说明 | 默认值 |
-|--------|------|--------|
-| `LISTEN_IP` | 监听地址 | `0.0.0.0` |
-| `LISTEN_PORT` | 监听端口 | `9501` |
-| `PREFIX` | URL 子路径 | 空 |
-| `MESSAGE_NUM` | 历史记录数 | `10` |
-| `AUTH_PASSWORD` | 访问密码 | 空（无密码） |
-| `TEXT_LIMIT` | 文本长度限制 | `4096` |
-| `FILE_EXPIRE` | 文件过期时间（秒） | `3600` |
-| `FILE_LIMIT` | 文件大小限制（字节） | `104857600` |
-| `ROOM_LIST` | 启用房间列表 | `false` |
-
-详细配置：[config.md](./cloud-clip/config.md)
 
 ---
 

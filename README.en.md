@@ -133,14 +133,19 @@ services:
     ports:
       - "9501:9501"
     environment:
-      - LISTEN_IP=0.0.0.0           # Listening address
-      - LISTEN_PORT=9501             # Listening port
-      - PREFIX=                       # URL subpath (e.g., /clipboard)
-      - MESSAGE_NUM=10                # History records count
-      - AUTH_PASSWORD=                # Access password (leave empty for no password)
-      - TEXT_LIMIT=4096               # Text length limit
-      - FILE_EXPIRE=3600              # File expiration time (seconds)
-      - FILE_LIMIT=104857600          # File size limit (bytes)
+      - LISTEN_IP= # Default is 0.0.0.0, can be set to 127.0.0.1. Don't change if unsure.
+      - LISTEN_IP6= # Default is empty, can be set to ::. Don't change if unsure.
+      - LISTEN_PORT= # Default is 9501, can be set to other ports.
+      - PREFIX= # Subpath, can be used with nginx, format: /cloud-clipboard
+      - MESSAGE_NUM= # Number of history records, default is 10.
+      - AUTH_PASSWORD= # Access password, default is false, can be a custom string password.
+      - TEXT_LIMIT= # Text length limit, default is 4096 (2048 Chinese characters).
+      - FILE_EXPIRE= # File expiration time, default is 3600 (1 hour), unit is seconds.
+      - FILE_LIMIT= # File size limit, default is 104857600 (100MB), unit is bytes.
+      - MKCERT_DOMAIN_OR_IP= # The domain name or IP address for mkcert, defaults to empty. You can set it to other domain names or IPs. Multiple values can be separated by spaces. Wildcards are supported for domain names only.
+      - MANUAL_KEY_PATH= # Manually set the path for the key. Defaults to empty. This parameter has higher priority than MKCERT_DOMAIN_OR_IP.
+      - MANUAL_CERT_PATH= # Manually set the path for the certificate. Defaults to empty. This parameter has higher priority than MKCERT_DOMAIN_OR_IP.
+      - ROOM_LIST= #是否启用房间列表展示功能,默认false
     volumes:
       - ./data:/app/server-node/data  # Data persistence
     healthcheck:
@@ -182,26 +187,6 @@ Example:
 ```bash
 ./cloud-clipboard-go -host 127.0.0.1 -port 8080 -auth mypassword123
 ```
-
----
-
-## 🔧 Configuration
-
-### Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `LISTEN_IP` | Listening address | `0.0.0.0` |
-| `LISTEN_PORT` | Listening port | `9501` |
-| `PREFIX` | URL subpath | Empty |
-| `MESSAGE_NUM` | History records count | `10` |
-| `AUTH_PASSWORD` | Access password | Empty (no password) |
-| `TEXT_LIMIT` | Text length limit | `4096` |
-| `FILE_EXPIRE` | File expiration time (seconds) | `3600` |
-| `FILE_LIMIT` | File size limit (bytes) | `104857600` |
-| `ROOM_LIST` | Enable room list display | `false` |
-
-Full Configuration: [config.md](./cloud-clip/config.md)
 
 ---
 
