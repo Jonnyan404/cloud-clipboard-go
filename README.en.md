@@ -365,7 +365,41 @@ MIT License - See [LICENSE](LICENSE) for details
 
 ---
 
-## 💬 Community
+## ☕ Support the Project
+
+If this project has been helpful to you, please consider supporting us:
+
+### 💰 Donation
+
+Your support motivates us to continue maintaining and improving this project!
+
+| Method | QR Code |
+|--------|---------|
+| **WeChat** | <img src="https://github.com/Jonnyan404/cloud-clipboard-go/blob/main/wechat.png" width="150" alt="WeChat"> |
+| **Alipay** | <img src="https://your-alipay-qr-code-url.png" width="150" alt="Alipay"> |
+
+
+### 🌟 Other Ways to Support
+
+- ⭐ **Star** - Give us a star if you like the project
+- 🐛 **Report Issues** - Help us improve by reporting bugs
+- 💡 **Suggestions** - Share your ideas in Discussions
+- 🔀 **Contribute Code** - Submit Pull Requests
+- 📢 **Share** - Tell others about this project
+
+### 📝 Supporters
+
+Thanks to those who have supported us:
+
+- 🥇 xxxxxxxx (¥199)
+- 🥈 xxxxxxxx (¥99)
+- 🥉 xxxxxxxx (¥50)
+
+> If you'd like to appear here, please leave your name or nickname when donating!
+
+---
+
+## 💬 Community & Feedback
 
 - 📝 Report [Issues](https://github.com/jonnyan404/cloud-clipboard-go/issues)
 - 🔀 Submit [Pull Requests](https://github.com/jonnyan404/cloud-clipboard-go/pulls)

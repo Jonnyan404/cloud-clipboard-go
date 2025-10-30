@@ -35,6 +35,12 @@
 
 </details>
 
+<details>
+<summary><b>📡 路由器</b></summary>
+
+![OpenWrt Preview](https://github.com/Jonnyan404/cloud-clipboard-go/blob/main/openwrt/demo.png)
+
+</details>
 ---
 
 ## ✨ 主要功能
@@ -362,6 +368,40 @@ docker restart cloud-clipboard-go
 ## 📄 许可证
 
 MIT License - 详见 [LICENSE](LICENSE)
+
+---
+
+## ☕ 支持项目
+
+如果这个项目对你有帮助，欢迎通过以下方式支持我们：
+
+### 💰 赞赏捐助
+
+你的支持是我们继续维护和改进项目的动力！
+
+| 方式 | 二维码 |
+|------|--------|
+| **微信** | <img src="https://github.com/Jonnyan404/cloud-clipboard-go/blob/main/wechat.png" width="150" alt="微信赞赏码"> |
+| **支付宝** | <img src="https://your-alipay-qr-code-url.png" width="150" alt="支付宝收款码"> |
+
+
+### 🌟 其他支持方式
+
+- ⭐ **Star 项目** - 如果觉得项目不错，请给个 Star
+- 🐛 **报告问题** - 提交 Issues 帮助我们改进
+- 💡 **提出建议** - 在 Discussions 中分享你的想法
+- 🔀 **贡献代码** - 提交 Pull Requests 帮助项目发展
+- 📢 **分享项目** - 告诉更多需要的人
+
+### 📝 赞赏者名单
+
+感谢以下用户的支持：
+
+- 🥇 xxxxxxxx（赞赏 ¥199）
+- 🥈 xxxxxxxx（赞赏 ¥99）
+- 🥉 xxxxxxxx（赞赏 ¥50）
+
+> 如果你也想出现在这里，请在赞赏时备注你的名字或昵称！
 
 ---
 
