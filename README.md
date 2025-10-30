@@ -350,27 +350,6 @@ docker restart cloud-clipboard-go
 
 ---
 
-## 🙏 致谢
-
-本项目基于以下开源项目开发：
-
-- [TransparentLC/cloud-clipboard](https://github.com/TransparentLC/cloud-clipboard)
-- [yurenchen000/cloud-clipboard](https://github.com/yurenchen000/cloud-clipboard)
-
----
-
-## 📊 Star 历史
-
-[![Star History Chart](https://api.star-history.com/svg?repos=Jonnyan404/cloud-clipboard-go&type=Date)](https://www.star-history.com/#Jonnyan404/cloud-clipboard-go&Date)
-
----
-
-## 📄 许可证
-
-MIT License - 详见 [LICENSE](LICENSE)
-
----
-
 ## ☕ 支持项目
 
 如果这个项目对你有帮助，欢迎通过以下方式支持我们：
@@ -381,8 +360,8 @@ MIT License - 详见 [LICENSE](LICENSE)
 
 | 方式 | 二维码 |
 |------|--------|
-| **微信** | <img src="https://github.com/Jonnyan404/cloud-clipboard-go/blob/main/wechat.png" width="150" alt="微信赞赏码"> |
-| **支付宝** | <img src="https://your-alipay-qr-code-url.png" width="150" alt="支付宝收款码"> |
+| **微信** | <img src="https://github.com/Jonnyan404/cloud-clipboard-go/blob/main/wechat.png" width="300" alt="微信赞赏码"> |
+
 
 
 ### 🌟 其他支持方式
@@ -404,6 +383,26 @@ MIT License - 详见 [LICENSE](LICENSE)
 > 如果你也想出现在这里，请在赞赏时备注你的名字或昵称！
 
 ---
+
+## 🙏 致谢
+
+本项目基于以下开源项目开发：
+
+- [TransparentLC/cloud-clipboard](https://github.com/TransparentLC/cloud-clipboard)
+- [yurenchen000/cloud-clipboard](https://github.com/yurenchen000/cloud-clipboard)
+
+---
+
+## 📊 Star 历史
+
+[![Star History Chart](https://api.star-history.com/svg?repos=Jonnyan404/cloud-clipboard-go&type=Date)](https://www.star-history.com/#Jonnyan404/cloud-clipboard-go&Date)
+
+---
+
+## 📄 许可证
+
+MIT License - 详见 [LICENSE](LICENSE)
+
 
 ## 💬 交流反馈
 

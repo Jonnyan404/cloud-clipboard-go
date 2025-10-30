@@ -376,8 +376,6 @@ Your support motivates us to continue maintaining and improving this project!
 | Method | QR Code |
 |--------|---------|
 | **WeChat** | <img src="https://github.com/Jonnyan404/cloud-clipboard-go/blob/main/wechat.png" width="150" alt="WeChat"> |
-| **Alipay** | <img src="https://your-alipay-qr-code-url.png" width="150" alt="Alipay"> |
-
 
 ### 🌟 Other Ways to Support
 
