@@ -80,17 +80,31 @@ docker run -d \
 cloud-clipboard-go.exe -port 9501
 ```
 
-### 3️⃣ 使用 Homebrew（macOS）
+### 3️⃣ 使用 Android 应用（移动设备）
+
+对于在 Android 手机/平板上直接部署服务器的场景：
+
+1. 前往 [Releases](https://github.com/jonnyan404/cloud-clipboard-go/releases) 下载 `.apk` 文件
+2. 在 Android 设备上安装 APK
+3. 打开应用，设置监听端口（默认 9501）
+4. 设置访问密码（可选）
+5. 点击"启动服务"
+
+然后在其他设备访问：`http://你的安卓设备IP:9501`
+
+**优点**：
+- 📱 无需电脑，在手机上直接运行服务器
+- 🚀 开箱即用，无需额外依赖
+- 💾 支持数据持久化
+
+### 4️⃣ 使用 Homebrew（macOS）
 
 ```bash
 brew install Jonnyan404/tap/cloud-clipboard-go
 brew services start cloud-clipboard-go
 ```
 
-### 4️⃣ 使用 OpenWrt（路由器）
-
-- openwrt 24.x 测试通过
-- istore 22.03.x 测试通过
+### 5️⃣ 使用 OpenWrt（路由器）
 
 ```bash
 opkg update
@@ -98,7 +112,7 @@ opkg install cloud-clipboard-go_*_platform.ipk
 opkg install cloud-clipboard-go_*_all.ipk
 ```
 
-### 5️⃣ 从源代码构建
+### 6️⃣ 从源代码构建
 
 ```bash
 # 前置要求：Node.js >= 22.12、Go >= 1.22

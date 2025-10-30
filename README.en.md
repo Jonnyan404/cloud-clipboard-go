@@ -80,17 +80,31 @@ Download from [Releases](https://github.com/jonnyan404/cloud-clipboard-go/releas
 cloud-clipboard-go.exe -port 9501
 ```
 
-### 3️⃣ Homebrew (macOS)
+### 3️⃣ Android Application (Mobile Devices)
+
+For deploying server directly on Android phone/tablet:
+
+1. Download `.apk` file from [Releases](https://github.com/jonnyan404/cloud-clipboard-go/releases)
+2. Install APK on your Android device
+3. Open the app and set listening port (default 9501)
+4. Set access password (optional)
+5. Tap "Start Service"
+
+Then access from other devices: `http://your-android-device-ip:9501`
+
+**Advantages**:
+- 📱 Run server directly on your phone without a computer
+- 🚀 Ready to use, no additional dependencies
+- 💾 Data persistence support
+
+### 4️⃣ Homebrew (macOS)
 
 ```bash
 brew install Jonnyan404/tap/cloud-clipboard-go
 brew services start cloud-clipboard-go
 ```
 
-### 4️⃣ OpenWrt (Router)
-
-- Testd on openwrt 24.x
-- Testd on istore 23.03.x
+### 5️⃣ OpenWrt (Router)
 
 ```bash
 opkg update
@@ -98,7 +112,7 @@ opkg install cloud-clipboard-go_*_platform.ipk
 opkg install cloud-clipboard-go_*_all.ipk
 ```
 
-### 5️⃣ Build from Source
+### 6️⃣ Build from Source
 
 ```bash
 # Requirements: Node.js >= 22.12, Go >= 1.22
