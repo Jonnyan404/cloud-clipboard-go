@@ -375,7 +375,7 @@ Your support motivates us to continue maintaining and improving this project!
 
 | Method | QR Code |
 |--------|---------|
-| **WeChat** | <img src="https://github.com/Jonnyan404/cloud-clipboard-go/blob/main/wechat.png" width="150" alt="WeChat"> |
+| **WeChat** | <img src="https://github.com/Jonnyan404/cloud-clipboard-go/blob/main/wechat.png" width="300" alt="WeChat"> |
 
 ### 🌟 Other Ways to Support
 
