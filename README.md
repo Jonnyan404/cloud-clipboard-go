@@ -345,7 +345,7 @@ docker pull jonnyan404/cloud-clipboard-go:latest
 
 ## 🙏 致谢
 
-本项目基于以下开源项目开发：
+本项目前端(client)和后端(cloud-clip) fork以下开源项目修改而来：
 
 - [TransparentLC/cloud-clipboard](https://github.com/TransparentLC/cloud-clipboard)
 - [yurenchen000/cloud-clipboard](https://github.com/yurenchen000/cloud-clipboard)
