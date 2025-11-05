@@ -137,6 +137,43 @@ go mod tidy
 go run -tags embed .
 ```
 
+### 7️⃣ 使用 Cloudflare（云端部署）
+
+对于需要云端部署的场景，支持一键部署到 Cloudflare Workers + Pages：
+
+```bash
+# 前置要求：Node.js >= 22.12、Wrangler CLI
+
+# 1. 安装 Wrangler CLI
+npm install -g wrangler
+
+# 2. 登录 Cloudflare
+wrangler login
+
+# 3. 执行部署脚本
+cd cloudflare
+./deploy.sh
+```
+
+**部署包含**：
+- Cloudflare Workers (API 后端)
+- Cloudflare D1 (数据库)
+- Cloudflare R2 (文件存储)
+- Cloudflare Pages (前端界面)
+
+**优点**：
+- 🌐 全球 CDN 加速
+- 🚀 无需服务器维护
+- 💾 自动备份和扩展
+- 🔒 Cloudflare 安全防护
+
+**注意事项**：
+- 需要 Cloudflare 账号
+- 免费额度内使用（Workers: 100,000 请求/天，D1: 500MB 存储，R2: 10GB 存储）
+- 部署完成后会显示访问 URL
+
+详见：[Cloudflare 部署文档](./cloudflare/README.md)
+
 ---
 
 ## 📋 部署指南
