@@ -131,6 +131,43 @@ go mod tidy
 go run -tags embed .
 ```
 
+### 7️⃣ Cloudflare Deployment
+
+For cloud deployment scenarios, support one-click deployment to Cloudflare Workers + Pages:
+
+```bash
+# Requirements: Node.js >= 22.12, Wrangler CLI
+
+# 1. Install Wrangler CLI
+npm install -g wrangler
+
+# 2. Login to Cloudflare
+wrangler login
+
+# 3. Run deployment script
+cd cloudflare
+./deploy.sh
+```
+
+**Deployment includes**:
+- Cloudflare Workers (API backend)
+- Cloudflare D1 (database)
+- Cloudflare R2 (file storage)
+- Cloudflare Pages (frontend interface)
+
+**Advantages**:
+- 🌐 Global CDN acceleration
+- 🚀 No server maintenance required
+- 💾 Automatic backup and scaling
+- 🔒 Cloudflare security protection
+
+**Important Notes**:
+- Requires Cloudflare account
+- Free tier usage (Workers: 100,000 requests/day, D1: 500MB storage, R2: 10GB storage)
+- Access URL will be displayed after deployment
+
+See: [Cloudflare Deployment Documentation](./cloudflare/README.md)
+
 ---
 
 ## 📋 Deployment Guide
