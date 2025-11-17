@@ -14,3 +14,5 @@ cloudflare/workers/node_modules
 cloudflare/pages/server*
 .kotlin/
 *.keystore
+clipboard-monitor
+clipboard-monitor/src-tauri/target/
