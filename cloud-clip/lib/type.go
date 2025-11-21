@@ -29,6 +29,7 @@ type PostList struct {
 	sync.Mutex
 	nextid      int
 	history_len int
+	logger      *log.Logger // 新增：用于记录日志
 
 	List []PostEvent `json:"receive"`
 }
