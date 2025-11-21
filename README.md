@@ -264,10 +264,9 @@ docker-compose up -d
 
 ### 🖥️ 桌面端应用
 
-- **Clipboard Monitor**（推荐）
-  - 自动监控剪贴板
+- **Clipboard Sync**（仅提供给捐赠用户）
+  - 双向同步剪贴板
   - 支持 Windows/macOS/Linux
-  - 详见：[clipboard-monitor 文档](./clipboard-monitor/README.md)
 
 ### 💻 UI 辅助工具
 
@@ -320,7 +319,6 @@ docker pull jonnyan404/cloud-clipboard-go:latest
 
 - 📖 [配置文件说明](./cloud-clip/config.md)
 - 🔌 [HTTP API 文档](./cloud-clip/config.md)
-- 🖥️ [Clipboard Monitor 文档](./clipboard-monitor/README.md)
 - 📱 [客户端部署指南](#-客户端使用)
 
 ---
@@ -342,8 +340,6 @@ docker pull jonnyan404/cloud-clipboard-go:latest
 ## 📦 衍生项目
 
 - **[Cloud Clipboard Go Launcher](https://github.com/jonnyan404/cloud-clipboard-go-launcher)** - UI 辅助工具，方便不使用终端的用户
-- **[Clipboard Monitor](./clipboard-monitor/)** - 桌面端监控应用
-
 ---
 
 ## ☕ 支持项目
