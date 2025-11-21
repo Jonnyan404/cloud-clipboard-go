@@ -52,5 +52,9 @@ export default {
             });
         },
     },
+    mounted() {
+        // 组件加载完成后自动聚焦
+        this.focus();
+    },
 }
 </script>
