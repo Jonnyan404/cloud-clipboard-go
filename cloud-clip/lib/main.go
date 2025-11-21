@@ -79,7 +79,8 @@ func NewClipboardServer(cfg *Config) (*ClipboardServer, error) {
 	if cfg.Server.History > 0 {
 		mqHistoryLen = cfg.Server.History
 	}
-	mq := NewMessageQueue(mqHistoryLen)
+	// 修改：传入 logger 以便在淘汰消息时打印日志
+	mq := NewMessageQueue(mqHistoryLen, logger)
 
 	uaParser := uaparser.NewFromSaved() // 初始化UA解析器
 
