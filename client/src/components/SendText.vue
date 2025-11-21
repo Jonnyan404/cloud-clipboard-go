@@ -42,6 +42,7 @@ export default {
             ).then(response => {
                 this.$toast(this.$t('sendSuccess'));
                 this.$root.send.text = '';
+                this.focus(); // 发送成功后重新聚焦输入框
             }).catch(error => {
                 if (error.response && error.response.data.msg) {
                     this.$toast(this.$t('sendFailedMsg', { msg: error.response.data.msg }));
