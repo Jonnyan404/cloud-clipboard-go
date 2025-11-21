@@ -258,10 +258,9 @@ Example:
 
 ### 🖥️ Desktop Application
 
-- **Clipboard Monitor** (Recommended)
-  - Auto clipboard monitoring
+- **Clipboard Sync** (仅提供给捐赠用户)
+  - Auto clipboard sync
   - Supports Windows/macOS/Linux
-  - See: [Clipboard Monitor Documentation](./clipboard-monitor/README.md)
 
 ### 💻 UI Launcher Tool
 
@@ -314,7 +313,6 @@ docker pull jonnyan404/cloud-clipboard-go:latest
 
 - 📖 [Configuration Guide](./cloud-clip/config.md)
 - 🔌 [HTTP API Documentation](./cloud-clip/config.md)
-- 🖥️ [Clipboard Monitor Guide](./clipboard-monitor/README.md)
 - 📱 [Client Deployment](#-client-usage)
 
 ---
