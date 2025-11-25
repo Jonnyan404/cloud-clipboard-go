@@ -429,4 +429,4 @@ Thanks to those who have supported us:
 
 ---
 
-**Last Updated**: October 30, 2025 | 📖 [中文版本](README.md)
+**Last Updated**: November 25, 2025 | 📖 [中文版本](README.md)

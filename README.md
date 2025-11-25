@@ -63,6 +63,10 @@
 
 ### 1️⃣ 使用 Docker（最推荐）
 
+- [【腾讯云】2核2G云服务器新老同享 99元/年，续费同价](https://cloud.tencent.com/act/cps/redirect?redirect=6150&cps_key=0b1dfaf9bb573dac05abef76202dc8cc&from=console)
+- [【阿里云】2核2G云服务器新老同享 99元/年，续费同价](https://www.aliyun.com/daily-act/ecs/activity_selection?userCode=79h2wrag)
+
+
 ```bash
 # 方式一：Docker Compose（推荐）
 docker-compose up -d
@@ -332,7 +336,7 @@ docker pull jonnyan404/cloud-clipboard-go:latest
 | Windows | ✅ | ✅ | ✅ | 需要 Visual C++ Build Tools |
 | Android | ✅ | - | ✅ | 服务端APK/快捷指令 |
 | iOS | - | - | - | 快捷指令 |
-| OpenWrt | ✅ | - | ✅ | 路由器系统 |
+| OpenWrt | ✅ | ✅ | ✅ | 路由器系统 |
 
 ---
 
@@ -358,6 +362,8 @@ docker pull jonnyan404/cloud-clipboard-go:latest
 
 ### 🌟 其他支持方式
 
+- [【腾讯云】2核2G云服务器新老同享 99元/年，续费同价](https://cloud.tencent.com/act/cps/redirect?redirect=6150&cps_key=0b1dfaf9bb573dac05abef76202dc8cc&from=console)
+- [【阿里云】2核2G云服务器新老同享 99元/年，续费同价](https://www.aliyun.com/daily-act/ecs/activity_selection?userCode=79h2wrag)
 - ⭐ **Star 项目** - 如果觉得项目不错，请给个 Star
 - 🐛 **报告问题** - 提交 Issues 帮助我们改进
 - 💡 **提出建议** - 在 Discussions 中分享你的想法
@@ -404,4 +410,4 @@ MIT License - 详见 [LICENSE](LICENSE)
 
 ---
 
-**最后更新**: 2025年10月30日 | 📖 [English Version](README.en.md)
+**最后更新**: 2025年11月25日 | 📖 [English Version](README.en.md)
