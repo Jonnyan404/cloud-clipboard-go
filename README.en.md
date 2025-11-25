@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <strong>A cross-platform cloud clipboard synchronization tool that supports real-time synchronization of text, images, and files to cloud or local servers.</strong>
+  <strong>A cross-platform cloud clipboard tool that supports real-time send of text, images, and files to cloud or local servers.</strong>
 </p>
 
 ---
