@@ -121,7 +121,7 @@ func defaultConfig() *Config {
 			Limit  int `json:"limit"`
 		}{
 			Expire: 3600,
-			Chunk:  2 * _MB,
+			Chunk:  1 * _MB,
 			Limit:  256 * _MB,
 		},
 	}
