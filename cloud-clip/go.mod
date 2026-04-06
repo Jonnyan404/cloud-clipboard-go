@@ -12,9 +12,13 @@ require (
 	github.com/spaolacci/murmur3 v1.1.0
 	github.com/ua-parser/uap-go v0.0.0-20250326155420-f7f5a2f9f5bc
 	golang.org/x/image v0.27.0
+	golang.org/x/mobile v0.0.0-20250218173823-21e291c9c26e
 )
 
 require (
 	github.com/hashicorp/golang-lru v1.0.2 // indirect
+	golang.org/x/mod v0.23.0 // indirect
+	golang.org/x/sync v0.11.0 // indirect
+	golang.org/x/tools v0.30.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
