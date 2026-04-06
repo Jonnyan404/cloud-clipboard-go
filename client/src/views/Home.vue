@@ -233,14 +233,6 @@ export default {
                 }
             }
         },
-         '$root.received': function() {
-            this.$nextTick(() => {
-                const scrollThreshold = 200;
-                if (document.documentElement.scrollHeight - window.innerHeight - window.scrollY < scrollThreshold) {
-                     window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-                }
-            });
-        },
     },
     beforeDestroy() { // Added beforeDestroy for cleanup
         window.removeEventListener('popstate', this.handlePopState);
