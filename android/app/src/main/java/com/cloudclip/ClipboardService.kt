@@ -12,7 +12,6 @@ import android.os.IBinder
 import android.os.Looper
 import android.provider.DocumentsContract
 import androidx.core.app.NotificationCompat
-import androidx.documentfile.provider.DocumentFile
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import mobile.Mobile
 import java.io.File
@@ -55,16 +54,15 @@ class ClipboardService : Service() {
         val baseDir: File
         if (storageDirUriString != null) {
             val uri = Uri.parse(storageDirUriString)
-            val docFile = DocumentFile.fromTreeUri(this, uri)
             // Go无法直接处理DocumentFile，我们需要一个真实的、可访问的路径
             // 这在现代Android上很棘手，我们用一个折衷方案：使用公共目录
             // 注意：这依赖于 getPathFromUri 的实现，并且可能在某些设备上不完美
             val path = getPathFromUri(this, uri)
             baseDir = File(path)
         } else {
-            // 如果用户未选择，回退到公共Documents目录
-            val publicDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
-            baseDir = File(publicDir, "CloudClipboard")
+            // 默认使用应用专属目录，避免依赖已废弃的外部存储权限
+            val appDocumentsDir = getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS) ?: filesDir
+            baseDir = File(appDocumentsDir, "CloudClipboard")
         }
 
         if (!baseDir.exists()) {
