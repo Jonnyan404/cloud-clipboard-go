@@ -11,16 +11,17 @@ on:
       tag_name:
         description: 'The existing tag to build for and update the release (e.g., v1.0.0)'
         required: true
-        default: 'v4.5.26'
+        default: 'v4.6.0'
+
+permissions:
+  contents: write
 
 jobs:
-  build-apk:
-    name: Build APK for ${{ matrix.arch }}
+  determine-tag:
+    name: Determine Target Tag
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        arch: [arm64-v8a, armeabi-v7a]
-
+    outputs:
+      tag: ${{ steps.get_tag.outputs.tag }}
     steps:
       - name: Determine Tag Name
         id: get_tag
@@ -31,21 +32,15 @@ jobs:
             echo "tag=${{ github.event.inputs.tag_name }}" >> $GITHUB_OUTPUT
           fi
 
+  build-frontend:
+    name: Build Frontend Assets
+    runs-on: ubuntu-latest
+    needs: determine-tag
+    steps:
       - name: Checkout repository at the specified tag
         uses: actions/checkout@v4
         with:
-          ref: ${{ steps.get_tag.outputs.tag }}
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.22'
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
+          ref: ${{ needs.determine-tag.outputs.tag }}
 
       - name: Set up Node.js for frontend build
         uses: actions/setup-node@v4
@@ -59,6 +54,43 @@ jobs:
           cd client
           npm install
           npm run build
+
+      - name: Upload frontend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: client/dist
+
+  build-apk:
+    name: Build APK for ${{ matrix.arch }}
+    runs-on: ubuntu-latest
+    needs: [determine-tag, build-frontend]
+    strategy:
+      matrix:
+        arch: [arm64-v8a, armeabi-v7a, x86_64]
+
+    steps:
+      - name: Checkout repository at the specified tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.determine-tag.outputs.tag }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Download frontend artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: client/dist
 
       - name: Prepare Go embed directory
         run: |
@@ -83,7 +115,12 @@ jobs:
       - name: Build Go AAR package for ${{ matrix.arch }}
         run: |
           export PATH=$PATH:$(go env GOPATH)/bin
-          TARGET_ARCH=$([ "${{ matrix.arch }}" == "arm64-v8a" ] && echo "android/arm64" || echo "android/arm")
+          TARGET_ARCH=""
+          case "${{ matrix.arch }}" in
+            "arm64-v8a") TARGET_ARCH="android/arm64" ;;
+            "armeabi-v7a") TARGET_ARCH="android/arm" ;;
+            "x86_64") TARGET_ARCH="android/amd64" ;;
+          esac
           cd cloud-clip/mobile
           gomobile bind -v -tags embed -androidapi 24 -o cloudclipservice.aar -target=$TARGET_ARCH -ldflags="-s -w" github.com/jonnyan404/cloud-clipboard-go/cloud-clip/mobile
           mkdir -p ../../android/app/libs
@@ -105,38 +142,129 @@ jobs:
             -PabiFilters=${{ matrix.arch }} \
             -Psigning.key.alias=${{ secrets.SIGNING_KEY_ALIAS }} \
             -Psigning.key.password=${{ secrets.SIGNING_KEY_PASSWORD }} \
-            -Psigning.store.file=app/my-release-key.keystore \
+            -Psigning.store.file=$GITHUB_WORKSPACE/android/app/my-release-key.keystore \
             -Psigning.store.password=${{ secrets.SIGNING_KEY_STORE_PASSWORD }} \
             --stacktrace
-      
-      - name: Rename APK
+
+      - name: List build outputs for debugging
         run: |
-          mv android/app/build/outputs/apk/release/app-release.apk cloud-clipboard-go-${{ steps.get_tag.outputs.tag }}-${{ matrix.arch }}.apk
+          echo "Listing contents of android/app/build/outputs/apk/ ..."
+          ls -R android/app/build/outputs/apk/
+
+      - name: Find and Rename APK
+        run: |
+          APK_PATH=$(find android/app/build/outputs/apk -type f -name "app-${{ matrix.arch }}-release.apk")
+          if [ -z "$APK_PATH" ]; then echo "::error::Per-arch APK file not found!" && exit 1; fi
+          echo "Found APK at: $APK_PATH"
+          mv "$APK_PATH" "cloud-clipboard-go-${{ needs.determine-tag.outputs.tag }}-${{ matrix.arch }}.apk"
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: apk-artifacts
-          path: cloud-clipboard-go-${{ steps.get_tag.outputs.tag }}-${{ matrix.arch }}.apk
+          name: apk-per-arch-artifacts-${{ matrix.arch }}
+          path: cloud-clipboard-go-${{ needs.determine-tag.outputs.tag }}-${{ matrix.arch }}.apk
+
+  build-universal-apk:
+    name: Build Universal Android APK
+    runs-on: ubuntu-latest
+    needs: [determine-tag, build-frontend]
+
+    steps:
+      - name: Checkout repository at the specified tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.determine-tag.outputs.tag }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Download frontend artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: client/dist
+
+      - name: Prepare Go embed directory
+        run: |
+          rm -rf cloud-clip/lib/static
+          mkdir -p cloud-clip/lib/static
+          cp -r client/dist/* cloud-clip/lib/static/
+
+      - name: Install and initialize gomobile
+        run: |
+          go install golang.org/x/mobile/cmd/gomobile@latest
+          export PATH=$PATH:$(go env GOPATH)/bin
+          gomobile init
+
+      - name: Build Go Universal AAR package
+        run: |
+          export PATH=$PATH:$(go env GOPATH)/bin
+          cd cloud-clip/mobile
+          gomobile bind -v -tags embed -androidapi 24 -o cloudclipservice.aar \
+            -target=android/arm,android/arm64,android/amd64 \
+            -ldflags="-s -w" github.com/jonnyan404/cloud-clipboard-go/cloud-clip/mobile
+          mkdir -p ../../android/app/libs
+          cp cloudclipservice.aar ../../android/app/libs/
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Decode Signing Key
+        run: echo "${{ secrets.SIGNING_KEY_STORE_BASE64 }}" | base64 --decode > $GITHUB_WORKSPACE/android/app/my-release-key.keystore
+
+      - name: Make gradlew executable
+        run: chmod +x ./android/gradlew
+
+      - name: Build Universal Android Release APK
+        run: |
+          cd android
+          ./gradlew assembleRelease \
+            -PbuildUniversal \
+            -Psigning.key.alias=${{ secrets.SIGNING_KEY_ALIAS }} \
+            -Psigning.key.password=${{ secrets.SIGNING_KEY_PASSWORD }} \
+            -Psigning.store.file=$GITHUB_WORKSPACE/android/app/my-release-key.keystore \
+            -Psigning.store.password=${{ secrets.SIGNING_KEY_STORE_PASSWORD }} \
+            --stacktrace
+
+      - name: Find and Rename Universal APK
+        run: |
+          APK_PATH=$(find android/app/build/outputs/apk -type f -name "app-universal-release.apk")
+          if [ -z "$APK_PATH" ]; then echo "::error::Universal APK file not found!" && exit 1; fi
+          echo "Found Universal APK at: $APK_PATH"
+          mv "$APK_PATH" "cloud-clipboard-go-${{ needs.determine-tag.outputs.tag }}-universal.apk"
+
+      - name: Upload Universal APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk-universal-artifact
+          path: cloud-clipboard-go-${{ needs.determine-tag.outputs.tag }}-universal.apk
 
   # 单独的 job 用于更新 Release
   update-release:
     name: Update GitHub Release
-    needs: build-apk
+    needs: [determine-tag, build-apk, build-universal-apk]
     runs-on: ubuntu-latest
 
     steps:
       - name: Download all APK artifacts
         uses: actions/download-artifact@v4
         with:
-          name: apk-artifacts
-          path: apks
+          path: artifacts
 
       - name: Update Release with APKs
         uses: softprops/action-gh-release@v2
         with:
-          # 查找所有下载的 APK 文件并上传
-          files: apks/*.apk
-          # 关键：设置为 true 以更新现有 Release，而不是创建新的
+          tag_name: ${{ needs.determine-tag.outputs.tag }}
+          files: |
+            artifacts/apk-per-arch-artifacts-*/*.apk
+            artifacts/apk-universal-artifact/*.apk
           prerelease: false
           draft: false
