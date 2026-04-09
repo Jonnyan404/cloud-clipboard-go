@@ -62,9 +62,9 @@ jobs:
 
       - name: Prepare Go embed directory
         run: |
-          rm -rf cloud-clip/static
-          mkdir -p cloud-clip/static
-          cp -r client/dist/* cloud-clip/static/
+          rm -rf cloud-clip/lib/static
+          mkdir -p cloud-clip/lib/static
+          cp -r client/dist/* cloud-clip/lib/static/
 
       - name: Install and initialize gomobile
         run: |
