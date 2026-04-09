@@ -1,6 +1,5 @@
 package com.cloudclip
 
-import android.Manifest
 import android.app.Activity
 import android.content.BroadcastReceiver
 import android.content.ClipData
@@ -8,7 +7,6 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.content.pm.PackageManager
 import android.graphics.Color
 import android.net.Uri
 import android.os.Build
@@ -21,8 +19,6 @@ import android.view.View
 import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import java.io.File
 
@@ -61,10 +57,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    companion object {
-        private const val STORAGE_PERMISSION_CODE = 101
-    }
-
     // 注册目录选择器回调
     private val openDirectoryLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
@@ -100,9 +92,6 @@ class MainActivity : AppCompatActivity() {
 
         loadConfig()
         
-        // 检查并请求存储权限
-        checkAndRequestPermissions()
-
         storageDirText.setOnClickListener {
             val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
             openDirectoryLauncher.launch(intent)
@@ -165,27 +154,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun checkAndRequestPermissions() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-                ActivityCompat.requestPermissions(
-                    this,
-                    arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE),
-                    STORAGE_PERMISSION_CODE
-                )
-            }
-        }
-    }
-
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == STORAGE_PERMISSION_CODE) {
-            if (!(grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED)) {
-                Toast.makeText(this, "存储权限被拒绝，文件将无法持久化保存！", Toast.LENGTH_LONG).show()
-            }
-        }
-    }
-
     private fun loadConfig() {
         val prefs = getSharedPreferences("config", MODE_PRIVATE)
         portInput.setText(prefs.getInt("port", 9501).toString())
@@ -198,8 +166,9 @@ class MainActivity : AppCompatActivity() {
             storageDirText.text = getPathFromUri(this, uri)
             historyFileText.text = getPathFromUri(this, uri) + File.separator + "history.json"
         } else {
-            storageDirText.text = "点击选择目录 (推荐 Documents/CloudClipboard)"
-            historyFileText.text = "将与存储目录同步"
+            val defaultBaseDir = File(getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), "CloudClipboard")
+            storageDirText.text = defaultBaseDir.absolutePath
+            historyFileText.text = File(defaultBaseDir, "history.json").absolutePath
         }
     }
 
