@@ -113,5 +113,13 @@
     "daysAgo": "{days} 天前",
     "failedToLoadRooms": "載入房間列表失敗",
     "addedToFavorites": "已將 {room} 新增至收藏",
-    "removedFromFavorites": "已將 {room} 從收藏中移除"
+    "removedFromFavorites": "已將 {room} 從收藏中移除",
+    "currentRoomLabel": "目前房間",
+    "currentRoomShortLabel": "目前",
+    "favoriteRoomsLabel": "收藏",
+    "activeRoomsLabel": "活躍",
+    "otherRoomsLabel": "其他房間",
+    "hideRoomBrowser": "隱藏房間側欄",
+    "dockLeft": "停靠到左側",
+    "dockRight": "停靠到右側"
   }
