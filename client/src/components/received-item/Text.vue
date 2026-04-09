@@ -1,70 +1,58 @@
 <template>
     <v-hover v-slot:default="{ hover }">
-        <v-card :elevation="hover ? 6 : 2" class="mb-2 transition-swing">
+        <v-card :elevation="hover ? 10 : 2" class="timeline-card timeline-card--text mb-3 transition-swing" :class="{ 'timeline-card--dark': $vuetify.theme.dark }">
             <v-card-text>
-                <div class="d-flex flex-row align-center">
+                <div class="d-flex flex-row align-start">
                     <div class="flex-grow-1 mr-2" style="min-width: 0">
-                        <!-- Info Line - 移除ID部分 -->
-                        <div class="caption text--secondary mb-1" v-if="meta.timestamp && ($root.showTimestamp || $root.showDeviceInfo || $root.showSenderIP)">
+                        <div class="d-flex flex-wrap align-center mb-2 timeline-card__meta" v-if="meta.timestamp && ($root.showTimestamp || $root.showDeviceInfo || $root.showSenderIP)">
+                            <v-chip x-small label color="primary" text-color="white" class="mr-2 mb-1">{{ $t('textMessage') }}</v-chip>
                             <template v-if="$root.showTimestamp">
-                                <v-icon small class="mr-1">{{ mdiClockOutline }}</v-icon>{{ formatTimestamp(meta.timestamp) }}
+                                <span class="mr-3 mb-1"><v-icon small class="mr-1">{{ mdiClockOutline }}</v-icon>{{ formatTimestamp(meta.timestamp) }}</span>
                             </template>
                             <template v-if="$root.showDeviceInfo && meta.senderDevice?.type">
-                                <v-icon small class="ml-2 mr-1">{{ deviceIcon(meta.senderDevice.type) }}</v-icon>{{ meta.senderDevice.os || meta.senderDevice.type }}
+                                <span class="mr-3 mb-1"><v-icon small class="mr-1">{{ deviceIcon(meta.senderDevice.type) }}</v-icon>{{ meta.senderDevice.os || meta.senderDevice.type }}</span>
                             </template>
                             <template v-if="$root.showSenderIP && meta.senderIP">
-                                <v-icon small class="ml-2 mr-1">{{ mdiIpNetworkOutline }}</v-icon>{{ meta.senderIP }}
+                                <span class="mb-1"><v-icon small class="mr-1">{{ mdiIpNetworkOutline }}</v-icon>{{ meta.senderIP }}</span>
                             </template>
                         </div>
-                        <!-- Title -->
-                        <div class="title text-truncate text--primary" @click="expand = !expand">
+                        <div class="title text-truncate text--primary timeline-card__title" @click="expand = !expand">
                             {{ $t('textMessage') }}<v-icon>{{expand ? mdiChevronUp : mdiChevronDown}}</v-icon>
                         </div>
-                        <!-- Preview -->
-                        <div class="text-truncate" @click="expand = !expand">{{ decodedContentPreview }}</div>
+                        <div class="body-2 text--secondary timeline-card__preview text-truncate" @click="expand = !expand">{{ decodedContentPreview }}</div>
                     </div>
-                    <!-- Buttons + ID -->
-                    <div class="align-self-start text-no-wrap d-flex flex-column align-end">
-                        <!-- ID显示在按钮上方 -->
-                        <div v-if="meta.id" class="caption grey--text text--darken-1 mb-1">
+                    <div class="align-self-start text-no-wrap d-flex flex-column align-end timeline-card__actions">
+                        <div v-if="meta.id" class="caption grey--text text--darken-1 mb-2">
                             <v-icon small class="mr-1">{{ mdiPound }}</v-icon>{{ meta.id }}
                         </div>
-                        <!-- 按钮组 -->
                         <div>
-                            <!-- Copy Text Button -->
                             <v-tooltip bottom>
                                 <template v-slot:activator="{ on }">
-                                    <v-btn v-on="on" icon color="grey" @click="copyText">
+                                    <v-btn v-on="on" icon color="grey" class="timeline-card__icon-button" @click="copyText">
                                         <v-icon>{{mdiContentCopy}}</v-icon>
                                     </v-btn>
                                 </template>
                                 <span>{{ $t('copyText') }}</span>
                             </v-tooltip>
-
-                            <!-- Copy Link Button -->
                             <v-tooltip bottom>
                                 <template v-slot:activator="{ on }">
-                                    <v-btn v-on="on" icon color="grey" @click="copyLink">
+                                    <v-btn v-on="on" icon color="grey" class="timeline-card__icon-button" @click="copyLink">
                                         <v-icon>{{ mdiLinkVariant }}</v-icon>
                                     </v-btn>
                                 </template>
                                 <span>{{ $t('copyLink') }}</span>
                             </v-tooltip>
-
-                            <!-- Show QR Code Button -->
                             <v-tooltip bottom>
                                 <template v-slot:activator="{ on }">
-                                    <v-btn v-on="on" icon color="grey" @click="qrDialogVisible = true">
+                                    <v-btn v-on="on" icon color="grey" class="timeline-card__icon-button" @click="qrDialogVisible = true">
                                         <v-icon>{{ mdiQrcode }}</v-icon>
                                     </v-btn>
                                 </template>
                                 <span>{{ $t('showQrCode') }}</span>
                             </v-tooltip>
-
-                            <!-- Delete Button -->
                             <v-tooltip bottom>
                                 <template v-slot:activator="{ on }">
-                                    <v-btn v-on="on" icon color="grey" @click="deleteItem">
+                                    <v-btn v-on="on" icon color="grey" class="timeline-card__icon-button" @click="deleteItem">
                                         <v-icon>{{mdiClose}}</v-icon>
                                     </v-btn>
                                 </template>
@@ -234,3 +222,62 @@ export default {
     },
 }
 </script>
+
+<style scoped>
+.timeline-card {
+    border-radius: 22px;
+    border: 1px solid rgba(148, 163, 184, 0.26);
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.9);
+    transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.timeline-card--dark {
+    border-color: rgba(71, 85, 105, 0.72);
+    background: rgba(15, 23, 42, 0.9);
+}
+
+.timeline-card--text {
+    box-shadow: 0 14px 32px rgba(15, 23, 42, 0.06);
+}
+
+.timeline-card--text::before {
+    content: '';
+    display: block;
+    height: 4px;
+    background: linear-gradient(90deg, #0ea5e9, #14b8a6);
+}
+
+.timeline-card__meta {
+    color: rgba(71, 85, 105, 0.9);
+}
+
+.timeline-card__title {
+    cursor: pointer;
+}
+
+.timeline-card__preview {
+    cursor: pointer;
+    margin-top: 0.25rem;
+}
+
+.timeline-card__actions {
+    min-width: 8rem;
+}
+
+.timeline-card__icon-button {
+    background: rgba(248, 250, 252, 0.92);
+    margin-left: 0.125rem;
+}
+
+.timeline-card--dark .timeline-card__meta,
+.timeline-card--dark .timeline-card__preview,
+.timeline-card--dark .timeline-card__actions,
+.timeline-card--dark .grey--text {
+    color: rgba(226, 232, 240, 0.72) !important;
+}
+
+.timeline-card--dark .timeline-card__icon-button {
+    background: rgba(30, 41, 59, 0.92);
+}
+</style>

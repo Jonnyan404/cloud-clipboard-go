@@ -1,5 +1,5 @@
 <template>
-    <v-app>
+    <v-app class="app-shell" :class="{ 'app-shell--dark': $vuetify.theme.dark }">
         <v-navigation-drawer
             v-model="drawer"
             temporary
@@ -174,6 +174,8 @@
             app
             color="primary"
             dark
+            flat
+            class="app-shell__bar"
         >
             <v-app-bar-nav-icon @click.stop="drawer = !drawer" />
             <v-toolbar-title @click="goHome" style="cursor: pointer;">
@@ -239,7 +241,7 @@
             {{ $t('clipboardClearedRefresh') }}
         </v-alert>
 
-        <v-main>
+        <v-main class="app-shell__main">
             <template v-if="$route.meta.keepAlive">
                 <keep-alive><router-view /></keep-alive>
             </template>
@@ -453,6 +455,27 @@
 </template>
 
 <style scoped>
+.app-shell {
+    background: #f4f7fb;
+    transition: background-color 0.2s ease;
+}
+
+.app-shell--dark {
+    background: #0f172a;
+}
+
+.app-shell__bar {
+    box-shadow: 0 14px 34px rgba(15, 23, 42, 0.18) !important;
+}
+
+.app-shell--dark .app-shell__bar {
+    box-shadow: 0 14px 34px rgba(2, 6, 23, 0.42) !important;
+}
+
+.app-shell__main {
+    background: transparent;
+}
+
 .v-navigation-drawer >>> .v-navigation-drawer__border {
     pointer-events: none;
 }
