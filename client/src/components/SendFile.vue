@@ -1,9 +1,9 @@
 <template>
-    <div>
-        <div class="headline text--primary mb-4">{{ $t('sendFile') }}</div>
+    <div class="send-panel" :class="{ 'send-panel--compact': compact }">
+        <div v-if="!hideTitle" class="headline text--primary mb-4">{{ $t('sendFile') }}</div>
         <v-card
             outlined
-            class="pa-3 mb-6 d-flex flex-row align-center"
+            class="send-file-dropzone pa-3 mb-6 d-flex flex-row align-center"
             @dragenter="$event.preventDefault()"
             @dragover="$event.preventDefault()"
             @dragleave="$event.preventDefault()"
@@ -67,9 +67,10 @@
         </v-card>
         <div class="text-right">
             <v-btn
+                depressed
                 color="primary"
                 :block="$vuetify.breakpoint.smAndDown"
-                :disabled="!$root.send.files.length || !$root.websocket || progress"
+                :disabled="isDisabled"
                 @click="send"
             >{{ $t('send') }}</v-btn>
         </div>
@@ -86,6 +87,16 @@ import {
 
 export default {
     name: 'send-file',
+    props: {
+        hideTitle: {
+            type: Boolean,
+            default: false,
+        },
+        compact: {
+            type: Boolean,
+            default: false,
+        },
+    },
     data() {
         return {
             progress: false,
@@ -104,6 +115,9 @@ export default {
         },
         uploadProgress() {
             return Math.min(this.fileSize !== 0 ? (this.uploadedSize / this.fileSize) : 0, 1);
+        },
+        isDisabled() {
+            return !this.$root.send.files.length || !this.$root.websocket || this.progress;
         },
         isUploadingImage() {
             return this.$root.send.files.length && this.$root.send.files[0].type.startsWith('image/');
@@ -188,3 +202,22 @@ export default {
     },
 }
 </script>
+
+<style scoped>
+.send-file-dropzone {
+    border-radius: 20px;
+    border-style: dashed !important;
+    border-width: 1.5px !important;
+    border-color: rgba(14, 165, 233, 0.35) !important;
+    background: rgba(248, 250, 252, 0.75);
+}
+
+.theme--dark .send-file-dropzone {
+    border-color: rgba(56, 189, 248, 0.45) !important;
+    background: rgba(30, 41, 59, 0.84);
+}
+
+.send-panel--compact .send-file-dropzone {
+    margin-bottom: 1rem !important;
+}
+</style>
