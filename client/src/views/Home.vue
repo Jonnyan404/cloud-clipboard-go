@@ -7,14 +7,30 @@
 
             <v-card class="timeline-panel" :class="{ 'surface-card--dark': $vuetify.theme.dark }" outlined>
                 <div class="timeline-panel__body px-3 px-md-5 py-4">
-                    <v-fade-transition group>
-                        <component
-                            v-for="item in $root.received"
-                            :key="item.id"
-                            :is="item.type === 'text' ? 'received-text' : 'received-file'"
-                            :meta="item"
-                        />
-                    </v-fade-transition>
+                    <div v-if="$root.received.length" class="timeline-panel__stream">
+                        <v-fade-transition group>
+                            <div
+                                v-for="item in $root.received"
+                                :key="item.id"
+                                class="timeline-panel__item"
+                                :class="{ 'timeline-panel__item--first': item === $root.received[0] }"
+                            >
+                                <v-chip
+                                    v-if="item === $root.received[0]"
+                                    x-small
+                                    outlined
+                                    color="primary"
+                                    class="timeline-panel__count-chip timeline-panel__count-chip--overlay"
+                                >
+                                    {{ $root.received.length }} {{ $t('messages') }}
+                                </v-chip>
+                                <component
+                                    :is="item.type === 'text' ? 'received-text' : 'received-file'"
+                                    :meta="item"
+                                />
+                            </div>
+                        </v-fade-transition>
+                    </div>
 
                     <v-sheet
                         v-if="!$root.received.length"
@@ -146,6 +162,38 @@ export default {
     min-height: 24rem;
 }
 
+.timeline-panel__stream {
+    position: relative;
+}
+
+.timeline-panel__item {
+    position: relative;
+}
+
+.timeline-panel__item--first {
+    padding-top: 10px;
+}
+
+.timeline-panel__count-chip {
+    height: 22px;
+    padding: 0 6px;
+    border-radius: 999px;
+}
+
+.timeline-panel__count-chip--overlay {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1;
+    backdrop-filter: blur(8px);
+    background: rgba(255, 255, 255, 0.78);
+}
+
+.home-minimal--dark .timeline-panel__count-chip--overlay {
+    background: rgba(15, 23, 42, 0.78);
+}
+
 .empty-timeline {
     border: 1px dashed rgba(148, 163, 184, 0.35);
     background: rgba(248, 250, 252, 0.68) !important;
@@ -176,6 +224,14 @@ export default {
 @media (max-width: 960px) {
     .home-minimal {
         min-height: calc(100vh - 56px);
+    }
+
+    .timeline-panel__stream {
+        padding-left: 0;
+    }
+
+    .timeline-panel__count-chip--overlay {
+        left: 50%;
     }
 }
 </style>

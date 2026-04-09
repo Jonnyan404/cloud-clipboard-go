@@ -186,7 +186,7 @@
             <!-- Room List Button (only show if roomList is enabled) -->
             <v-tooltip left v-if="$root.config && $root.config.server && $root.config.server.roomList">
                 <template v-slot:activator="{ on }">
-                    <v-btn icon v-on="on" @click="roomSheet = true; fetchRoomList();">
+                    <v-btn icon v-on="on" @click="openRoomBrowser()">
                         <v-badge
                             :content="availableRooms.length"
                             :value="availableRooms.length > 0"
@@ -242,10 +242,176 @@
         </v-alert>
 
         <v-main class="app-shell__main">
-            <template v-if="$route.meta.keepAlive">
-                <keep-alive><router-view /></keep-alive>
-            </template>
-            <router-view v-else />
+            <div
+                class="app-shell__workspace"
+                :class="{
+                    'app-shell__workspace--dock-right': isDesktopRoomDockEnabled && roomDockSide === 'right',
+                    'app-shell__workspace--dock-left': isDesktopRoomDockEnabled && roomDockSide === 'left'
+                }"
+            >
+                <div class="app-shell__content">
+                    <template v-if="$route.meta.keepAlive">
+                        <keep-alive><router-view /></keep-alive>
+                    </template>
+                    <router-view v-else />
+                </div>
+
+                <aside
+                    v-if="isDesktopRoomDockVisible"
+                    class="room-browser room-browser--dock"
+                    :class="[
+                        { 'room-browser--dark': $vuetify.theme.dark },
+                        roomDockSide === 'left' ? 'room-browser--dock-left' : 'room-browser--dock-right'
+                    ]"
+                >
+                    <div class="room-browser__header room-browser__header--dock d-flex align-center">
+                        <div class="d-flex align-center room-browser__title-wrap">
+                            <v-icon left>{{ mdiViewGrid }}</v-icon>
+                            <span>{{ $t('roomList') }}</span>
+                            <v-chip class="ml-2" small outlined>{{ availableRooms.length }} {{ $t('rooms') }}</v-chip>
+                        </div>
+                        <div class="d-flex align-center">
+                            <v-tooltip left>
+                                <template v-slot:activator="{ on }">
+                                    <v-btn icon v-on="on" @click="toggleRoomDockSide()">
+                                        <v-icon>{{ roomDockSide === 'right' ? mdiChevronLeft : mdiChevronRight }}</v-icon>
+                                    </v-btn>
+                                </template>
+                                <span>{{ roomDockSide === 'right' ? $t('dockLeft') : $t('dockRight') }}</span>
+                            </v-tooltip>
+                            <v-tooltip bottom>
+                                <template v-slot:activator="{ on }">
+                                    <v-btn icon small v-on="on" @click="hideDesktopRoomDock()">
+                                        <v-icon>{{ mdiClose }}</v-icon>
+                                    </v-btn>
+                                </template>
+                                <span>{{ $t('hideRoomBrowser') }}</span>
+                            </v-tooltip>
+                        </div>
+                    </div>
+
+                    <div class="room-browser__body room-browser__body--dock">
+                        <div class="room-browser__toolbar">
+                            <v-text-field
+                                v-model="roomSearch"
+                                :placeholder="$t('searchRooms')"
+                                :prepend-inner-icon="mdiMagnify"
+                                outlined
+                                dense
+                                clearable
+                                hide-details
+                                class="room-browser__search"
+                            ></v-text-field>
+                        </div>
+
+                        <div class="room-browser__summary">
+                            <v-chip small outlined color="primary">{{ getRoomDisplayName({ name: $root.room }) }}</v-chip>
+                            <v-chip small outlined>{{ favoriteRooms.length }} {{ $t('favoriteRoomsLabel') }}</v-chip>
+                            <v-chip small outlined>{{ activeRooms.length }} {{ $t('activeRoomsLabel') }}</v-chip>
+                        </div>
+
+                        <div v-if="roomsLoading" class="text-center py-4">
+                            <v-progress-circular indeterminate color="primary"></v-progress-circular>
+                            <div class="mt-2">{{ $t('loadingRooms') }}</div>
+                        </div>
+
+                        <div v-else-if="filteredRooms.length === 0" class="text-center py-8">
+                            <v-icon size="64" color="grey lighten-1">{{ mdiHomeOutline }}</v-icon>
+                            <div class="mt-2 grey--text">{{ $t('noRoomsFound') }}</div>
+                        </div>
+
+                        <div v-else class="room-browser__sections">
+                            <section v-if="currentRoomEntry" class="room-group">
+                                <div class="room-group__label">{{ $t('currentRoomLabel') }}</div>
+                                <v-list class="room-list" dense>
+                                    <v-list-item
+                                        class="room-entry room-entry--current"
+                                        @click="switchRoom(currentRoomEntry.name)"
+                                    >
+                                        <v-list-item-avatar size="42" class="room-entry__avatar room-entry__avatar--current">
+                                            <v-icon color="primary">{{ currentRoomEntry.name === '' ? mdiHomeOutline : mdiHome }}</v-icon>
+                                        </v-list-item-avatar>
+                                        <v-list-item-content>
+                                            <div class="room-entry__title-row">
+                                                <div class="room-entry__name">{{ getRoomDisplayName(currentRoomEntry) }}</div>
+                                                <v-chip x-small color="primary" text-color="white">{{ $t('currentRoomShortLabel') }}</v-chip>
+                                            </div>
+                                            <v-list-item-subtitle class="room-entry__meta">
+                                                {{ currentRoomEntry.deviceCount || 0 }} {{ $t('devices') }} · {{ $t('messages') }} {{ currentRoomEntry.messageCount || 0 }}
+                                            </v-list-item-subtitle>
+                                            <v-list-item-subtitle class="room-entry__activity">
+                                                {{ $t('lastActive') }} · {{ formatTime(currentRoomEntry.lastActive) }}
+                                            </v-list-item-subtitle>
+                                        </v-list-item-content>
+                                        <v-list-item-action>
+                                            <v-btn
+                                                icon
+                                                small
+                                                @click.stop="toggleFavoriteRoom(currentRoomEntry.name)"
+                                                :color="currentRoomEntry.isFavorite ? 'error' : ''"
+                                            >
+                                                <v-icon small>
+                                                    {{ currentRoomEntry.isFavorite ? mdiHeart : mdiHeartOutline }}
+                                                </v-icon>
+                                            </v-btn>
+                                        </v-list-item-action>
+                                    </v-list-item>
+                                </v-list>
+                            </section>
+
+                            <section
+                                v-for="group in sidebarRoomGroups"
+                                :key="`dock-${group.key}`"
+                                class="room-group"
+                            >
+                                <div class="room-group__label">{{ group.title }}</div>
+                                <v-list class="room-list" dense>
+                                    <v-list-item
+                                        v-for="room in group.rooms"
+                                        :key="room.name"
+                                        class="room-entry"
+                                        :class="{ 'room-entry--active': room.isActive }"
+                                        @click="switchRoom(room.name)"
+                                    >
+                                        <v-list-item-avatar size="42" class="room-entry__avatar">
+                                            <v-icon :color="room.isActive ? 'success' : 'primary'">
+                                                {{ room.name === '' ? mdiHomeOutline : mdiHome }}
+                                            </v-icon>
+                                        </v-list-item-avatar>
+                                        <v-list-item-content>
+                                            <div class="room-entry__title-row">
+                                                <div class="room-entry__name">{{ getRoomDisplayName(room) }}</div>
+                                                <div class="room-entry__state" :class="room.isActive ? 'room-entry__state--active' : 'room-entry__state--idle'">
+                                                    <span class="room-entry__state-dot"></span>
+                                                    {{ room.isActive ? $t('active') : $t('inactive') }}
+                                                </div>
+                                            </div>
+                                            <v-list-item-subtitle class="room-entry__meta">
+                                                {{ room.deviceCount || 0 }} {{ $t('devices') }} · {{ $t('messages') }} {{ room.messageCount || 0 }}
+                                            </v-list-item-subtitle>
+                                            <v-list-item-subtitle class="room-entry__activity">
+                                                {{ $t('lastActive') }} · {{ formatTime(room.lastActive) }}
+                                            </v-list-item-subtitle>
+                                        </v-list-item-content>
+                                        <v-list-item-action>
+                                            <v-btn
+                                                icon
+                                                small
+                                                @click.stop="toggleFavoriteRoom(room.name)"
+                                                :color="room.isFavorite ? 'error' : ''"
+                                            >
+                                                <v-icon small>
+                                                    {{ room.isFavorite ? mdiHeart : mdiHeartOutline }}
+                                                </v-icon>
+                                            </v-btn>
+                                        </v-list-item-action>
+                                    </v-list-item>
+                                </v-list>
+                            </section>
+                        </div>
+                    </div>
+                </aside>
+            </div>
         </v-main>
 
         <v-dialog v-model="colorDialog" max-width="300" hide-overlay>
@@ -297,7 +463,7 @@
                         :label="$t('roomName')"
                         :append-icon="mdiDiceMultiple"
                         @click:append="$root.roomInput = ['reimu', 'marisa', 'rumia', 'cirno', 'meiling', 'patchouli', 'sakuya', 'remilia', 'flandre', 'letty', 'chen', 'lyrica', 'lunasa', 'merlin', 'youmu', 'yuyuko', 'ran', 'yukari', 'suika', 'mystia', 'keine', 'tewi', 'reisen', 'eirin', 'kaguya', 'mokou'][Math.floor(Math.random() * 26)] + '-' + Math.random().toString(16).substring(2, 6)"
-                        @keyup.enter="$router.push({ path: '/', query: { room: $root.roomInput }}); $root.roomDialog = false;"
+                        @keyup.enter="submitRoomChange()"
                         autofocus
                     ></v-text-field>
                 </v-card-text>
@@ -311,10 +477,7 @@
                     <v-btn
                         color="primary darken-1"
                         text
-                        @click="
-                            $router.push({ path: '/', query: { room: $root.roomInput }});
-                            $root.roomDialog = false;
-                        "
+                        @click="submitRoomChange()"
                     >{{ $t('enterRoom') }}</v-btn>
                 </v-card-actions>
             </v-card>
@@ -343,110 +506,147 @@
         </v-dialog>
 
         <!-- Room List Bottom Sheet -->
-        <v-bottom-sheet v-model="roomSheet" scrollable max-width="800">
-            <v-card>
-                <v-card-title class="d-flex align-center">
+        <v-bottom-sheet v-model="roomSheet" scrollable max-width="820">
+            <v-card class="room-browser" :class="{ 'room-browser--dark': $vuetify.theme.dark }">
+                <v-card-title class="d-flex align-center room-browser__header">
                     <v-icon left>{{ mdiViewGrid }}</v-icon>
                     {{ $t('roomList') }}
                     <v-chip class="ml-2" small outlined>{{ availableRooms.length }} {{ $t('rooms') }}</v-chip>
                     <v-spacer></v-spacer>
-                    <!-- 移除刷新按钮 -->
                     <v-btn icon @click="roomSheet = false">
                         <v-icon>{{ mdiClose }}</v-icon>
                     </v-btn>
                 </v-card-title>
-                
+
                 <v-divider></v-divider>
-                
-                <v-card-text style="max-height: 60vh;">
-                    <!-- Search Box -->
-                    <v-text-field
-                        v-model="roomSearch"
-                        :placeholder="$t('searchRooms')"
-                        :prepend-inner-icon="mdiMagnify"
-                        outlined
-                        dense
-                        clearable
-                        class="mb-4"
-                    ></v-text-field>
-                    
-                    <!-- Loading State -->
+
+                <v-card-text class="room-browser__body">
+                    <div class="room-browser__toolbar">
+                        <v-text-field
+                            v-model="roomSearch"
+                            :placeholder="$t('searchRooms')"
+                            :prepend-inner-icon="mdiMagnify"
+                            outlined
+                            dense
+                            clearable
+                            hide-details
+                            class="room-browser__search"
+                        ></v-text-field>
+                        <v-btn
+                            outlined
+                            color="primary"
+                            class="room-browser__manual-action"
+                            @click="roomSheet = false; $root.roomInput = $root.room; $root.roomDialog = true"
+                        >
+                            {{ $t('enterRoom') }}
+                        </v-btn>
+                    </div>
+
+                    <div class="room-browser__summary">
+                        <v-chip small outlined color="primary">{{ getRoomDisplayName({ name: $root.room }) }}</v-chip>
+                        <v-chip small outlined>{{ favoriteRooms.length }} {{ $t('favoriteRoomsLabel') }}</v-chip>
+                        <v-chip small outlined>{{ activeRooms.length }} {{ $t('activeRoomsLabel') }}</v-chip>
+                    </div>
+
                     <div v-if="roomsLoading" class="text-center py-4">
                         <v-progress-circular indeterminate color="primary"></v-progress-circular>
                         <div class="mt-2">{{ $t('loadingRooms') }}</div>
                     </div>
-                    
-                    <!-- Empty State -->
+
                     <div v-else-if="filteredRooms.length === 0" class="text-center py-8">
                         <v-icon size="64" color="grey lighten-1">{{ mdiHomeOutline }}</v-icon>
                         <div class="mt-2 grey--text">{{ $t('noRoomsFound') }}</div>
                     </div>
-                    
-                    <!-- Room Grid -->
-                    <v-row v-else>
-                        <v-col
-                            v-for="room in filteredRooms"
-                            :key="room.name"
-                            cols="12"
-                            sm="6"
-                            md="4"
+
+                    <div v-else class="room-browser__sections">
+                        <section v-if="currentRoomEntry" class="room-group">
+                            <div class="room-group__label">{{ $t('currentRoomLabel') }}</div>
+                            <v-list class="room-list" dense>
+                                <v-list-item
+                                    class="room-entry room-entry--current"
+                                    @click="switchRoom(currentRoomEntry.name)"
+                                >
+                                    <v-list-item-avatar size="42" class="room-entry__avatar room-entry__avatar--current">
+                                        <v-icon color="primary">{{ currentRoomEntry.name === '' ? mdiHomeOutline : mdiHome }}</v-icon>
+                                    </v-list-item-avatar>
+                                    <v-list-item-content>
+                                        <div class="room-entry__title-row">
+                                            <div class="room-entry__name">{{ getRoomDisplayName(currentRoomEntry) }}</div>
+                                            <v-chip x-small color="primary" text-color="white">{{ $t('currentRoomShortLabel') }}</v-chip>
+                                        </div>
+                                        <v-list-item-subtitle class="room-entry__meta">
+                                            {{ currentRoomEntry.deviceCount || 0 }} {{ $t('devices') }} · {{ $t('messages') }} {{ currentRoomEntry.messageCount || 0 }}
+                                        </v-list-item-subtitle>
+                                        <v-list-item-subtitle class="room-entry__activity">
+                                            {{ $t('lastActive') }} · {{ formatTime(currentRoomEntry.lastActive) }}
+                                        </v-list-item-subtitle>
+                                    </v-list-item-content>
+                                    <v-list-item-action>
+                                        <v-btn
+                                            icon
+                                            small
+                                            @click.stop="toggleFavoriteRoom(currentRoomEntry.name)"
+                                            :color="currentRoomEntry.isFavorite ? 'error' : ''"
+                                        >
+                                            <v-icon small>
+                                                {{ currentRoomEntry.isFavorite ? mdiHeart : mdiHeartOutline }}
+                                            </v-icon>
+                                        </v-btn>
+                                    </v-list-item-action>
+                                </v-list-item>
+                            </v-list>
+                        </section>
+
+                        <section
+                            v-for="group in roomGroups"
+                            :key="group.key"
+                            class="room-group"
                         >
-                            <v-card
-                                outlined
-                                hover
-                                :color="$root.room === room.name ? 'primary' : ''"
-                                :dark="$root.room === room.name"
-                                @click="switchRoom(room.name)"
-                                style="cursor: pointer; transition: all 0.3s ease;"
-                                :elevation="$root.room === room.name ? 4 : 0"
-                            >
-                                <v-card-text>
-                                    <div class="d-flex justify-space-between align-center mb-3">
-                                        <v-icon :color="$root.room === room.name ? 'white' : 'primary'">
+                            <div class="room-group__label">{{ group.title }}</div>
+                            <v-list class="room-list" dense>
+                                <v-list-item
+                                    v-for="room in group.rooms"
+                                    :key="room.name"
+                                    class="room-entry"
+                                    :class="{ 'room-entry--active': room.isActive }"
+                                    @click="switchRoom(room.name)"
+                                >
+                                    <v-list-item-avatar size="42" class="room-entry__avatar">
+                                        <v-icon :color="room.isActive ? 'success' : 'primary'">
                                             {{ room.name === '' ? mdiHomeOutline : mdiHome }}
                                         </v-icon>
-                                        <v-chip
-                                            x-small
-                                            :color="room.isActive ? 'success' : 'grey'"
-                                            :text-color="room.isActive ? 'white' : 'grey darken-2'"
-                                        >
-                                            {{ room.isActive ? $t('active') : $t('inactive') }}
-                                        </v-chip>
-                                    </div>
-                                    
-                                    <div class="subtitle-1 font-weight-bold mb-2" style="word-break: break-word;">
-                                        {{ room.name || $t('publicRoom') }}
-                                    </div>
-                                    
-                                    <div class="caption mb-3" :class="$root.room === room.name ? 'white--text' : 'grey--text'">
-                                        {{ $t('messages') }}: {{ room.messageCount }}<br>
-                                        {{ $t('lastActive') }}: {{ formatTime(room.lastActive) }}
-                                    </div>
-                                    
-                                    <div class="d-flex justify-space-between align-center">
-                                        <v-chip 
-                                            x-small 
-                                            :outlined="$root.room !== room.name"
-                                            :color="$root.room === room.name ? 'white' : 'primary'"
-                                            :text-color="$root.room === room.name ? 'primary' : 'white'"
-                                        >
-                                            {{ room.deviceCount }} {{ $t('devices') }}
-                                        </v-chip>
+                                    </v-list-item-avatar>
+                                    <v-list-item-content>
+                                        <div class="room-entry__title-row">
+                                            <div class="room-entry__name">{{ getRoomDisplayName(room) }}</div>
+                                            <div class="room-entry__state" :class="room.isActive ? 'room-entry__state--active' : 'room-entry__state--idle'">
+                                                <span class="room-entry__state-dot"></span>
+                                                {{ room.isActive ? $t('active') : $t('inactive') }}
+                                            </div>
+                                        </div>
+                                        <v-list-item-subtitle class="room-entry__meta">
+                                            {{ room.deviceCount || 0 }} {{ $t('devices') }} · {{ $t('messages') }} {{ room.messageCount || 0 }}
+                                        </v-list-item-subtitle>
+                                        <v-list-item-subtitle class="room-entry__activity">
+                                            {{ $t('lastActive') }} · {{ formatTime(room.lastActive) }}
+                                        </v-list-item-subtitle>
+                                    </v-list-item-content>
+                                    <v-list-item-action>
                                         <v-btn
-                                            x-small
                                             icon
+                                            small
                                             @click.stop="toggleFavoriteRoom(room.name)"
-                                            :color="$root.room === room.name ? 'white' : 'grey'"
+                                            :color="room.isFavorite ? 'error' : ''"
                                         >
                                             <v-icon small>
                                                 {{ room.isFavorite ? mdiHeart : mdiHeartOutline }}
                                             </v-icon>
                                         </v-btn>
-                                    </div>
-                                </v-card-text>
-                            </v-card>
-                        </v-col>
-                    </v-row>
+                                    </v-list-item-action>
+                                </v-list-item>
+                            </v-list>
+                        </section>
+                    </div>
                 </v-card-text>
             </v-card>
         </v-bottom-sheet>
@@ -476,6 +676,27 @@
     background: transparent;
 }
 
+.app-shell__workspace {
+    display: flex;
+    align-items: flex-start;
+    gap: 20px;
+    min-height: calc(100vh - 64px);
+    padding: 16px 20px 24px;
+}
+
+.app-shell__workspace--dock-left {
+    flex-direction: row;
+}
+
+.app-shell__workspace--dock-right {
+    flex-direction: row-reverse;
+}
+
+.app-shell__content {
+    flex: 1;
+    min-width: 0;
+}
+
 .v-navigation-drawer >>> .v-navigation-drawer__border {
     pointer-events: none;
 }
@@ -485,6 +706,230 @@
     /* Adjust top value if your app bar height is different */
     top: 64px; /* Default Vuetify app bar height */
     z-index: 5; /* Ensure it's above v-main but below v-app-bar */
+}
+
+.room-browser {
+    border-top-left-radius: 24px;
+    border-top-right-radius: 24px;
+    background: rgba(255, 255, 255, 0.96);
+}
+
+.room-browser--dark {
+    background: rgba(15, 23, 42, 0.96);
+}
+
+.room-browser__header {
+    padding-bottom: 12px;
+}
+
+.room-browser__header--dock {
+    padding: 16px 18px 12px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.room-browser__title-wrap {
+    min-width: 0;
+}
+
+.room-browser__body {
+    max-height: 68vh;
+    padding-top: 20px;
+}
+
+.room-browser__body--dock {
+    max-height: calc(100vh - 164px);
+    overflow: auto;
+    padding: 16px 18px 20px;
+}
+
+.room-browser__toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.room-browser__search {
+    flex: 1;
+}
+
+.room-browser__manual-action {
+    flex: 0 0 auto;
+}
+
+.room-browser__summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 18px;
+}
+
+.room-browser__sections {
+    display: grid;
+    gap: 18px;
+}
+
+.room-browser--dock {
+    position: sticky;
+    top: 80px;
+    flex: 0 0 332px;
+    width: 332px;
+    max-height: calc(100vh - 100px);
+    border-radius: 24px;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.14);
+    overflow: hidden;
+}
+
+.room-group {
+    display: grid;
+    gap: 10px;
+}
+
+.room-group__label {
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(100, 116, 139, 0.95);
+}
+
+.app-shell--dark .room-group__label {
+    color: rgba(148, 163, 184, 0.9);
+}
+
+.room-list {
+    padding: 0;
+    background: transparent !important;
+}
+
+.room-entry {
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    border-radius: 18px;
+    margin-bottom: 10px;
+    padding: 10px 8px;
+    background: rgba(248, 250, 252, 0.72);
+    transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+}
+
+.room-entry:hover {
+    transform: translateY(-1px);
+    border-color: rgba(59, 130, 246, 0.3);
+    box-shadow: 0 12px 24px rgba(15, 23, 42, 0.06);
+}
+
+.room-entry--current {
+    border-color: rgba(59, 130, 246, 0.38);
+    background: rgba(239, 246, 255, 0.92);
+}
+
+.app-shell--dark .room-entry {
+    border-color: rgba(71, 85, 105, 0.78);
+    background: rgba(15, 23, 42, 0.7);
+}
+
+.app-shell--dark .room-entry--current {
+    border-color: rgba(96, 165, 250, 0.52);
+    background: rgba(30, 41, 59, 0.92);
+}
+
+.room-entry__avatar {
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.7);
+}
+
+.app-shell--dark .room-entry__avatar {
+    background: rgba(30, 41, 59, 0.8);
+}
+
+.room-entry__avatar--current {
+    background: rgba(219, 234, 254, 0.9);
+}
+
+.app-shell--dark .room-entry__avatar--current {
+    background: rgba(30, 64, 175, 0.24);
+}
+
+.room-entry__title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 4px;
+}
+
+.room-entry__name {
+    font-size: 0.98rem;
+    font-weight: 700;
+    color: rgba(15, 23, 42, 0.96);
+    word-break: break-word;
+}
+
+.app-shell--dark .room-entry__name {
+    color: rgba(226, 232, 240, 0.96);
+}
+
+.room-entry__meta,
+.room-entry__activity {
+    color: rgba(100, 116, 139, 0.95) !important;
+}
+
+.app-shell--dark .room-entry__meta,
+.app-shell--dark .room-entry__activity {
+    color: rgba(148, 163, 184, 0.9) !important;
+}
+
+.room-entry__state {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    font-size: 0.74rem;
+    font-weight: 600;
+}
+
+.room-entry__state--active {
+    color: #15803d;
+}
+
+.room-entry__state--idle {
+    color: #64748b;
+}
+
+.app-shell--dark .room-entry__state--active {
+    color: #86efac;
+}
+
+.app-shell--dark .room-entry__state--idle {
+    color: #94a3b8;
+}
+
+.room-entry__state-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: currentColor;
+    opacity: 0.9;
+}
+
+@media (max-width: 600px) {
+    .room-browser__toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .room-entry__title-row {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 4px;
+    }
+}
+
+@media (max-width: 1263px) {
+    .app-shell__workspace {
+        display: block;
+        padding: 0;
+    }
 }
 </style>
 
@@ -506,6 +951,8 @@ import {
     mdiIpNetworkOutline,
     mdiViewGrid,
     mdiClose,
+    mdiChevronLeft,
+    mdiChevronRight,
     mdiMagnify,
     mdiHome,
     mdiHomeOutline,
@@ -522,6 +969,8 @@ export default {
             clipboardClearedMessageVisible: false,
             roomSheet: false,
             roomSearch: '',
+            roomDockVisible: true,
+            roomDockSide: 'right',
             availableRooms: [],
             roomsLoading: false,
             // 图标
@@ -541,6 +990,8 @@ export default {
             mdiIpNetworkOutline,
             mdiViewGrid,
             mdiClose,
+            mdiChevronLeft,
+            mdiChevronRight,
             mdiMagnify,
             mdiHome,
             mdiHomeOutline,
@@ -559,8 +1010,14 @@ export default {
                 default: return 'English';
             }
         },
+        isDesktopRoomDockEnabled() {
+            return !this.$vuetify.breakpoint.mdAndDown && this.$root.config && this.$root.config.server && this.$root.config.server.roomList;
+        },
+        isDesktopRoomDockVisible() {
+            return this.isDesktopRoomDockEnabled && this.roomDockVisible;
+        },
         filteredRooms() {
-            let rooms = this.availableRooms;
+            let rooms = this.availableRooms.slice();
             
             // 先按搜索条件过滤
             if (this.roomSearch) {
@@ -580,8 +1037,129 @@ export default {
                 return 0;
             });
         },
+        currentRoomEntry() {
+            const currentRoomName = this.$root.room || '';
+            return this.filteredRooms.find(room => room.name === currentRoomName) || this.createOptimisticRoom(currentRoomName);
+        },
+        favoriteRooms() {
+            const currentRoomName = this.$root.room || '';
+            return this.filteredRooms.filter(room => room.isFavorite && room.name !== currentRoomName);
+        },
+        activeRooms() {
+            const currentRoomName = this.$root.room || '';
+            return this.filteredRooms.filter(room => !room.isFavorite && room.isActive && room.name !== currentRoomName);
+        },
+        otherRooms() {
+            const currentRoomName = this.$root.room || '';
+            return this.filteredRooms.filter(room => !room.isFavorite && !room.isActive && room.name !== currentRoomName);
+        },
+        roomGroups() {
+            return [
+                {
+                    key: 'favorites',
+                    title: this.$t('favoriteRoomsLabel'),
+                    rooms: this.favoriteRooms,
+                },
+                {
+                    key: 'active',
+                    title: this.$t('activeRoomsLabel'),
+                    rooms: this.activeRooms,
+                },
+                {
+                    key: 'other',
+                    title: this.$t('otherRoomsLabel'),
+                    rooms: this.otherRooms,
+                },
+            ].filter(group => group.rooms.length > 0);
+        },
+        sidebarRoomGroups() {
+            return [
+                {
+                    key: 'favorites',
+                    title: this.$t('favoriteRoomsLabel'),
+                    rooms: this.favoriteRooms,
+                },
+                {
+                    key: 'other',
+                    title: this.$t('otherRoomsLabel'),
+                    rooms: this.otherRooms.concat(this.activeRooms),
+                },
+            ].filter(group => group.rooms.length > 0);
+        },
     },
     methods: {
+        async submitRoomChange() {
+            const roomName = this.$root.roomInput || '';
+
+            this.ensureRoomPresent(roomName);
+
+            await this.$router.push({
+                path: '/',
+                query: roomName ? { room: roomName } : {},
+            });
+
+            this.$root.roomDialog = false;
+        },
+        createOptimisticRoom(roomName = this.$root.room || '') {
+            if (roomName === undefined || roomName === null) {
+                return null;
+            }
+
+            const normalizedRoomName = roomName || '';
+
+            return {
+                name: normalizedRoomName,
+                isFavorite: this.getFavoriteRooms().includes(normalizedRoomName),
+                isActive: true,
+                messageCount: 0,
+                deviceCount: 0,
+                lastActive: Math.floor(Date.now() / 1000),
+            };
+        },
+        ensureRoomPresent(roomName = this.$root.room || '') {
+            const normalizedRoomName = roomName || '';
+
+            if (this.availableRooms.some(room => room.name === normalizedRoomName)) {
+                return;
+            }
+
+            this.availableRooms = [
+                this.createOptimisticRoom(normalizedRoomName),
+                ...this.availableRooms,
+            ];
+        },
+        openRoomBrowser() {
+            if (this.isDesktopRoomDockEnabled) {
+                this.roomDockVisible = true;
+                this.persistRoomBrowserPreferences();
+                this.ensureRoomPresent();
+                this.fetchRoomList();
+                return;
+            }
+
+            this.roomSheet = true;
+            this.ensureRoomPresent();
+            this.fetchRoomList();
+        },
+        hideDesktopRoomDock() {
+            this.roomDockVisible = false;
+            this.persistRoomBrowserPreferences();
+        },
+        toggleRoomDockSide() {
+            this.roomDockSide = this.roomDockSide === 'right' ? 'left' : 'right';
+            this.persistRoomBrowserPreferences();
+        },
+        persistRoomBrowserPreferences() {
+            localStorage.setItem('roomDockVisible', String(this.roomDockVisible));
+            localStorage.setItem('roomDockSide', this.roomDockSide);
+        },
+        restoreRoomBrowserPreferences() {
+            const storedVisible = localStorage.getItem('roomDockVisible');
+            const storedSide = localStorage.getItem('roomDockSide');
+
+            this.roomDockVisible = storedVisible === null ? true : storedVisible === 'true';
+            this.roomDockSide = storedSide === 'left' ? 'left' : 'right';
+        },
         async clearAll() {
             // Set message visible immediately on confirmation
             // this.clipboardClearedMessageVisible = true; // Moved to button click for immediate feedback
@@ -672,6 +1250,7 @@ export default {
                     ...room,
                     isFavorite: favoriteRooms.includes(room.name)
                 }));
+                this.ensureRoomPresent();
                 console.log(`房间列表更新成功，共 ${this.availableRooms.length} 个房间`);
             } catch (error) {
                 console.error('Failed to fetch room list:', error);
@@ -724,6 +1303,9 @@ export default {
             
             // 注意：由于使用了计算属性 filteredRooms，收藏状态改变后会自动重新排序
         },
+        getRoomDisplayName(room) {
+            return room && room.name ? room.name : this.$t('publicRoom');
+        },
 
         // 修复格式化时间方法
         formatTime(timestamp) {
@@ -754,6 +1336,8 @@ export default {
         // stopRoomRefresh() - 已删除
     },
     mounted() {
+        this.restoreRoomBrowserPreferences();
+
         // primary color <==> localStorage
         const darkPrimary = localStorage.getItem('darkPrimary');
         const lightPrimary = localStorage.getItem('lightPrimary');
@@ -772,11 +1356,23 @@ export default {
             localStorage.setItem('lightPrimary', newVal);
         });
 
+        this.$watch('isDesktopRoomDockVisible', (newVal) => {
+            if (newVal) {
+                this.ensureRoomPresent();
+                this.fetchRoomList();
+            }
+        }, { immediate: true });
+
         console.log('App.vue mounted - 房间列表将在用户点击时获取');
     },
     watch: {
         '$route'() {
             this.clipboardClearedMessageVisible = false;
+
+            if (this.$root.config && this.$root.config.server && this.$root.config.server.roomList) {
+                this.ensureRoomPresent();
+                this.fetchRoomList();
+            }
         }
     }
 };

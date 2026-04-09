@@ -113,5 +113,13 @@
     "daysAgo": "{days} 日前",
     "failedToLoadRooms": "ルームリストの読み込みに失敗しました",
     "addedToFavorites": "{room} をお気に入りに追加しました",
-    "removedFromFavorites": "{room} をお気に入りから削除しました"
+    "removedFromFavorites": "{room} をお気に入りから削除しました",
+    "currentRoomLabel": "現在のルーム",
+    "currentRoomShortLabel": "現在",
+    "favoriteRoomsLabel": "お気に入り",
+    "activeRoomsLabel": "アクティブ",
+    "otherRoomsLabel": "その他のルーム",
+    "hideRoomBrowser": "ルームサイドバーを隠す",
+    "dockLeft": "左側に固定",
+    "dockRight": "右側に固定"
   }
