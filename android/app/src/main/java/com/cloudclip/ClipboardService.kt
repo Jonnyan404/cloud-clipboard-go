@@ -3,14 +3,11 @@ package com.cloudclip
 import android.app.*
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.net.wifi.WifiManager
 import android.os.Build
-import android.os.Environment
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
-import android.provider.DocumentsContract
 import androidx.core.app.NotificationCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import mobile.Mobile
@@ -48,22 +45,7 @@ class ClipboardService : Service() {
 
         val port = intent?.getIntExtra("port", 9501) ?: 9501
         val auth = intent?.getStringExtra("auth") ?: ""
-        val storageDirUriString = intent?.getStringExtra("storageDirUri")
-
-        // 根据URI或默认值确定路径
-        val baseDir: File
-        if (storageDirUriString != null) {
-            val uri = Uri.parse(storageDirUriString)
-            // Go无法直接处理DocumentFile，我们需要一个真实的、可访问的路径
-            // 这在现代Android上很棘手，我们用一个折衷方案：使用公共目录
-            // 注意：这依赖于 getPathFromUri 的实现，并且可能在某些设备上不完美
-            val path = getPathFromUri(this, uri)
-            baseDir = File(path)
-        } else {
-            // 默认使用应用专属目录，避免依赖已废弃的外部存储权限
-            val appDocumentsDir = getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS) ?: filesDir
-            baseDir = File(appDocumentsDir, "CloudClipboard")
-        }
+        val baseDir = CloudClipboardPaths.resolveBaseDir(this)
 
         if (!baseDir.exists()) {
             baseDir.mkdirs()
@@ -210,25 +192,4 @@ class ClipboardService : Service() {
         }
     }
 
-    // 将 getPathFromUri 移到这里，因为它在 Service 中也需要
-    private fun getPathFromUri(context: Context, uri: Uri): String {
-        // 确保在 Android 5.0 (Lollipop) 及以上版本运行
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            // 检查 URI 是否代表一个目录树
-            if (DocumentsContract.isTreeUri(uri)) {
-                val treeDocId = DocumentsContract.getTreeDocumentId(uri)
-                val split = treeDocId.split(":")
-                if (split.size > 1) {
-                    val type = split[0]
-                    val path = split[1]
-                    // 如果是主存储器
-                    if ("primary".equals(type, ignoreCase = true)) {
-                        return "${Environment.getExternalStorageDirectory()}/$path"
-                    }
-                }
-            }
-        }
-        // 如果以上方法失败，使用备用方案
-        return uri.path ?: "未知路径"
-    }
 }

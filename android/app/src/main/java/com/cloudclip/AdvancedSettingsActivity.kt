@@ -3,6 +3,7 @@ package com.cloudclip
 import android.os.Bundle
 import android.widget.Button
 import android.widget.EditText
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import org.json.JSONException
@@ -11,6 +12,7 @@ import java.io.File
 
 class AdvancedSettingsActivity : AppCompatActivity() {
 
+    private lateinit var configPathText: TextView
     private lateinit var jsonEditor: EditText
     private lateinit var saveButton: Button
     private lateinit var restoreDefaultsButton: Button
@@ -21,16 +23,14 @@ class AdvancedSettingsActivity : AppCompatActivity() {
         setContentView(R.layout.activity_advanced_settings)
 
         // 初始化视图
+        configPathText = findViewById(R.id.configPathText)
         jsonEditor = findViewById(R.id.jsonEditor)
         saveButton = findViewById(R.id.saveButton)
         restoreDefaultsButton = findViewById(R.id.restoreDefaultsButton)
 
-        // 设置配置文件路径
-        val configDir = File(filesDir, "cloudclip")
-        if (!configDir.exists()) {
-            configDir.mkdirs()
-        }
-        configFile = File(configDir, "config.json")
+        // 使用与后台服务相同的配置文件路径
+        configFile = CloudClipboardPaths.resolveConfigFile(this)
+        configPathText.text = "当前配置文件: ${configFile.absolutePath}"
 
         // 加载当前配置
         loadConfig()
