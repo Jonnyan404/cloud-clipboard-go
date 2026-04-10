@@ -14,7 +14,6 @@ import android.os.Bundle
 import android.os.Environment
 import android.os.Handler
 import android.os.Looper
-import android.provider.DocumentsContract
 import android.view.View
 import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
@@ -68,7 +67,7 @@ class MainActivity : AppCompatActivity() {
                 val prefs = getSharedPreferences("config", MODE_PRIVATE).edit()
                 prefs.putString("storageDirUri", uri.toString())
                 prefs.apply()
-                storageDirText.text = getPathFromUri(this, uri)
+                storageDirText.text = CloudClipboardPaths.getPathFromUri(this, uri)
             }
         }
     }
@@ -163,10 +162,11 @@ class MainActivity : AppCompatActivity() {
         val storageDirUriString = prefs.getString("storageDirUri", null)
         if (storageDirUriString != null) {
             val uri = Uri.parse(storageDirUriString)
-            storageDirText.text = getPathFromUri(this, uri)
-            historyFileText.text = getPathFromUri(this, uri) + File.separator + "history.json"
+            val resolvedPath = CloudClipboardPaths.getPathFromUri(this, uri)
+            storageDirText.text = resolvedPath
+            historyFileText.text = resolvedPath + File.separator + "history.json"
         } else {
-            val defaultBaseDir = File(getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), "CloudClipboard")
+            val defaultBaseDir = CloudClipboardPaths.resolveBaseDir(this)
             storageDirText.text = defaultBaseDir.absolutePath
             historyFileText.text = File(defaultBaseDir, "history.json").absolutePath
         }
@@ -178,23 +178,6 @@ class MainActivity : AppCompatActivity() {
         prefs.putString("auth", authInput.text.toString())
         // 路径URI已在选择时保存，此处无需重复保存
         prefs.apply()
-    }
-
-    // 辅助函数：从URI获取一个可读的路径用于显示
-    private fun getPathFromUri(context: Context, uri: Uri): String {
-        // 尝试从 Document Provider 获取路径
-        if (DocumentsContract.isDocumentUri(context, uri)) {
-            val docId = DocumentsContract.getTreeDocumentId(uri)
-            val split = docId.split(":")
-            if (split.size > 1) {
-                val type = split[0]
-                val path = split[1]
-                if ("primary".equals(type, ignoreCase = true)) {
-                    return "${Environment.getExternalStorageDirectory()}/$path"
-                }
-            }
-        }
-        return uri.path ?: "未知路径"
     }
 
     private fun updateStatus() {
