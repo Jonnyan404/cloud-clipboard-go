@@ -24,6 +24,22 @@
 
 将`option enabled`改为`1`以启用服务
 
+如需使用按房间密码,请编辑 `/etc/cloud-clipboard/config.json`，在 `server` 下加入 `roomAuth`，例如：
+
+```json
+{
+   "server": {
+      "auth": true,
+      "roomAuth": {
+         "private": "",
+         "finance": "finance-pass"
+      }
+   }
+}
+```
+
+其中空字符串表示该房间沿用全局 `auth`，非空字符串表示该房间使用独立密码。
+
 5. 启动服务
 
 `/etc/init.d/cloud-clipboard start`

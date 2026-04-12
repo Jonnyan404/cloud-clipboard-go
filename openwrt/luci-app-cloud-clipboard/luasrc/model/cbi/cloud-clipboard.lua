@@ -22,13 +22,13 @@ o.rmempty = false
 o = s:option(Value, "auth", translate("访问密码"))
 o.password = true
 o.rmempty = true
-o.description = translate("如果设置,访问时需要输入此密码。留空表示不需要密码。")
+o.description = translate("如果设置,访问时需要输入此密码。留空表示不需要密码。启用 roomAuth 且房间密码为空字符串时,也会回退到这里。")
 
 -- 添加配置文件路径设置
 o = s:option(Value, "config", translate("配置文件路径"))
 o.default = "/etc/cloud-clipboard/config.json"
 o.rmempty = false
-o.description = translate("高级选项：配置文件路径。") .. 
+o.description = translate("高级选项：配置文件路径。可在配置文件中使用 roomAuth 按房间配置密码。") .. 
                 ' <a href="' .. 
                 luci.dispatcher.build_url("admin", "services", "cloud-clipboard", "config") .. 
                 '" class="cbi-button cbi-button-apply">' .. translate("编辑配置文件") .. '</a>'
