@@ -12,6 +12,7 @@
 cloudflare/workers/.wrangler
 cloudflare/workers/node_modules
 cloudflare/pages/server*
+cloudflare/node_modules
 .kotlin/
 *.keystore
 clipboard-monitor
