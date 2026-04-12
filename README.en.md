@@ -59,7 +59,7 @@
 
 ```bash
 # Option 1: Docker Compose (Recommended)
-docker-compose up -d
+docker compose up -d
 
 # Option 2: Docker CLI
 docker run -d \
@@ -176,49 +176,57 @@ See: [Cloudflare Deployment Documentation](./cloudflare/README.md)
 
 ### Docker Compose Configuration
 
-Create `docker-compose.yml`:
+Use the existing `docker-compose.yml` in the repository root as the source of truth. The container entrypoint generates the runtime config from these environment variables, so the documentation should match that file exactly.
+
+Edit the root `docker-compose.yml` as needed:
 
 ```yaml
-version: '3.8'
-
 services:
   cloud-clipboard-go:
-    image: jonnyan404/cloud-clipboard-go:latest
     container_name: cloud-clipboard-go
     restart: always
     ports:
       - "9501:9501"
-    environment:
-      - LISTEN_IP= # Default is 0.0.0.0, can be set to 127.0.0.1. Don't change if unsure.
-      - LISTEN_IP6= # Default is empty, can be set to ::. Don't change if unsure.
-      - LISTEN_PORT= # Default is 9501, can be set to other ports.
-      - PREFIX= # Subpath, can be used with nginx, format: /cloud-clipboard
-      - MESSAGE_NUM= # Number of history records, default is 10.
-      - AUTH_PASSWORD= # Access password, default is false, can be a custom string password.
-      - ROOM_AUTH_JSON= # Room password JSON, example {"finance":"finance-pass","private":""}
-      - TEXT_LIMIT= # Text length limit, default is 4096 (2048 Chinese characters).
-      - FILE_EXPIRE= # File expiration time, default is 3600 (1 hour), unit is seconds.
-      - FILE_LIMIT= # File size limit, default is 104857600 (100MB), unit is bytes.
-      - MKCERT_DOMAIN_OR_IP= # The domain name or IP address for mkcert, defaults to empty. You can set it to other domain names or IPs. Multiple values can be separated by spaces. Wildcards are supported for domain names only.
-      - MANUAL_KEY_PATH= # Manually set the path for the key. Defaults to empty. This parameter has higher priority than MKCERT_DOMAIN_OR_IP.
-      - MANUAL_CERT_PATH= # Manually set the path for the certificate. Defaults to empty. This parameter has higher priority than MKCERT_DOMAIN_OR_IP.
-      - ROOM_LIST= #是否启用房间列表展示功能,默认false
-    volumes:
-      - ./data:/app/server-node/data  # Data persistence
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9501"]
+      test: ["CMD-SHELL", "PORT=\"${LISTEN_PORT:-9501}\"; PREFIX=\"${PREFIX:-}\"; wget -q --no-check-certificate --spider \"https://127.0.0.1:${PORT}${PREFIX}/server\" || wget -q --spider \"http://127.0.0.1:${PORT}${PREFIX}/server\" || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 10s
+    environment:
+      LISTEN_IP: ${LISTEN_IP:-} # Defaults to 0.0.0.0. You can set 127.0.0.1 if needed.
+      LISTEN_IP6: ${LISTEN_IP6:-} # Defaults to empty. You can set :: for IPv6.
+      LISTEN_PORT: ${LISTEN_PORT:-} # Defaults to 9501.
+      PREFIX: ${PREFIX:-} # Subpath, for example /cloud-clipboard
+      MESSAGE_NUM: ${MESSAGE_NUM:-} # History item count, defaults to 10.
+      AUTH_PASSWORD: ${AUTH_PASSWORD:-} # Global access password, defaults to false.
+      ROOM_AUTH_JSON: '${ROOM_AUTH_JSON:-{}}' # Room password JSON, for example {"finance":"finance-pass","ops":""}
+      TEXT_LIMIT: ${TEXT_LIMIT:-} # Text length limit, defaults to 4096.
+      FILE_EXPIRE: ${FILE_EXPIRE:-} # File expiration time in seconds, defaults to 3600.
+      FILE_LIMIT: ${FILE_LIMIT:-} # File size limit in bytes, defaults to 104857600.
+      MKCERT_DOMAIN_OR_IP: ${MKCERT_DOMAIN_OR_IP:-} # mkcert domain or IP. Multiple values can be separated by spaces.
+      MANUAL_KEY_PATH: ${MANUAL_KEY_PATH:-} # Manual key path. Higher priority than MKCERT_DOMAIN_OR_IP.
+      MANUAL_CERT_PATH: ${MANUAL_CERT_PATH:-} # Manual certificate path. Higher priority than MKCERT_DOMAIN_OR_IP.
+      ROOM_LIST: ${ROOM_LIST:-} # Enable room list display, default is false.
+    volumes:
+      - /path/your/dir/data:/app/server-node/data # Replace with your own directory
+    image: jonnyan404/cloud-clipboard-go:latest
 ```
 
 Run:
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 `ROOM_AUTH_JSON` must be a valid JSON object. An empty string value means that room falls back to `AUTH_PASSWORD`.
+
+Additional notes:
+
+- The documented Docker Compose variable name is `ROOM_AUTH_JSON`.
+- The entrypoint still accepts the legacy variable name `ROOM_AUTH` for backward compatibility, but the Compose example and docs are now standardized on `ROOM_AUTH_JSON`.
+- If you use a `.env` file, keep the same variable names and only fill in the values.
+- The image now includes `wget`, and the health check probes `https://127.0.0.1:${LISTEN_PORT}${PREFIX}/server` first, then falls back to HTTP, so it works for both in-container HTTPS and plain HTTP setups.
 
 Example:
 
