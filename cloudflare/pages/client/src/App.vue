@@ -1302,11 +1302,14 @@ export default {
                  console.log('Already on public room (/), not navigating.');
             }
         },
-        async fetchRoomsWithToken(token = '') {
-            const normalizedToken = (token || '').trim();
+        async fetchRooms() {
+            const candidateTokens = typeof this.$root.getKnownAuthTokens === 'function'
+                ? this.$root.getKnownAuthTokens()
+                : [];
+            const dedupedTokens = Array.from(new Set(candidateTokens.map(token => (token || '').trim()).filter(Boolean)));
             const response = await this.$http.get('rooms', {
-                headers: normalizedToken ? {
-                    Authorization: `Bearer ${normalizedToken}`,
+                headers: dedupedTokens.length ? {
+                    'X-Room-Auth-Tokens': JSON.stringify(dedupedTokens),
                 } : undefined,
                 __skipRoomAuthHandling: true,
             });
@@ -1327,55 +1330,10 @@ export default {
             this.roomListRefreshSilent = true;
             console.log('获取房间列表');
             try {
-                const candidateTokens = typeof this.$root.getKnownAuthTokens === 'function'
-                    ? this.$root.getKnownAuthTokens()
-                    : [];
-                const requestTokens = [''].concat(candidateTokens.filter(Boolean));
-                const seenTokens = new Set();
-                const mergedRooms = new Map();
-                let successfulRequests = 0;
-                let lastError = null;
-                for (const token of requestTokens) {
-                    const tokenKey = (token || '').trim();
-                    if (seenTokens.has(tokenKey)) {
-                        continue;
-                    }
-                    seenTokens.add(tokenKey);
-
-                    let rooms = [];
-                    try {
-                        rooms = await this.fetchRoomsWithToken(tokenKey);
-                        successfulRequests++;
-                    } catch (error) {
-                        lastError = error;
-                        console.warn('房间列表请求失败，跳过当前 token', {
-                            hasToken: Boolean(tokenKey),
-                            message: error?.message,
-                            status: error?.response?.status,
-                        });
-                        continue;
-                    }
-
-                    for (const room of rooms) {
-                        const existing = mergedRooms.get(room.name);
-                        mergedRooms.set(room.name, existing ? {
-                            ...existing,
-                            ...room,
-                            messageCount: Math.max(existing.messageCount || 0, room.messageCount || 0),
-                            deviceCount: Math.max(existing.deviceCount || 0, room.deviceCount || 0),
-                            lastActive: Math.max(existing.lastActive || 0, room.lastActive || 0),
-                            isActive: Boolean(existing.isActive || room.isActive),
-                            isProtected: Boolean(existing.isProtected || room.isProtected),
-                        } : room);
-                    }
-                }
-
-                if (successfulRequests === 0 && lastError) {
-                    throw lastError;
-                }
+                const rooms = await this.fetchRooms();
 
                 const favoriteRooms = this.getFavoriteRooms();
-                this.syncAvailableRooms(Array.from(mergedRooms.values()).map(room => ({
+                this.syncAvailableRooms(rooms.map(room => ({
                     ...room,
                     isFavorite: favoriteRooms.includes(room.name)
                 })));

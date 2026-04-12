@@ -145,6 +145,79 @@ export default {
                 }
             }
         },
+        async uploadSingleFile(file, index) {
+            this.progress = true;
+            await this.$http.post('upload', file, {
+                headers: {
+                    'Content-Type': file.type || 'application/octet-stream',
+                    'X-File-Name': encodeURIComponent(file.name),
+                    'X-File-Size': String(file.size),
+                },
+                params: new URLSearchParams([['room', this.$root.room]]),
+                onUploadProgress: e => this.$set(this.uploadedSizes, index, e.loaded),
+            });
+        },
+        async uploadMultipartFile(file, index, chunkSize) {
+            let session = null;
+            try {
+                const initResponse = await this.$http.post('upload/multipart/create', {
+                    name: file.name,
+                    size: file.size,
+                    type: file.type || 'application/octet-stream',
+                }, {
+                    headers: { 'Content-Type': 'application/json' },
+                    params: new URLSearchParams([['room', this.$root.room]]),
+                });
+                session = initResponse.data.result;
+
+                const parts = [];
+                let uploadedSize = 0;
+                this.progress = true;
+
+                while (uploadedSize < file.size) {
+                    const chunk = file.slice(uploadedSize, uploadedSize + chunkSize);
+                    const partNumber = parts.length + 1;
+                    const partResponse = await this.$http.put(`upload/multipart/${partNumber}`, chunk, {
+                        headers: { 'Content-Type': 'application/octet-stream' },
+                        params: new URLSearchParams([
+                            ['room', this.$root.room],
+                            ['uploadId', session.uploadId],
+                            ['key', session.key],
+                        ]),
+                        onUploadProgress: e => this.$set(this.uploadedSizes, index, uploadedSize + e.loaded),
+                    });
+                    parts.push(partResponse.data.result || partResponse.data);
+                    uploadedSize += chunk.size;
+                    this.$set(this.uploadedSizes, index, uploadedSize);
+                }
+
+                await this.$http.post('upload/multipart/complete', {
+                    uploadId: session.uploadId,
+                    key: session.key,
+                    name: file.name,
+                    size: file.size,
+                    parts,
+                }, {
+                    headers: { 'Content-Type': 'application/json' },
+                    params: new URLSearchParams([['room', this.$root.room]]),
+                });
+            } catch (error) {
+                if (session && session.uploadId && session.key) {
+                    try {
+                        await this.$http.delete('upload/multipart', {
+                            params: new URLSearchParams([
+                                ['room', this.$root.room],
+                                ['uploadId', session.uploadId],
+                                ['key', session.key],
+                            ]),
+                        });
+                    } catch (abortError) {
+                        console.error('取消分片上传失败:', abortError);
+                    }
+                }
+                throw error;
+            }
+        },
         async send() {
             try {
                 const chunkSize = this.$root.config.file.chunk;
@@ -152,40 +225,17 @@ export default {
                 this.uploadedSizes.push(...Array(this.$root.send.files.length).fill(0));
                 await Promise.all(this.$root.send.files.map(async (file, i) => {
                     if (file.size < chunkSize) {
-                        const fd = new FormData;
-                        fd.set('file', file);
-                        this.progress = true;
-                        await this.$http.post('upload', fd, {
-                            params: new URLSearchParams([['room', this.$root.room]]),
-                            onUploadProgress: e => this.$set(this.uploadedSizes, i, e.loaded),
-                        });
+                        await this.uploadSingleFile(file, i);
                     } else {
-                        const response = await this.$http.post('upload/chunk', file.name, {
-                            headers: {'Content-Type': 'text/plain'},
-                            params: new URLSearchParams([['room', this.$root.room]]),
-                        });
-                        const uuid = response.data.result.uuid;
-
-                        let uploadedSize = 0;
-                        this.progress = true;
-                        while (uploadedSize < file.size) {
-                            const chunk = file.slice(uploadedSize, uploadedSize + chunkSize);
-                            await this.$http.post(`upload/chunk/${uuid}`, chunk, {
-                                headers: {'Content-Type': 'application/octet-stream'},
-                                onUploadProgress: e => this.$set(this.uploadedSizes, i, uploadedSize + e.loaded),
-                            });
-                            uploadedSize += chunkSize;
-                        }
-                        await this.$http.post(`upload/finish/${uuid}`, null, {
-                            params: new URLSearchParams([['room', this.$root.room]]),
-                        });
+                        await this.uploadMultipartFile(file, i, chunkSize);
                     }
                 }));
                 this.$toast(this.$t('sendSuccess')); // Translate toast
                 this.$root.send.files.splice(0);
             } catch (error) {
-                if (error.response && error.response.data.msg) {
-                    this.$toast(this.$t('sendFailedMsg', { msg: error.response.data.msg })); // Translate toast
+                const errorMessage = error?.response?.data?.msg || error?.response?.data?.message || error?.message;
+                if (errorMessage) {
+                    this.$toast(this.$t('sendFailedMsg', { msg: errorMessage })); // Translate toast
                 } else {
                     this.$toast(this.$t('sendFailed')); // Translate toast
                 }
