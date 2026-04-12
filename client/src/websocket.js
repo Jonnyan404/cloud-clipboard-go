@@ -1,10 +1,31 @@
+const ROOM_AUTH_CACHE_KEY = 'roomAuthCache';
+const DEFAULT_ROOM_KEY = '__default__';
+
+function loadRoomAuthCache() {
+    try {
+        const raw = localStorage.getItem(ROOM_AUTH_CACHE_KEY);
+        if (!raw) {
+            return {};
+        }
+
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {
+        return {};
+    }
+}
+
 export default {
     data() {
         return {
             websocket: null,
             websocketConnecting: false,
-            authCode: localStorage.getItem('auth') || '',
+            authCode: '',
             authCodeDialog: false,
+            authPendingRoom: '',
+            authCodeError: '',
+            authDialogLoading: false,
+            roomAuthCache: loadRoomAuthCache(),
             room: this.$router.currentRoute.query.room || '',
             roomInput: '',
             roomDialog: false,
@@ -47,47 +68,235 @@ export default {
                     }
                 },
                 forbidden: () => {
-                    this.authCode = '';
-                    localStorage.removeItem('auth');
+                    this.clearAuthTokenForRoom(this.room);
                 },
             },
         };
     },
     watch: {
         room() {
+            this.authCode = this.getAuthTokenForRoom(this.room);
             this.disconnect();
             this.connect();
         },
     },
     methods: {
-        connect() {
+        normalizeRoomName(room = '') {
+            const normalized = (room || '').trim();
+            return normalized === 'default' ? '' : normalized;
+        },
+        getRoomStorageKey(room = this.room) {
+            const normalizedRoom = this.normalizeRoomName(room);
+            return normalizedRoom || DEFAULT_ROOM_KEY;
+        },
+        persistRoomAuthCache() {
+            localStorage.setItem(ROOM_AUTH_CACHE_KEY, JSON.stringify(this.roomAuthCache));
+        },
+        getAuthTokenForRoom(room = this.room) {
+            return this.roomAuthCache[this.getRoomStorageKey(room)] || '';
+        },
+        cacheAuthTokenForRoom(room, token) {
+            const normalizedToken = (token || '').trim();
+            const key = this.getRoomStorageKey(room);
+
+            if (!normalizedToken) {
+                this.clearAuthTokenForRoom(room);
+                return;
+            }
+
+            this.$set(this.roomAuthCache, key, normalizedToken);
+            this.persistRoomAuthCache();
+
+            if (this.normalizeRoomName(room) === this.normalizeRoomName(this.room)) {
+                this.authCode = normalizedToken;
+            }
+        },
+        clearAuthTokenForRoom(room = this.room) {
+            const key = this.getRoomStorageKey(room);
+            if (Object.prototype.hasOwnProperty.call(this.roomAuthCache, key)) {
+                this.$delete(this.roomAuthCache, key);
+                this.persistRoomAuthCache();
+            }
+
+            if (this.normalizeRoomName(room) === this.normalizeRoomName(this.room)) {
+                this.authCode = '';
+            }
+        },
+        getKnownAuthTokens(room = this.room) {
+            const tokens = [];
+            const pushToken = token => {
+                const normalizedToken = (token || '').trim();
+                if (normalizedToken && !tokens.includes(normalizedToken)) {
+                    tokens.push(normalizedToken);
+                }
+            };
+
+            pushToken(this.getAuthTokenForRoom(room));
+            pushToken(this.authCode);
+            Object.values(this.roomAuthCache).forEach(pushToken);
+
+            return tokens;
+        },
+        getRequestRoom(config = {}) {
+            if (config.params instanceof URLSearchParams) {
+                return this.normalizeRoomName(config.params.get('room') || this.room);
+            }
+
+            if (config.params && typeof config.params === 'object' && config.params.room !== undefined) {
+                return this.normalizeRoomName(config.params.room);
+            }
+
+            return this.normalizeRoomName(this.room);
+        },
+        getRequestAuthToken(config = {}) {
+            return this.getAuthTokenForRoom(this.getRequestRoom(config));
+        },
+        async fetchServerInfo(room = this.room, { token = '' } = {}) {
+            const normalizedRoom = this.normalizeRoomName(room);
+            const response = await this.$http.get('server', {
+                params: new URLSearchParams([['room', normalizedRoom]]),
+                headers: token ? {
+                    Authorization: `Bearer ${token}`,
+                } : undefined,
+                __skipRoomAuthHandling: true,
+            });
+            return response.data;
+        },
+        async verifyRoomAccess(room, token) {
+            const normalizedRoom = this.normalizeRoomName(room);
+            const normalizedToken = (token || '').trim();
+            if (!normalizedToken) {
+                return false;
+            }
+
+            const serverInfo = await this.fetchServerInfo(normalizedRoom, {
+                token: normalizedToken,
+            });
+            return serverInfo.auth ? serverInfo.authorized === true : true;
+        },
+        openAuthDialog(room, initialToken = '') {
+            this.authPendingRoom = this.normalizeRoomName(room);
+            this.roomDialog = false;
+            this.authCode = initialToken || this.getAuthTokenForRoom(room) || '';
+            this.authCodeError = '';
+            this.authDialogLoading = false;
+            this.authCodeDialog = true;
+        },
+        async resolveAuthTokenForRoom(room, { interactive = true } = {}) {
+            const normalizedRoom = this.normalizeRoomName(room);
+            const serverInfo = await this.fetchServerInfo(normalizedRoom);
+            if (!serverInfo.auth) {
+                return '';
+            }
+
+            const candidateTokens = this.getKnownAuthTokens(normalizedRoom);
+            for (const token of candidateTokens) {
+                const verified = await this.verifyRoomAccess(normalizedRoom, token);
+                if (verified) {
+                    this.cacheAuthTokenForRoom(normalizedRoom, token);
+                    return token;
+                }
+            }
+
+            if (interactive) {
+                this.openAuthDialog(normalizedRoom);
+            }
+
+            return null;
+        },
+        async navigateToRoom(room) {
+            const normalizedRoom = this.normalizeRoomName(room);
+            const token = await this.resolveAuthTokenForRoom(normalizedRoom, { interactive: true });
+            if (token === null) {
+                return false;
+            }
+
+            await this.$router.push({
+                path: '/',
+                query: normalizedRoom ? { room: normalizedRoom } : {},
+            });
+            return true;
+        },
+        async submitAuthCodeForPendingRoom() {
+            const targetRoom = this.authPendingRoom || this.normalizeRoomName(this.room);
+            const token = (this.authCode || '').trim();
+            if (!token || this.authDialogLoading) {
+                return;
+            }
+
+            this.authDialogLoading = true;
+            this.authCodeError = '';
+
+            try {
+                const verified = await this.verifyRoomAccess(targetRoom, token);
+                if (!verified) {
+                    this.authCodeError = this.$t('authInvalid');
+                    return;
+                }
+
+                this.cacheAuthTokenForRoom(targetRoom, token);
+                this.authCodeDialog = false;
+                this.authPendingRoom = '';
+
+                if (this.normalizeRoomName(targetRoom) !== this.normalizeRoomName(this.room)) {
+                    await this.navigateToRoom(targetRoom);
+                    return;
+                }
+
+                this.retry = 0;
+                this.connect();
+            } catch (error) {
+                console.error(error);
+                this.authCodeError = this.$t('connectionFailedRetry');
+            } finally {
+                this.authDialogLoading = false;
+            }
+        },
+        handleHttpUnauthorized(config = {}) {
+            const room = this.getRequestRoom(config);
+            this.clearAuthTokenForRoom(room);
+            this.openAuthDialog(room);
+        },
+        async connect() {
+            if (this.websocketConnecting) {
+                return;
+            }
+
             this.websocketConnecting = true;
-            this.$toast(this.$t('connectingServer')); // Translate toast
-            this.$http.get('server').then(response => {
-                if (this.authCode) localStorage.setItem('auth', this.authCode);
-                return new Promise((resolve, reject) => {
-                    const wsUrl = new URL(response.data.server);
+            this.$toast(this.$t('connectingServer'));
+
+            try {
+                const currentRoom = this.normalizeRoomName(this.room);
+                const serverInfo = await this.fetchServerInfo(currentRoom);
+                let resolvedToken = '';
+
+                if (serverInfo.auth) {
+                    resolvedToken = await this.resolveAuthTokenForRoom(currentRoom, { interactive: true });
+                    if (resolvedToken === null) {
+                        this.websocketConnecting = false;
+                        return;
+                    }
+                }
+
+                const ws = await new Promise((resolve, reject) => {
+                    const wsUrl = new URL(serverInfo.server);
                     wsUrl.protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
                     wsUrl.port = location.port;
-                    if (response.data.auth) {
-                        if (this.authCode) {
-                            wsUrl.searchParams.set('auth', this.authCode);
-                        } else {
-                            this.authCodeDialog = true;
-                            return;
-                        }
+                    if (resolvedToken) {
+                        wsUrl.searchParams.set('auth', resolvedToken);
                     }
-                    wsUrl.searchParams.set('room', this.room);
-                    const ws = new WebSocket(wsUrl);
-                    ws.onopen = () => resolve(ws);
-                    ws.onerror = reject;
+                    wsUrl.searchParams.set('room', currentRoom);
+                    const socket = new WebSocket(wsUrl);
+                    socket.onopen = () => resolve(socket);
+                    socket.onerror = reject;
                 });
-            }).then((/** @type {WebSocket} */ ws) => {
+
                 this.websocket = ws;
                 this.websocketConnecting = false;
                 this.retry = 0;
                 this.received = [];
-                this.$toast(this.$t('connectionSuccess')); // Translate toast
+                this.authCode = this.getAuthTokenForRoom(currentRoom);
+                this.$toast(this.$t('connectionSuccess'));
                 setInterval(() => {ws.send('')}, 30000);
                 ws.onclose = () => {
                     this.websocket = null;
@@ -95,10 +304,10 @@ export default {
                     this.device.splice(0);
                     if (this.retry < 3) {
                         this.retry++;
-                        this.$toast(this.$t('reconnectingServer', { retry: this.retry })); // Translate toast
+                        this.$toast(this.$t('reconnectingServer', { retry: this.retry }));
                         setTimeout(() => this.connect(), 3000);
-                    } else if (this.authCode) {
-                        this.authCodeDialog = true;
+                    } else if (this.getAuthTokenForRoom(this.room)) {
+                        this.openAuthDialog(this.room, this.getAuthTokenForRoom(this.room));
                     }
                 };
                 ws.onmessage = e => {
@@ -107,11 +316,10 @@ export default {
                         (this.event[parsed.event] || (() => {}))(parsed.data);
                     } catch {}
                 };
-            }).catch(error => {
-                // console.log(error);
+            } catch (error) {
                 this.websocketConnecting = false;
                 this.failure();
-            });
+            }
         },
         disconnect() {
             this.websocketConnecting = false;
@@ -123,7 +331,6 @@ export default {
             this.$root.device = [];
         },
         failure() {
-            localStorage.removeItem('auth');
             this.websocket = null;
             this.$root.device = [];
             if (this.retry++ < 3) {
@@ -140,6 +347,7 @@ export default {
         },
     },
     mounted() {
+        this.authCode = this.getAuthTokenForRoom(this.room);
         this.connect();
     },
 }

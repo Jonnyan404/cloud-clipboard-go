@@ -32,6 +32,11 @@ const app = new Vue({
             dark: null,
             config: {
                 version: '',
+                server: {
+                    history: 0,
+                    prefix: '',
+                    roomList: false,
+                },
                 text: {
                     limit: 0,
                 },
@@ -114,10 +119,29 @@ const app = new Vue({
 
 
 axios.interceptors.request.use(config => {
-    if (app.authCode) {
-        config.headers.Authorization = `Bearer ${app.authCode}`;
+    if (!config.headers) {
+        config.headers = {};
+    }
+
+    if (!config.headers.Authorization && typeof app.getRequestAuthToken === 'function') {
+        const token = app.getRequestAuthToken(config);
+        if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+        }
     }
     return config;
 });
+
+axios.interceptors.response.use(
+    response => response,
+    error => {
+        const status = error && error.response ? error.response.status : 0;
+        const config = error && error.config ? error.config : {};
+        if (status === 401 && !config.__skipRoomAuthHandling && typeof app.handleHttpUnauthorized === 'function') {
+            app.handleHttpUnauthorized(config);
+        }
+        return Promise.reject(error);
+    },
+);
 
 app.$mount('#app');

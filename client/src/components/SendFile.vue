@@ -160,7 +160,10 @@ export default {
                             onUploadProgress: e => this.$set(this.uploadedSizes, i, e.loaded),
                         });
                     } else {
-                        const response = await this.$http.post('upload/chunk', file.name, {headers: {'Content-Type': 'text/plain'}});
+                        const response = await this.$http.post('upload/chunk', file.name, {
+                            headers: {'Content-Type': 'text/plain'},
+                            params: new URLSearchParams([['room', this.$root.room]]),
+                        });
                         const uuid = response.data.result.uuid;
 
                         let uploadedSize = 0;

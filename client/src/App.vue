@@ -179,7 +179,16 @@
         >
             <v-app-bar-nav-icon @click.stop="drawer = !drawer" />
             <v-toolbar-title @click="goHome" style="cursor: pointer;">
-                {{ $t('cloudClipboard') }}<span class="d-none d-sm-inline" v-if="$root.room">（{{ $t('room') }}：<abbr :title="$t('copyRoomName')" style="cursor:pointer" @click.stop="copyRoomName($root.room)">{{$root.room}}</abbr>）</span>
+                {{ $t('cloudClipboard') }}
+                <span class="d-none d-sm-inline" v-if="$root.room">
+                    （<v-icon
+                        v-if="$root.config && $root.config.auth"
+                        x-small
+                        class="room-title__lock-icon"
+                    >{{ mdiLock }}</v-icon>
+                    {{ $t('room') }}：
+                    <abbr :title="$t('copyRoomName')" style="cursor:pointer" @click.stop="copyRoomName($root.room)">{{$root.room}}</abbr>）
+                </span>
             </v-toolbar-title>
             <v-spacer></v-spacer>
             
@@ -334,7 +343,18 @@
                                         <v-list-item-content>
                                             <div class="room-entry__title-row">
                                                 <div class="room-entry__name">{{ getRoomDisplayName(currentRoomEntry) }}</div>
-                                                <v-chip x-small color="primary" text-color="white">{{ $t('currentRoomShortLabel') }}</v-chip>
+                                                <div class="room-entry__badges">
+                                                    <v-chip
+                                                        v-if="currentRoomEntry.isProtected"
+                                                        x-small
+                                                        outlined
+                                                        class="room-entry__security-chip"
+                                                    >
+                                                        <v-icon x-small left>{{ mdiLock }}</v-icon>
+                                                        {{ $t('protectedRoom') }}
+                                                    </v-chip>
+                                                    <v-chip x-small color="primary" text-color="white">{{ $t('currentRoomShortLabel') }}</v-chip>
+                                                </div>
                                             </div>
                                             <v-list-item-subtitle class="room-entry__meta">
                                                 {{ currentRoomEntry.deviceCount || 0 }} {{ $t('devices') }} · {{ $t('messages') }} {{ currentRoomEntry.messageCount || 0 }}
@@ -381,9 +401,20 @@
                                         <v-list-item-content>
                                             <div class="room-entry__title-row">
                                                 <div class="room-entry__name">{{ getRoomDisplayName(room) }}</div>
-                                                <div class="room-entry__state" :class="room.isActive ? 'room-entry__state--active' : 'room-entry__state--idle'">
-                                                    <span class="room-entry__state-dot"></span>
-                                                    {{ room.isActive ? $t('active') : $t('inactive') }}
+                                                <div class="room-entry__badges">
+                                                    <v-chip
+                                                        v-if="room.isProtected"
+                                                        x-small
+                                                        outlined
+                                                        class="room-entry__security-chip"
+                                                    >
+                                                        <v-icon x-small left>{{ mdiLock }}</v-icon>
+                                                        {{ $t('protectedRoom') }}
+                                                    </v-chip>
+                                                    <div class="room-entry__state" :class="room.isActive ? 'room-entry__state--active' : 'room-entry__state--idle'">
+                                                        <span class="room-entry__state-dot"></span>
+                                                        {{ room.isActive ? $t('active') : $t('inactive') }}
+                                                    </div>
                                                 </div>
                                             </div>
                                             <v-list-item-subtitle class="room-entry__meta">
@@ -433,9 +464,19 @@
                 <v-card-title class="headline">{{ $t('authRequired') }}</v-card-title>
                 <v-card-text>
                     <p>{{ $t('authPrompt') }}</p>
-                    <v-text-field v-model="$root.authCode" :label="$t('password')"
-                    @keyup.enter="$root.authCodeDialog = false; $root.connect();"
-                    autofocus
+                    <p class="text-caption text--secondary mb-3">
+                        {{ $t('room') }}: {{ getRoomDisplayName({ name: $root.authPendingRoom || $root.room }) }}
+                    </p>
+                    <v-text-field
+                        v-model="$root.authCode"
+                        :label="$t('password')"
+                        :loading="$root.authDialogLoading"
+                        :disabled="$root.authDialogLoading"
+                        :error-messages="$root.authCodeError ? [$root.authCodeError] : []"
+                        hide-details="auto"
+                        @input="$root.authCodeError = ''"
+                        @keyup.enter="$root.submitAuthCodeForPendingRoom()"
+                        autofocus
                     ></v-text-field>
                 </v-card-text>
                 <v-card-actions>
@@ -443,10 +484,8 @@
                     <v-btn
                         color="primary darken-1"
                         text
-                        @click="
-                            $root.authCodeDialog = false;
-                            $root.connect();
-                        "
+                        :loading="$root.authDialogLoading"
+                        @click="$root.submitAuthCodeForPendingRoom()"
                     >{{ $t('submit') }}</v-btn>
                 </v-card-actions>
             </v-card>
@@ -572,7 +611,18 @@
                                     <v-list-item-content>
                                         <div class="room-entry__title-row">
                                             <div class="room-entry__name">{{ getRoomDisplayName(currentRoomEntry) }}</div>
-                                            <v-chip x-small color="primary" text-color="white">{{ $t('currentRoomShortLabel') }}</v-chip>
+                                            <div class="room-entry__badges">
+                                                <v-chip
+                                                    v-if="currentRoomEntry.isProtected"
+                                                    x-small
+                                                    outlined
+                                                    class="room-entry__security-chip"
+                                                >
+                                                    <v-icon x-small left>{{ mdiLock }}</v-icon>
+                                                    {{ $t('protectedRoom') }}
+                                                </v-chip>
+                                                <v-chip x-small color="primary" text-color="white">{{ $t('currentRoomShortLabel') }}</v-chip>
+                                            </div>
                                         </div>
                                         <v-list-item-subtitle class="room-entry__meta">
                                             {{ currentRoomEntry.deviceCount || 0 }} {{ $t('devices') }} · {{ $t('messages') }} {{ currentRoomEntry.messageCount || 0 }}
@@ -619,9 +669,20 @@
                                     <v-list-item-content>
                                         <div class="room-entry__title-row">
                                             <div class="room-entry__name">{{ getRoomDisplayName(room) }}</div>
-                                            <div class="room-entry__state" :class="room.isActive ? 'room-entry__state--active' : 'room-entry__state--idle'">
-                                                <span class="room-entry__state-dot"></span>
-                                                {{ room.isActive ? $t('active') : $t('inactive') }}
+                                            <div class="room-entry__badges">
+                                                <v-chip
+                                                    v-if="room.isProtected"
+                                                    x-small
+                                                    outlined
+                                                    class="room-entry__security-chip"
+                                                >
+                                                    <v-icon x-small left>{{ mdiLock }}</v-icon>
+                                                    {{ $t('protectedRoom') }}
+                                                </v-chip>
+                                                <div class="room-entry__state" :class="room.isActive ? 'room-entry__state--active' : 'room-entry__state--idle'">
+                                                    <span class="room-entry__state-dot"></span>
+                                                    {{ room.isActive ? $t('active') : $t('inactive') }}
+                                                </div>
                                             </div>
                                         </div>
                                         <v-list-item-subtitle class="room-entry__meta">
@@ -725,6 +786,12 @@
 .room-browser__header--dock {
     padding: 16px 18px 12px;
     border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.room-title__lock-icon {
+    margin: 0 4px 2px 0;
+    vertical-align: middle;
+    opacity: 0.92;
 }
 
 .room-browser__title-wrap {
@@ -858,6 +925,14 @@
     margin-bottom: 4px;
 }
 
+.room-entry__badges {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
 .room-entry__name {
     font-size: 0.98rem;
     font-weight: 700;
@@ -867,6 +942,18 @@
 
 .app-shell--dark .room-entry__name {
     color: rgba(226, 232, 240, 0.96);
+}
+
+.room-entry__security-chip {
+    color: #b45309 !important;
+    border-color: rgba(217, 119, 6, 0.32) !important;
+    background: rgba(245, 158, 11, 0.08) !important;
+}
+
+.app-shell--dark .room-entry__security-chip {
+    color: #fbbf24 !important;
+    border-color: rgba(251, 191, 36, 0.35) !important;
+    background: rgba(245, 158, 11, 0.14) !important;
 }
 
 .room-entry__meta,
@@ -956,6 +1043,7 @@ import {
     mdiMagnify,
     mdiHome,
     mdiHomeOutline,
+    mdiLock,
     mdiHeart,
     mdiHeartOutline,
 } from '@mdi/js';
@@ -995,6 +1083,7 @@ export default {
             mdiMagnify,
             mdiHome,
             mdiHomeOutline,
+            mdiLock,
             mdiHeart,
             mdiHeartOutline,
             navigator,
@@ -1093,12 +1182,9 @@ export default {
 
             this.ensureRoomPresent(roomName);
 
-            await this.$router.push({
-                path: '/',
-                query: roomName ? { room: roomName } : {},
-            });
-
             this.$root.roomDialog = false;
+
+            await this.$root.navigateToRoom(roomName);
         },
         createOptimisticRoom(roomName = this.$root.room || '') {
             if (roomName === undefined || roomName === null) {
@@ -1224,6 +1310,17 @@ export default {
             }
         },
 
+        async fetchRoomsWithToken(token = '') {
+            const normalizedToken = (token || '').trim();
+            const response = await this.$http.get('rooms', {
+                headers: normalizedToken ? {
+                    Authorization: `Bearer ${normalizedToken}`,
+                } : undefined,
+                __skipRoomAuthHandling: true,
+            });
+            return Array.isArray(response.data?.rooms) ? response.data.rooms : [];
+        },
+
         // 简化的房间列表获取方法 - 添加更严格的检查
         async fetchRoomList() {
             // 添加更严格的配置检查
@@ -1244,9 +1341,36 @@ export default {
             console.log('获取房间列表');
             
             try {
-                const response = await this.$http.get('rooms');
+                const candidateTokens = typeof this.$root.getKnownAuthTokens === 'function'
+                    ? this.$root.getKnownAuthTokens()
+                    : [];
+                const requestTokens = [''].concat(candidateTokens.filter(Boolean));
+                const seenTokens = new Set();
+                const mergedRooms = new Map();
+
+                for (const token of requestTokens) {
+                    const tokenKey = (token || '').trim();
+                    if (seenTokens.has(tokenKey)) {
+                        continue;
+                    }
+                    seenTokens.add(tokenKey);
+
+                    const rooms = await this.fetchRoomsWithToken(tokenKey);
+                    for (const room of rooms) {
+                        const existing = mergedRooms.get(room.name);
+                        mergedRooms.set(room.name, existing ? {
+                            ...existing,
+                            ...room,
+                            messageCount: Math.max(existing.messageCount || 0, room.messageCount || 0),
+                            deviceCount: Math.max(existing.deviceCount || 0, room.deviceCount || 0),
+                            lastActive: Math.max(existing.lastActive || 0, room.lastActive || 0),
+                            isActive: Boolean(existing.isActive || room.isActive),
+                        } : room);
+                    }
+                }
+
                 const favoriteRooms = this.getFavoriteRooms();
-                this.availableRooms = response.data.rooms.map(room => ({
+                this.availableRooms = Array.from(mergedRooms.values()).map(room => ({
                     ...room,
                     isFavorite: favoriteRooms.includes(room.name)
                 }));
@@ -1261,14 +1385,9 @@ export default {
         },
 
         // 切换房间
-        switchRoom(roomName) {
+        async switchRoom(roomName) {
             this.roomSheet = false;
-            if (roomName === '') {
-                // 公共房间
-                this.$router.push('/');
-            } else {
-                this.$router.push({ path: '/', query: { room: roomName } });
-            }
+            await this.$root.navigateToRoom(roomName);
         },
 
         // 获取收藏房间列表
