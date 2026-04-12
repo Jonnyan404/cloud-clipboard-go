@@ -10,8 +10,14 @@ else
 fi
 
 echo "=== 部署 Cloud Clipboard 到 Cloudflare ==="
+echo ""
+echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+echo "!!! 部署前请先检查并修改 workers/wrangler.toml.template !!!"
+echo "!!! 特别是 AUTH_PASSWORD、ROOM_AUTH、ROOM_LIST 等变量     !!!"
+echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+echo ""
 
-echo "=== 部署 Cloud Clipboard 到 Cloudflare ==="
+read -rp "请确认已修改完毕并按下 Enter 键继续..."
 
 # 颜色输出函数
 GREEN='\033[0;32m'
@@ -29,6 +35,32 @@ warn() {
 
 error() {
     echo -e "${RED}[ERROR]${NC} $1"
+}
+
+version_lt() {
+    [[ "$1" == "$2" ]] && return 1
+    [[ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | head -n 1)" == "$1" ]]
+}
+
+should_run_local_d1() {
+    if [[ "${SKIP_LOCAL_D1:-}" == "1" ]]; then
+        return 1
+    fi
+
+    if [[ "$(uname -s)" != "Darwin" ]]; then
+        return 0
+    fi
+
+    local macos_version
+    macos_version=$(sw_vers -productVersion)
+
+    if version_lt "$macos_version" "13.5.0"; then
+        warn "检测到 macOS $macos_version，低于 workerd 本地运行要求的 13.5.0，跳过本地 D1 迁移。"
+        warn "如需强制跳过本地 D1，可在执行前设置 SKIP_LOCAL_D1=1。"
+        return 1
+    fi
+
+    return 0
 }
 
 # 检查必要工具
@@ -112,8 +144,12 @@ deploy_worker() {
     wrangler d1 execute cloud-clipboard-db --file=../d1/schema.sql --remote
     
     # 可选：同时迁移本地数据库用于开发
-    info "执行本地数据库迁移..."
-    wrangler d1 execute cloud-clipboard-db --file=../d1/schema.sql --local
+    if should_run_local_d1; then
+        info "执行本地数据库迁移..."
+        wrangler d1 execute cloud-clipboard-db --file=../d1/schema.sql --local
+    else
+        info "已跳过本地数据库迁移，不影响远程部署。"
+    fi
 
    
 
@@ -229,7 +265,13 @@ show_results() {
     echo "🔧 环境变量配置:"
     echo "  - 脚本执行的默认环境变量在 cloudflare/workers/wrangler.toml.template 中定义。可在此文件内更改后,重新执行脚本."
     echo "  - 也可部署完成后,去 workers 后台设置-变量-处更改"
-    echo "  - 不支持content路由"
+    echo ""
+    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+    echo "!!! 如果你在部署前没有修改 wrangler.toml.template        !!!"
+    echo "!!! 部署完成后务必去 Cloudflare Workers 后台检查并修改变量 !!!"
+    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+    echo "  - 已支持 /api/content/latest、/api/content/:id 及对应 .json 路由"
+    echo "  - 当前与 Go 版仍有少量行为差异，例如部分文件内容请求会重定向到 /api/file"
 }
 
 # 错误处理

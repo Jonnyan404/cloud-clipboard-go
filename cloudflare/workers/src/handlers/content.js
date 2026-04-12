@@ -1,13 +1,126 @@
 import { corsHeaders } from '../cors';
-import { broadcastMessage } from '../utils';
+import { broadcastMessage, buildSenderDevice } from '../utils';
+import { ensureRoomAccess, normalizeRoomName } from '../auth';
+
+function normalizeExpire(expireTime) {
+  const numericExpire = Number(expireTime || 0);
+  if (!numericExpire) {
+    return 0;
+  }
+
+  return String(numericExpire).length === 10 ? numericExpire : Math.floor(numericExpire / 1000);
+}
+
+function prefersJSON(request, url) {
+  if (url.pathname.endsWith('.json')) {
+    return true;
+  }
+
+  const jsonParam = String(url.searchParams.get('json') || '').toLowerCase();
+  if (jsonParam === 'true' || jsonParam === '1') {
+    return true;
+  }
+
+  return request.headers.get('Accept')?.includes('application/json') === true;
+}
+
+function buildJsonContentPayload(row) {
+  const base = {
+    id: row.id.toString(),
+    timestamp: row.timestamp,
+    room: row.room || 'default',
+    senderIP: row.senderIP || 'unknown',
+    senderDevice: buildSenderDevice(row.userAgent || 'unknown'),
+  };
+
+  if (row.type === 'text') {
+    return {
+      ...base,
+      type: 'text',
+      content: row.content,
+    };
+  }
+
+  return {
+    ...base,
+    type: ContentHandler.determineFileType(row.name),
+    name: row.name,
+    size: row.size,
+    uuid: row.uuid,
+    url: row.url,
+    cache: row.uuid,
+    expire: normalizeExpire(row.expireTime),
+  };
+}
 
 export class ContentHandler {
+  static async buildFileResponse(env, result, { forceDownload = false } = {}) {
+    if (!env.R2_BUCKET) {
+      return new Response('Storage not available', {
+        status: 503,
+        headers: corsHeaders,
+      });
+    }
+
+    const object = await env.R2_BUCKET.get(`files/${result.uuid}`);
+    if (!object) {
+      return new Response('File not found', {
+        status: 404,
+        headers: corsHeaders,
+      });
+    }
+
+    const expireTime = parseInt(object.customMetadata?.expireTime || '0', 10);
+    const currentTime = Math.floor(Date.now() / 1000);
+    if (expireTime > 0 && currentTime > expireTime) {
+      return new Response('File expired', {
+        status: 404,
+        headers: corsHeaders,
+      });
+    }
+
+    const contentType = object.httpMetadata?.contentType || 'application/octet-stream';
+    const fileType = ContentHandler.determineFileType(result.name);
+    const headers = {
+      'Content-Type': contentType,
+      'Content-Length': object.size.toString(),
+      'Last-Modified': new Date(parseInt(object.customMetadata?.uploadTime || Date.now(), 10)).toUTCString(),
+      'X-Content-ID': result.id.toString(),
+      'X-Content-Type': 'file',
+      'X-Content-Room': result.room || 'default',
+      'X-File-UUID': result.uuid,
+      'X-File-Type': fileType,
+      ...corsHeaders,
+    };
+
+    if (forceDownload) {
+      headers['Content-Disposition'] = `attachment; filename="${encodeURIComponent(result.name)}"`;
+    } else if (
+      fileType === 'image' ||
+      fileType === 'video' ||
+      fileType === 'audio' ||
+      contentType.startsWith('text/') ||
+      contentType === 'application/pdf'
+    ) {
+      headers['Content-Disposition'] = `inline; filename="${encodeURIComponent(result.name)}"`;
+      headers['Cache-Control'] = 'public, max-age=300';
+    } else {
+      headers['Content-Disposition'] = `attachment; filename="${encodeURIComponent(result.name)}"`;
+    }
+
+    return new Response(object.body, { headers });
+  }
+
   static async getLatest(request, env) {
     try {
       const url = new URL(request.url);
-      const room = url.searchParams.get('room') || 'default';
-      const isJSON = url.pathname.endsWith('.json') || url.searchParams.get('json') === 'true';
+      const room = normalizeRoomName(url.searchParams.get('room'));
+      const isJSON = prefersJSON(request, url);
       const forceDownload = url.searchParams.get('download') === 'true';
+      const authResult = ensureRoomAccess(request, env, room);
+      if (!authResult.ok) {
+        return authResult.response;
+      }
 
       console.log(`获取最新内容: room=${room}, isJSON=${isJSON}, forceDownload=${forceDownload}`);
 
@@ -25,14 +138,8 @@ export class ContentHandler {
       }
 
       // 从 D1 获取最新消息
-      let query = 'SELECT * FROM messages WHERE 1=1';
-      const params = [];
-      
-      if (room !== 'default') {
-        query += ' AND room = ?';
-        params.push(room);
-      }
-      
+      let query = 'SELECT * FROM messages WHERE room = ?';
+      const params = [room];
       query += ' ORDER BY timestamp DESC LIMIT 1';
 
       console.log(`最新内容查询: ${query}, 参数:`, params);
@@ -57,13 +164,7 @@ export class ContentHandler {
       // 处理文本内容
       if (result.type === 'text') {
         if (isJSON) {
-          return new Response(JSON.stringify({
-            type: 'text',
-            content: result.content,
-            id: result.id.toString(),
-            timestamp: result.timestamp,
-            room: result.room || 'default'
-          }), {
+          return new Response(JSON.stringify(buildJsonContentPayload(result)), {
             headers: { 'Content-Type': 'application/json', ...corsHeaders }
           });
         } else {
@@ -82,84 +183,11 @@ export class ContentHandler {
       // 处理文件内容
       else if (result.type === 'file') {
         if (isJSON) {
-          return new Response(JSON.stringify({
-            type: ContentHandler.determineFileType(result.name),
-            name: result.name,
-            size: result.size,
-            uuid: result.uuid,
-            url: result.url,
-            id: result.id.toString(),
-            timestamp: result.timestamp,
-            room: result.room || 'default'
-          }), {
+          return new Response(JSON.stringify(buildJsonContentPayload(result)), {
             headers: { 'Content-Type': 'application/json', ...corsHeaders }
           });
         } else {
-          console.log(`获取最新文件: ${result.uuid}`);
-          
-          if (!env.R2_BUCKET) {
-            return new Response('Storage not available', { 
-              status: 503,
-              headers: corsHeaders 
-            });
-          }
-
-          const object = await env.R2_BUCKET.get(`files/${result.uuid}`);
-          
-          if (!object) {
-            console.log(`文件未找到: ${result.uuid}`);
-            return new Response('File not found', { 
-              status: 404,
-              headers: corsHeaders 
-            });
-          }
-
-          // 检查文件是否过期
-          const expireTime = parseInt(object.customMetadata?.expireTime || '0');
-          const currentTime = Math.floor(Date.now() / 1000);
-          if (expireTime > 0 && currentTime > expireTime) {
-            console.log(`文件已过期: ${result.uuid}`);
-            return new Response('File expired', { 
-              status: 404,
-              headers: corsHeaders 
-            });
-          }
-
-          console.log(`返回最新文件内容: ${result.uuid}, size: ${object.size}`);
-
-          // 获取正确的 MIME 类型
-          const contentType = object.httpMetadata?.contentType || 'application/octet-stream';
-          const fileType = ContentHandler.determineFileType(result.name);
-          
-          // 构建响应头
-          const headers = {
-            'Content-Type': contentType,
-            'Content-Length': object.size.toString(),
-            'Last-Modified': new Date(parseInt(object.customMetadata?.uploadTime || Date.now())).toUTCString(),
-            'X-Content-ID': result.id.toString(),
-            'X-Content-Type': 'file',
-            'X-Content-Room': result.room || 'default',
-            'X-File-UUID': result.uuid,
-            'X-File-Type': fileType,
-            ...corsHeaders
-          };
-
-          // 根据文件类型和请求决定 Content-Disposition
-          if (forceDownload) {
-            headers['Content-Disposition'] = `attachment; filename="${encodeURIComponent(result.name)}"`;
-          } else {
-            // 对于可以在浏览器中显示的文件类型，使用 inline
-            if (fileType === 'image' || fileType === 'video' || fileType === 'audio' || 
-                contentType.startsWith('text/') || contentType === 'application/pdf') {
-              headers['Content-Disposition'] = `inline; filename="${encodeURIComponent(result.name)}"`;
-              headers['Cache-Control'] = 'public, max-age=300'; // 5分钟缓存
-            } else {
-              // 其他文件类型强制下载，避免浏览器尝试渲染
-              headers['Content-Disposition'] = `attachment; filename="${encodeURIComponent(result.name)}"`;
-            }
-          }
-
-          return new Response(object.body, { headers });
+          return await ContentHandler.buildFileResponse(env, result, { forceDownload });
         }
       }
 
@@ -181,8 +209,13 @@ export class ContentHandler {
     try {
       const { id } = request.params;
       const url = new URL(request.url);
-      const room = url.searchParams.get('room');
-      const isJSON = url.pathname.endsWith('.json') || url.searchParams.get('json') === 'true';
+      const room = normalizeRoomName(url.searchParams.get('room'));
+      const isJSON = prefersJSON(request, url);
+      const forceDownload = url.searchParams.get('download') === 'true';
+      const authResult = ensureRoomAccess(request, env, room);
+      if (!authResult.ok) {
+        return authResult.response;
+      }
 
       console.log(`获取内容: ID ${id}, room: ${room}, isJSON: ${isJSON}`);
 
@@ -200,13 +233,8 @@ export class ContentHandler {
       }
 
       // 从 D1 获取消息
-      let query = 'SELECT * FROM messages WHERE id = ?';
-      const params = [parseInt(id)];
-      
-      if (room) {
-        query += ' AND room = ?';
-        params.push(room);
-      }
+      const query = 'SELECT * FROM messages WHERE id = ? AND room = ?';
+      const params = [parseInt(id), room];
 
       console.log(`查询 SQL: ${query}, 参数:`, params);
 
@@ -229,12 +257,7 @@ export class ContentHandler {
 
       if (result.type === 'text') {
         if (isJSON) {
-          return new Response(JSON.stringify({
-            type: 'text',
-            content: result.content,
-            id: result.id.toString(),
-            timestamp: result.timestamp
-          }), {
+          return new Response(JSON.stringify(buildJsonContentPayload(result)), {
             headers: { 'Content-Type': 'application/json', ...corsHeaders }
           });
         } else {
@@ -245,21 +268,11 @@ export class ContentHandler {
         }
       } else if (result.type === 'file') {
         if (isJSON) {
-          return new Response(JSON.stringify({
-            type: ContentHandler.determineFileType(result.name),
-            name: result.name,
-            size: result.size,
-            uuid: result.uuid,
-            url: result.url,
-            id: result.id.toString(),
-            timestamp: result.timestamp
-          }), {
+          return new Response(JSON.stringify(buildJsonContentPayload(result)), {
             headers: { 'Content-Type': 'application/json', ...corsHeaders }
           });
         } else {
-          // 对于按 ID 查询的文件，保持重定向行为
-          console.log(`重定向到文件: ${result.url}`);
-          return Response.redirect(result.url, 302);
+          return await ContentHandler.buildFileResponse(env, result, { forceDownload });
         }
       }
 
@@ -279,24 +292,13 @@ export class ContentHandler {
 
   static async revoke(request, env) {
     try {
-      // 认证检查
-      if (env.AUTH_PASSWORD) {
-        const auth = request.headers.get('Authorization') || 
-                    new URL(request.url).searchParams.get('auth');
-        if (!auth || auth.replace('Bearer ', '') !== env.AUTH_PASSWORD) {
-          return new Response(JSON.stringify({
-            error: 'Unauthorized',
-            message: '需要认证令牌'
-          }), {
-            status: 401,
-            headers: { 'Content-Type': 'application/json', ...corsHeaders }
-          });
-        }
-      }
-
       const { id } = request.params;
       const url = new URL(request.url);
-      const room = url.searchParams.get('room') || 'default';
+      const room = normalizeRoomName(url.searchParams.get('room'));
+      const authResult = ensureRoomAccess(request, env, room);
+      if (!authResult.ok) {
+        return authResult.response;
+      }
 
       console.log(`删除消息请求: ID ${id}, room: ${room}`);
 
@@ -311,13 +313,8 @@ export class ContentHandler {
       }
 
       // 查找要删除的消息
-      let query = 'SELECT * FROM messages WHERE id = ?';
-      const params = [parseInt(id)];
-      
-      if (room !== 'default') {
-        query += ' AND room = ?';
-        params.push(room);
-      }
+      const query = 'SELECT * FROM messages WHERE id = ? AND room = ?';
+      const params = [parseInt(id), room];
 
       const message = await env.DB.prepare(query).bind(...params).first();
 
@@ -371,23 +368,12 @@ export class ContentHandler {
 
   static async revokeAll(request, env) {
     try {
-      // 认证检查
-      if (env.AUTH_PASSWORD) {
-        const auth = request.headers.get('Authorization') || 
-                    new URL(request.url).searchParams.get('auth');
-        if (!auth || auth.replace('Bearer ', '') !== env.AUTH_PASSWORD) {
-          return new Response(JSON.stringify({
-            error: 'Unauthorized',
-            message: '需要认证令牌'
-          }), {
-            status: 401,
-            headers: { 'Content-Type': 'application/json', ...corsHeaders }
-          });
-        }
-      }
-
       const url = new URL(request.url);
-      const room = url.searchParams.get('room') || 'default';
+      const room = normalizeRoomName(url.searchParams.get('room'));
+      const authResult = ensureRoomAccess(request, env, room);
+      if (!authResult.ok) {
+        return authResult.response;
+      }
 
       console.log(`清空所有消息请求: room: ${room}`);
 
@@ -402,13 +388,8 @@ export class ContentHandler {
       }
 
       // 获取要删除的文件UUID列表
-      let fileQuery = 'SELECT uuid FROM messages WHERE type = ? AND uuid IS NOT NULL';
-      const fileParams = ['file'];
-      
-      if (room !== 'default') {
-        fileQuery += ' AND room = ?';
-        fileParams.push(room);
-      }
+      let fileQuery = 'SELECT uuid FROM messages WHERE type = ? AND uuid IS NOT NULL AND room = ?';
+      const fileParams = ['file', room];
 
       const fileResults = await env.DB.prepare(fileQuery).bind(...fileParams).all();
 
@@ -427,13 +408,8 @@ export class ContentHandler {
       }
 
       // 删除消息记录
-      let deleteQuery = 'DELETE FROM messages WHERE 1=1';
-      const deleteParams = [];
-      
-      if (room !== 'default') {
-        deleteQuery += ' AND room = ?';
-        deleteParams.push(room);
-      }
+      const deleteQuery = 'DELETE FROM messages WHERE room = ?';
+      const deleteParams = [room];
 
       await env.DB.prepare(deleteQuery).bind(...deleteParams).run();
 

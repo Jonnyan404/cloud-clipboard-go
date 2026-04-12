@@ -1,3 +1,10 @@
+import { normalizeRoomName, resolveRoomAuth } from '../auth';
+import { buildSenderDevice, parseUserAgent } from '../utils';
+
+function isRoomListEnabled(env) {
+  return ['1', 'true', 'yes', 'on'].includes(String(env.ROOM_LIST || '').toLowerCase());
+}
+
 export class WebSocketRoom {
   constructor(state, env) {
     this.state = state;
@@ -23,6 +30,10 @@ export class WebSocketRoom {
       }
     }
 
+    if (url.pathname === '/stats') {
+      return Response.json(this.getRoomStats());
+    }
+
     // 处理 WebSocket 升级请求
     const upgradeHeader = request.headers.get('Upgrade');
     if (upgradeHeader && upgradeHeader.toLowerCase() === 'websocket') {
@@ -44,7 +55,7 @@ export class WebSocketRoom {
       const sessionId = this.generateSessionId();
       const userAgent = request.headers.get('User-Agent') || '';
       const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
-      const room = url.searchParams.get('room') || 'default';
+      const room = normalizeRoomName(url.searchParams.get('room'));
       
       console.log(`创建 WebSocket 会话: ${sessionId}, room: ${room}, ip: ${ip}`);
       
@@ -58,6 +69,7 @@ export class WebSocketRoom {
       };
 
       this.sessions.set(sessionId, session);
+      await this.persistSessionPresence(session);
 
       // 接受 WebSocket 连接
       server.accept();
@@ -77,13 +89,13 @@ export class WebSocketRoom {
         this.handleError(sessionId, event);
       });
 
-      // 按正确顺序发送初始化消息
-      await this.sendConfigMessage(server);
+      // 与 Go 后端保持一致：先发送历史，再发送配置，再同步设备。
       await this.sendHistoryMessages(server, room);
+      await this.sendConfigMessage(server, room);
       await this.sendExistingDevices(server, room, sessionId);
 
       // 广播新设备连接
-      this.broadcastDeviceConnect(sessionId, userAgent);
+      this.broadcastDeviceConnect(sessionId, userAgent, room);
 
       console.log(`WebSocket 会话 ${sessionId} 初始化完成`);
 
@@ -101,24 +113,27 @@ export class WebSocketRoom {
     }
   }
 
-  async sendConfigMessage(webSocket) {
+  async sendConfigMessage(webSocket, room) {
     try {
+      const fileLimit = parseInt(this.env.FILE_LIMIT) || 104857600;
       const configMessage = {
         event: 'config',
         data: {
           version: 'cloudflare-worker-v1.0.0',
           server: {
-            history: parseInt(this.env.HISTORY_LIMIT) || 10
+            history: parseInt(this.env.HISTORY_LIMIT) || 10,
+            prefix: '',
+            roomList: isRoomListEnabled(this.env)
           },
           text: {
             limit: parseInt(this.env.TEXT_LIMIT) || 4096
           },
           file: {
             expire: parseInt(this.env.FILE_EXPIRE) || 3600,
-            chunk: 2097152, // 2MB 分块大小
-            limit: parseInt(this.env.FILE_LIMIT) || 104857600
+            chunk: fileLimit + 1,
+            limit: fileLimit
           },
-          auth: !!this.env.AUTH_PASSWORD
+          auth: resolveRoomAuth(this.env, room).required
         }
       };
       
@@ -150,15 +165,16 @@ export class WebSocketRoom {
       const historyLimit = parseInt(this.env.HISTORY_LIMIT || '10');
       console.log(`历史消息限制: ${historyLimit}`);
 
-      let query = 'SELECT * FROM messages WHERE 1=1';
-      const params = [];
-      
-      if (room && room !== 'default') {
-        query += ' AND room = ?';
-        params.push(room);
-      }
-      
-      query += ` ORDER BY timestamp ASC LIMIT ${historyLimit}`;
+      const query = `
+        SELECT * FROM (
+          SELECT * FROM messages
+          WHERE room = ?
+          ORDER BY timestamp DESC, id DESC
+          LIMIT ?
+        ) recent
+        ORDER BY timestamp ASC, id ASC
+      `;
+      const params = [normalizeRoomName(room), historyLimit];
       
       console.log(`历史消息查询: ${query}, 参数:`, params, `限制: ${historyLimit}`);
       
@@ -185,7 +201,8 @@ export class WebSocketRoom {
             type: row.type,
             timestamp: row.timestamp,
             room: row.room || 'default',
-            senderIP: row.senderIP || 'unknown'
+            senderIP: row.senderIP || 'unknown',
+            senderDevice: buildSenderDevice(row.userAgent || 'unknown')
           }
         };
 
@@ -216,8 +233,6 @@ export class WebSocketRoom {
         
         webSocket.send(JSON.stringify(historyMessage));
         
-        // 添加小延迟避免消息发送过快
-        await new Promise(resolve => setTimeout(resolve, 10));
       }
       
       console.log(`历史消息发送完成，共发送 ${results.results.length} 条 (限制: ${historyLimit})`);
@@ -234,11 +249,11 @@ export class WebSocketRoom {
       const existingDevices = [];
       for (const [sessionId, session] of this.sessions) {
         if (sessionId !== excludeSessionId && session.room === room) {
-          const deviceInfo = this.parseUserAgent(session.userAgent);
+          const deviceInfo = parseUserAgent(session.userAgent);
           existingDevices.push({
             id: sessionId,
-            type: deviceInfo.device,
-            device: deviceInfo.browser,
+            type: deviceInfo.type,
+            device: deviceInfo.device,
             os: deviceInfo.os,
             browser: deviceInfo.browser
           });
@@ -277,36 +292,38 @@ export class WebSocketRoom {
     const session = this.sessions.get(sessionId);
     if (session) {
       this.sessions.delete(sessionId);
+      void this.removeSessionPresence(sessionId);
       
       // 广播设备断开连接
       this.broadcast({
         event: 'disconnect',
         data: { id: sessionId }
-      });
+      }, session.room);
     }
   }
 
   handleError(sessionId, event) {
     console.error(`WebSocket 错误 (${sessionId}):`, event);
     this.sessions.delete(sessionId);
+    void this.removeSessionPresence(sessionId);
   }
 
-  broadcastDeviceConnect(sessionId, userAgent) {
+  broadcastDeviceConnect(sessionId, userAgent, room) {
     try {
-      const deviceInfo = this.parseUserAgent(userAgent);
+      const deviceInfo = parseUserAgent(userAgent);
       
       const connectMessage = {
         event: 'connect',
         data: {
           id: sessionId,
-          type: deviceInfo.device,
-          device: deviceInfo.browser,
+          type: deviceInfo.type,
+          device: deviceInfo.device,
           os: deviceInfo.os,
           browser: deviceInfo.browser
         }
       };
       
-      this.broadcast(connectMessage);
+      this.broadcast(connectMessage, room, sessionId);
       console.log(`设备连接广播: ${sessionId}`);
       
     } catch (error) {
@@ -314,7 +331,7 @@ export class WebSocketRoom {
     }
   }
 
-  broadcast(message) {
+  broadcast(message, room = null, excludeSessionId = null) {
     if (!message || typeof message !== 'object') {
       console.error('无效的广播消息:', message);
       return;
@@ -322,11 +339,18 @@ export class WebSocketRoom {
 
     const messageString = JSON.stringify(message);
     const disconnectedSessions = [];
+    const targetRoom = room ? normalizeRoomName(room) : null;
     
     console.log(`广播消息给 ${this.sessions.size} 个会话: ${message.event}`);
     
     for (const [sessionId, session] of this.sessions) {
       try {
+        if (excludeSessionId && sessionId === excludeSessionId) {
+          continue;
+        }
+        if (targetRoom && normalizeRoomName(session.room) !== targetRoom) {
+          continue;
+        }
         if (session.webSocket.readyState === WebSocket.OPEN) {
           session.webSocket.send(messageString);
         } else {
@@ -342,6 +366,7 @@ export class WebSocketRoom {
     // 清理断开的连接
     for (const sessionId of disconnectedSessions) {
       this.sessions.delete(sessionId);
+      void this.removeSessionPresence(sessionId);
     }
     
     console.log(`广播完成，清理了 ${disconnectedSessions.length} 个断开的会话`);
@@ -351,35 +376,53 @@ export class WebSocketRoom {
     return Math.random().toString(36).substr(2, 9);
   }
 
-  parseUserAgent(uaString) {
-    const isWindows = /Windows/.test(uaString);
-    const isMac = /Mac OS X/.test(uaString);
-    const isLinux = /Linux/.test(uaString);
-    const isAndroid = /Android/.test(uaString);
-    const isiOS = /iPhone|iPad/.test(uaString);
-    
-    const isChrome = /Chrome/.test(uaString);
-    const isFirefox = /Firefox/.test(uaString);
-    const isSafari = /Safari/.test(uaString) && !/Chrome/.test(uaString);
-    const isEdge = /Edg/.test(uaString);
-    
-    let os = 'Unknown';
-    if (isWindows) os = 'Windows';
-    else if (isMac) os = 'macOS';
-    else if (isLinux) os = 'Linux';
-    else if (isAndroid) os = 'Android';
-    else if (isiOS) os = 'iOS';
-    
-    let browser = 'Unknown';
-    if (isEdge) browser = 'Edge';
-    else if (isChrome) browser = 'Chrome';
-    else if (isFirefox) browser = 'Firefox';
-    else if (isSafari) browser = 'Safari';
-    
-    return { 
-      os, 
-      browser, 
-      device: `${browser} on ${os}` 
+  async persistSessionPresence(session) {
+    if (!this.env.DB) {
+      return;
+    }
+
+    try {
+      const connectedAt = Math.floor(session.connectedAt / 1000);
+      await this.env.DB.prepare(`
+        INSERT OR REPLACE INTO room_presence (sessionId, room, connectedAt, userAgent, updatedAt)
+        VALUES (?, ?, ?, ?, ?)
+      `).bind(
+        session.sessionId,
+        normalizeRoomName(session.room),
+        connectedAt,
+        session.userAgent || '',
+        connectedAt,
+      ).run();
+    } catch (error) {
+      console.error(`持久化房间在线状态失败 (${session.sessionId}):`, error);
+    }
+  }
+
+  async removeSessionPresence(sessionId) {
+    if (!this.env.DB) {
+      return;
+    }
+
+    try {
+      await this.env.DB.prepare('DELETE FROM room_presence WHERE sessionId = ?').bind(sessionId).run();
+    } catch (error) {
+      console.error(`删除房间在线状态失败 (${sessionId}):`, error);
+    }
+  }
+
+  getRoomStats() {
+    let latestConnectedAt = 0;
+
+    for (const session of this.sessions.values()) {
+      if (session.connectedAt > latestConnectedAt) {
+        latestConnectedAt = session.connectedAt;
+      }
+    }
+
+    return {
+      deviceCount: this.sessions.size,
+      isActive: this.sessions.size > 0,
+      lastActive: latestConnectedAt ? Math.floor(latestConnectedAt / 1000) : 0,
     };
   }
 }
