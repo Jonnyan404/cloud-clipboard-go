@@ -116,6 +116,9 @@ export class WebSocketRoom {
   async sendConfigMessage(webSocket, room) {
     try {
       const fileLimit = parseInt(this.env.FILE_LIMIT) || 104857600;
+      const multipartPartSize = fileLimit > 5 * 1024 * 1024
+        ? Math.min(fileLimit, 8 * 1024 * 1024)
+        : fileLimit + 1;
       const configMessage = {
         event: 'config',
         data: {
@@ -130,7 +133,7 @@ export class WebSocketRoom {
           },
           file: {
             expire: parseInt(this.env.FILE_EXPIRE) || 3600,
-            chunk: fileLimit + 1,
+            chunk: multipartPartSize,
             limit: fileLimit
           },
           auth: resolveRoomAuth(this.env, room).required
