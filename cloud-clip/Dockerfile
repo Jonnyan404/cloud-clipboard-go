@@ -31,7 +31,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -tags=embed -ldflags="-s -w" -o cloud-clip
 FROM alpine:latest
 
 # 安装运行时依赖
-RUN apk add --no-cache ca-certificates
+RUN apk add --no-cache ca-certificates wget
 
 # 创建应用目录
 WORKDIR /app/server-node
@@ -44,6 +44,12 @@ RUN apk add --no-cache git tzdata \
     && apk add --repository=https://dl-cdn.alpinelinux.org/alpine/edge/testing mkcert
 # 暴露端口
 EXPOSE 9501
+
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=10s \
+    CMD PORT="${LISTEN_PORT:-9501}"; PREFIX="${PREFIX:-}"; \
+        wget -q --no-check-certificate --spider "https://127.0.0.1:${PORT}${PREFIX}/server" \
+        || wget -q --spider "http://127.0.0.1:${PORT}${PREFIX}/server" \
+        || exit 1
 
 # 运行应用
 ENTRYPOINT ["/app/entrypoint.sh"]
