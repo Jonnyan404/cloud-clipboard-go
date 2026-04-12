@@ -1,33 +1,19 @@
 import { corsHeaders } from '../cors';
+import { ensureRoomAccess, normalizeRoomName } from '../auth';
 
 export class WebSocketHandler {
   static async connect(request, env) {
     try {
       const url = new URL(request.url);
-      const room = url.searchParams.get('room') || 'default';
+      const room = normalizeRoomName(url.searchParams.get('room'));
       
       console.log(`WebSocket 连接请求: room=${room}, url=${url.toString()}`);
-      
-      // 认证检查 - 匹配 Go 版本的逻辑
-      let authNeeded = false;
-      let expectedPassword = '';
-      
-      if (env.AUTH_PASSWORD) {
-        authNeeded = true;
-        expectedPassword = env.AUTH_PASSWORD;
+      const authResult = ensureRoomAccess(request, env, room);
+      if (!authResult.ok) {
+        console.log('WebSocket 认证失败');
+        return authResult.response;
       }
-
-      if (authNeeded) {
-        const token = url.searchParams.get('auth');
-        if (!token || token !== expectedPassword) {
-          console.log('WebSocket 认证失败');
-          return new Response('Unauthorized', {
-            status: 401,
-            headers: corsHeaders
-          });
-        }
-        console.log('WebSocket 认证成功');
-      }
+      console.log('WebSocket 认证成功');
 
       // 检查是否为 WebSocket 升级请求
       const upgradeHeader = request.headers.get('Upgrade');

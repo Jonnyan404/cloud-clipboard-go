@@ -6,7 +6,9 @@ compatibility_flags = ["nodejs_compat"]
 # 环境变量
 [vars]
 AUTH_PASSWORD = "123"
-HISTORY_LIMIT = "5"
+ROOM_AUTH = "{\"private\":\"\",\"finance\":\"finance-pass\"}"
+ROOM_LIST = "true"
+HISTORY_LIMIT = "50"
 TEXT_LIMIT = "40960"
 FILE_LIMIT = "204857600"
 FILE_EXPIRE = "3600"
