@@ -87,6 +87,7 @@ type File struct {
 	Size       int64  `json:"size"`
 	UploadTime int64  `json:"uploadTime"`
 	ExpireTime int64  `json:"expireTime"`
+	Room       string `json:"room,omitempty"`
 }
 
 // History represents the entire JSON structure
@@ -143,6 +144,7 @@ type RoomInfo struct {
 	DeviceCount  int    `json:"deviceCount"`  // 设备数量
 	LastActive   int64  `json:"lastActive"`   // 最后活跃时间（Unix时间戳）
 	IsActive     bool   `json:"isActive"`     // 是否活跃（有设备连接）
+	IsProtected  bool   `json:"isProtected"`  // 是否为受保护房间
 }
 
 // RoomListResponse 房间列表响应结构体

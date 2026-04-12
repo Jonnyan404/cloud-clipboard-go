@@ -14,7 +14,11 @@
         "port": 9501, // 端口号，falsy 值表示不监听
         "prefix": "", // 部署时的URL前缀，例如想要在 http://localhost/prefix/ 访问，则将这一项设为 /prefix
         "history": 10, // 消息历史记录的数量
-        "auth": false, // 是否在连接时要求使用密码认证，falsy 值表示不使用
+        "auth": false, // 全局入口密码。只要设置了就对所有房间生效，保证旧密码升级后仍可用
+        "roomAuth": {
+            "private": "", // 空字符串表示该房间只接受全局 auth
+            "finance": "finance-pass" // 非空字符串表示该房间额外接受独立密码
+        },
         "historyFile": null, // 自定义历史记录存储路径，默认为当前目录的 history.json
         "storageDir": null, // 自定义文件存储目录，默认为临时文件夹的.cloud-clipboard-storage目录
         "roomList": false, // 房间列表开关,默认false
@@ -36,8 +40,12 @@
 >
 > “密码认证”的说明：
 >
-> 如果启用“密码认证”，只有输入正确的密码才能连接到服务端并查看剪贴板内容。
-> 可以将 `server.auth` 字段设为 `true`（随机生成六位密码）或字符串（自定义密码）来启用这个功能，启动服务端后终端会以 `Authorization code: ******` 的格式输出当前使用的密码。
+> 如果启用“密码认证”，只有输入正确的密码才能连接到服务端并查看对应房间的剪贴板内容。
+> 可以将 `server.auth` 字段设为 `true`（随机生成密码）或字符串（自定义全局密码）来启用这个功能。
+> 如果设置了 `server.auth`，它始终作为全局入口密码，对所有房间生效。
+> `server.roomAuth` 不会让 `server.auth` 失效；它只是给指定房间增加一个额外可用密码。
+> `server.roomAuth` 中值为空字符串时，该房间只接受全局 `server.auth`；值为非空字符串时，该房间同时接受全局 `server.auth` 和该房间自己的密码。
+> 未通过认证的用户不会在房间列表里看到受保护房间。
 
 
 ### HTTP API
