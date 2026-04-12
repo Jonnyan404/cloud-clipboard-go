@@ -1,5 +1,5 @@
 import { corsHeaders } from '../cors';
-import { canAccessRoom, extractAuthToken, hasRoomAuthEntry, normalizeRoomName, parseRoomAuth } from '../auth';
+import { canAccessRoom, extractAuthTokens, hasRoomAuthEntry, normalizeRoomName, parseRoomAuth } from '../auth';
 
 function toDisplayRoom(room) {
   return normalizeRoomName(room) === 'default' ? '' : normalizeRoomName(room);
@@ -32,7 +32,7 @@ export class RoomsHandler {
         });
       }
 
-      const token = extractAuthToken(request);
+      const tokens = extractAuthTokens(request);
       const roomAuth = parseRoomAuth(env);
       const messageResult = await env.DB.prepare(`
         SELECT room, COUNT(*) AS messageCount, MAX(timestamp) AS lastActive
@@ -84,10 +84,10 @@ export class RoomsHandler {
         }
       }
 
-      const rooms = (await Promise.all(Array.from(roomMap.values())
+      const roomEntries = await Promise.all(Array.from(roomMap.values())
         .map(async row => {
           const normalizedRoom = row.room;
-          if (!canAccessRoom(env, normalizedRoom, token)) {
+          if (!canAccessRoom(env, normalizedRoom, '') && !tokens.some(token => canAccessRoom(env, normalizedRoom, token))) {
             return null;
           }
           const messageLastActive = Number(row.messageLastActive || 0);
@@ -102,8 +102,10 @@ export class RoomsHandler {
             isActive: deviceCount > 0,
             isProtected: hasRoomAuthEntry(env, normalizedRoom),
           };
-        }))
-        .filter(Boolean))
+        }));
+
+      const rooms = roomEntries
+        .filter(Boolean)
         .sort(compareRooms);
 
       return new Response(JSON.stringify({ rooms }), {

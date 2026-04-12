@@ -18,6 +18,34 @@ export function extractAuthToken(request) {
   return new URL(request.url).searchParams.get('auth') || '';
 }
 
+export function extractAuthTokens(request) {
+  const tokens = [];
+  const pushToken = value => {
+    const normalized = normalizeAuthValue(value);
+    if (normalized && !tokens.includes(normalized)) {
+      tokens.push(normalized);
+    }
+  };
+
+  pushToken(extractAuthToken(request));
+
+  const extraHeader = request.headers.get('X-Room-Auth-Tokens');
+  if (!extraHeader) {
+    return tokens;
+  }
+
+  try {
+    const parsed = JSON.parse(extraHeader);
+    if (Array.isArray(parsed)) {
+      parsed.forEach(pushToken);
+    }
+  } catch {
+    extraHeader.split(',').forEach(pushToken);
+  }
+
+  return tokens;
+}
+
 export function normalizeAuthValue(value) {
   if (value === undefined || value === null || value === false) {
     return '';

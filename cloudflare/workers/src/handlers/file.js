@@ -2,6 +2,135 @@ import { corsHeaders } from '../cors';
 import { buildSenderDevice, saveToD1, broadcastMessage, generateUUID } from '../utils';
 import { ensureRoomAccess, normalizeRoomName } from '../auth';
 
+function decodeUploadFilename(value = '') {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function toSafeAsciiFilename(filename = '') {
+  const normalized = String(filename || '')
+    .replace(/[\r\n]/g, ' ')
+    .replace(/["\\]/g, '_')
+    .replace(/[^\x20-\x7E]/g, '_')
+    .trim();
+  return normalized || 'file';
+}
+
+function buildContentDisposition(filename = '', disposition = 'inline') {
+  const safeFallback = toSafeAsciiFilename(filename);
+  const encodedFilename = encodeURIComponent(String(filename || safeFallback));
+  return `${disposition}; filename="${safeFallback}"; filename*=UTF-8''${encodedFilename}`;
+}
+
+const MULTIPART_MIN_PART_SIZE = 5 * 1024 * 1024;
+const DEFAULT_MULTIPART_PART_SIZE = 8 * 1024 * 1024;
+
+function getFileLimit(env) {
+  return env.FILE_LIMIT ? parseInt(env.FILE_LIMIT, 10) : 104857600;
+}
+
+function getMultipartPartSize(env) {
+  const fileLimit = getFileLimit(env);
+  if (!Number.isFinite(fileLimit) || fileLimit <= MULTIPART_MIN_PART_SIZE) {
+    return fileLimit + 1;
+  }
+  return Math.min(fileLimit, DEFAULT_MULTIPART_PART_SIZE);
+}
+
+function createFileKey(uuid) {
+  return `files/${uuid}`;
+}
+
+function extractUuidFromKey(key = '') {
+  return String(key || '').startsWith('files/') ? String(key).slice('files/'.length) : String(key || '');
+}
+
+function buildMultipartOptions({ room, fileName, fileType, expireTime }) {
+  return {
+    httpMetadata: {
+      contentType: fileType || 'application/octet-stream',
+      contentDisposition: buildContentDisposition(fileName, 'inline')
+    },
+    customMetadata: {
+      originalName: fileName,
+      uploadTime: Date.now().toString(),
+      expireTime: expireTime.toString(),
+      room,
+    }
+  };
+}
+
+async function finalizeUploadedFile({ request, env, url, room, uuid, fileName, fileSize, expireTime }) {
+  const fileUrl = `${url.origin}/api/file/${uuid}/${encodeURIComponent(fileName)}`;
+  const messageData = {
+    type: 'file',
+    name: fileName,
+    size: fileSize,
+    room,
+    timestamp: Math.floor(Date.now() / 1000),
+    senderIP: request.headers.get('CF-Connecting-IP') || 'unknown',
+    userAgent: request.headers.get('User-Agent') || 'unknown',
+    uuid,
+    expireTime,
+    url: fileUrl
+  };
+  const senderDevice = buildSenderDevice(messageData.userAgent);
+
+  const saveResult = await saveToD1(env.DB, messageData, env);
+  const messageId = saveResult.messageId;
+  const filesToCleanup = saveResult.filesToCleanup;
+
+  console.log('[upload] saved message', {
+    room,
+    uuid,
+    messageId,
+    cleanupCount: filesToCleanup.length,
+  });
+
+  if (filesToCleanup.length > 0 && env.R2_BUCKET) {
+    console.log(`清理 ${filesToCleanup.length} 个旧文件`);
+    for (const fileUuid of filesToCleanup) {
+      try {
+        await env.R2_BUCKET.delete(createFileKey(fileUuid));
+        console.log(`已删除旧文件: ${fileUuid}`);
+      } catch (deleteError) {
+        console.error(`删除文件失败: ${fileUuid}`, deleteError);
+      }
+    }
+  }
+
+  await broadcastMessage(env, room, {
+    event: 'receive',
+    data: {
+      ...messageData,
+      id: messageId,
+      expire: expireTime,
+      cache: uuid,
+      senderDevice,
+    }
+  });
+
+  const contentURL = `${url.origin}/api/content/${messageId}${room !== 'default' ? `?room=${room}` : ''}`;
+
+  console.log('[upload] success', {
+    room,
+    uuid,
+    messageId,
+    contentURL,
+  });
+
+  return new Response(JSON.stringify({
+    id: messageId.toString(),
+    type: FileHandler.determineFileType(fileName),
+    url: contentURL
+  }), {
+    headers: { 'Content-Type': 'application/json', ...corsHeaders }
+  });
+}
+
 export class FileHandler {
   static async upload(request, env) {
     try {
@@ -22,10 +151,46 @@ export class FileHandler {
         });
       }
 
-      const formData = await request.formData();
-      const file = formData.get('file');
+      const rawFileName = request.headers.get('X-File-Name');
+      const isStreamUpload = Boolean(rawFileName);
+      let file = null;
+      let fileName = '';
+      let fileSize = 0;
+      let fileType = request.headers.get('Content-Type') || 'application/octet-stream';
+      let fileBody = null;
 
-      if (!file) {
+      console.log('[upload] start', {
+        room,
+        hasAuthHeader: Boolean(request.headers.get('Authorization')),
+        contentType: fileType,
+        hasRawFilenameHeader: isStreamUpload,
+      });
+
+      if (isStreamUpload) {
+        fileName = decodeUploadFilename(rawFileName) || 'file';
+        fileSize = Number(request.headers.get('X-File-Size') || 0);
+        fileBody = request.body;
+      } else {
+        const formData = await request.formData();
+        file = formData.get('file');
+        if (file) {
+          fileName = file.name;
+          fileSize = file.size;
+          fileType = file.type || fileType;
+          fileBody = file.stream();
+        }
+      }
+
+      console.log('[upload] parsed', {
+        room,
+        isStreamUpload,
+        fileName,
+        fileSize,
+        fileType,
+        hasBody: Boolean(fileBody),
+      });
+
+      if (!fileBody || !fileName) {
         return new Response(JSON.stringify({
           error: 'No file provided',
           message: '未提供文件'
@@ -36,8 +201,8 @@ export class FileHandler {
       }
 
       // 检查文件大小限制
-      const fileLimit = env.FILE_LIMIT ? parseInt(env.FILE_LIMIT) : 104857600; // 100MB
-      if (file.size > fileLimit) {
+      const fileLimit = getFileLimit(env);
+      if (fileSize > fileLimit) {
         return new Response(JSON.stringify({
           error: 'File too large',
           message: `文件大小超出限制 (最大 ${Math.floor(fileLimit / 1024 / 1024)}MB)`
@@ -53,81 +218,278 @@ export class FileHandler {
       const expireTime = currentTime + expireSeconds;
 
       // 上传文件到 R2
-      await env.R2_BUCKET.put(`files/${uuid}`, file.stream(), {
-        httpMetadata: {
-          contentType: file.type || 'application/octet-stream',
-          contentDisposition: `inline; filename="${file.name}"`
-        },
-        customMetadata: {
-          originalName: file.name,
-          uploadTime: Date.now().toString(),
-          expireTime: expireTime.toString(),
-          room: room
-        }
-      });
+      await env.R2_BUCKET.put(createFileKey(uuid), fileBody, buildMultipartOptions({ room, fileName, fileType, expireTime }));
 
-      const fileUrl = `${url.origin}/api/file/${uuid}/${encodeURIComponent(file.name)}`;
-
-      // 创建消息记录
-      const messageData = {
-        type: 'file',
-        name: file.name,
-        size: file.size,
+      console.log('[upload] stored in r2', {
         room,
-        timestamp: Math.floor(Date.now() / 1000), // 使用毫秒时间戳
-        senderIP: request.headers.get('CF-Connecting-IP') || 'unknown',
-        userAgent: request.headers.get('User-Agent') || 'unknown',
         uuid,
-        expireTime,
-        url: fileUrl
-      };
-      const senderDevice = buildSenderDevice(messageData.userAgent);
-
-      // 保存到 D1 并获取清理结果
-      const saveResult = await saveToD1(env.DB, messageData, env); // 修复：传递 env
-      const messageId = saveResult.messageId;
-      const filesToCleanup = saveResult.filesToCleanup;
-
-      // 清理被删除的旧文件
-      if (filesToCleanup.length > 0 && env.R2_BUCKET) {
-        console.log(`清理 ${filesToCleanup.length} 个旧文件`);
-        for (const fileUuid of filesToCleanup) {
-          try {
-            await env.R2_BUCKET.delete(`files/${fileUuid}`);
-            console.log(`已删除旧文件: ${fileUuid}`);
-          } catch (deleteError) {
-            console.error(`删除文件失败: ${fileUuid}`, deleteError);
-          }
-        }
-      }
-
-      // 广播到 WebSocket 连接
-      await broadcastMessage(env, room, {
-        event: 'receive',
-        data: {
-          ...messageData,
-          id: messageId,
-          expire: expireTime,
-          cache: uuid,
-          senderDevice,
-        }
+        fileName,
+        fileSize,
       });
 
-      const contentURL = `${url.origin}/api/content/${messageId}${room !== 'default' ? `?room=${room}` : ''}`;
-
-      return new Response(JSON.stringify({
-        id: messageId.toString(),
-        type: this.determineFileType(file.name),
-        url: contentURL
-      }), {
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      return await finalizeUploadedFile({
+        request,
+        env,
+        url,
+        room,
+        uuid,
+        fileName,
+        fileSize,
+        expireTime,
       });
 
     } catch (error) {
       console.error('File upload error:', error);
+      console.error('File upload stack:', error?.stack || '(no stack)');
       return new Response(JSON.stringify({
         error: 'Internal Server Error',
         message: '上传文件时发生错误'
+      }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      });
+    }
+  }
+
+  static async createMultipart(request, env) {
+    try {
+      const url = new URL(request.url);
+      const room = normalizeRoomName(url.searchParams.get('room'));
+      const authResult = ensureRoomAccess(request, env, room);
+      if (!authResult.ok) {
+        return authResult.response;
+      }
+
+      if (!env.R2_BUCKET) {
+        return new Response(JSON.stringify({
+          error: 'Storage not available',
+          message: '文件存储服务不可用'
+        }), {
+          status: 503,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders }
+        });
+      }
+
+      const body = await request.json();
+      const fileName = String(body?.name || '').trim();
+      const fileSize = Number(body?.size || 0);
+      const fileType = String(body?.type || 'application/octet-stream');
+
+      if (!fileName || !fileSize) {
+        return new Response(JSON.stringify({
+          error: 'Invalid file metadata',
+          message: '文件元数据无效'
+        }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders }
+        });
+      }
+
+      const fileLimit = getFileLimit(env);
+      if (fileSize > fileLimit) {
+        return new Response(JSON.stringify({
+          error: 'File too large',
+          message: `文件大小超出限制 (最大 ${Math.floor(fileLimit / 1024 / 1024)}MB)`
+        }), {
+          status: 413,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders }
+        });
+      }
+
+      const uuid = generateUUID();
+      const key = createFileKey(uuid);
+      const expireSeconds = env.FILE_EXPIRE ? parseInt(env.FILE_EXPIRE) : 3600;
+      const expireTime = Math.floor(Date.now() / 1000) + expireSeconds;
+      const upload = await env.R2_BUCKET.createMultipartUpload(key, buildMultipartOptions({ room, fileName, fileType, expireTime }));
+      const partSize = getMultipartPartSize(env);
+
+      console.log('[multipart] created', {
+        room,
+        uuid,
+        key,
+        uploadId: upload.uploadId,
+        fileName,
+        fileSize,
+        partSize,
+      });
+
+      return new Response(JSON.stringify({
+        result: {
+          uuid,
+          key,
+          uploadId: upload.uploadId,
+          partSize,
+          minPartSize: MULTIPART_MIN_PART_SIZE,
+        }
+      }), {
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      });
+    } catch (error) {
+      console.error('Create multipart upload error:', error);
+      console.error('Create multipart upload stack:', error?.stack || '(no stack)');
+      return new Response(JSON.stringify({
+        error: 'Internal Server Error',
+        message: '初始化分片上传时发生错误'
+      }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      });
+    }
+  }
+
+  static async uploadMultipartPart(request, env) {
+    try {
+      const url = new URL(request.url);
+      const room = normalizeRoomName(url.searchParams.get('room'));
+      const authResult = ensureRoomAccess(request, env, room);
+      if (!authResult.ok) {
+        return authResult.response;
+      }
+
+      const uploadId = String(url.searchParams.get('uploadId') || '').trim();
+      const key = String(url.searchParams.get('key') || '').trim();
+      const partNumber = Number(request.params.partNumber);
+
+      if (!uploadId || !key || !partNumber || !request.body) {
+        return new Response(JSON.stringify({
+          error: 'Invalid multipart request',
+          message: '分片上传参数无效'
+        }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders }
+        });
+      }
+
+      const upload = env.R2_BUCKET.resumeMultipartUpload(key, uploadId);
+      const part = await upload.uploadPart(partNumber, request.body);
+
+      console.log('[multipart] uploaded part', {
+        room,
+        key,
+        uploadId,
+        partNumber,
+      });
+
+      return new Response(JSON.stringify({ result: part }), {
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      });
+    } catch (error) {
+      console.error('Multipart upload part error:', error);
+      console.error('Multipart upload part stack:', error?.stack || '(no stack)');
+      return new Response(JSON.stringify({
+        error: 'Internal Server Error',
+        message: '上传文件分片时发生错误'
+      }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      });
+    }
+  }
+
+  static async completeMultipart(request, env) {
+    try {
+      const url = new URL(request.url);
+      const room = normalizeRoomName(url.searchParams.get('room'));
+      const authResult = ensureRoomAccess(request, env, room);
+      if (!authResult.ok) {
+        return authResult.response;
+      }
+
+      const body = await request.json();
+      const uploadId = String(body?.uploadId || '').trim();
+      const key = String(body?.key || '').trim();
+      const parts = Array.isArray(body?.parts) ? [...body.parts] : [];
+
+      if (!uploadId || !key || !parts.length) {
+        return new Response(JSON.stringify({
+          error: 'Invalid multipart request',
+          message: '分片完成参数无效'
+        }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders }
+        });
+      }
+
+      const upload = env.R2_BUCKET.resumeMultipartUpload(key, uploadId);
+      const completedObject = await upload.complete(parts.sort((left, right) => left.partNumber - right.partNumber));
+      const uuid = extractUuidFromKey(key);
+      const fileName = completedObject.customMetadata?.originalName || body?.name || uuid || 'file';
+      const expireTime = Number(completedObject.customMetadata?.expireTime || 0);
+      const fileSize = Number(completedObject.size || body?.size || 0);
+
+      console.log('[multipart] completed', {
+        room,
+        uuid,
+        key,
+        uploadId,
+        fileName,
+        fileSize,
+      });
+
+      return await finalizeUploadedFile({
+        request,
+        env,
+        url,
+        room,
+        uuid,
+        fileName,
+        fileSize,
+        expireTime,
+      });
+    } catch (error) {
+      console.error('Complete multipart upload error:', error);
+      console.error('Complete multipart upload stack:', error?.stack || '(no stack)');
+      return new Response(JSON.stringify({
+        error: 'Internal Server Error',
+        message: '完成分片上传时发生错误'
+      }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      });
+    }
+  }
+
+  static async abortMultipart(request, env) {
+    try {
+      const url = new URL(request.url);
+      const room = normalizeRoomName(url.searchParams.get('room'));
+      const authResult = ensureRoomAccess(request, env, room);
+      if (!authResult.ok) {
+        return authResult.response;
+      }
+
+      const uploadId = String(url.searchParams.get('uploadId') || '').trim();
+      const key = String(url.searchParams.get('key') || '').trim();
+      if (!uploadId || !key) {
+        return new Response(JSON.stringify({
+          error: 'Invalid multipart request',
+          message: '缺少 uploadId 或 key'
+        }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders }
+        });
+      }
+
+      const upload = env.R2_BUCKET.resumeMultipartUpload(key, uploadId);
+      await upload.abort();
+
+      console.log('[multipart] aborted', {
+        room,
+        key,
+        uploadId,
+      });
+
+      return new Response(JSON.stringify({
+        status: '已取消分片上传'
+      }), {
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      });
+    } catch (error) {
+      console.error('Abort multipart upload error:', error);
+      console.error('Abort multipart upload stack:', error?.stack || '(no stack)');
+      return new Response(JSON.stringify({
+        error: 'Internal Server Error',
+        message: '取消分片上传时发生错误'
       }), {
         status: 500,
         headers: { 'Content-Type': 'application/json', ...corsHeaders }
@@ -190,9 +552,9 @@ export class FileHandler {
       const originalName = object.customMetadata?.originalName || filename || 'file';
       
       if (url.searchParams.get('download') === 'true') {
-        headers['Content-Disposition'] = `attachment; filename="${encodeURIComponent(originalName)}"`;
+        headers['Content-Disposition'] = buildContentDisposition(originalName, 'attachment');
       } else {
-        headers['Content-Disposition'] = `inline; filename="${encodeURIComponent(originalName)}"`;
+        headers['Content-Disposition'] = buildContentDisposition(originalName, 'inline');
       }
 
       return new Response(object.body, { headers });
