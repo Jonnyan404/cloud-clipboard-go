@@ -19,3 +19,15 @@ CREATE INDEX IF NOT EXISTS idx_messages_room ON messages(room);
 CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages(timestamp);
 CREATE INDEX IF NOT EXISTS idx_messages_uuid ON messages(uuid);
 CREATE INDEX IF NOT EXISTS idx_messages_expire ON messages(expireTime);
+
+-- 当前在线的 WebSocket 会话
+CREATE TABLE IF NOT EXISTS room_presence (
+  sessionId TEXT PRIMARY KEY,
+  room TEXT NOT NULL DEFAULT 'default',
+  connectedAt INTEGER NOT NULL,
+  userAgent TEXT,
+  updatedAt INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_room_presence_room ON room_presence(room);
+CREATE INDEX IF NOT EXISTS idx_room_presence_updated_at ON room_presence(updatedAt);

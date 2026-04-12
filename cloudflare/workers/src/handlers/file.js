@@ -1,26 +1,16 @@
 import { corsHeaders } from '../cors';
-import { saveToD1, broadcastMessage, generateUUID } from '../utils';
+import { buildSenderDevice, saveToD1, broadcastMessage, generateUUID } from '../utils';
+import { ensureRoomAccess, normalizeRoomName } from '../auth';
 
 export class FileHandler {
   static async upload(request, env) {
     try {
-      // 认证检查
-      if (env.AUTH_PASSWORD) {
-        const auth = request.headers.get('Authorization') || 
-                    new URL(request.url).searchParams.get('auth');
-        if (!auth || auth.replace('Bearer ', '') !== env.AUTH_PASSWORD) {
-          return new Response(JSON.stringify({
-            error: 'Unauthorized',
-            message: '需要认证令牌'
-          }), {
-            status: 401,
-            headers: { 'Content-Type': 'application/json', ...corsHeaders }
-          });
-        }
-      }
-
       const url = new URL(request.url);
-      const room = url.searchParams.get('room') || 'default';
+      const room = normalizeRoomName(url.searchParams.get('room'));
+      const authResult = ensureRoomAccess(request, env, room);
+      if (!authResult.ok) {
+        return authResult.response;
+      }
 
       if (!env.R2_BUCKET) {
         return new Response(JSON.stringify({
@@ -91,6 +81,7 @@ export class FileHandler {
         expireTime,
         url: fileUrl
       };
+      const senderDevice = buildSenderDevice(messageData.userAgent);
 
       // 保存到 D1 并获取清理结果
       const saveResult = await saveToD1(env.DB, messageData, env); // 修复：传递 env
@@ -117,7 +108,8 @@ export class FileHandler {
           ...messageData,
           id: messageId,
           expire: expireTime,
-          cache: uuid
+          cache: uuid,
+          senderDevice,
         }
       });
 
@@ -147,6 +139,13 @@ export class FileHandler {
     try {
       const { uuid, filename } = request.params;
       console.log(`文件下载请求: UUID ${uuid}, filename: ${filename}`);
+
+      const object = env.R2_BUCKET ? await env.R2_BUCKET.get(`files/${uuid}`) : null;
+      const room = normalizeRoomName(object?.customMetadata?.room || 'default');
+      const authResult = ensureRoomAccess(request, env, room);
+      if (!authResult.ok) {
+        return authResult.response;
+      }
       
       if (!env.R2_BUCKET) {
         return new Response('Storage not available', { 
@@ -154,8 +153,6 @@ export class FileHandler {
           headers: corsHeaders 
         });
       }
-
-      const object = await env.R2_BUCKET.get(`files/${uuid}`);
       
       if (!object) {
         console.log(`文件未找到: ${uuid}`);
@@ -212,19 +209,26 @@ export class FileHandler {
 
   static async delete(request, env) {
     try {
-      // 认证检查
-      if (env.AUTH_PASSWORD) {
-        const auth = request.headers.get('Authorization') || 
-                    new URL(request.url).searchParams.get('auth');
-        if (!auth || auth.replace('Bearer ', '') !== env.AUTH_PASSWORD) {
-          return new Response(JSON.stringify({
-            error: 'Unauthorized',
-            message: '需要认证令牌'
-          }), {
-            status: 401,
-            headers: { 'Content-Type': 'application/json', ...corsHeaders }
-          });
+      let room = 'default';
+      if (env.R2_BUCKET) {
+        const object = await env.R2_BUCKET.head(`files/${request.params.uuid}`);
+        if (object?.customMetadata?.room) {
+          room = normalizeRoomName(object.customMetadata.room);
         }
+      }
+
+      if (room === 'default' && env.DB) {
+        const fileRecord = await env.DB.prepare('SELECT room FROM messages WHERE uuid = ? ORDER BY id DESC LIMIT 1')
+          .bind(request.params.uuid)
+          .first();
+        if (fileRecord?.room) {
+          room = normalizeRoomName(fileRecord.room);
+        }
+      }
+
+      const authResult = ensureRoomAccess(request, env, room);
+      if (!authResult.ok) {
+        return authResult.response;
       }
 
       const { uuid } = request.params;

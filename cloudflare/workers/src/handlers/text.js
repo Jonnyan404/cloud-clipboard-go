@@ -1,29 +1,20 @@
 import { corsHeaders } from '../cors';
-import { saveToD1, broadcastMessage } from '../utils';
+import { buildSenderDevice, saveToD1, broadcastMessage } from '../utils';
+import { ensureRoomAccess, normalizeRoomName } from '../auth';
 
 export class TextHandler {
   static async create(request, env) {
     try {
       console.log('处理文本创建请求');
-      
-      // 认证检查
-      if (env.AUTH_PASSWORD) {
-        const auth = request.headers.get('Authorization') || 
-                    new URL(request.url).searchParams.get('auth');
-        if (!auth || auth.replace('Bearer ', '') !== env.AUTH_PASSWORD) {
-          console.log('文本创建请求认证失败');
-          return new Response(JSON.stringify({
-            error: 'Unauthorized',
-            message: '需要认证令牌'
-          }), {
-            status: 401,
-            headers: { 'Content-Type': 'application/json', ...corsHeaders }
-          });
-        }
-      }
 
       const url = new URL(request.url);
-      const room = url.searchParams.get('room') || 'default';
+      const room = normalizeRoomName(url.searchParams.get('room'));
+      const targetMessageId = url.searchParams.get('id');
+      const authResult = ensureRoomAccess(request, env, room);
+      if (!authResult.ok) {
+        console.log('文本创建请求认证失败');
+        return authResult.response;
+      }
       
       console.log(`文本消息房间: ${room}`);
       
@@ -55,6 +46,17 @@ export class TextHandler {
         });
       }
 
+      if (targetMessageId) {
+        const updated = await TextHandler.update(request, env, {
+          id: targetMessageId,
+          room,
+          content,
+          url,
+        });
+
+        return updated;
+      }
+
       // 创建消息记录
       const messageData = {
         type: 'text',
@@ -64,6 +66,7 @@ export class TextHandler {
         senderIP: request.headers.get('CF-Connecting-IP') || 'unknown',
         userAgent: request.headers.get('User-Agent') || 'unknown'
       };
+      const senderDevice = buildSenderDevice(messageData.userAgent);
 
       console.log('准备保存文本消息:', messageData);
 
@@ -102,7 +105,8 @@ export class TextHandler {
         event: 'receive',
         data: {
           ...messageData,
-          id: messageId
+          id: messageId,
+          senderDevice,
         }
       });
 
@@ -128,5 +132,86 @@ export class TextHandler {
         headers: { 'Content-Type': 'application/json', ...corsHeaders }
       });
     }
+  }
+
+  static async update(request, env, { id, room, content, url }) {
+    const numericId = parseInt(id, 10);
+    if (!Number.isInteger(numericId) || numericId <= 0) {
+      return new Response(JSON.stringify({
+        error: 'Invalid message id',
+        message: '无效的 ID 参数'
+      }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      });
+    }
+
+    if (!env.DB) {
+      return new Response(JSON.stringify({
+        error: 'Database not available',
+        message: '数据库服务不可用'
+      }), {
+        status: 503,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      });
+    }
+
+    const existingMessage = await env.DB.prepare(
+      'SELECT id, type, content, room FROM messages WHERE id = ? AND room = ?'
+    ).bind(numericId, room).first();
+
+    if (!existingMessage || existingMessage.type !== 'text') {
+      return new Response(JSON.stringify({
+        error: 'Message not found',
+        message: '消息未找到或无法更新'
+      }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      });
+    }
+
+    const contentURL = `${url.origin}/api/content/${numericId}${room !== 'default' ? `?room=${room}` : ''}`;
+
+    if (existingMessage.content === content) {
+      return new Response(JSON.stringify({
+        id: numericId.toString(),
+        type: 'text',
+        url: contentURL
+      }), {
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      });
+    }
+
+    const timestamp = Math.floor(Date.now() / 1000);
+    const senderIP = request.headers.get('CF-Connecting-IP') || 'unknown';
+    const userAgent = request.headers.get('User-Agent') || 'unknown';
+    const senderDevice = buildSenderDevice(userAgent);
+
+    await env.DB.prepare(`
+      UPDATE messages
+      SET content = ?, timestamp = ?, senderIP = ?, userAgent = ?
+      WHERE id = ? AND room = ? AND type = 'text'
+    `).bind(content, timestamp, senderIP, userAgent, numericId, room).run();
+
+    await broadcastMessage(env, room, {
+      event: 'update',
+      data: {
+        id: numericId,
+        type: 'text',
+        content,
+        timestamp,
+        room,
+        senderIP,
+        senderDevice,
+      }
+    });
+
+    return new Response(JSON.stringify({
+      id: numericId.toString(),
+      type: 'text',
+      url: contentURL
+    }), {
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
   }
 }
