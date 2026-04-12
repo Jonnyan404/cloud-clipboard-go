@@ -21,43 +21,74 @@ func (m *PostList) Append(item *PostEvent) {
 	m.Lock()
 	defer m.Unlock()
 
+	m.appendLocked(*item)
+}
+
+func (m *PostList) appendLocked(item PostEvent) {
 	if item.Data.ID() <= 0 { //fill uniq id, thread-safe way
 		item.Data.SetID(m.nextid)
 	}
-	m.List = append(m.List, *item)
-
-	for len(m.List) > m.history_len { //history reach max
-		// 新增：记录被淘汰的消息日志
-		if m.logger != nil {
-			evicted := m.List[0]
-
-			var content string
-			// 提取内容预览
-			if evicted.Data.TextReceive != nil {
-				content = evicted.Data.TextReceive.Content
-			} else if evicted.Data.FileReceive != nil {
-				content = "[文件] " + evicted.Data.FileReceive.Name
-			}
-
-			// 截断内容 (支持中文)，超过30个字符则截断
-			runes := []rune(content)
-			if len(runes) > 30 {
-				content = string(runes[:30]) + "..."
-			}
-
-			m.logger.Printf("消息队列已满(%d)，淘汰旧消息: ID=%d, 房间=[%s], 类型=%s, 内容=[%s]",
-				m.history_len, evicted.Data.ID(), evicted.Data.Room(), evicted.Event, content)
-		}
-
-		m.List = m.List[1:]
-	}
-
-	m.nextid++
+	m.List = append(m.List, item)
+	m.trimRoomHistoryLocked(item.Data.Room())
 
 	itemID := item.Data.ID()
 	if m.nextid <= itemID {
 		m.nextid = itemID + 1
 	}
+}
+
+func (m *PostList) trimRoomHistoryLocked(room string) {
+	if m.history_len <= 0 {
+		m.List = []PostEvent{}
+		return
+	}
+
+	normalizedRoom := normalizeRoomName(room)
+	roomCount := 0
+	for _, msg := range m.List {
+		if normalizeRoomName(msg.Data.Room()) == normalizedRoom {
+			roomCount++
+		}
+	}
+
+	for roomCount > m.history_len {
+		evictedIndex := -1
+		for i, msg := range m.List {
+			if normalizeRoomName(msg.Data.Room()) == normalizedRoom {
+				m.logEvictedMessage(msg)
+				evictedIndex = i
+				break
+			}
+		}
+
+		if evictedIndex == -1 {
+			return
+		}
+
+		m.List = append(m.List[:evictedIndex], m.List[evictedIndex+1:]...)
+		roomCount--
+	}
+}
+
+func (m *PostList) logEvictedMessage(evicted PostEvent) {
+	if m.logger == nil {
+		return
+	}
+
+	var content string
+	if evicted.Data.TextReceive != nil {
+		content = evicted.Data.TextReceive.Content
+	} else if evicted.Data.FileReceive != nil {
+		content = "[文件] " + evicted.Data.FileReceive.Name
+	}
+
+	runes := []rune(content)
+	if len(runes) > 30 {
+		content = string(runes[:30]) + "..."
+	}
+
+	m.logger.Printf("房间消息队列已满(%d)，淘汰旧消息: ID=%d, 房间=[%s], 类型=%s, 内容=[%s]",
+		m.history_len, evicted.Data.ID(), normalizeRoomName(evicted.Data.Room()), evicted.Event, content)
 }
 
 func (m *PostList) ClearAll() {

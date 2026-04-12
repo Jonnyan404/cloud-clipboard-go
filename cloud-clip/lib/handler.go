@@ -6,7 +6,6 @@ import (
 	"io"
 	"mime"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -19,12 +18,17 @@ import (
 func (s *ClipboardServer) handle_server(w http.ResponseWriter, r *http.Request) {
 	s.logger.Printf("处理 /server 请求，来自: %s", get_remote_ip(r))
 	authNeeded := false
-	if authStr, ok := s.config.Server.Auth.(string); ok && authStr != "" {
+	authorized := true
+	roomProtected := false
+	globalPassword := normalizeAuthValue(s.config.Server.Auth)
+	if _, hasRoom := r.URL.Query()["room"]; hasRoom {
+		room := r.URL.Query().Get("room")
+		authNeeded = s.resolveRoomAuth(room).Required
+		authorized = s.canAccessRoom(room, extractAuthToken(r))
+		roomProtected = s.hasRoomAuthEntry(room)
+	} else if globalPassword != "" {
 		authNeeded = true
-	} else if authBool, ok := s.config.Server.Auth.(bool); ok && authBool {
-		// 如同 authMiddleware 中的注释，如果 auth: true 但没有密码，这是一种不明确状态。
-		// 客户端可能需要知道是否需要认证。
-		authNeeded = true
+		authorized = s.canAccessRoom("default", extractAuthToken(r))
 	}
 
 	wsProtocol := "ws"
@@ -33,10 +37,13 @@ func (s *ClipboardServer) handle_server(w http.ResponseWriter, r *http.Request) 
 	}
 
 	response := map[string]interface{}{
-		"server": fmt.Sprintf("%s://%s%s/push", wsProtocol, r.Host, s.config.Server.Prefix),
-		"auth":   authNeeded,
+		"server":        fmt.Sprintf("%s://%s%s/push", wsProtocol, r.Host, s.config.Server.Prefix),
+		"auth":          authNeeded,
+		"authorized":    authorized,
+		"roomProtected": roomProtected,
 		"config": map[string]interface{}{
 			"server": map[string]interface{}{
+				"history":  s.config.Server.History,
 				"roomList": s.config.Server.RoomList,
 			},
 		},
@@ -50,35 +57,20 @@ func (s *ClipboardServer) handle_server(w http.ResponseWriter, r *http.Request) 
 
 func (s *ClipboardServer) handle_push(w http.ResponseWriter, r *http.Request) {
 	ip := get_remote_ip(r)
-	room := r.URL.Query().Get("room")
-	if room == "" {
-		room = "default" // 默认房间
-	}
+	room := normalizeRoomName(r.URL.Query().Get("room"))
 	s.logger.Printf("处理 /push WebSocket 连接请求，来自: %s, 房间: %s", ip, room)
 
-	authNeeded := false
-	var expectedPassword string
-	// 从 s.config.Server.Auth 获取期望的密码（可能是随机生成的或配置的）
-	if authStr, ok := s.config.Server.Auth.(string); ok && authStr != "" {
-		authNeeded = true
-		expectedPassword = authStr
-	}
-	// 注意：布尔型 true 的情况已在 NewClipboardServer 中处理并转换为字符串密码或空字符串
-
+	requirement := s.resolveRoomAuth(room)
+	authNeeded := requirement.Required
 	if authNeeded {
-		token := r.URL.Query().Get("auth")
-		if expectedPassword == "" { // 这种情况理论上不应发生，因为 NewClipboardServer 会处理
-			s.logger.Printf("WebSocket 认证失败: 服务器端未配置有效密码，但需要认证。来自 IP: %s, 房间: %s", ip, room)
-			http.Error(w, "Unauthorized: Server authentication misconfiguration", http.StatusUnauthorized)
-			return
-		}
+		token := extractAuthToken(r)
 		if token == "" {
 			s.logger.Printf("WebSocket 认证失败: 未提供 token。来自 IP: %s, 房间: %s", ip, room)
 			http.Error(w, "Unauthorized: Missing token", http.StatusUnauthorized)
 			return
 		}
-		if token != expectedPassword {
-			s.logger.Printf("WebSocket 认证失败: 提供的 token '%s' 与期望的 '%s' 不匹配。来自 IP: %s, 房间: %s", token, expectedPassword, ip, room)
+		if !s.canAccessRoom(room, token) {
+			s.logger.Printf("WebSocket 认证失败: 提供的 token 与房间 '%s' 的认证配置不匹配。来自 IP: %s", room, ip)
 			http.Error(w, "Unauthorized: Invalid token", http.StatusUnauthorized)
 			return
 		}
@@ -182,6 +174,7 @@ func (s *ClipboardServer) handle_push(w http.ResponseWriter, r *http.Request) {
 	clientConfigData := struct {
 		Version string `json:"version"`
 		Server  struct {
+			History  int    `json:"history"`
 			Prefix   string `json:"prefix"`
 			RoomList bool   `json:"roomList"`
 		} `json:"server"`
@@ -197,9 +190,11 @@ func (s *ClipboardServer) handle_push(w http.ResponseWriter, r *http.Request) {
 	}{
 		Version: server_version,
 		Server: struct {
+			History  int    `json:"history"`
 			Prefix   string `json:"prefix"`
 			RoomList bool   `json:"roomList"`
 		}{
+			History:  s.config.Server.History,
 			Prefix:   s.config.Server.Prefix,
 			RoomList: s.config.Server.RoomList,
 		},
@@ -333,10 +328,7 @@ func (s *ClipboardServer) handle_text(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	room := r.URL.Query().Get("room")
-	if room == "" {
-		room = "default"
-	}
+	room := normalizeRoomName(r.URL.Query().Get("room"))
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -455,10 +447,7 @@ func (s *ClipboardServer) handle_upload(w http.ResponseWriter, r *http.Request) 
 	contentType := r.Header.Get("Content-Type")
 	s.logger.Printf("处理上传请求，路径: %s, 内容类型: %s, 来自: %s", path, contentType, get_remote_ip(r))
 
-	room := r.URL.Query().Get("room")
-	if room == "" {
-		room = "default"
-	}
+	room := normalizeRoomName(r.URL.Query().Get("room"))
 
 	// 处理 /upload/chunk 路径（文件名初始化请求）
 	if strings.HasSuffix(path, "/upload/chunk") && contentType == "text/plain" {
@@ -483,6 +472,7 @@ func (s *ClipboardServer) handle_upload(w http.ResponseWriter, r *http.Request) 
 			Size:       0, // 初始大小为0
 			ExpireTime: expireTime,
 			UploadTime: time.Now().Unix(),
+			Room:       room,
 		}
 		s.runMutex.Unlock()
 
@@ -550,6 +540,7 @@ func (s *ClipboardServer) handle_upload(w http.ResponseWriter, r *http.Request) 
 		Size:       fileSize,
 		UploadTime: timestamp,
 		ExpireTime: expireTime,
+		Room:       room,
 	}
 
 	s.runMutex.Lock() // 保护 uploadFileMap
@@ -667,10 +658,7 @@ func (s *ClipboardServer) handle_finish(w http.ResponseWriter, r *http.Request) 
 
 	// 从路径中提取 UUID
 	uuid := strings.TrimPrefix(r.URL.Path, s.config.Server.Prefix+"/upload/finish/")
-	room := r.URL.Query().Get("room")
-	if room == "" {
-		room = "default"
-	}
+	room := normalizeRoomName(r.URL.Query().Get("room"))
 
 	s.logger.Printf("处理上传完成请求, UUID: %s, 房间: %s, 来自: %s", uuid, room, get_remote_ip(r))
 
@@ -682,6 +670,10 @@ func (s *ClipboardServer) handle_finish(w http.ResponseWriter, r *http.Request) 
 		s.logger.Printf("错误: 无效的 UUID: %s", uuid)
 		http.Error(w, "无效的 UUID", http.StatusBadRequest)
 		return
+	}
+
+	if room == "default" && fileInfo.Room != "" {
+		room = normalizeRoomName(fileInfo.Room)
 	}
 
 	// 生成消息相关信息
@@ -747,32 +739,41 @@ func (s *ClipboardServer) handle_revoke(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	room := r.URL.Query().Get("room") // 撤销也可能需要房间上下文
+	token := extractAuthToken(r)
+	requestedRoom, hasRequestedRoom := r.URL.Query()["room"]
+	_ = requestedRoom
 
 	s.messageQueue.Lock()
-	var foundMsg *PostEvent // 指向 PostEvent
+	var foundMsg PostEvent
 	foundIndex := -1
+	unauthorized := false
 
 	for i := range s.messageQueue.List { // 使用大写 L
-		// 假设 PostEvent 的 ID 是通过其 Data 字段的 ID() 方法访问的
 		if s.messageQueue.List[i].Data.ID() == id {
-			// 检查房间匹配
-			if room == "" || s.messageQueue.List[i].Data.Room() == "" || s.messageQueue.List[i].Data.Room() == room {
-				foundMsg = &s.messageQueue.List[i]
-				foundIndex = i
-				break
+			messageRoom := normalizeRoomName(s.messageQueue.List[i].Data.Room())
+			if hasRequestedRoom && messageRoom != normalizeRoomName(r.URL.Query().Get("room")) {
+				continue
 			}
+			if !s.canAccessRoom(messageRoom, token) {
+				unauthorized = true
+				continue
+			}
+			foundMsg = s.messageQueue.List[i]
+			foundIndex = i
+			break
 		}
 	}
-	// ...
-	if foundMsg != nil {
+	if foundIndex != -1 {
 		// 从消息队列中移除
 		s.messageQueue.List = append(s.messageQueue.List[:foundIndex], s.messageQueue.List[foundIndex+1:]...) // 使用大写 L
 	}
 	s.messageQueue.Unlock()
-	// ...
-	if foundMsg == nil {
-		s.logger.Printf("尝试撤销未找到的消息 ID: %d (房间: '%s')", id, room)
+	if foundIndex == -1 {
+		if unauthorized {
+			writeAuthJSONError(w, http.StatusUnauthorized, "无权访问该房间")
+			return
+		}
+		s.logger.Printf("尝试撤销未找到的消息 ID: %d", id)
 		http.Error(w, "消息未找到", http.StatusNotFound)
 		return
 	}
@@ -799,15 +800,18 @@ func (s *ClipboardServer) handle_revoke(w http.ResponseWriter, r *http.Request) 
 		Event: "revoke",
 		Data:  map[string]int{"id": id}, // 前端期望的载荷
 	}
-	s.broadcastWebSocketMessage(revokeWsMsg, room) // 使用新的广播函数
+	s.broadcastWebSocketMessage(revokeWsMsg, foundMsg.Data.Room()) // 使用新的广播函数
 	s.saveHistoryData()
 }
 
 func (s *ClipboardServer) handleClearAll(w http.ResponseWriter, r *http.Request) {
-	room := r.URL.Query().Get("room")
-	normalizedRoom := normalizeRoomName(room) // 应用规范化：空字符串 -> "default"
+	normalizedRoom := normalizeRoomName(r.URL.Query().Get("room"))
+	if !s.canAccessRoom(normalizedRoom, extractAuthToken(r)) {
+		writeAuthJSONError(w, http.StatusUnauthorized, "无权访问该房间")
+		return
+	}
 
-	s.logger.Printf("处理 /revoke/all 请求 (房间: '%s', 规范化后: '%s')", room, normalizedRoom)
+	s.logger.Printf("处理 /revoke/all 请求 (规范化后: '%s')", normalizedRoom)
 
 	s.messageQueue.Lock()
 	var newMsgList []PostEvent
@@ -827,39 +831,29 @@ func (s *ClipboardServer) handleClearAll(w http.ResponseWriter, r *http.Request)
 	// 删除关联的文件
 	s.runMutex.Lock() // 保护 uploadFileMap
 	var filesToRemove []string
-	if room == "" { // 清空所有文件
-		for uuid := range s.uploadFileMap {
+	for uuid, fileInfo := range s.uploadFileMap {
+		if normalizeRoomName(fileInfo.Room) == normalizedRoom {
 			filesToRemove = append(filesToRemove, uuid)
-		}
-		s.uploadFileMap = make(map[string]File) // 清空 map
-	} else { // 只清空指定房间的文件 (需要消息中有房间信息来判断)
-		// 这个逻辑比较复杂，因为 uploadFileMap 本身不直接关联房间。
-		// 需要遍历原始消息（在它们被清除之前）来确定哪些文件属于该房间。
-		// 或者，如果 PostEvent 中记录了文件UUID，可以在清除消息时收集这些UUID。
-		// 简单起见，如果按房间清除，我们目前只清除消息，文件由过期机制处理。
-		// 一个更完善的实现会跟踪与房间关联的文件。
-		// 或者，在清除消息时，如果消息是文件类型且属于该房间，则记录其UUID并删除。
-		// 这里我们假设，如果按房间清除，文件暂时不主动删除，依赖过期。
-		// 如果是全局清除，则删除所有文件。
-		if room == "" {
-			for _, uuid := range filesToRemove {
-				filePath := filepath.Join(s.storageFolder, uuid)
-				if err := os.Remove(filePath); err != nil {
-					if !os.IsNotExist(err) {
-						s.logger.Printf("警告: 清除所有时删除文件 %s 失败: %v", filePath, err)
-					}
-				}
-			}
+			delete(s.uploadFileMap, uuid)
 		}
 	}
 	s.runMutex.Unlock()
 
+	for _, uuid := range filesToRemove {
+		filePath := filepath.Join(s.storageFolder, uuid)
+		if err := os.Remove(filePath); err != nil {
+			if !os.IsNotExist(err) {
+				s.logger.Printf("警告: 清理房间 %s 时删除文件 %s 失败: %v", normalizedRoom, filePath, err)
+			}
+		}
+	}
+
 	// 广播 clearAll 事件
 	clearWsMsg := WebSocketMessage{
 		Event: "clearAll",
-		Data:  map[string]string{"room": room}, // 前端期望的载荷
+		Data:  map[string]string{"room": normalizedRoom}, // 前端期望的载荷
 	}
-	s.broadcastWebSocketMessage(clearWsMsg, room) // 使用新的广播函数
+	s.broadcastWebSocketMessage(clearWsMsg, normalizedRoom) // 使用新的广播函数
 	s.saveHistoryData()
 
 	w.WriteHeader(http.StatusOK)
@@ -900,95 +894,115 @@ func (s *ClipboardServer) handleContent(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "无效的内容 ID", http.StatusBadRequest)
 		return
 	}
-	room := r.URL.Query().Get("room") // 可选的房间参数
-	s.logger.Printf("处理内容请求, ID: %d, 房间: '%s', JSON请求: %t", id, room, isJSONRequest)
+	token := extractAuthToken(r)
+	_, hasRequestedRoom := r.URL.Query()["room"]
+	requestedRoom := normalizeRoomName(r.URL.Query().Get("room"))
+	s.logger.Printf("处理内容请求, ID: %d, 房间参数存在: %t, JSON请求: %t", id, hasRequestedRoom, isJSONRequest)
 
 	s.messageQueue.Lock()
 	defer s.messageQueue.Unlock()
+	unauthorized := false
 
 	// 遍历消息列表寻找匹配的消息
 	for _, msg := range s.messageQueue.List {
 		// 检查ID是否匹配
 		if msg.Data.ID() == id {
-			// 检查房间是否匹配（如果指定了房间）
-			if room == "" || msg.Data.Room() == "" || msg.Data.Room() == room {
-				// 根据消息类型处理
-				switch msg.Data.Type() {
-				case "file":
-					if msg.Data.FileReceive != nil {
-						if isJSONRequest {
-							// 返回JSON格式的文件信息
-							fileReceive := msg.Data.FileReceive
-							responseType := DetermineResponseType(fileReceive.Name)
+			messageRoom := normalizeRoomName(msg.Data.Room())
+			if hasRequestedRoom && messageRoom != requestedRoom {
+				continue
+			}
+			if !s.canAccessRoom(messageRoom, token) {
+				unauthorized = true
+				continue
+			}
 
-							responseData := map[string]interface{}{
-								"type":      responseType,
-								"name":      fileReceive.Name,
-								"size":      fileReceive.Size,
-								"uuid":      fileReceive.Cache,
-								"url":       fileReceive.URL,
-								"id":        strconv.Itoa(msg.Data.ID()),
-								"timestamp": fileReceive.Timestamp,
-							}
+			// 根据消息类型处理
+			switch msg.Data.Type() {
+			case "file":
+				if msg.Data.FileReceive != nil {
+					if isJSONRequest {
+						// 返回JSON格式的文件信息
+						fileReceive := msg.Data.FileReceive
+						responseType := DetermineResponseType(fileReceive.Name)
 
-							w.Header().Set("Content-Type", "application/json")
-							json.NewEncoder(w).Encode(responseData)
-							s.logger.Printf("以JSON格式返回文件信息, ID: %d", id)
-							return
-						} else {
-							// 文件类型，重定向到文件URL
-							cacheUUID := msg.Data.FileReceive.Cache
-							filename := msg.Data.FileReceive.Name
-							scheme := getScheme(r)
-							encodedFilename := url.PathEscape(filename)
-
-							fileURL := fmt.Sprintf("%s://%s%s/file/%s/%s",
-								scheme,
-								r.Host,
-								s.config.Server.Prefix,
-								cacheUUID,
-								encodedFilename,
-							)
-							s.logger.Printf("找到文件内容, 重定向到: %s", fileURL)
-							http.Redirect(w, r, fileURL, http.StatusFound)
-							return
+						responseData := map[string]interface{}{
+							"type":      responseType,
+							"name":      fileReceive.Name,
+							"size":      fileReceive.Size,
+							"uuid":      fileReceive.Cache,
+							"url":       fileReceive.URL,
+							"id":        strconv.Itoa(msg.Data.ID()),
+							"timestamp": fileReceive.Timestamp,
 						}
-					}
-				case "text":
-					if msg.Data.TextReceive != nil {
-						// 返回格式判断优先级：1. isJSONRequest参数 2. Accept头
-						if isJSONRequest || strings.Contains(r.Header.Get("Accept"), "application/json") {
-							// JSON格式响应
-							responseData := map[string]interface{}{
-								"type":      "text",
-								"content":   msg.Data.TextReceive.Content,
-								"id":        strconv.Itoa(msg.Data.ID()),
-								"timestamp": msg.Data.TextReceive.Timestamp,
-							}
 
-							w.Header().Set("Content-Type", "application/json")
-							json.NewEncoder(w).Encode(responseData)
-							s.logger.Printf("以JSON格式返回文本内容, ID: %d", id)
-							return
-						} else {
-							// 默认返回纯文本
-							w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-							content := msg.Data.TextReceive.Content
-							if !strings.HasSuffix(content, "\n") {
-								content += "\n"
-							}
-							w.Write([]byte(content))
-							s.logger.Printf("以纯文本格式返回文本内容, ID: %d", id)
-							return
-						}
+						w.Header().Set("Content-Type", "application/json")
+						json.NewEncoder(w).Encode(responseData)
+						s.logger.Printf("以JSON格式返回文件信息, ID: %d", id)
+						return
 					}
+
+					filePath := filepath.Join(s.storageFolder, msg.Data.FileReceive.Cache)
+					file, openErr := os.Open(filePath)
+					if openErr != nil {
+						s.logger.Printf("错误: 打开文件失败: %v", openErr)
+						http.Error(w, "文件在磁盘上未找到", http.StatusNotFound)
+						return
+					}
+					defer file.Close()
+
+					stat, statErr := file.Stat()
+					if statErr != nil {
+						s.logger.Printf("错误: 获取文件状态失败: %v", statErr)
+						http.Error(w, "无法获取文件状态", http.StatusInternalServerError)
+						return
+					}
+
+					dispositionType := "inline"
+					if r.URL.Query().Get("download") == "true" {
+						dispositionType = "attachment"
+					}
+					w.Header().Set("Content-Disposition", fmt.Sprintf("%s; filename=%q", dispositionType, msg.Data.FileReceive.Name))
+					http.ServeContent(w, r, msg.Data.FileReceive.Name, stat.ModTime(), file)
+					return
+				}
+			case "text":
+				if msg.Data.TextReceive != nil {
+					// 返回格式判断优先级：1. isJSONRequest参数 2. Accept头
+					if isJSONRequest || strings.Contains(r.Header.Get("Accept"), "application/json") {
+						// JSON格式响应
+						responseData := map[string]interface{}{
+							"type":      "text",
+							"content":   msg.Data.TextReceive.Content,
+							"id":        strconv.Itoa(msg.Data.ID()),
+							"timestamp": msg.Data.TextReceive.Timestamp,
+						}
+
+						w.Header().Set("Content-Type", "application/json")
+						json.NewEncoder(w).Encode(responseData)
+						s.logger.Printf("以JSON格式返回文本内容, ID: %d", id)
+						return
+					}
+
+					// 默认返回纯文本
+					w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+					content := msg.Data.TextReceive.Content
+					if !strings.HasSuffix(content, "\n") {
+						content += "\n"
+					}
+					w.Write([]byte(content))
+					s.logger.Printf("以纯文本格式返回文本内容, ID: %d", id)
+					return
 				}
 			}
 		}
 	}
 
 	// 内容未找到时的响应格式也遵循JSON请求参数
-	s.logger.Printf("未找到内容 ID: %d (房间: '%s')", id, room)
+	if unauthorized && hasRequestedRoom {
+		writeAuthJSONError(w, http.StatusUnauthorized, "无权访问该房间")
+		return
+	}
+	s.logger.Printf("未找到内容 ID: %d", id)
 	if isJSONRequest {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusNotFound)
@@ -999,7 +1013,9 @@ func (s *ClipboardServer) handleContent(w http.ResponseWriter, r *http.Request) 
 }
 
 func (s *ClipboardServer) handleLatestContent(w http.ResponseWriter, r *http.Request) {
-	room := r.URL.Query().Get("room")
+	token := extractAuthToken(r)
+	_, hasRequestedRoom := r.URL.Query()["room"]
+	requestedRoom := normalizeRoomName(r.URL.Query().Get("room"))
 
 	// // 检查是否是 latest.json 请求
 	isJSONRequest := strings.HasSuffix(r.URL.Path, "latest.json")
@@ -1008,14 +1024,14 @@ func (s *ClipboardServer) handleLatestContent(w http.ResponseWriter, r *http.Req
 		isJSONRequest = true
 	}
 
-	s.logger.Printf("处理最新内容请求 (房间: '%s', JSON请求: %t)", room, isJSONRequest)
+	s.logger.Printf("处理最新内容请求 (房间参数存在: %t, JSON请求: %t)", hasRequestedRoom, isJSONRequest)
 
 	s.messageQueue.Lock()
 	defer s.messageQueue.Unlock()
 
 	// 检查消息队列是否为空
 	if len(s.messageQueue.List) == 0 {
-		s.logger.Printf("没有可用的内容 (房间: '%s')", room)
+		s.logger.Printf("没有可用的内容")
 		if isJSONRequest {
 			// 如果是JSON请求，返回JSON格式的404响应
 			w.Header().Set("Content-Type", "application/json")
@@ -1029,11 +1045,17 @@ func (s *ClipboardServer) handleLatestContent(w http.ResponseWriter, r *http.Req
 	}
 
 	// 从后向前查找匹配房间的最新消息
+	unauthorized := false
 	for i := len(s.messageQueue.List) - 1; i >= 0; i-- {
 		msg := s.messageQueue.List[i]
+		messageRoom := normalizeRoomName(msg.Data.Room())
 
 		// 检查房间匹配 (空房间参数表示匹配任何房间)
-		if room != "" && msg.Data.Room() != "" && msg.Data.Room() != room {
+		if hasRequestedRoom && messageRoom != requestedRoom {
+			continue
+		}
+		if !s.canAccessRoom(messageRoom, token) {
+			unauthorized = true
 			continue
 		}
 
@@ -1078,7 +1100,7 @@ func (s *ClipboardServer) handleLatestContent(w http.ResponseWriter, r *http.Req
 			}
 
 			json.NewEncoder(w).Encode(responseData)
-			s.logger.Printf("以JSON格式返回最新内容 (类型: %s, 房间: '%s')", responseType, room)
+			s.logger.Printf("以JSON格式返回最新内容 (类型: %s, 房间: '%s')", responseType, messageRoom)
 			return
 		}
 
@@ -1149,7 +1171,11 @@ func (s *ClipboardServer) handleLatestContent(w http.ResponseWriter, r *http.Req
 		}
 	}
 
-	s.logger.Printf("未找到匹配的最新内容 (房间: '%s')", room)
+	if unauthorized && hasRequestedRoom {
+		writeAuthJSONError(w, http.StatusUnauthorized, "无权访问该房间")
+		return
+	}
+	s.logger.Printf("未找到匹配的最新内容")
 	if isJSONRequest {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusNotFound)
@@ -1164,7 +1190,7 @@ func (s *ClipboardServer) handleRooms(w http.ResponseWriter, r *http.Request) {
 	// 添加 CORS 头
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Room-Auth-Tokens")
 
 	// 处理预检请求
 	if r.Method == "OPTIONS" {
@@ -1190,7 +1216,7 @@ func (s *ClipboardServer) handleRooms(w http.ResponseWriter, r *http.Request) {
 
 	s.logger.Printf("处理房间列表请求，来自: %s", get_remote_ip(r))
 
-	roomList := s.getRoomList()
+	roomList := s.getRoomList(extractAuthTokens(r))
 
 	response := RoomListResponse{
 		Rooms: roomList,
