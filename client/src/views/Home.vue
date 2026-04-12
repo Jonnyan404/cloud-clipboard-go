@@ -22,7 +22,7 @@
                                     color="primary"
                                     class="timeline-panel__count-chip timeline-panel__count-chip--overlay"
                                 >
-                                    {{ $root.received.length }} {{ $t('messages') }}
+                                    {{ historyUsageLabel }}
                                 </v-chip>
                                 <component
                                     :is="item.type === 'text' ? 'received-text' : 'received-file'"
@@ -100,6 +100,11 @@ export default {
     computed: {
         activeRoomName() {
             return this.$root.room || this.$t('publicRoom');
+        },
+        historyUsageLabel() {
+            const current = this.$root.received.length;
+            const limit = Number(this.$root.config?.server?.history || 0);
+            return `${current}/${limit}`;
         },
         currentPageUrl() {
             return window.location.href;
