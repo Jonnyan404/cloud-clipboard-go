@@ -69,7 +69,7 @@
 
 ```bash
 # 方式一：Docker Compose（推荐）
-docker-compose up -d
+docker compose up -d
 
 # 方式二：Docker 命令行
 docker run -d \
@@ -186,49 +186,57 @@ cd cloudflare
 
 ### Docker Compose 配置
 
-创建 `docker-compose.yml`：
+以仓库根目录现有的 `docker-compose.yml` 为准。镜像启动时会由入口脚本按这些环境变量生成配置文件，因此文档中的变量写法也应与它保持一致。
+
+按需修改根目录 `docker-compose.yml`：
 
 ```yaml
-version: '3.8'
-
 services:
   cloud-clipboard-go:
-    image: jonnyan404/cloud-clipboard-go:latest
     container_name: cloud-clipboard-go
     restart: always
     ports:
       - "9501:9501"
-    environment:
-      - LISTEN_IP= #默认为0.0.0.0,可设置为 127.0.0.1 不懂勿动
-      - LISTEN_IP6= #默认为空,ipv6地址,可设置为::,不懂勿动
-      - LISTEN_PORT= #默认为9501,可设置为其他端口
-      - PREFIX= #子路径,可配合nginx使用,格式: /cloud-clipboard
-      - MESSAGE_NUM= #历史记录的数量,默认为10
-      - AUTH_PASSWORD= #访问密码,默认为false,可自定义字符串密码
-      - ROOM_AUTH_JSON= #房间密码 JSON，示例 {"finance":"finance-pass","private":""}
-      - TEXT_LIMIT= #文本长度限制,默认为4096(2048个汉字),可设置为其他长度
-      - FILE_EXPIRE= #文件过期时间,默认为3600(1小时),可设置为其他时间,单位为秒
-      - FILE_LIMIT= #文件大小限制,默认为104857600(100MB),可设置为其他大小,单位为字节
-      - MKCERT_DOMAIN_OR_IP= #mkcert域名或IP,默认为空,可设置为其他域名或IP,多个用空格分隔,仅域名支持通配符*
-      - MANUAL_KEY_PATH= #手动设置证书路径,默认为空,该参数优先级高于MKCERT_DOMAIN_OR_IP
-      - MANUAL_CERT_PATH= #手动设置证书路径,默认为空,该参数优先级高于MKCERT_DOMAIN_OR_IP
-      - ROOM_LIST= #是否启用房间列表展示功能,默认false
-    volumes:
-      - ./data:/app/server-node/data  # 数据持久化
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9501"]
+      test: ["CMD-SHELL", "PORT=\"${LISTEN_PORT:-9501}\"; PREFIX=\"${PREFIX:-}\"; wget -q --no-check-certificate --spider \"https://127.0.0.1:${PORT}${PREFIX}/server\" || wget -q --spider \"http://127.0.0.1:${PORT}${PREFIX}/server\" || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 10s
+    environment:
+      LISTEN_IP: ${LISTEN_IP:-} #默认为0.0.0.0,可设置为 127.0.0.1 不懂勿动
+      LISTEN_IP6: ${LISTEN_IP6:-} #默认为空,ipv6地址,可设置为::,不懂勿动
+      LISTEN_PORT: ${LISTEN_PORT:-} #默认为9501,可设置为其他端口
+      PREFIX: ${PREFIX:-} #子路径,可配合nginx使用,格式: /cloud-clipboard
+      MESSAGE_NUM: ${MESSAGE_NUM:-} #历史记录的数量,默认为10
+      AUTH_PASSWORD: ${AUTH_PASSWORD:-} #访问密码,默认为false,可自定义字符串密码
+      ROOM_AUTH_JSON: '${ROOM_AUTH_JSON:-{}}' #房间密码JSON, 例如 {"finance":"finance-pass","ops":""}
+      TEXT_LIMIT: ${TEXT_LIMIT:-} #文本长度限制,默认为4096(2048个汉字),可设置为其他长度
+      FILE_EXPIRE: ${FILE_EXPIRE:-} #文件过期时间,默认为3600(1小时),可设置为其他时间,单位为秒
+      FILE_LIMIT: ${FILE_LIMIT:-} #文件大小限制,默认为104857600(100MB),可设置为其他大小,单位为字节
+      MKCERT_DOMAIN_OR_IP: ${MKCERT_DOMAIN_OR_IP:-} #mkcert域名或IP,默认为空,可设置为其他域名或IP,多个用空格分隔,仅域名支持通配符*
+      MANUAL_KEY_PATH: ${MANUAL_KEY_PATH:-} #手动设置证书路径,默认为空,该参数优先级高于MKCERT_DOMAIN_OR_IP
+      MANUAL_CERT_PATH: ${MANUAL_CERT_PATH:-} #手动设置证书路径,默认为空,该参数优先级高于MKCERT_DOMAIN_OR_IP
+      ROOM_LIST: ${ROOM_LIST:-} #是否启用房间列表展示功能,默认false
+    volumes:
+      - /path/your/dir/data:/app/server-node/data #请注意修改为你自己的目录
+    image: jonnyan404/cloud-clipboard-go:latest
 ```
 
 运行：
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 `ROOM_AUTH_JSON` 需要是合法的 JSON 对象，值为空字符串时表示该房间沿用 `AUTH_PASSWORD`。
+
+补充说明：
+
+- 当前 Docker Compose 文档变量名以 `ROOM_AUTH_JSON` 为准。
+- 入口脚本仍兼容旧变量名 `ROOM_AUTH`，但 Compose 示例和后续文档统一使用 `ROOM_AUTH_JSON`。
+- 如果你使用 `.env` 文件，建议保持与上面的 `${VAR:-}` 模板对应，只填写右侧的实际值。
+- 镜像内已包含 `wget`，Compose 健康检查会优先探测 `https://127.0.0.1:${LISTEN_PORT}${PREFIX}/server`，失败后再回退到 HTTP，因此无论是否启用容器内 HTTPS 都能正常探活。
 
 示例：
 

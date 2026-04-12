@@ -8,7 +8,7 @@ on:
       version:
         description: '版本标签 (例如: v1.0.0)'
         required: true
-        default: 'v4.3.1'
+        default: 'v4.7.0'
       platforms:
         description: '构建平台 (用逗号分隔的平台列表)'
         required: true

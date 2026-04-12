@@ -5,6 +5,12 @@ services:
         restart: always
         ports:
             - "9501:9501"
+        healthcheck:
+            test: ["CMD-SHELL", "PORT=\"${LISTEN_PORT:-9501}\"; PREFIX=\"${PREFIX:-}\"; wget -q --no-check-certificate --spider \"https://127.0.0.1:${PORT}${PREFIX}/server\" || wget -q --spider \"http://127.0.0.1:${PORT}${PREFIX}/server\" || exit 1"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 10s
         environment:
             LISTEN_IP: ${LISTEN_IP:-} #默认为0.0.0.0,可设置为 127.0.0.1 不懂勿动
             LISTEN_IP6: ${LISTEN_IP6:-} #默认为空,ipv6地址,可设置为::,不懂勿动
