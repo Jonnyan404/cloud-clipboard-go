@@ -39,6 +39,10 @@ start_service() {
         "historyFile": "/etc/cloud-clipboard/data/history.json",
         "storageDir": "/etc/cloud-clipboard/data/upload",
         "auth": false,
+        "roomAuth": {
+            "private": "",
+            "finance": "finance-pass"
+        },
         "roomList": false,
         "roomCleanup": 3600
     },

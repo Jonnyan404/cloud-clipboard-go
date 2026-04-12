@@ -65,6 +65,8 @@ docker-compose up -d
 docker run -d \
   --name=cloud-clipboard-go \
   -p 9501:9501 \
+  -e AUTH_PASSWORD='global-pass' \
+  -e ROOM_AUTH_JSON='{"finance":"finance-pass","private":""}' \
   -v /path/to/data:/app/server-node/data \
   jonnyan404/cloud-clipboard-go
 ```
@@ -193,6 +195,7 @@ services:
       - PREFIX= # Subpath, can be used with nginx, format: /cloud-clipboard
       - MESSAGE_NUM= # Number of history records, default is 10.
       - AUTH_PASSWORD= # Access password, default is false, can be a custom string password.
+      - ROOM_AUTH_JSON= # Room password JSON, example {"finance":"finance-pass","private":""}
       - TEXT_LIMIT= # Text length limit, default is 4096 (2048 Chinese characters).
       - FILE_EXPIRE= # File expiration time, default is 3600 (1 hour), unit is seconds.
       - FILE_LIMIT= # File size limit, default is 104857600 (100MB), unit is bytes.
@@ -214,6 +217,37 @@ Run:
 ```bash
 docker-compose up -d
 ```
+
+`ROOM_AUTH_JSON` must be a valid JSON object. An empty string value means that room falls back to `AUTH_PASSWORD`.
+
+Example:
+
+```yaml
+environment:
+  AUTH_PASSWORD: 'global-pass'
+  ROOM_AUTH_JSON: '{"finance":"finance-pass","private":""}'
+```
+
+To change `roomAuth` dynamically through variables, the recommended approach is to use a `.env` file:
+
+```env
+AUTH_PASSWORD=global-pass
+ROOM_AUTH_JSON={"finance":"finance-pass","private":""}
+```
+
+Then run:
+
+```bash
+docker compose up -d
+```
+
+You can also override it for a single run:
+
+```bash
+ROOM_AUTH_JSON='{"finance":"new-pass","ops":"ops-pass"}' docker compose up -d
+```
+
+Note: the Docker image only auto-generates config when [cloud-clip/config.json](cloud-clip/config.json) does not exist. If you already mounted an existing `config.json`, changing environment variables will not rewrite it automatically. In that case, delete the file and recreate the container, or edit `server.roomAuth` manually.
 
 ### Binary Command-line Parameters
 

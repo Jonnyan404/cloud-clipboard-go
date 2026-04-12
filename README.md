@@ -75,6 +75,8 @@ docker-compose up -d
 docker run -d \
   --name=cloud-clipboard-go \
   -p 9501:9501 \
+  -e AUTH_PASSWORD='global-pass' \
+  -e ROOM_AUTH_JSON='{"finance":"finance-pass","private":""}' \
   -v /path/to/data:/app/server-node/data \
   jonnyan404/cloud-clipboard-go
 ```
@@ -203,6 +205,7 @@ services:
       - PREFIX= #子路径,可配合nginx使用,格式: /cloud-clipboard
       - MESSAGE_NUM= #历史记录的数量,默认为10
       - AUTH_PASSWORD= #访问密码,默认为false,可自定义字符串密码
+      - ROOM_AUTH_JSON= #房间密码 JSON，示例 {"finance":"finance-pass","private":""}
       - TEXT_LIMIT= #文本长度限制,默认为4096(2048个汉字),可设置为其他长度
       - FILE_EXPIRE= #文件过期时间,默认为3600(1小时),可设置为其他时间,单位为秒
       - FILE_LIMIT= #文件大小限制,默认为104857600(100MB),可设置为其他大小,单位为字节
@@ -224,6 +227,37 @@ services:
 ```bash
 docker-compose up -d
 ```
+
+`ROOM_AUTH_JSON` 需要是合法的 JSON 对象，值为空字符串时表示该房间沿用 `AUTH_PASSWORD`。
+
+示例：
+
+```yaml
+environment:
+  AUTH_PASSWORD: 'global-pass'
+  ROOM_AUTH_JSON: '{"finance":"finance-pass","private":""}'
+```
+
+如果你想通过变量动态修改 `roomAuth`，推荐配合 `.env` 文件：
+
+```env
+AUTH_PASSWORD=global-pass
+ROOM_AUTH_JSON={"finance":"finance-pass","private":""}
+```
+
+然后执行：
+
+```bash
+docker compose up -d
+```
+
+也可以临时覆盖：
+
+```bash
+ROOM_AUTH_JSON='{"finance":"new-pass","ops":"ops-pass"}' docker compose up -d
+```
+
+注意：Docker 镜像启动时只会在不存在 [cloud-clip/config.json](cloud-clip/config.json) 时自动生成配置。若你已挂载旧的 `config.json`，修改环境变量后需要删除该文件重建，或直接手动修改其中的 `server.roomAuth`。
 
 ### 二进制文件参数
 
