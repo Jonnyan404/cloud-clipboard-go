@@ -117,6 +117,7 @@ func NewClipboardServer(cfg *Config) (*ClipboardServer, error) {
 		logger.Printf("认证未启用。")
 		cfg.Server.Auth = "" // 确保在未配置或配置为false时为空字符串
 	}
+	cfg.Server.RoomAuth = normalizeRoomAuthConfig(cfg.Server.RoomAuth)
 
 	s := &ClipboardServer{
 		config:          cfg,
@@ -172,25 +173,13 @@ func (s *ClipboardServer) loadHistoryData() error {
 	}
 
 	s.messageQueue.Lock()
-	// 将 loadedHist.Receive ([]ReceiveHolder) 转换为 []PostEvent
 	s.messageQueue.List = make([]PostEvent, 0, len(loadedHist.Receive))
+	s.messageQueue.nextid = 1
 	for _, rh := range loadedHist.Receive {
-		s.messageQueue.List = append(s.messageQueue.List, PostEvent{
+		s.messageQueue.appendLocked(PostEvent{
 			Event: rh.Type(), // 从 ReceiveHolder 获取事件类型
 			Data:  rh,        // ReceiveHolder 赋值给 PostEvent.Data
 		})
-	}
-
-	// 确保 nextid 至少是加载的最后一个消息的 ID + 1
-	if len(s.messageQueue.List) > 0 {
-		lastID := s.messageQueue.List[len(s.messageQueue.List)-1].Data.ID()
-		if s.messageQueue.nextid <= lastID {
-			s.messageQueue.nextid = lastID + 1
-		}
-	}
-
-	if len(s.messageQueue.List) > s.messageQueue.history_len {
-		s.messageQueue.List = s.messageQueue.List[len(s.messageQueue.List)-s.messageQueue.history_len:]
 	}
 	s.messageQueue.Unlock()
 
@@ -205,6 +194,7 @@ func (s *ClipboardServer) loadHistoryData() error {
 					Size:       fileRec.Size,
 					ExpireTime: fileRec.Expire,
 					UploadTime: rh.Timestamp(), // 使用 ReceiveHolder 的 Timestamp 方法
+					Room:       normalizeRoomName(rh.Room()),
 				}
 			} else {
 				s.logger.Printf("历史记录中的文件 %s (UUID: %s) 在磁盘上未找到，将不加载到文件映射中。", fileRec.Name, fileRec.Cache)
@@ -324,21 +314,15 @@ func (s *ClipboardServer) setupRoutes() {
 	mux.HandleFunc(prefix+"/server", s.handle_server)
 	mux.HandleFunc(prefix+"/push", s.handle_push)
 	mux.HandleFunc(prefix+"/rooms", s.handleRooms)
-	mux.HandleFunc(prefix+"/file/", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet {
-			s.handle_file(w, r)
-		} else {
-			s.authMiddleware(s.handle_file)(w, r)
-		}
-	})
+	mux.HandleFunc(prefix+"/file/", s.authMiddleware(s.handle_file))
 	mux.HandleFunc(prefix+"/text", s.authMiddleware(s.handle_text))
 	mux.HandleFunc(prefix+"/upload", s.authMiddleware(s.handle_upload))
 	mux.HandleFunc(prefix+"/upload/chunk", s.authMiddleware(s.handle_upload))
 	mux.HandleFunc(prefix+"/upload/chunk/", s.authMiddleware(s.handle_chunk))
 	mux.HandleFunc(prefix+"/upload/finish/", s.authMiddleware(s.handle_finish))
-	mux.HandleFunc(prefix+"/revoke/", s.authMiddleware(s.handle_revoke))
-	mux.HandleFunc(prefix+"/revoke/all", s.authMiddleware(s.handleClearAll))
-	mux.HandleFunc(prefix+"/content/", s.authMiddleware(s.handleContent))
+	mux.HandleFunc(prefix+"/revoke/", s.handle_revoke)
+	mux.HandleFunc(prefix+"/revoke/all", s.handleClearAll)
+	mux.HandleFunc(prefix+"/content/", s.handleContent)
 
 	s.httpServer = &http.Server{
 		Handler: mux,
@@ -464,13 +448,10 @@ func (s *ClipboardServer) Start() error {
 	}
 
 	// 等待任何一个服务器出错或全部正常关闭
-	var err error
-	select {
-	case err = <-errChan:
-		s.logger.Printf("一个或多个 HTTP 服务器出错: %v", err)
-		// 尝试优雅关闭所有服务器
-		s.Stop()
-	}
+	err := <-errChan
+	s.logger.Printf("一个或多个 HTTP 服务器出错: %v", err)
+	// 尝试优雅关闭所有服务器
+	s.Stop()
 
 	s.runMutex.Lock()
 	s.isRunning = false
@@ -677,7 +658,7 @@ func (s *ClipboardServer) authMiddleware(next http.HandlerFunc) http.HandlerFunc
 		// 添加 CORS 头，允许跨域请求
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Room-Auth-Tokens")
 
 		// 处理预检请求
 		if r.Method == "OPTIONS" {
@@ -685,99 +666,37 @@ func (s *ClipboardServer) authMiddleware(next http.HandlerFunc) http.HandlerFunc
 			return
 		}
 
-		// 快速路径：如果不需要认证，直接调用下一个处理函数
-		authNeeded := false
-		var expectedPassword string
-
-		// 处理所有可能的类型：string、bool、int、float64
-		switch auth := s.config.Server.Auth.(type) {
-		case string:
-			if auth != "" {
-				authNeeded = true
-				expectedPassword = auth
-			}
-		case bool:
-			// bool true 的情况已在 NewClipboardServer 中处理为随机密码
-			if auth {
-				authNeeded = true
-				// expectedPassword 应该已经在 NewClipboardServer 中设置
-				if authStr, ok := s.config.Server.Auth.(string); ok {
-					expectedPassword = authStr
-				}
-			}
-		case int:
-			authNeeded = true
-			expectedPassword = strconv.Itoa(auth)
-		case float64:
-			authNeeded = true
-			expectedPassword = strconv.FormatFloat(auth, 'f', 0, 64)
-		}
-
-		if !authNeeded {
+		requirement := s.resolveRoomAuth(s.inferRequestRoom(r))
+		if !requirement.Required {
 			next.ServeHTTP(w, r)
 			return
 		}
 
-		// 获取认证令牌 - 先检查 Authorization 头，再检查查询参数
-		token := ""
-
-		// 检查 Authorization 头
-		authHeader := r.Header.Get("Authorization")
-		if authHeader != "" {
-			parts := strings.Split(authHeader, " ")
-			if len(parts) == 2 && strings.ToLower(parts[0]) == "bearer" {
-				token = parts[1]
-			} else {
-				// 尝试将整个头部作为令牌（向后兼容）
-				token = authHeader
-			}
-		}
-
-		// 如果头部没有令牌，尝试从查询参数获取
-		if token == "" {
-			token = r.URL.Query().Get("auth")
-		}
+		token := extractAuthToken(r)
 
 		clientIP := get_remote_ip(r)
 
 		// 验证令牌
 		if token == "" {
-			s.logger.Printf("认证失败: 未提供令牌。来自 IP: %s, 路径: %s", clientIP, r.URL.Path)
-
-			// 返回结构化的 JSON 错误响应
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusUnauthorized)
-			json.NewEncoder(w).Encode(map[string]string{
-				"error":   "Unauthorized",
-				"message": "需要认证令牌",
-			})
+			s.logger.Printf("认证失败: 未提供令牌。来自 IP: %s, 路径: %s, 房间: %s", clientIP, r.URL.Path, requirement.Room)
+			writeAuthJSONError(w, http.StatusUnauthorized, "需要认证令牌")
 			return
 		}
 
-		if expectedPassword == "" {
+		if requirement.Password == "" {
 			s.logger.Printf("认证失败: 服务器认证配置错误。来自 IP: %s", clientIP)
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(map[string]string{
-				"error":   "ServerError",
-				"message": "服务器认证配置错误",
-			})
+			writeAuthJSONError(w, http.StatusInternalServerError, "服务器认证配置错误")
 			return
 		}
 
-		if token != expectedPassword {
-			s.logger.Printf("认证失败: 无效令牌。来自 IP: %s, 路径: %s,token:%s,server:%s", clientIP, r.URL.Path, token, expectedPassword)
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusUnauthorized)
-			json.NewEncoder(w).Encode(map[string]string{
-				"error":   "Unauthorized",
-				"message": "无效的认证令牌",
-			})
+		if token != requirement.Password {
+			s.logger.Printf("认证失败: 无效令牌。来自 IP: %s, 路径: %s, 房间: %s", clientIP, r.URL.Path, requirement.Room)
+			writeAuthJSONError(w, http.StatusUnauthorized, "无效的认证令牌")
 			return
 		}
 
 		// 认证成功
-		s.logger.Printf("认证成功: IP: %s, 路径: %s", clientIP, r.URL.Path)
+		s.logger.Printf("认证成功: IP: %s, 路径: %s, 房间: %s", clientIP, r.URL.Path, requirement.Room)
 		next.ServeHTTP(w, r)
 	}
 }
@@ -855,7 +774,7 @@ func (s *ClipboardServer) updateRoomDeviceCount(room string, deviceID string, co
 }
 
 // getRoomList 获取房间列表
-func (s *ClipboardServer) getRoomList() []RoomInfo {
+func (s *ClipboardServer) getRoomList(tokens []string) []RoomInfo {
 	if !s.config.Server.RoomList {
 		return []RoomInfo{}
 	}
@@ -920,6 +839,19 @@ func (s *ClipboardServer) getRoomList() []RoomInfo {
 
 	var roomList []RoomInfo
 	for room := range allRooms {
+		accessible := s.canAccessRoom(room, "")
+		if !accessible {
+			for _, token := range tokens {
+				if s.canAccessRoom(room, token) {
+					accessible = true
+					break
+				}
+			}
+		}
+		if !accessible {
+			continue
+		}
+
 		// 显示时转换：default 显示为空字符串
 		displayRoom := room
 		if room == "default" {
@@ -949,6 +881,7 @@ func (s *ClipboardServer) getRoomList() []RoomInfo {
 			DeviceCount:  deviceCount,
 			LastActive:   lastActive,
 			IsActive:     deviceCount > 0,
+			IsProtected:  s.hasRoomAuthEntry(room),
 		}
 
 		roomList = append(roomList, roomInfo)
@@ -1064,7 +997,8 @@ func (s *ClipboardServer) cleanupEmptyRooms() {
 // normalizeRoomName 统一房间名称处理
 // 空字符串和"default"都转换为"default"，其他保持不变
 func normalizeRoomName(room string) string {
-	if room == "" {
+	room = strings.TrimSpace(room)
+	if room == "" || room == "default" {
 		return "default"
 	}
 	return room

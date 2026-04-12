@@ -26,6 +26,7 @@ export default {
             authCodeError: '',
             authDialogLoading: false,
             roomAuthCache: loadRoomAuthCache(),
+            roomProtectionCache: {},
             room: this.$router.currentRoute.query.room || '',
             roomInput: '',
             roomDialog: false,
@@ -151,6 +152,10 @@ export default {
         getRequestAuthToken(config = {}) {
             return this.getAuthTokenForRoom(this.getRequestRoom(config));
         },
+        setRoomProtection(room, isProtected) {
+            const normalizedRoom = this.normalizeRoomName(room);
+            this.$set(this.roomProtectionCache, normalizedRoom, Boolean(isProtected));
+        },
         async fetchServerInfo(room = this.room, { token = '' } = {}) {
             const normalizedRoom = this.normalizeRoomName(room);
             const response = await this.$http.get('server', {
@@ -160,6 +165,9 @@ export default {
                 } : undefined,
                 __skipRoomAuthHandling: true,
             });
+            if (Object.prototype.hasOwnProperty.call(response.data || {}, 'roomProtected')) {
+                this.setRoomProtection(normalizedRoom, response.data.roomProtected);
+            }
             return response.data;
         },
         async verifyRoomAccess(room, token) {

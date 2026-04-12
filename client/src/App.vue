@@ -182,7 +182,7 @@
                 {{ $t('cloudClipboard') }}
                 <span class="d-none d-sm-inline" v-if="$root.room">
                     （<v-icon
-                        v-if="$root.config && $root.config.auth"
+                        v-if="currentRoomEntry && currentRoomEntry.isProtected"
                         x-small
                         class="room-title__lock-icon"
                     >{{ mdiLock }}</v-icon>
@@ -1196,6 +1196,7 @@ export default {
             return {
                 name: normalizedRoomName,
                 isFavorite: this.getFavoriteRooms().includes(normalizedRoomName),
+                isProtected: Boolean(this.$root.roomProtectionCache?.[normalizedRoomName]),
                 isActive: true,
                 messageCount: 0,
                 deviceCount: 0,
@@ -1209,10 +1210,26 @@ export default {
                 return;
             }
 
-            this.availableRooms = [
-                this.createOptimisticRoom(normalizedRoomName),
-                ...this.availableRooms,
-            ];
+            this.availableRooms.unshift(this.createOptimisticRoom(normalizedRoomName));
+        },
+        syncAvailableRooms(rooms) {
+            const nextRooms = Array.isArray(rooms) ? rooms : [];
+            const existingByName = new Map(this.availableRooms.map(room => [room.name, room]));
+            const orderedRooms = nextRooms.map(roomData => {
+                const existing = existingByName.get(roomData.name);
+                if (existing) {
+                    Object.assign(existing, roomData);
+                    return existing;
+                }
+                return roomData;
+            });
+
+            const currentRoomName = this.$root.room || '';
+            if (!orderedRooms.some(room => room.name === currentRoomName)) {
+                orderedRooms.unshift(existingByName.get(currentRoomName) || this.createOptimisticRoom(currentRoomName));
+            }
+
+            this.availableRooms.splice(0, this.availableRooms.length, ...orderedRooms);
         },
         openRoomBrowser() {
             if (this.isDesktopRoomDockEnabled) {
@@ -1310,11 +1327,14 @@ export default {
             }
         },
 
-        async fetchRoomsWithToken(token = '') {
-            const normalizedToken = (token || '').trim();
+        async fetchRooms() {
+            const candidateTokens = typeof this.$root.getKnownAuthTokens === 'function'
+                ? this.$root.getKnownAuthTokens()
+                : [];
+            const dedupedTokens = Array.from(new Set(candidateTokens.map(token => (token || '').trim()).filter(Boolean)));
             const response = await this.$http.get('rooms', {
-                headers: normalizedToken ? {
-                    Authorization: `Bearer ${normalizedToken}`,
+                headers: dedupedTokens.length ? {
+                    'X-Room-Auth-Tokens': JSON.stringify(dedupedTokens),
                 } : undefined,
                 __skipRoomAuthHandling: true,
             });
@@ -1341,39 +1361,13 @@ export default {
             console.log('获取房间列表');
             
             try {
-                const candidateTokens = typeof this.$root.getKnownAuthTokens === 'function'
-                    ? this.$root.getKnownAuthTokens()
-                    : [];
-                const requestTokens = [''].concat(candidateTokens.filter(Boolean));
-                const seenTokens = new Set();
-                const mergedRooms = new Map();
-
-                for (const token of requestTokens) {
-                    const tokenKey = (token || '').trim();
-                    if (seenTokens.has(tokenKey)) {
-                        continue;
-                    }
-                    seenTokens.add(tokenKey);
-
-                    const rooms = await this.fetchRoomsWithToken(tokenKey);
-                    for (const room of rooms) {
-                        const existing = mergedRooms.get(room.name);
-                        mergedRooms.set(room.name, existing ? {
-                            ...existing,
-                            ...room,
-                            messageCount: Math.max(existing.messageCount || 0, room.messageCount || 0),
-                            deviceCount: Math.max(existing.deviceCount || 0, room.deviceCount || 0),
-                            lastActive: Math.max(existing.lastActive || 0, room.lastActive || 0),
-                            isActive: Boolean(existing.isActive || room.isActive),
-                        } : room);
-                    }
-                }
+                const rooms = await this.fetchRooms();
 
                 const favoriteRooms = this.getFavoriteRooms();
-                this.availableRooms = Array.from(mergedRooms.values()).map(room => ({
+                this.syncAvailableRooms(rooms.map(room => ({
                     ...room,
                     isFavorite: favoriteRooms.includes(room.name)
-                }));
+                })));
                 this.ensureRoomPresent();
                 console.log(`房间列表更新成功，共 ${this.availableRooms.length} 个房间`);
             } catch (error) {
@@ -1473,6 +1467,12 @@ export default {
         });
         this.$watch('$vuetify.theme.themes.light.primary', (newVal) => {
             localStorage.setItem('lightPrimary', newVal);
+        });
+
+        this.$watch(() => Boolean(this.$root.websocket), (connected) => {
+            if (connected && this.$root.config && this.$root.config.server && this.$root.config.server.roomList) {
+                this.fetchRoomList();
+            }
         });
 
         this.$watch('isDesktopRoomDockVisible', (newVal) => {

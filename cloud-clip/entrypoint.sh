@@ -1,6 +1,24 @@
 #!/bin/sh
 CONFIG_FILE='/app/server-node/config.json'
 DOMAIN_RECORD_FILE='/app/server-node/data/domain_record.txt'
+ROOM_AUTH_JSON_VALUE="${ROOM_AUTH_JSON:-${ROOM_AUTH:-}}"
+AUTH_JSON_VALUE="${AUTH_PASSWORD:-false}"
+
+if [ -z "${ROOM_AUTH_JSON_VALUE}" ]; then
+    ROOM_AUTH_JSON_VALUE='{}'
+fi
+
+case "${AUTH_JSON_VALUE}" in
+    "" )
+        AUTH_JSON_VALUE='false'
+        ;;
+    false|true|null)
+        ;;
+    *)
+        AUTH_ESCAPED_VALUE=$(printf '%s' "${AUTH_JSON_VALUE}" | sed 's/\\/\\\\/g; s/"/\\"/g')
+        AUTH_JSON_VALUE="\"${AUTH_ESCAPED_VALUE}\""
+        ;;
+esac
 
 # --- Determine SSL Configuration ---
 KEY=""
@@ -92,7 +110,8 @@ cat>"${CONFIG_FILE}"<<EOF
         "key": "${KEY}",
         "cert": "${CERT}",
         "history": ${MESSAGE_NUM:-10},
-        "auth": ${AUTH_PASSWORD:-false},
+        "auth": ${AUTH_JSON_VALUE},
+        "roomAuth": ${ROOM_AUTH_JSON_VALUE},
         "historyFile": "/app/server-node/data/history.json",
         "storageDir": "/app/server-node/data/",
         "roomList": ${ROOM_LIST:-false},
