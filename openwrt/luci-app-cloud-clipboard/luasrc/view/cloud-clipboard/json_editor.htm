@@ -70,7 +70,13 @@
           "history": 100,
           "historyFile": "",
           "storageDir": "",
-          "auth": <%=(luci.model.uci.cursor():get("cloud-clipboard", "main", "auth") or "") ~= "" and "true" or "false"%>
+          "auth": <%=(luci.model.uci.cursor():get("cloud-clipboard", "main", "auth") or "") ~= "" and "true" or "false"%>,
+          "roomAuth": {
+            "private": "",
+            "finance": "finance-pass"
+          },
+          "roomList": false,
+          "roomCleanup": 3600
         },
         "text": {
           "limit": 4096

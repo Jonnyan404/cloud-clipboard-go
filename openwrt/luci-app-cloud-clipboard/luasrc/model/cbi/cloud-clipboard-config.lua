@@ -61,6 +61,10 @@ else
                     historyFile = "/etc/cloud-clipboard/data/history.json",
                     storageDir = "/etc/cloud-clipboard/data/upload",
                     auth = auth ~= "",
+                    roomAuth = {
+                        private = "",
+                        finance = "finance-pass"
+                    },
                     roomList = false,
                     roomCleanup = 3600
                 },
@@ -93,6 +97,10 @@ else
         "historyFile": "/etc/cloud-clipboard/data/history.json",
         "storageDir": "/etc/cloud-clipboard/data/upload",
         "auth": ]] .. (auth ~= "" and "true" or "false") .. [[,
+        "roomAuth": {
+            "private": "",
+            "finance": "finance-pass"
+        },
         "roomList": false,
         "roomCleanup": 3600
     },
@@ -133,9 +141,22 @@ else
             -- 保存到配置文件
             nixio.fs.writefile(config_path, value)
             
-            -- 如果在配置中启用了auth但UCI中没有设置密码,显示警告
+            -- 如果在配置中启用了auth或roomAuth回退到全局auth,但UCI中没有设置密码,显示警告
             local auth = luci.model.uci.cursor():get("cloud-clipboard", "main", "auth")
-            if (parsed and parsed.server and parsed.server.auth == true) and (not auth or #auth == 0) then
+            local require_global_auth = false
+            if parsed and parsed.server then
+                require_global_auth = parsed.server.auth == true
+                if type(parsed.server.roomAuth) == "table" then
+                    for _, password in pairs(parsed.server.roomAuth) do
+                        if password == "" then
+                            require_global_auth = true
+                            break
+                        end
+                    end
+                end
+            end
+
+            if require_global_auth and (not auth or #auth == 0) then
                 return nil, "警告：配置文件中启用了认证,但在基本设置中未设置密码,这可能导致访问问题"
             end
         end
@@ -159,7 +180,11 @@ json_help.value = [[
         "history": 100,            // 历史记录数量
         "historyFile": "/etc/cloud-clipboard/data/history.json",  // 历史记录文件路径
         "storageDir": "/etc/cloud-clipboard/data/upload",         // 文件存储目录
-        "auth": false,              // 是否启用认证,true时需在UCI设置中配置密码
+        "auth": false,              // 全局密码开关或默认房间密码来源,true时需在UCI设置中配置密码
+        "roomAuth": {
+            "private": "",         // 空字符串表示该房间沿用全局 auth
+            "finance": "finance-pass" // 非空字符串表示该房间使用独立密码
+        },
         "roomList": false,          // 是否启用房间列表功能
         "roomCleanup": 3600        // 房间清理周期(秒),清理消息数为0的房间
     },

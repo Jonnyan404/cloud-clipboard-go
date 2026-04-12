@@ -91,6 +91,10 @@ class AdvancedSettingsActivity : AppCompatActivity() {
                 "prefix": "",
                 "history": 100,
                 "auth": false,
+                "roomAuth": {
+                    "private": "",
+                    "finance": "finance-pass"
+                },
                 "historyFile": null,
                 "storageDir": null,
                 "roomList": false,
