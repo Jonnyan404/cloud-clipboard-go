@@ -188,7 +188,7 @@ services:
     ports:
       - "9501:9501"
     healthcheck:
-      test: ["CMD-SHELL", "PORT=\"${LISTEN_PORT:-9501}\"; PREFIX=\"${PREFIX:-}\"; wget -q --no-check-certificate --spider \"https://127.0.0.1:${PORT}${PREFIX}/server\" || wget -q --spider \"http://127.0.0.1:${PORT}${PREFIX}/server\" || exit 1"]
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 \"${LISTEN_PORT:-9501}\" || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -226,7 +226,7 @@ Additional notes:
 - The documented Docker Compose variable name is `ROOM_AUTH_JSON`.
 - The entrypoint still accepts the legacy variable name `ROOM_AUTH` for backward compatibility, but the Compose example and docs are now standardized on `ROOM_AUTH_JSON`.
 - If you use a `.env` file, keep the same variable names and only fill in the values.
-- The image now includes `wget`, and the health check probes `https://127.0.0.1:${LISTEN_PORT}${PREFIX}/server` first, then falls back to HTTP, so it works for both in-container HTTPS and plain HTTP setups.
+- The image explicitly installs `nc`, and the health check only verifies that the container is listening on the configured port, independent of `PREFIX` and HTTP/HTTPS settings.
 
 Example:
 

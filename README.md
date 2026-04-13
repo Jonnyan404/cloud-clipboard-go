@@ -198,7 +198,7 @@ services:
     ports:
       - "9501:9501"
     healthcheck:
-      test: ["CMD-SHELL", "PORT=\"${LISTEN_PORT:-9501}\"; PREFIX=\"${PREFIX:-}\"; wget -q --no-check-certificate --spider \"https://127.0.0.1:${PORT}${PREFIX}/server\" || wget -q --spider \"http://127.0.0.1:${PORT}${PREFIX}/server\" || exit 1"]
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 \"${LISTEN_PORT:-9501}\" || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -236,7 +236,7 @@ docker compose up -d
 - 当前 Docker Compose 文档变量名以 `ROOM_AUTH_JSON` 为准。
 - 入口脚本仍兼容旧变量名 `ROOM_AUTH`，但 Compose 示例和后续文档统一使用 `ROOM_AUTH_JSON`。
 - 如果你使用 `.env` 文件，建议保持与上面的 `${VAR:-}` 模板对应，只填写右侧的实际值。
-- 镜像内已包含 `wget`，Compose 健康检查会优先探测 `https://127.0.0.1:${LISTEN_PORT}${PREFIX}/server`，失败后再回退到 HTTP，因此无论是否启用容器内 HTTPS 都能正常探活。
+- 镜像内显式安装了 `nc`，Compose 健康检查只检查容器内监听端口，和 `PREFIX`、HTTP/HTTPS 配置无关。
 
 示例：
 

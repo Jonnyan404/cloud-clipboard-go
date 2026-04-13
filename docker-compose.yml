@@ -6,7 +6,7 @@ services:
         ports:
             - "9501:9501"
         healthcheck:
-            test: ["CMD-SHELL", "PORT=\"${LISTEN_PORT:-9501}\"; PREFIX=\"${PREFIX:-}\"; wget -q --no-check-certificate --spider \"https://127.0.0.1:${PORT}${PREFIX}/server\" || wget -q --spider \"http://127.0.0.1:${PORT}${PREFIX}/server\" || exit 1"]
+            test: ["CMD-SHELL", "nc -z 127.0.0.1 \"${LISTEN_PORT:-9501}\" || exit 1"]
             interval: 30s
             timeout: 10s
             retries: 3
