@@ -8,6 +8,7 @@
 )
 
 $ErrorActionPreference = "Stop"
+$XMobileVersion = "v0.0.0-20250218173823-21e291c9c26e"
 
 # 显示帮助信息
 function Show-Help {
@@ -70,6 +71,18 @@ function Exit-WithError {
     exit 1
 }
 
+function Add-GoBinToPath {
+    $goPath = (go env GOPATH).Trim()
+    $goBin = (go env GOBIN).Trim()
+    $binDir = if ([string]::IsNullOrWhiteSpace($goBin)) { Join-Path $goPath "bin" } else { $goBin }
+
+    if (-not [string]::IsNullOrWhiteSpace($binDir) -and -not (($env:PATH -split [IO.Path]::PathSeparator) -contains $binDir)) {
+        $env:PATH = "$binDir$([IO.Path]::PathSeparator)$env:PATH"
+    }
+
+    return $binDir
+}
+
 # 检查必要工具
 Write-Host "[检查] 验证必要工具..." -ForegroundColor Yellow
 
@@ -84,13 +97,22 @@ if ($BuildAAR) {
     }
     Write-Host "[✓] Go 已安装" -ForegroundColor Green
 
+    $goBinDir = Add-GoBinToPath
+
     if (-not (Test-Command "gomobile")) {
         Write-Host "[警告] gomobile 未安装,正在安装..." -ForegroundColor Yellow
-        go install golang.org/x/mobile/cmd/gomobile@latest
+        go install "golang.org/x/mobile/cmd/gomobile@$XMobileVersion"
+        go install "golang.org/x/mobile/cmd/gobind@$XMobileVersion"
         if ($LASTEXITCODE -ne 0) {
             Exit-WithError "gomobile 安装失败"
         }
     }
+
+    $goBinDir = Add-GoBinToPath
+    if (-not (Test-Command "gomobile")) {
+        Exit-WithError "gomobile 安装后仍不可用，请确认 $goBinDir 已加入 PATH"
+    }
+
     Write-Host "[✓] gomobile 已安装" -ForegroundColor Green
 
     # 检查并初始化 gomobile
@@ -103,6 +125,7 @@ if ($BuildAAR) {
         if ($LASTEXITCODE -ne 0) {
             Exit-WithError "gomobile 初始化失败"
         }
+        go install "golang.org/x/mobile/cmd/gobind@$XMobileVersion"
         Write-Host "[✓] gomobile 初始化成功" -ForegroundColor Green
     } else {
         Write-Host "[✓] gomobile 已初始化" -ForegroundColor Green
