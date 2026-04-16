@@ -12,6 +12,7 @@ RED='\033[0;31m'
 CYAN='\033[0;36m'
 GRAY='\033[0;90m'
 NC='\033[0m' # 无颜色
+X_MOBILE_VERSION='v0.0.0-20250218173823-21e291c9c26e'
 
 # --- 默认标志 ---
 BUILD_AAR=true
@@ -39,6 +40,34 @@ show_help() {
 exit_with_error() {
     echo -e "${RED}[错误] $1${NC}" >&2
     exit 1
+}
+
+ensure_go_bin_in_path() {
+    local gopath
+    local gobin
+    local go_bin_dir
+
+    gopath=$(go env GOPATH)
+    gobin=$(go env GOBIN)
+
+    if [ -n "$gobin" ]; then
+        go_bin_dir="$gobin"
+    else
+        go_bin_dir="$gopath/bin"
+    fi
+
+    case ":$PATH:" in
+        *":$go_bin_dir:"*) ;;
+        *) export PATH="$go_bin_dir:$PATH" ;;
+    esac
+}
+
+run_gradle() {
+    if [ -x "./gradlew" ]; then
+        ./gradlew "$@"
+    else
+        sh ./gradlew "$@"
+    fi
 }
 
 # --- 参数解析 ---
@@ -90,10 +119,20 @@ if [ "$BUILD_AAR" = true ]; then
     fi
     echo -e "${GREEN}[✓] Go 已安装${NC}"
 
+    ensure_go_bin_in_path
+
     if ! command -v gomobile &> /dev/null; then
         echo -e "${YELLOW}[警告] gomobile 未安装,正在安装...${NC}"
-        go install golang.org/x/mobile/cmd/gomobile@latest
+        go install "golang.org/x/mobile/cmd/gomobile@${X_MOBILE_VERSION}"
+        go install "golang.org/x/mobile/cmd/gobind@${X_MOBILE_VERSION}"
     fi
+
+    ensure_go_bin_in_path
+
+    if ! command -v gomobile &> /dev/null; then
+        exit_with_error "gomobile 安装后仍不可用，请确认 $(go env GOPATH)/bin 或 GOBIN 已加入 PATH"
+    fi
+
     echo -e "${GREEN}[✓] gomobile 已安装${NC}"
 
     echo -e "${YELLOW}[检查] 验证 gomobile 初始化状态...${NC}"
@@ -101,6 +140,7 @@ if [ "$BUILD_AAR" = true ]; then
     if [ ! -d "$GOPATH/pkg/gomobile" ]; then
         echo -e "${YELLOW}[信息] gomobile 需要初始化,这可能需要几分钟...${NC}"
         gomobile init
+        go install "golang.org/x/mobile/cmd/gobind@${X_MOBILE_VERSION}"
     fi
     echo -e "${GREEN}[✓] gomobile 已初始化${NC}"
 fi
@@ -165,10 +205,10 @@ if [ "$BUILD_APK" = true ]; then
 
     echo -e "${GRAY}[信息] 当前目录: $(pwd)${NC}"
     echo -e "${YELLOW}[信息] 清理项目...${NC}"
-    ./gradlew clean
+    run_gradle clean
 
     echo -e "${YELLOW}[信息] 编译 Debug APK...${NC}"
-    ./gradlew assembleDebug
+    run_gradle assembleDebug
 
     echo ""
     echo -e "${CYAN}========================================${NC}"
@@ -180,14 +220,14 @@ if [ "$BUILD_APK" = true ]; then
 
     if [ "$INSTALL_APK" = true ]; then
         echo -e "${YELLOW}[信息] 正在安装 APK...${NC}"
-        ./gradlew installDebug
+        run_gradle installDebug
         echo -e "${GREEN}[✓] APK 已成功安装到设备${NC}"
     else
         read -p "是否安装到设备? (y/n) " -n 1 -r
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             echo -e "${YELLOW}[信息] 正在安装 APK...${NC}"
-            ./gradlew installDebug
+            run_gradle installDebug
             echo -e "${GREEN}[✓] APK 已成功安装到设备${NC}"
         fi
     fi
