@@ -416,7 +416,8 @@ docker pull jonnyan404/cloud-clipboard-go:latest
 
 感谢以下用户的支持：
 
-- 🥇 xxxxxxxx（赞赏 ¥199）
+- 🥇 DOYO（赞赏 ¥20）谢谢老大写的 clipboard go捏,很好用!想提 pr 了 (
+> 首先感谢赞赏,欢迎提 pr 的
 - 🥈 xxxxxxxx（赞赏 ¥99）
 - 🥉 xxxxxxxx（赞赏 ¥50）
 
