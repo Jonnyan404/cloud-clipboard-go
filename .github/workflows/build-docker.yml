@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0  # 确保获取所有标签
 
@@ -40,7 +40,7 @@ jobs:
             ghcr.io/${{ github.repository }}
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ github.event.repository.name }}
           tags: |
-            type=raw,value=${{ github.event_name == 'release' && github.event.release.tag_name || github.event.inputs.version }}
+            type=raw,value=${{ github.event.inputs.version }}
             type=raw,value=latest,enable=${{ github.event_name == 'workflow_dispatch' && github.event.inputs.also_latest == 'true' }}
 
       - name: Set up QEMU

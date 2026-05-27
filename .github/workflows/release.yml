@@ -60,7 +60,7 @@ jobs:
           cache: 'npm'
           cache-dependency-path: client/package.json
       # - name: Download frontend artifact
-      #   uses: actions/download-artifact@v4
+      #   uses: actions/download-artifact@v5
       #   with:
       #     name: frontend-dist
       #     path: client/dist
@@ -109,7 +109,7 @@ jobs:
       - uses: actions/setup-java@v4
         with: { java-version: '17', distribution: 'temurin' }
       - name: Download frontend artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: frontend-dist
           path: client/dist
@@ -183,7 +183,7 @@ jobs:
       - uses: actions/setup-java@v4
         with: { java-version: '17', distribution: 'temurin' }
       - name: Download frontend artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: frontend-dist
           path: client/dist
@@ -238,7 +238,7 @@ jobs:
     needs: [build-desktop, build-apk, build-universal-apk]
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           path: artifacts
       - name: Display downloaded artifacts structure for debugging
