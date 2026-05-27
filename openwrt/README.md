@@ -2,7 +2,9 @@
 
 ## 安装方法
 
-1. 下载与您的OpenWrt设备架构相匹配的IPK文件
+1. 根据您的 OpenWrt 版本下载对应格式的软件包
+   - OpenWrt 25.12 及以上: 下载与设备 `cat /etc/apk/arch` 输出匹配的 APK 文件
+   - OpenWrt 24.10 及以下: 下载与设备架构匹配的 IPK 文件
    - arm-7: 适用于大多数ARM路由器
    - aarch64: 适用于64位ARM设备（如部分高端路由器）
    - mips/mipsel: 适用于传统路由器
@@ -11,12 +13,24 @@
 
 2. 上传到OpenWrt设备
 
-`scp cloud-clipboard_1.0.0_arm-7.ipk root@192.168.1.1:/tmp/`
+OpenWrt 25.12 及以上:
+
+`scp cloud-clipboard-1.0.0-aarch64_cortex-a53.apk root@192.168.1.1:/tmp/`
+
+OpenWrt 24.10 及以下:
+
+`scp cloud-clipboard_1.0.0_arm_cortex-a7.ipk root@192.168.1.1:/tmp/`
 
 
 3. 通过SSH连接到设备并安装
 
-`opkg install /tmp/cloud-clipboard_1.0.0_arm-7.ipk`
+OpenWrt 25.12 及以上:
+
+`apk add --allow-untrusted /tmp/cloud-clipboard-1.0.0-aarch64_cortex-a53.apk`
+
+OpenWrt 24.10 及以下:
+
+`opkg install /tmp/cloud-clipboard_1.0.0_arm_cortex-a7.ipk`
 
 4. 配置服务
 
@@ -47,18 +61,24 @@
 
 ## 打包说明
 
-如果您想自己构建IPK包：
+如果您想自己构建 OpenWrt 包:
 
 ```bash
 # 在项目根目录下执行
 # 构建二进制文件
-./openwrt/ipk/scripts/build.sh 版本号
+./openwrt/scripts/build.sh 版本号
 
-# 打包IPK
-./openwrt/ipk/scripts/package-openwrt.sh 版本号 架构
+# 打包 IPK
+./openwrt/scripts/package-openwrt.sh 版本号 架构
+
+# 打包 APK，需要 apk-tools 或 Docker
+./openwrt/scripts/package-openwrt-apk.sh 版本号 二进制架构 OpenWrt包架构
+
+# 例如在设备上 `cat /etc/apk/arch` 得到 aarch64_cortex-a53
+./openwrt/scripts/package-openwrt-apk.sh 版本号 aarch64 aarch64_cortex-a53
 ```
 
-支持的架构：amd64, i386, arm-7, aarch64, mips, mipsel
+OpenWrt APK 包架构不能直接等同于 Go 二进制架构，请以设备上的 `/etc/apk/arch` 为准。
 
 
 
@@ -70,7 +90,11 @@ Cloud Clipboard还提供了LuCI界面，可以方便地在OpenWrt管理页面进
 
 1. 安装主应用包（如上方步骤所示）
 2. 安装LuCI界面包
-`opkg install luci-app-cloud-clipboard_1.0.0_all.ipk`
+OpenWrt 25.12 及以上:
+`apk add --allow-untrusted /tmp/luci-app-cloud-clipboard-1.0.0-noarch.apk`
+
+OpenWrt 24.10 及以下:
+`opkg install /tmp/luci-app-cloud-clipboard_1.0.0_all.ipk`
 3. 重启LuCI
 `/etc/init.d/uhttpd restart`
 4. 在OpenWrt管理界面的"服务"菜单下找到"Cloud Clipboard"

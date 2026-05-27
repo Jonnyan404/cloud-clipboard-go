@@ -1,4 +1,4 @@
-name: Build LuCI IPK
+name: Build LuCI Packages
 
 on:
     workflow_dispatch: # 允许手动触发
@@ -15,17 +15,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       
-      - name: Get Version
-        run: |
-          # 如果上一级工作流输出没有传递版本号，则从输入获取版本号
-          if [ -z "${{ github.event.inputs.version }}" ]; then
-            echo "未指定版本号，请在输入version变量"
-            exit 1
-          fi
-          VERSION="${{ github.event.inputs.version }}"
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-      
       - name: Create directory structure and set permissions
         run: |
           mkdir -p openwrt/build
@@ -36,10 +25,27 @@ jobs:
       - name: Package LuCI App
         run: |
           chmod +x openwrt/scripts/package-luci-app.sh
-          ./openwrt/scripts/package-luci-app.sh ${{ env.VERSION }}
+          ./openwrt/scripts/package-luci-app.sh ${{ github.event.inputs.version }}
+
+      - name: Package LuCI APK
+        run: |
+          docker run --rm \
+            -v "$PWD:/work" \
+            -w /work \
+            alpine:edge \
+            sh -lc '
+              chmod +x openwrt/scripts/package-luci-app-apk.sh
+              ./openwrt/scripts/package-luci-app-apk.sh ${{ github.event.inputs.version }}
+            '
       
       - name: Upload LuCI IPK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: luci-app-cloud-clipboard_${{ env.VERSION }}_all.ipk
-          path: openwrt/build/luci-app-cloud-clipboard_${{ env.VERSION }}_all.ipk
+          name: luci-app-cloud-clipboard_${{ github.event.inputs.version }}_all.ipk
+          path: openwrt/build/luci-app-cloud-clipboard_${{ github.event.inputs.version }}_all.ipk
+
+      - name: Upload LuCI APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: luci-app-cloud-clipboard-${{ github.event.inputs.version }}-noarch.apk
+          path: openwrt/build/luci-app-cloud-clipboard-${{ github.event.inputs.version }}-noarch.apk

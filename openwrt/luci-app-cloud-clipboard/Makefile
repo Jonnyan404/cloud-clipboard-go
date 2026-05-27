@@ -22,9 +22,6 @@ define Package/$(PKG_NAME)/install
     $(INSTALL_DIR) $(1)/usr/lib/lua/luci/view/cloud-clipboard
     $(INSTALL_DATA) ./luasrc/view/cloud-clipboard/*.htm $(1)/usr/lib/lua/luci/view/cloud-clipboard/
     
-    $(INSTALL_DIR) $(1)/etc/config
-    $(INSTALL_CONF) ./root/etc/config/cloud-clipboard $(1)/etc/config/
-    
     $(INSTALL_DIR) $(1)/usr/share/rpcd/acl.d
     $(INSTALL_DATA) ./root/usr/share/rpcd/acl.d/luci-app-cloud-clipboard.json $(1)/usr/share/rpcd/acl.d/
 endef
