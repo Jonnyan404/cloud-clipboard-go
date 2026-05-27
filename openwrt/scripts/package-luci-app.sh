@@ -57,6 +57,7 @@ cp -v "$LUCI_DIR/luasrc/view/cloud-clipboard/"*.htm "$PKG_DIR/usr/lib/lua/luci/v
 # 复制root目录结构（如果存在）
 if [ -d "$LUCI_DIR/root" ]; then
     cp -r "$LUCI_DIR/root/"* "$PKG_DIR/"
+    rm -f "$PKG_DIR/etc/config/cloud-clipboard"
     echo "✓ 已复制root目录结构"
 else
     echo "! 警告: 找不到root目录结构"

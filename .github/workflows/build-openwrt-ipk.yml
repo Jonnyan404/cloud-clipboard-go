@@ -1,4 +1,4 @@
-name: Build OpenWrt IPK
+name: Build OpenWrt Packages
 
 on:
 #   push:
@@ -15,11 +15,8 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  build-binaries:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        arch: [x86_64, i386, arm_cortex-a5, arm_cortex-a7, arm_cortex-a8, arm_cortex-a9, arm_cortex-a15_neon-vfpv4, aarch64, mips_24kc, mipsel_24kc]
 
     steps:
       - name: Checkout code
@@ -44,16 +41,37 @@ jobs:
           chmod +x openwrt/scripts/build.sh
           ./openwrt/scripts/build.sh ${{ github.event.inputs.version }}
 
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: openwrt-binaries-${{ github.event.inputs.version }}
+          path: openwrt/build/cloud-clipboard-${{ github.event.inputs.version }}-*
+
+  build-ipk:
+    runs-on: ubuntu-latest
+    needs: build-binaries
+    strategy:
+      matrix:
+        arch: [x86_64, i386, arm_cortex-a5, arm_cortex-a7, arm_cortex-a8, arm_cortex-a9, arm_cortex-a15_neon-vfpv4, aarch64, mips_24kc, mipsel_24kc]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Create directory structure
+        run: |
+          mkdir -p openwrt/build
+
+      - name: Download binary artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: openwrt-binaries-${{ github.event.inputs.version }}
+          path: openwrt/build
+
       - name: Package IPK
         run: |
           chmod +x openwrt/scripts/package-openwrt.sh
           ./openwrt/scripts/package-openwrt.sh ${{ github.event.inputs.version }} ${{ matrix.arch }}
-
-      - name: Upload binary artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: cloud-clipboard-${{ github.event.inputs.version }}-${{ matrix.arch }}
-          path: openwrt/build/cloud-clipboard-${{ github.event.inputs.version }}-${{ matrix.arch }}
 
       - name: Upload IPK artifact
         uses: actions/upload-artifact@v4
@@ -61,9 +79,82 @@ jobs:
           name: cloud-clipboard_${{ github.event.inputs.version }}_${{ matrix.arch }}.ipk
           path: openwrt/build/cloud-clipboard_${{ github.event.inputs.version }}_${{ matrix.arch }}.ipk
 
+  build-apk:
+    runs-on: ubuntu-latest
+    needs: build-binaries
+    strategy:
+      matrix:
+        include:
+          - binary_arch: x86_64
+            apk_arch: x86_64
+          - binary_arch: i386
+            apk_arch: i386_pentium4
+          - binary_arch: i386
+            apk_arch: i386_pentium-mmx
+          - binary_arch: arm_cortex-a5
+            apk_arch: arm_cortex-a5_vfpv4
+          - binary_arch: arm_cortex-a7
+            apk_arch: arm_cortex-a7
+          - binary_arch: arm_cortex-a7
+            apk_arch: arm_cortex-a7_neon-vfpv4
+          - binary_arch: arm_cortex-a7
+            apk_arch: arm_cortex-a7_vfpv4
+          - binary_arch: arm_cortex-a8
+            apk_arch: arm_cortex-a8_vfpv3
+          - binary_arch: arm_cortex-a9
+            apk_arch: arm_cortex-a9
+          - binary_arch: arm_cortex-a9
+            apk_arch: arm_cortex-a9_neon
+          - binary_arch: arm_cortex-a9
+            apk_arch: arm_cortex-a9_vfpv3-d16
+          - binary_arch: arm_cortex-a15_neon-vfpv4
+            apk_arch: arm_cortex-a15_neon-vfpv4
+          - binary_arch: aarch64
+            apk_arch: aarch64_generic
+          - binary_arch: aarch64
+            apk_arch: aarch64_cortex-a53
+          - binary_arch: aarch64
+            apk_arch: aarch64_cortex-a72
+          - binary_arch: aarch64
+            apk_arch: aarch64_cortex-a76
+          - binary_arch: mips_24kc
+            apk_arch: mips_24kc
+          - binary_arch: mipsel_24kc
+            apk_arch: mipsel_24kc
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Create directory structure
+        run: |
+          mkdir -p openwrt/build
+
+      - name: Download binary artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: openwrt-binaries-${{ github.event.inputs.version }}
+          path: openwrt/build
+
+      - name: Package APK
+        run: |
+          docker run --rm \
+            -v "$PWD:/work" \
+            -w /work \
+            alpine:edge \
+            sh -lc '
+              chmod +x openwrt/scripts/package-openwrt-apk.sh
+              ./openwrt/scripts/package-openwrt-apk.sh ${{ github.event.inputs.version }} ${{ matrix.binary_arch }} ${{ matrix.apk_arch }}
+            '
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloud-clipboard-${{ github.event.inputs.version }}-${{ matrix.apk_arch }}.apk
+          path: openwrt/build/cloud-clipboard-${{ github.event.inputs.version }}-${{ matrix.apk_arch }}.apk
+
   build-luci:
     runs-on: ubuntu-latest
-    needs: build
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -74,10 +165,21 @@ jobs:
           # 设置权限，递归为所有文件增加可执行权限
           find openwrt/luci-app-cloud-clipboard -type f -exec chmod +x {} \;
       
-      - name: Package LuCI App
+      - name: Package LuCI IPK
         run: |
           chmod +x openwrt/scripts/package-luci-app.sh
           ./openwrt/scripts/package-luci-app.sh ${{ github.event.inputs.version }}
+
+      - name: Package LuCI APK
+        run: |
+          docker run --rm \
+            -v "$PWD:/work" \
+            -w /work \
+            alpine:edge \
+            sh -lc '
+              chmod +x openwrt/scripts/package-luci-app-apk.sh
+              ./openwrt/scripts/package-luci-app-apk.sh ${{ github.event.inputs.version }}
+            '
       
       - name: Upload LuCI IPK artifact
         uses: actions/upload-artifact@v4
@@ -85,8 +187,14 @@ jobs:
           name: luci-app-cloud-clipboard_${{ github.event.inputs.version }}_all.ipk
           path: openwrt/build/luci-app-cloud-clipboard_${{ github.event.inputs.version }}_all.ipk
 
+      - name: Upload LuCI APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: luci-app-cloud-clipboard-${{ github.event.inputs.version }}-noarch.apk
+          path: openwrt/build/luci-app-cloud-clipboard-${{ github.event.inputs.version }}-noarch.apk
+
   release:
-    needs: [build, build-luci]
+    needs: [build-binaries, build-ipk, build-apk, build-luci]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     
@@ -106,6 +214,7 @@ jobs:
         with:
           files: |
             artifacts/**/*.ipk
+            artifacts/**/*.apk
             artifacts/**/cloud-clipboard-*
           draft: false
           prerelease: ${{ !startsWith(github.ref, 'refs/tags/v') }}

@@ -17,3 +17,4 @@ cloudflare/node_modules
 *.keystore
 clipboard-monitor
 clipboard-monitor/src-tauri/target/
+openwrt/build/
