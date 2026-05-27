@@ -122,9 +122,14 @@ brew services start cloud-clipboard-go
 ### 5️⃣ 使用 OpenWrt（路由器）
 
 ```bash
-opkg update
-opkg install cloud-clipboard-go_*_platform.ipk
-opkg install cloud-clipboard-go_*_all.ipk
+# OpenWrt 25.12+
+cat /etc/apk/arch
+apk add --allow-untrusted ./cloud-clipboard-<version>-<apk-arch>.apk
+apk add --allow-untrusted ./luci-app-cloud-clipboard-<version>-noarch.apk
+
+# OpenWrt 24.10 及以下
+opkg install ./cloud-clipboard_<version>_<arch>.ipk
+opkg install ./luci-app-cloud-clipboard_<version>_all.ipk
 ```
 
 ### 6️⃣ 从源代码构建

@@ -16,7 +16,9 @@ fi
 # 目录定义
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BASE_DIR="$(dirname "$SCRIPT_DIR")"  # 这是 openwrt 目录
-BINARY="$BASE_DIR/build/cloud-clipboard-$VERSION-$ARCH"
+EXPECTED_BINARY="$BASE_DIR/build/cloud-clipboard-$VERSION-$ARCH"
+LEGACY_BINARY="$BASE_DIR/build/cloud-clipboard--$ARCH"
+BINARY="$EXPECTED_BINARY"
 PKG_DIR="$BASE_DIR/build/pkg-$ARCH"
 CONTROL_DIR="$BASE_DIR/ipk/control"
 ROOTFS_DIR="$BASE_DIR/ipk/rootfs"
@@ -25,6 +27,12 @@ IPK_NAME="cloud-clipboard_${VERSION}_${ARCH}.ipk"
 # 调试输出
 echo "脚本目录: $SCRIPT_DIR"
 echo "根目录: $BASE_DIR"
+
+if [ ! -f "$EXPECTED_BINARY" ] && [ -f "$LEGACY_BINARY" ]; then
+    BINARY="$LEGACY_BINARY"
+    echo "警告: 找到旧的无版本二进制 ${LEGACY_BINARY}，建议重新运行 build.sh 生成带版本号的产物"
+fi
+
 echo "二进制文件: $BINARY"
 
 # 检查二进制文件
