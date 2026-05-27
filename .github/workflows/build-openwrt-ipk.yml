@@ -143,8 +143,9 @@ jobs:
             -w /work \
             alpine:edge \
             sh -lc '
+              apk add --no-cache bash >/dev/null
               chmod +x openwrt/scripts/package-openwrt-apk.sh
-              ./openwrt/scripts/package-openwrt-apk.sh ${{ github.event.inputs.version }} ${{ matrix.binary_arch }} ${{ matrix.apk_arch }}
+              bash ./openwrt/scripts/package-openwrt-apk.sh ${{ github.event.inputs.version }} ${{ matrix.binary_arch }} ${{ matrix.apk_arch }}
             '
 
       - name: Upload APK artifact
@@ -177,8 +178,9 @@ jobs:
             -w /work \
             alpine:edge \
             sh -lc '
+              apk add --no-cache bash >/dev/null
               chmod +x openwrt/scripts/package-luci-app-apk.sh
-              ./openwrt/scripts/package-luci-app-apk.sh ${{ github.event.inputs.version }}
+              bash ./openwrt/scripts/package-luci-app-apk.sh ${{ github.event.inputs.version }}
             '
       
       - name: Upload LuCI IPK artifact
