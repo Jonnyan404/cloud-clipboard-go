@@ -215,7 +215,6 @@ jobs:
           files: |
             artifacts/**/*.ipk
             artifacts/**/*.apk
-            artifacts/**/cloud-clipboard-*
           draft: false
           prerelease: ${{ !startsWith(github.ref, 'refs/tags/v') }}
           tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v{0}', github.event.inputs.version) }}
