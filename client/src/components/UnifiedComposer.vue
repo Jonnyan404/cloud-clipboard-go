@@ -1,5 +1,13 @@
 <template>
-    <v-card class="unified-composer" :class="{ 'unified-composer--dark': $vuetify.theme.dark }" outlined>
+    <v-card
+        class="unified-composer"
+        :class="{ 'unified-composer--dark': $vuetify.theme.dark, 'unified-composer--dragover': dragover }"
+        outlined
+        @dragenter.prevent="dragover = true"
+        @dragover.prevent="dragover = true"
+        @dragleave.prevent="handleDragLeave"
+        @drop.prevent="handleDrop"
+    >
         <div class="unified-composer__body pa-3 pa-md-4">
             <v-textarea
                 ref="textarea"
@@ -91,6 +99,7 @@ export default {
     data() {
         return {
             progress: false,
+            dragover: false,
             uploadedSizes: [],
             mdiPaperclip,
             mdiQrcode,
@@ -244,6 +253,24 @@ export default {
                 this.progress = false;
             }
         },
+        handleDragLeave(event) {
+            // Only clear the drag state when the pointer actually leaves the card,
+            // not when it moves over a child element.
+            if (event.currentTarget.contains(event.relatedTarget)) {
+                return;
+            }
+            this.dragover = false;
+        },
+        handleDrop(event) {
+            this.dragover = false;
+            if (!(event && event.dataTransfer)) {
+                return;
+            }
+            const files = Array.from(event.dataTransfer.files || []);
+            if (files.length) {
+                this.handleSelectFiles(files);
+            }
+        },
         handlePaste(event) {
             if (!(event && event.clipboardData)) {
                 return;
@@ -280,6 +307,15 @@ export default {
     border-color: rgba(71, 85, 105, 0.72) !important;
     box-shadow: 0 18px 36px rgba(2, 6, 23, 0.3);
     background: rgba(15, 23, 42, 0.94);
+}
+
+.unified-composer--dragover {
+    border-color: var(--v-primary-base, #1976d2) !important;
+    box-shadow: 0 0 0 2px var(--v-primary-base, #1976d2);
+}
+
+.unified-composer--dragover * {
+    pointer-events: none;
 }
 
 .unified-composer__textarea ::v-deep .v-input__slot {
