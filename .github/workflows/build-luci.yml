@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       
       - name: Create directory structure and set permissions
         run: |
@@ -34,8 +34,9 @@ jobs:
             -w /work \
             alpine:edge \
             sh -lc '
+              apk add --no-cache bash >/dev/null
               chmod +x openwrt/scripts/package-luci-app-apk.sh
-              ./openwrt/scripts/package-luci-app-apk.sh ${{ github.event.inputs.version }}
+              bash ./openwrt/scripts/package-luci-app-apk.sh ${{ github.event.inputs.version }}
             '
       
       - name: Upload LuCI IPK artifact
