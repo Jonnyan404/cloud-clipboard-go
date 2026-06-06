@@ -14,6 +14,12 @@
 </p>
 
 <p align="center">
+  <a href="https://ko-fi.com/jonnyan404">
+    <img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Buy Me a Coffee at ko-fi.com">
+  </a>
+</p>
+
+<p align="center">
   <strong>一个跨平台的云剪贴板工具，支持文本、图片、文件实时发送到云端或本地服务器。</strong>
 </p>
 

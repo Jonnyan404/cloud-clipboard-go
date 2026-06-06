@@ -14,6 +14,12 @@
 </p>
 
 <p align="center">
+  <a href="https://ko-fi.com/jonnyan404">
+    <img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Buy Me a Coffee at ko-fi.com">
+  </a>
+</p>
+
+<p align="center">
   <strong>A cross-platform cloud clipboard tool that supports real-time send of text, images, and files to cloud or local servers.</strong>
 </p>
 
