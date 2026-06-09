@@ -80,6 +80,9 @@ export default {
             this.disconnect();
             this.connect();
         },
+        '$route.fullPath'() {
+            this.syncAuthFromRoute(this.$route);
+        },
     },
     methods: {
         normalizeRoomName(room = '') {
@@ -121,6 +124,22 @@ export default {
 
             if (this.normalizeRoomName(room) === this.normalizeRoomName(this.room)) {
                 this.authCode = '';
+            }
+        },
+        syncAuthFromRoute(route = this.$router.currentRoute) {
+            const routeRoom = this.normalizeRoomName(route?.query?.room || '');
+            const routeAuth = String(route?.query?.auth || '').trim();
+
+            if (routeAuth) {
+                this.cacheAuthTokenForRoom(routeRoom, routeAuth);
+                if (routeRoom === this.normalizeRoomName(this.room)) {
+                    this.authCode = routeAuth;
+                }
+                return;
+            }
+
+            if (routeRoom === this.normalizeRoomName(this.room)) {
+                this.authCode = this.getAuthTokenForRoom(routeRoom);
             }
         },
         getKnownAuthTokens(room = this.room) {
@@ -355,6 +374,7 @@ export default {
         },
     },
     mounted() {
+        this.syncAuthFromRoute(this.$route);
         this.authCode = this.getAuthTokenForRoom(this.room);
         this.connect();
     },

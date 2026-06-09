@@ -54,10 +54,14 @@
 
         <v-dialog v-model="pageQrDialogVisible" max-width="250">
             <v-card>
-                <v-card-title class="headline justify-center">{{ $t('scanToAccessPage') }}</v-card-title>
+                <v-card-title class="headline justify-center">{{ $t('scanToAccess') }}</v-card-title>
                 <v-card-text class="text-center pa-4">
-                    <qrcode-vue :value="currentPageUrl" :size="200" level="H" />
-                    <div class="text-caption mt-2" style="word-break: break-all;">{{ currentPageUrl }}</div>
+                    <v-btn-toggle v-model="pageQrMode" mandatory dense class="mb-3">
+                        <v-btn small value="page">{{ $t('currentShare') }}</v-btn>
+                        <v-btn small value="latest">{{ $t('latestShare') }}</v-btn>
+                    </v-btn-toggle>
+                    <qrcode-vue :value="pageQrUrl" :size="200" level="H" />
+                    <div class="text-caption mt-2" style="word-break: break-all;">{{ pageQrUrl }}</div>
                 </v-card-text>
                 <v-card-actions>
                     <v-spacer></v-spacer>
@@ -91,6 +95,7 @@ export default {
     data() {
         return {
             pageQrDialogVisible: false,
+            pageQrMode: 'page',
             mdiLanConnect,
             mdiLanPending,
             mdiLanDisconnect,
@@ -107,10 +112,61 @@ export default {
             return `${current}/${limit}`;
         },
         currentPageUrl() {
-            return window.location.href;
+            const currentRoom = this.$root.room || '';
+            const authToken = typeof this.$root.getAuthTokenForRoom === 'function'
+                ? this.$root.getAuthTokenForRoom(currentRoom)
+                : '';
+            const query = {};
+
+            if (currentRoom) {
+                query.room = currentRoom;
+            }
+
+            if (authToken) {
+                query.auth = authToken;
+            }
+
+            const resolved = this.$router.resolve({
+                path: '/',
+                query,
+            });
+            const url = new URL(window.location.pathname, window.location.origin);
+            url.hash = resolved.href.startsWith('#') ? resolved.href : `#${resolved.href}`;
+            return url.toString();
+        },
+        latestContentUrl() {
+            const currentRoom = this.$root.room || '';
+            const roomQuery = currentRoom ? `?room=${currentRoom}` : '';
+            return this.buildAbsoluteRouteUrl(`content/latest${roomQuery}`);
+        },
+        pageQrUrl() {
+            return this.pageQrMode === 'latest' ? this.latestContentUrl : this.currentPageUrl;
         },
     },
     methods: {
+        buildAbsoluteRouteUrl(path) {
+            const normalizedPath = String(path || '').replace(/^\/+/, '');
+            const baseURL = this.$http?.defaults?.baseURL || '';
+            const currentRoom = this.$root.room || '';
+            const authToken = typeof this.$root.getAuthTokenForRoom === 'function'
+                ? this.$root.getAuthTokenForRoom(currentRoom)
+                : '';
+
+            if (baseURL) {
+                const url = new URL(normalizedPath, `${baseURL.replace(/\/+$/, '')}/`);
+                if (authToken) {
+                    url.searchParams.set('auth', authToken);
+                }
+                return url.toString();
+            }
+
+            const prefix = this.$root.config?.server?.prefix || '';
+            const url = new URL(`${prefix}/${normalizedPath}`, `${window.location.origin}/`);
+            if (authToken) {
+                url.searchParams.set('auth', authToken);
+            }
+            return url.toString();
+        },
         focusComposer(type) {
             this.$nextTick(() => {
                 if (this.$refs.composer && typeof this.$refs.composer.focus === 'function') {

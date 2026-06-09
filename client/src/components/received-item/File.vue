@@ -277,24 +277,41 @@ export default {
             return mdiImageSearchOutline;
         },
         contentUrl() {
-            const protocol = window.location.protocol;
-            const host = window.location.host;
-            const prefix = this.$root.config?.server?.prefix || '';
             const roomQuery = this.$root.room ? `?room=${this.$root.room}` : '';
             const id = this.meta?.id ?? '';
-            return `${protocol}//${host}${prefix}/content/${id}${roomQuery}`;
+            return this.buildAbsoluteRouteUrl(`content/${id}${roomQuery}`);
         },
         fileUrl() {
-            const protocol = window.location.protocol;
-            const host = window.location.host;
-            const prefix = this.$root.config?.server?.prefix || '';
             const cache = this.meta?.cache || '';
             const encodedFilename = encodeURIComponent(this.meta?.name || 'file');
-            return `${protocol}//${host}${prefix}/file/${cache}/${encodedFilename}`;
+            return this.buildAbsoluteRouteUrl(`file/${cache}/${encodedFilename}`);
         }
     },
     methods: {
         formatTimestamp,
+        buildAbsoluteRouteUrl(path) {
+            const normalizedPath = String(path || '').replace(/^\/+/, '');
+            const baseURL = this.$http?.defaults?.baseURL || '';
+            const currentRoom = this.$root.room || '';
+            const authToken = typeof this.$root.getAuthTokenForRoom === 'function'
+                ? this.$root.getAuthTokenForRoom(currentRoom)
+                : '';
+
+            if (baseURL) {
+                const url = new URL(normalizedPath, `${baseURL.replace(/\/+$/, '')}/`);
+                if (authToken) {
+                    url.searchParams.set('auth', authToken);
+                }
+                return url.toString();
+            }
+
+            const prefix = this.$root.config?.server?.prefix || '';
+            const url = new URL(`${prefix}/${normalizedPath}`, `${window.location.origin}/`);
+            if (authToken) {
+                url.searchParams.set('auth', authToken);
+            }
+            return url.toString();
+        },
         previewFile() {
             if (this.expand) {
                 this.expand = false;
@@ -305,7 +322,7 @@ export default {
             }
             this.expand = true;
             if (this.isPreviewableVideo || this.isPreviewableAudio) {
-                this.srcPreview = `file/${this.meta.cache}/${encodeURIComponent(this.meta.name)}`;
+                this.srcPreview = this.fileUrl;
             } else if (this.isPreviewableText) {
                 this.showFullTextPreview = false;
                 this.loadingPreview = true;
