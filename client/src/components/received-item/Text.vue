@@ -153,16 +153,36 @@ export default {
             return decoded; // You might want to truncate this further
         },
         contentUrl() {
-            const protocol = window.location.protocol;
-            const host = window.location.host;
-            const prefix = this.$root.config?.server?.prefix || '';
             const roomQuery = this.$root.room ? `?room=${this.$root.room}` : '';
             const id = this.meta?.id ?? '';
-            return `${protocol}//${host}${prefix}/content/${id}${roomQuery}`;
+            return this.buildAbsoluteRouteUrl(`content/${id}${roomQuery}`);
         }
     },
     methods: {
         formatTimestamp, // Make formatter available
+        buildAbsoluteRouteUrl(path) {
+            const normalizedPath = String(path || '').replace(/^\/+/, '');
+            const baseURL = this.$http?.defaults?.baseURL || '';
+            const currentRoom = this.$root.room || '';
+            const authToken = typeof this.$root.getAuthTokenForRoom === 'function'
+                ? this.$root.getAuthTokenForRoom(currentRoom)
+                : '';
+
+            if (baseURL) {
+                const url = new URL(normalizedPath, `${baseURL.replace(/\/+$/, '')}/`);
+                if (authToken) {
+                    url.searchParams.set('auth', authToken);
+                }
+                return url.toString();
+            }
+
+            const prefix = this.$root.config?.server?.prefix || '';
+            const url = new URL(`${prefix}/${normalizedPath}`, `${window.location.origin}/`);
+            if (authToken) {
+                url.searchParams.set('auth', authToken);
+            }
+            return url.toString();
+        },
         deviceIcon(type) {
             const lowerType = type.toLowerCase();
             if (lowerType.includes('mobile') || lowerType.includes('phone') || lowerType.includes('tablet') || lowerType.includes('ios') || lowerType.includes('android')) {
