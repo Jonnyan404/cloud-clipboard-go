@@ -54,7 +54,7 @@
 
         <v-dialog v-model="pageQrDialogVisible" max-width="250">
             <v-card>
-                <v-card-title class="headline justify-center">{{ $t('scanToAccessPage') }}</v-card-title>
+                <v-card-title class="headline justify-center">{{ $t('scanToAccess') }}</v-card-title>
                 <v-card-text class="text-center pa-4">
                     <qrcode-vue :value="currentPageUrl" :size="200" level="H" />
                     <div class="text-caption mt-2" style="word-break: break-all;">{{ currentPageUrl }}</div>

@@ -6,6 +6,7 @@
 /cloud-clip/history.json
 /cloud-clip/mobile/*.aar
 /cloud-clip/mobile/*.jar
+/cloud-clip/cloud-clip
 /android/.idea/
 /android/.gradle/
 .vscode/
