@@ -1,4 +1,4 @@
-# Cloud Clipboard Go
+<h1 align="center"> Cloud Clipboard Go </h1>
 
 <p align="center">
   <a href="README.md"><img src="https://img.shields.io/badge/lang-简体中文-blue.svg" alt="Chinese Readme"></a>
