@@ -1,7 +1,7 @@
 # Cloud Clipboard Go
 
 <p align="center">
-  <a href="README.md"><img src="https://img.shields.io/badge/lang-简体中文-blue.svg" alt="中文 Readme"></a>
+  <a href="README.md"><img src="https://img.shields.io/badge/lang-简体中文-blue.svg" alt="Chinese Readme"></a>
   <a href="https://raw.githubusercontent.com/jonnyan404/cloud-clipboard-go-launcher/main/LICENSE">
     <img src="https://img.shields.io/github/license/jonnyan404/cloud-clipboard-go-launcher?color=brightgreen" alt="license">
   </a>
@@ -20,7 +20,7 @@
 </p>
 
 <p align="center">
-  <strong>A cross-platform cloud clipboard tool that supports real-time send of text, images, and files to cloud or local servers.</strong>
+  <strong>A cross-platform cloud clipboard tool for sending text, images, and files to a cloud or local server in real time.</strong>
 </p>
 
 ---
@@ -41,27 +41,36 @@
 
 </details>
 
+<details>
+<summary><b>📡 Router</b></summary>
+
+![OpenWrt Preview](https://github.com/Jonnyan404/cloud-clipboard-go/blob/main/openwrt/demo.png)
+
+</details>
 
 ---
 
-## 🎯 Advantages
+## 🎯 Highlights
 
 | Feature | Description |
 |---------|-------------|
-| 🔒 **Privacy** | Deploy locally or on your own server, full data control |
-| 📦 **Easy Deploy** | Docker, Binary, Source code, Homebrew, OpenWrt, and more options |
-| 🌍 **Cross-platform** | Windows, macOS, Linux, Android, iOS |
-| ⚡ **Fast Sync** | Real-time synchronization, zero delay |
-| 🔐 **Security** | Password and Token authentication support |
-| 💾 **Flexible Storage** | Configurable history and file expiration |
-| 🚀 **Lightweight** | Low resource usage, runs smoothly on low-end devices |
-| 🔍 **Shortcuts** | Android/iOS shortcuts support |
+| 🔒 **Privacy & Security** | Deploy locally or on your own server and keep full control of your data |
+| 📦 **Easy Deployment** | Supports Docker, source builds, binaries, Homebrew, OpenWrt, and more |
+| 🌍 **Cross-platform** | Works on Windows, macOS, Linux, Android, and iOS |
+| ⚡ **Real-time Sync** | Instant synchronization with no noticeable delay |
+| 🔐 **Authentication** | Supports password and token-based protection |
+| 💾 **Flexible Storage** | Configurable history retention and file expiration |
+| 🚀 **Lightweight** | Low resource usage, suitable even for low-spec devices |
+| 🔍 **Shortcuts Support** | Android and iOS shortcuts are supported |
 
 ---
 
 ## 🚀 Quick Start
 
 ### 1️⃣ Docker (Recommended)
+
+- [Tencent Cloud: 2 vCPU / 2 GB server from CNY 99/year](https://cloud.tencent.com/act/cps/redirect?redirect=6150&cps_key=0b1dfaf9bb573dac05abef76202dc8cc&from=console)
+- [Alibaba Cloud: 2 vCPU / 2 GB server from CNY 99/year](https://www.aliyun.com/daily-act/ecs/activity_selection?userCode=79h2wrag)
 
 ```bash
 # Option 1: Docker Compose (Recommended)
@@ -81,7 +90,7 @@ Then visit: `http://localhost:9501`
 
 ### 2️⃣ Binary Files
 
-Download from [Releases](https://github.com/jonnyan404/cloud-clipboard-go/releases):
+Download the package for your platform from [Releases](https://github.com/jonnyan404/cloud-clipboard-go/releases):
 
 ```bash
 # Linux/macOS
@@ -91,22 +100,22 @@ Download from [Releases](https://github.com/jonnyan404/cloud-clipboard-go/releas
 cloud-clipboard-go.exe -port 9501
 ```
 
-### 3️⃣ Android Application (Mobile Devices)
+### 3️⃣ Android App (Mobile Devices)
 
-For deploying server directly on Android phone/tablet:
+For running the server directly on an Android phone or tablet:
 
-1. Download `.apk` file from [Releases](https://github.com/jonnyan404/cloud-clipboard-go/releases)
-2. Install APK on your Android device
-3. Open the app and set listening port (default 9501)
-4. Set access password (optional)
-5. Tap "Start Service"
+1. Download the `.apk` file from [Releases](https://github.com/jonnyan404/cloud-clipboard-go/releases)
+2. Install the APK on your Android device
+3. Open the app and set the listening port, default `9501`
+4. Set an access password if needed
+5. Tap `Start Service`
 
-Then access from other devices: `http://your-android-device-ip:9501`
+Then open it from another device: `http://your-android-device-ip:9501`
 
 **Advantages**:
-- 📱 Run server directly on your phone without a computer
-- 🚀 Ready to use, no additional dependencies
-- 💾 Data persistence support
+- 📱 Run the server directly on your phone without a computer
+- 🚀 Ready to use with no extra dependencies
+- 💾 Persistent local data storage
 
 ### 4️⃣ Homebrew (macOS)
 
@@ -115,7 +124,7 @@ brew install Jonnyan404/tap/cloud-clipboard-go
 brew services start cloud-clipboard-go
 ```
 
-### 5️⃣ OpenWrt (Router)
+### 5️⃣ OpenWrt (Routers)
 
 ```bash
 # OpenWrt 25.12+
@@ -133,12 +142,12 @@ opkg install ./luci-app-cloud-clipboard_<version>_all.ipk
 ```bash
 # Requirements: Node.js >= 22.12, Go >= 1.22
 
-# 1. Build frontend
+# 1. Build the frontend
 cd client
 npm install
 npm run build
 
-# 2. Run backend
+# 2. Run the backend
 cd ../cloud-clip
 go mod tidy
 go run -tags embed .
@@ -146,7 +155,7 @@ go run -tags embed .
 
 ### 7️⃣ Cloudflare Deployment
 
-For cloud deployment scenarios, support one-click deployment to Cloudflare Workers + Pages:
+For cloud hosting, you can deploy to Cloudflare Workers + Pages in one go:
 
 ```bash
 # Requirements: Node.js >= 22.12, Wrangler CLI
@@ -154,10 +163,10 @@ For cloud deployment scenarios, support one-click deployment to Cloudflare Worke
 # 1. Install Wrangler CLI
 npm install -g wrangler
 
-# 2. Login to Cloudflare
+# 2. Log in to Cloudflare
 wrangler login
 
-# 3. Run deployment script
+# 3. Run the deployment script
 cd cloudflare
 ./deploy.sh
 ```
@@ -170,16 +179,16 @@ cd cloudflare
 
 **Advantages**:
 - 🌐 Global CDN acceleration
-- 🚀 No server maintenance required
+- 🚀 No server maintenance
 - 💾 Automatic backup and scaling
 - 🔒 Cloudflare security protection
 
-**Important Notes**:
-- Requires Cloudflare account
-- Free tier usage (Workers: 100,000 requests/day, D1: 500MB storage, R2: 10GB storage)
-- Access URL will be displayed after deployment
+**Notes**:
+- A Cloudflare account is required
+- Can be used within the free tier limits (Workers: 100,000 requests/day, D1: 500 MB storage, R2: 10 GB storage)
+- The access URL is displayed after deployment
 
-See: [Cloudflare Deployment Documentation](./cloudflare/README.md)
+See also: [Cloudflare Deployment Documentation](./cloudflare/README.md)
 
 ---
 
@@ -187,9 +196,9 @@ See: [Cloudflare Deployment Documentation](./cloudflare/README.md)
 
 ### Docker Compose Configuration
 
-Use the existing `docker-compose.yml` in the repository root as the source of truth. The container entrypoint generates the runtime config from these environment variables, so the documentation should match that file exactly.
+Use the existing `docker-compose.yml` in the repository root as the source of truth. The image entrypoint generates the runtime configuration from these environment variables, so the documentation should follow the same naming.
 
-Edit the root `docker-compose.yml` as needed:
+Adjust the root `docker-compose.yml` as needed:
 
 ```yaml
 services:
@@ -205,20 +214,20 @@ services:
       retries: 3
       start_period: 10s
     environment:
-      LISTEN_IP: ${LISTEN_IP:-} # Defaults to 0.0.0.0. You can set 127.0.0.1 if needed.
-      LISTEN_IP6: ${LISTEN_IP6:-} # Defaults to empty. You can set :: for IPv6.
-      LISTEN_PORT: ${LISTEN_PORT:-} # Defaults to 9501.
-      PREFIX: ${PREFIX:-} # Subpath, for example /cloud-clipboard
-      MESSAGE_NUM: ${MESSAGE_NUM:-} # History item count, defaults to 10.
-      AUTH_PASSWORD: ${AUTH_PASSWORD:-} # Global access password, defaults to false.
+      LISTEN_IP: ${LISTEN_IP:-} # Defaults to 0.0.0.0. Leave unchanged unless you know you need 127.0.0.1.
+      LISTEN_IP6: ${LISTEN_IP6:-} # Defaults to empty. Set :: for IPv6 if needed.
+      LISTEN_PORT: ${LISTEN_PORT:-} # Defaults to 9501. Change if you need another port.
+      PREFIX: ${PREFIX:-} # Subpath, useful with nginx. Example: /cloud-clipboard
+      MESSAGE_NUM: ${MESSAGE_NUM:-} # History record count, default 10.
+      AUTH_PASSWORD: ${AUTH_PASSWORD:-} # Global access password. Default false.
       ROOM_AUTH_JSON: '${ROOM_AUTH_JSON:-{}}' # Room password JSON, for example {"finance":"finance-pass","ops":""}
-      TEXT_LIMIT: ${TEXT_LIMIT:-} # Text length limit, defaults to 4096.
-      FILE_EXPIRE: ${FILE_EXPIRE:-} # File expiration time in seconds, defaults to 3600.
-      FILE_LIMIT: ${FILE_LIMIT:-} # File size limit in bytes, defaults to 104857600.
-      MKCERT_DOMAIN_OR_IP: ${MKCERT_DOMAIN_OR_IP:-} # mkcert domain or IP. Multiple values can be separated by spaces.
+      TEXT_LIMIT: ${TEXT_LIMIT:-} # Text length limit, default 4096.
+      FILE_EXPIRE: ${FILE_EXPIRE:-} # File expiration in seconds, default 3600.
+      FILE_LIMIT: ${FILE_LIMIT:-} # File size limit in bytes, default 104857600.
+      MKCERT_DOMAIN_OR_IP: ${MKCERT_DOMAIN_OR_IP:-} # mkcert domain or IP. Separate multiple values with spaces. Wildcards are supported for domains only.
       MANUAL_KEY_PATH: ${MANUAL_KEY_PATH:-} # Manual key path. Higher priority than MKCERT_DOMAIN_OR_IP.
       MANUAL_CERT_PATH: ${MANUAL_CERT_PATH:-} # Manual certificate path. Higher priority than MKCERT_DOMAIN_OR_IP.
-      ROOM_LIST: ${ROOM_LIST:-} # Enable room list display, default is false.
+      ROOM_LIST: ${ROOM_LIST:-} # Whether to enable room list display. Default false.
     volumes:
       - /path/your/dir/data:/app/server-node/data # Replace with your own directory
     image: jonnyan404/cloud-clipboard-go:latest
@@ -230,14 +239,14 @@ Run:
 docker compose up -d
 ```
 
-`ROOM_AUTH_JSON` must be a valid JSON object. An empty string value means that room falls back to `AUTH_PASSWORD`.
+`ROOM_AUTH_JSON` must be a valid JSON object. If a room value is an empty string, that room falls back to `AUTH_PASSWORD`.
 
 Additional notes:
 
-- The documented Docker Compose variable name is `ROOM_AUTH_JSON`.
-- The entrypoint still accepts the legacy variable name `ROOM_AUTH` for backward compatibility, but the Compose example and docs are now standardized on `ROOM_AUTH_JSON`.
-- If you use a `.env` file, keep the same variable names and only fill in the values.
-- The image explicitly installs `nc`, and the health check only verifies that the container is listening on the configured port, independent of `PREFIX` and HTTP/HTTPS settings.
+- The Docker Compose variable name is now standardized as `ROOM_AUTH_JSON`.
+- The entrypoint still accepts the legacy variable name `ROOM_AUTH`, but the Compose example and later docs use `ROOM_AUTH_JSON` consistently.
+- If you use a `.env` file, keep the same `${VAR:-}` mapping and only fill in the actual values.
+- The image explicitly installs `nc`, and the Compose health check only verifies the listening port inside the container. It is unrelated to `PREFIX` or HTTP/HTTPS settings.
 
 Example:
 
@@ -247,7 +256,7 @@ environment:
   ROOM_AUTH_JSON: '{"finance":"finance-pass","private":""}'
 ```
 
-To change `roomAuth` dynamically through variables, the recommended approach is to use a `.env` file:
+If you want to change `roomAuth` through variables dynamically, use a `.env` file:
 
 ```env
 AUTH_PASSWORD=global-pass
@@ -260,18 +269,18 @@ Then run:
 docker compose up -d
 ```
 
-You can also override it for a single run:
+You can also override it temporarily:
 
 ```bash
 ROOM_AUTH_JSON='{"finance":"new-pass","ops":"ops-pass"}' docker compose up -d
 ```
 
-Note: the Docker image only auto-generates config when [cloud-clip/config.json](cloud-clip/config.json) does not exist. If you already mounted an existing `config.json`, changing environment variables will not rewrite it automatically. In that case, delete the file and recreate the container, or edit `server.roomAuth` manually.
+Note: the Docker image only auto-generates [cloud-clip/config.json](./cloud-clip/config.json) when it does not already exist. If you mounted an existing `config.json`, updating environment variables will not rewrite it automatically. In that case, delete the file and recreate the container, or edit `server.roomAuth` manually.
 
 ### Binary Command-line Parameters
 
 ```bash
-# Priority: Command-line > Config file > Default values
+# Priority: command line > config file > default value
 
 -host string
     Server listening address (default "0.0.0.0")
@@ -302,26 +311,26 @@ Example:
 ### 📲 Android Shortcuts
 
 1. Download [HTTP Shortcuts](https://github.com/Waboodoo/HTTP-Shortcuts/releases)
-2. Download [Shortcuts file](https://raw.githubusercontent.com/jonnyan404/cloud-clipboard-go/refs/heads/main/shortcuts/cloud-clipboard-shortcuts.zip)
-3. Import into HTTP Shortcuts
-4. Configure variables:
-   - `url`: Your server address (e.g., `http://192.168.1.100:9501`)
-   - `room`: Room name (optional)
-   - `auth`: Authentication password (optional)
+2. Download the [shortcuts package](https://raw.githubusercontent.com/jonnyan404/cloud-clipboard-go/refs/heads/main/shortcuts/cloud-clipboard-shortcuts.zip)
+3. Import it into HTTP Shortcuts
+4. Configure the variables:
+   - `url`: your server address, for example `http://192.168.1.100:9501`
+   - `room`: room name, optional
+   - `auth`: authentication password, optional
 
 ### 🖥️ Desktop Application
 
-- **Clipboard Sync** (仅提供给捐赠用户)
-  - Auto clipboard sync
-  - Supports Windows/macOS/Linux
+- **Clipboard Sync** (available only to donors)
+  - Two-way clipboard sync
+  - Supports Windows, macOS, and Linux
 
 ### 💻 UI Launcher Tool
 
-Download [Cloud Clipboard Go Launcher](https://github.com/jonnyan404/cloud-clipboard-go-launcher/releases) - no command line needed.
+Download [Cloud Clipboard Go Launcher](https://github.com/jonnyan404/cloud-clipboard-go-launcher/releases) if you prefer not to use the command line.
 
 ---
 
-## 🌐 API Endpoints
+## 🌐 API
 
 ### Get Latest Content
 
@@ -329,10 +338,10 @@ Download [Cloud Clipboard Go Launcher](https://github.com/jonnyan404/cloud-clipb
 GET /content/latest
 ```
 
-Returns the latest clipboard content.
+Returns the latest clipboard item.
 
 **Parameters**:
-- `room` (optional): Room name
+- `room` (optional): room name
 
 **Examples**:
 
@@ -341,7 +350,7 @@ curl http://localhost:9501/content/latest
 curl http://localhost:9501/content/latest?room=work
 ```
 
-Full API Documentation: [API.md](./cloud-clip/config.md)
+Full API documentation: [API.md](./cloud-clip/config.md)
 
 ---
 
@@ -354,7 +363,7 @@ Full API Documentation: [API.md](./cloud-clip/config.md)
 | Docker Hub | `jonnyan404/cloud-clipboard-go` |
 | GitHub Container Registry | `ghcr.io/jonnyan404/cloud-clipboard-go` |
 
-### Pull Latest Image
+### Pull the Latest Image
 
 ```bash
 docker pull jonnyan404/cloud-clipboard-go:latest
@@ -362,11 +371,11 @@ docker pull jonnyan404/cloud-clipboard-go:latest
 
 ---
 
-## 📚 Documentation
+## 📚 Detailed Documentation
 
 - 📖 [Configuration Guide](./cloud-clip/config.md)
 - 🔌 [HTTP API Documentation](./cloud-clip/config.md)
-- 📱 [Client Deployment](#-client-usage)
+- 📱 [Client Deployment Guide](#-client-usage)
 
 ---
 
@@ -375,55 +384,59 @@ docker pull jonnyan404/cloud-clipboard-go:latest
 | Platform | Binary | Docker | Source | Notes |
 |----------|--------|--------|--------|-------|
 | Linux | ✅ | ✅ | ✅ | Primary support |
-| macOS | ✅ | ✅ | ✅ | Intel/Apple Silicon |
+| macOS | ✅ | ✅ | ✅ | Intel and Apple Silicon |
 | Windows | ✅ | ✅ | ✅ | Requires Visual C++ Build Tools |
-| Android | ✅ | - | ✅ | Server APK/Shortcuts |
+| Android | ✅ | - | ✅ | Server APK and shortcuts |
 | iOS | - | - | - | Shortcuts |
-| OpenWrt | ✅ | - | ✅ | Router systems |
+| OpenWrt | ✅ | ✅ | ✅ | Router system |
 
 ---
 
-## 🐛 Troubleshooting
-
-### Docker Container Won't Start
-
-```bash
-# Check logs
-docker logs cloud-clipboard-go
-
-# Check if port is in use
-netstat -tuln | grep 9501
-
-# Restart container
-docker restart cloud-clipboard-go
-```
-
-### Can't Access Web Interface
-
-- Check firewall isn't blocking port 9501
-- Verify container is running: `docker ps | grep cloud-clipboard-go`
-- Try local access: `http://localhost:9501`
-
-### File Upload Fails
-
-- Check disk space availability
-- Verify `FILE_LIMIT` environment variable setting
-- Ensure data directory is writable: `chmod 777 ./data`
-
-Full Guide: [Troubleshooting](./docs/troubleshooting.md)
-
-
-
 ## 📦 Related Projects
 
-- **[Cloud Clipboard Go Launcher](https://github.com/jonnyan404/cloud-clipboard-go-launcher)** - UI launcher tool for easier usage
-- **[Clipboard Monitor](./clipboard-monitor/)** - Desktop monitoring application
+- **[Cloud Clipboard Go Launcher](https://github.com/jonnyan404/cloud-clipboard-go-launcher)** - A UI helper tool for users who do not want to work in a terminal
+
+---
+
+## ☕ Support the Project
+
+If this project helps you, you can support it in the following ways:
+
+### 💰 Donations
+
+Your support helps keep the project maintained and improved.
+
+| Method | QR Code |
+|--------|---------|
+| **WeChat** | <img src="https://github.com/Jonnyan404/cloud-clipboard-go/blob/main/wechat.png" width="300" alt="WeChat donation QR code"> |
+
+### 🌟 Other Ways to Support
+
+- [Tencent Cloud: 2 vCPU / 2 GB server from CNY 99/year](https://cloud.tencent.com/act/cps/redirect?redirect=6150&cps_key=0b1dfaf9bb573dac05abef76202dc8cc&from=console)
+- [Alibaba Cloud: 2 vCPU / 2 GB server from CNY 99/year](https://www.aliyun.com/daily-act/ecs/activity_selection?userCode=79h2wrag)
+- ⭐ **Star the project** if you find it useful
+- 🐛 **Report issues** to help improve it
+- 💡 **Share suggestions** in Discussions
+- 🔀 **Contribute code** through Pull Requests
+- 📢 **Share the project** with others who may need it
+
+### 📝 Supporters
+
+Thanks to the following supporters:
+
+> Thanks for the support, and PRs are always welcome.
+- 🥇 DOYO (donated CNY 20) Thanks for building clipboard go. It is super useful, and now I want to submit a PR.
+
+- 🥈 xxxxxxxx (donated CNY 99)
+- 🥉 xxxxxxxx (donated CNY 50)
+
+> If you want to be listed here too, leave your name or nickname with your donation.
 
 ---
 
 ## 🙏 Acknowledgments
 
-This project is based on:
+The frontend (client) and backend (cloud-clip) in this project are forked and adapted from the following open-source projects:
 
 - [TransparentLC/cloud-clipboard](https://github.com/TransparentLC/cloud-clipboard)
 - [yurenchen000/cloud-clipboard](https://github.com/yurenchen000/cloud-clipboard)
@@ -440,46 +453,3 @@ This project is based on:
 
 MIT License - See [LICENSE](LICENSE) for details
 
----
-
-## ☕ Support the Project
-
-If this project has been helpful to you, please consider supporting us:
-
-### 💰 Donation
-
-Your support motivates us to continue maintaining and improving this project!
-
-| Method | QR Code |
-|--------|---------|
-| **WeChat** | <img src="https://github.com/Jonnyan404/cloud-clipboard-go/blob/main/wechat.png" width="300" alt="WeChat"> |
-
-### 🌟 Other Ways to Support
-
-- ⭐ **Star** - Give us a star if you like the project
-- 🐛 **Report Issues** - Help us improve by reporting bugs
-- 💡 **Suggestions** - Share your ideas in Discussions
-- 🔀 **Contribute Code** - Submit Pull Requests
-- 📢 **Share** - Tell others about this project
-
-### 📝 Supporters
-
-Thanks to those who have supported us:
-
-- 🥇 xxxxxxxx (¥199)
-- 🥈 xxxxxxxx (¥99)
-- 🥉 xxxxxxxx (¥50)
-
-> If you'd like to appear here, please leave your name or nickname when donating!
-
----
-
-## 💬 Community & Feedback
-
-- 📝 Report [Issues](https://github.com/jonnyan404/cloud-clipboard-go/issues)
-- 🔀 Submit [Pull Requests](https://github.com/jonnyan404/cloud-clipboard-go/pulls)
-- 💡 Join [Discussions](https://github.com/jonnyan404/cloud-clipboard-go/discussions)
-
----
-
-**Last Updated**: November 25, 2025 | 📖 [中文版本](README.md)
