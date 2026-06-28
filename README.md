@@ -427,8 +427,9 @@ docker pull jonnyan404/cloud-clipboard-go:latest
 
 感谢以下用户的支持：
 
-- 🥇 DOYO（赞赏 ¥20）谢谢老大写的 clipboard go捏,很好用!想提 pr 了 (
 > 首先感谢赞赏,欢迎提 pr 的
+- 🥇 DOYO（赞赏 ¥20）谢谢老大写的 clipboard go捏,很好用!想提 pr 了 (
+
 - 🥈 xxxxxxxx（赞赏 ¥99）
 - 🥉 xxxxxxxx（赞赏 ¥50）
 
@@ -454,14 +455,3 @@ docker pull jonnyan404/cloud-clipboard-go:latest
 ## 📄 许可证
 
 MIT License - 详见 [LICENSE](LICENSE)
-
-
-## 💬 交流反馈
-
-- 📝 提交 [Issues](https://github.com/jonnyan404/cloud-clipboard-go/issues)
-- 🔀 贡献 [Pull Requests](https://github.com/jonnyan404/cloud-clipboard-go/pulls)
-- 💡 讨论 [Discussions](https://github.com/jonnyan404/cloud-clipboard-go/discussions)
-
----
-
-**最后更新**: 2025年11月25日 | 📖 [English Version](README.en.md)
