@@ -1,0 +1,21 @@
+# Ignore node_modules
+**/node_modules
+node_modules
+client/node_modules
+cloudflare/node_modules
+cloudflare/workers/node_modules
+
+# Ignore build artifacts and outputs
+**/dist
+**/dist-bin
+dist
+dist-bin
+client/dist
+
+# Ignore version control and system files
+.git
+.github
+.gitignore
+.dockerignore
+.DS_Store
+*.log

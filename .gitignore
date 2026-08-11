@@ -19,3 +19,21 @@ cloudflare/node_modules
 clipboard-monitor
 clipboard-monitor/src-tauri/target/
 openwrt/build/
+
+# Build artifacts & binaries output
+/dist/
+/dist-bin/
+**/dist/
+**/dist-bin/
+
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Root level accidental package-lock
+/package-lock.json
+
+# OS & Environment junk files
+.DS_Store
+**/.DS_Store
+*.log
