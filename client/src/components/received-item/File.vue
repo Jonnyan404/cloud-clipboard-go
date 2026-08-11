@@ -65,8 +65,7 @@
                                         icon
                                         color="grey"
                                         class="timeline-card__icon-button"
-                                        :href="expired ? null : fileUrl"
-                                        :download="expired ? null : meta.name"
+                                        @click="!expired && downloadWithTicket()"
                                         :disabled="expired"
                                     >
                                         <v-icon>{{ expired ? mdiDownloadOff : mdiDownload }}</v-icon>
@@ -312,6 +311,42 @@ export default {
             }
             return url.toString();
         },
+        downloadWithTicket() {
+            const cache = this.meta?.cache || '';
+            const roomQuery = this.$root.room ? `?room=${this.$root.room}` : '';
+            this.$http.post(`ticket/${cache}${roomQuery}`).then(response => {
+                const ticket = response.data?.ticket;
+                const encodedFilename = encodeURIComponent(this.meta?.name || 'file');
+                const prefix = this.$root.config?.server?.prefix || '';
+                const baseURL = this.$http?.defaults?.baseURL || '';
+                
+                let targetUrl = '';
+                if (baseURL) {
+                    targetUrl = `${baseURL.replace(/\/+$/, '')}/file/${cache}/${encodedFilename}`;
+                } else {
+                    targetUrl = `${window.location.origin}${prefix}/file/${cache}/${encodedFilename}`;
+                }
+
+                const urlObj = new URL(targetUrl);
+                if (ticket) {
+                    urlObj.searchParams.set('auth', ticket);
+                }
+                urlObj.searchParams.set('download', 'true');
+                
+                const link = document.createElement('a');
+                link.href = urlObj.toString();
+                link.setAttribute('download', this.meta?.name || 'file');
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+            }).catch(error => {
+                if (error.response && error.response.data && error.response.data.message) {
+                    this.$toast(error.response.data.message);
+                } else {
+                    this.$toast(this.$t('fileFetchFailed'));
+                }
+            });
+        },
         previewFile() {
             if (this.expand) {
                 this.expand = false;
@@ -322,7 +357,27 @@ export default {
             }
             this.expand = true;
             if (this.isPreviewableVideo || this.isPreviewableAudio) {
-                this.srcPreview = this.fileUrl;
+                const cache = this.meta?.cache || '';
+                const roomQuery = this.$root.room ? `?room=${this.$root.room}` : '';
+                this.loadingPreview = true;
+                this.$http.post(`ticket/${cache}${roomQuery}`).then(response => {
+                    const ticket = response.data?.ticket;
+                    const encodedFilename = encodeURIComponent(this.meta?.name || 'file');
+                    const prefix = this.$root.config?.server?.prefix || '';
+                    const baseURL = this.$http?.defaults?.baseURL || '';
+                    let targetUrl = baseURL
+                        ? `${baseURL.replace(/\/+$/, '')}/file/${cache}/${encodedFilename}`
+                        : `${window.location.origin}${prefix}/file/${cache}/${encodedFilename}`;
+                    const urlObj = new URL(targetUrl);
+                    if (ticket) {
+                        urlObj.searchParams.set('auth', ticket);
+                    }
+                    this.srcPreview = urlObj.toString();
+                }).catch(() => {
+                    this.srcPreview = this.fileUrl;
+                }).finally(() => {
+                    this.loadingPreview = false;
+                });
             } else if (this.isPreviewableText) {
                 this.showFullTextPreview = false;
                 this.loadingPreview = true;

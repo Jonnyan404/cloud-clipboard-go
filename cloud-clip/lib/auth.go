@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type RoomAuthRequirement struct {
@@ -127,10 +128,63 @@ func (s *ClipboardServer) tokenMatchesRoom(room string, token string) bool {
 
 	normalizedRoom := normalizeRoomName(room)
 	if roomPassword, ok := s.config.Server.RoomAuth[normalizedRoom]; ok && roomPassword != "" {
-		return token == roomPassword
+		if token == roomPassword {
+			return true
+		}
 	}
 
 	return false
+}
+
+// createDownloadTicket 为指定文件生成短期有效的下载 Ticket (默认60秒有效)
+func (s *ClipboardServer) createDownloadTicket(uuid string, room string) string {
+	s.ticketMutex.Lock()
+	defer s.ticketMutex.Unlock()
+
+	ticket := gen_UUID()
+	now := time.Now().Unix()
+
+	// 顺便清理过期的 ticket
+	for t, dt := range s.downloadTicketMap {
+		if dt.ExpireTime < now {
+			delete(s.downloadTicketMap, t)
+		}
+	}
+
+	s.downloadTicketMap[ticket] = DownloadTicket{
+		Ticket:     ticket,
+		UUID:       uuid,
+		Room:       normalizeRoomName(room),
+		ExpireTime: now + 60, // 60秒有效
+	}
+
+	return ticket
+}
+
+// validateAndConsumeTicket 验证 Ticket 是否有效且匹配目标文件 UUID，并在验证成功后一次性销毁 (Single-use)
+func (s *ClipboardServer) validateAndConsumeTicket(ticket string, targetUUID string) bool {
+	s.ticketMutex.Lock()
+	defer s.ticketMutex.Unlock()
+
+	dt, ok := s.downloadTicketMap[ticket]
+	if !ok {
+		return false
+	}
+
+	now := time.Now().Unix()
+	if dt.ExpireTime < now {
+		delete(s.downloadTicketMap, ticket)
+		return false
+	}
+
+	if dt.UUID != "" && targetUUID != "" && dt.UUID != targetUUID {
+		return false
+	}
+
+	// 消费凭证（一次性使用）
+	delete(s.downloadTicketMap, ticket)
+
+	return true
 }
 
 func (s *ClipboardServer) canAccessRoom(room string, token string) bool {

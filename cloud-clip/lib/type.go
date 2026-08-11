@@ -78,6 +78,17 @@ type ClipboardServer struct {
 	roomStats         map[string]*RoomStat `json:"-"` // 房间统计信息，不序列化
 	roomStatsMutex    sync.RWMutex         `json:"-"` // 房间统计读写锁
 	roomCleanupTicker *time.Ticker         `json:"-"` // 房间清理定时器
+
+	// 临时下载凭证 (Ticket)
+	downloadTicketMap map[string]DownloadTicket `json:"-"`
+	ticketMutex       sync.Mutex                `json:"-"`
+}
+
+type DownloadTicket struct {
+	Ticket     string
+	UUID       string
+	Room       string
+	ExpireTime int64
 }
 
 // file item in File[]

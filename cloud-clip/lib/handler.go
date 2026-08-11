@@ -235,6 +235,28 @@ func (s *ClipboardServer) handle_push(w http.ResponseWriter, r *http.Request) {
 	}()
 }
 
+func (s *ClipboardServer) handle_ticket(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "仅允许 POST 请求", http.StatusMethodNotAllowed)
+		return
+	}
+
+	pathPart := strings.TrimPrefix(r.URL.Path, s.config.Server.Prefix+"/ticket/")
+	uuid := strings.SplitN(pathPart, "/", 2)[0]
+	if uuid == "" {
+		http.Error(w, "无效的 UUID", http.StatusBadRequest)
+		return
+	}
+
+	room := s.inferRequestRoom(r)
+	ticket := s.createDownloadTicket(uuid, room)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"ticket": ticket,
+	})
+}
+
 func (s *ClipboardServer) handle_file(w http.ResponseWriter, r *http.Request) {
 	// 修改 UUID 提取逻辑
 	pathPart := strings.TrimPrefix(r.URL.Path, s.config.Server.Prefix+"/file/")

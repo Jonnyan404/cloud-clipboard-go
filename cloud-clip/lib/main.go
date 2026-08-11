@@ -134,8 +134,9 @@ func NewClipboardServer(cfg *Config) (*ClipboardServer, error) {
 		deviceHashSeed:  murmur3.Sum32(random_bytes(32)) & 0xffffffff, // 在此处初始化种子
 
 		// 初始化房间管理相关字段
-		roomStats:      make(map[string]*RoomStat),
-		roomStatsMutex: sync.RWMutex{},
+		roomStats:         make(map[string]*RoomStat),
+		roomStatsMutex:    sync.RWMutex{},
+		downloadTicketMap: make(map[string]DownloadTicket),
 	}
 
 	if err := s.loadHistoryData(); err != nil {
@@ -314,6 +315,7 @@ func (s *ClipboardServer) setupRoutes() {
 	mux.HandleFunc(prefix+"/server", s.handle_server)
 	mux.HandleFunc(prefix+"/push", s.handle_push)
 	mux.HandleFunc(prefix+"/rooms", s.handleRooms)
+	mux.HandleFunc(prefix+"/ticket/", s.authMiddleware(s.handle_ticket))
 	mux.HandleFunc(prefix+"/file/", s.authMiddleware(s.handle_file))
 	mux.HandleFunc(prefix+"/text", s.authMiddleware(s.handle_text))
 	mux.HandleFunc(prefix+"/upload", s.authMiddleware(s.handle_upload))
@@ -666,15 +668,26 @@ func (s *ClipboardServer) authMiddleware(next http.HandlerFunc) http.HandlerFunc
 			return
 		}
 
+		token := extractAuthToken(r)
+		clientIP := get_remote_ip(r)
+
+		// 优先校验临时下载 Ticket
+		filePrefix := s.config.Server.Prefix + "/file/"
+		if strings.HasPrefix(r.URL.Path, filePrefix) && token != "" {
+			pathPart := strings.TrimPrefix(r.URL.Path, filePrefix)
+			uuid := strings.SplitN(pathPart, "/", 2)[0]
+			if s.validateAndConsumeTicket(token, uuid) {
+				s.logger.Printf("Ticket 认证成功: IP: %s, 路径: %s, UUID: %s", clientIP, r.URL.Path, uuid)
+				next.ServeHTTP(w, r)
+				return
+			}
+		}
+
 		requirement := s.resolveRoomAuth(s.inferRequestRoom(r))
 		if !requirement.Required {
 			next.ServeHTTP(w, r)
 			return
 		}
-
-		token := extractAuthToken(r)
-
-		clientIP := get_remote_ip(r)
 
 		// 验证令牌
 		if token == "" {
