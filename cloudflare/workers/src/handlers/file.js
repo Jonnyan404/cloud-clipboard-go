@@ -1,6 +1,7 @@
 import { corsHeaders } from '../cors';
 import { buildSenderDevice, saveToD1, broadcastMessage, generateUUID } from '../utils';
 import { ensureRoomAccess, normalizeRoomName } from '../auth';
+import { ensureRoomOrShareAccess } from '../share';
 
 function decodeUploadFilename(value = '') {
   try {
@@ -504,7 +505,10 @@ export class FileHandler {
 
       const object = env.R2_BUCKET ? await env.R2_BUCKET.get(`files/${uuid}`) : null;
       const room = normalizeRoomName(object?.customMetadata?.room || 'default');
-      const authResult = ensureRoomAccess(request, env, room);
+      const authResult = await ensureRoomOrShareAccess(request, env, room, {
+        shareType: 'file',
+        shareId: uuid,
+      });
       if (!authResult.ok) {
         return authResult.response;
       }

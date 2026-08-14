@@ -314,6 +314,8 @@ func (s *ClipboardServer) setupRoutes() {
 	mux.HandleFunc(prefix+"/server", s.handle_server)
 	mux.HandleFunc(prefix+"/push", s.handle_push)
 	mux.HandleFunc(prefix+"/rooms", s.handleRooms)
+	// /share 在 handler 内按目标资源所在房间鉴权（支持 body 中的 file uuid）
+	mux.HandleFunc(prefix+"/share", s.handle_share)
 	mux.HandleFunc(prefix+"/file/", s.authMiddleware(s.handle_file))
 	mux.HandleFunc(prefix+"/text", s.authMiddleware(s.handle_text))
 	mux.HandleFunc(prefix+"/upload", s.authMiddleware(s.handle_upload))
@@ -666,38 +668,42 @@ func (s *ClipboardServer) authMiddleware(next http.HandlerFunc) http.HandlerFunc
 			return
 		}
 
-		requirement := s.resolveRoomAuth(s.inferRequestRoom(r))
+		room := s.inferRequestRoom(r)
+		requirement := s.resolveRoomAuth(room)
 		if !requirement.Required {
 			next.ServeHTTP(w, r)
 			return
 		}
 
 		token := extractAuthToken(r)
-
 		clientIP := get_remote_ip(r)
 
-		// 验证令牌
-		if token == "" {
+		// 1) 房间密码（Authorization / ?auth=）—— 保持现有 API 兼容
+		if token != "" && s.tokenMatchesRoom(room, token) {
+			s.logger.Printf("认证成功: IP: %s, 路径: %s, 房间: %s", clientIP, r.URL.Path, requirement.Room)
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// 2) 短期分享 token（?t=）—— 仅放行文件下载 GET，不影响上传/删除等写操作
+		if r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, s.config.Server.Prefix+"/file/") {
+			pathPart := strings.TrimPrefix(r.URL.Path, s.config.Server.Prefix+"/file/")
+			fileUUID := strings.SplitN(pathPart, "/", 2)[0]
+			if fileUUID != "" && s.validateShareToken(r, "file", fileUUID, room) {
+				s.logger.Printf("分享令牌认证成功: IP: %s, 路径: %s, 房间: %s", clientIP, r.URL.Path, requirement.Room)
+				next.ServeHTTP(w, r)
+				return
+			}
+		}
+
+		if token == "" && extractShareToken(r) == "" {
 			s.logger.Printf("认证失败: 未提供令牌。来自 IP: %s, 路径: %s, 房间: %s", clientIP, r.URL.Path, requirement.Room)
 			writeAuthJSONError(w, http.StatusUnauthorized, "需要认证令牌")
 			return
 		}
 
-		if requirement.Password == "" {
-			s.logger.Printf("认证失败: 服务器认证配置错误。来自 IP: %s", clientIP)
-			writeAuthJSONError(w, http.StatusInternalServerError, "服务器认证配置错误")
-			return
-		}
-
-		if token != requirement.Password {
-			s.logger.Printf("认证失败: 无效令牌。来自 IP: %s, 路径: %s, 房间: %s", clientIP, r.URL.Path, requirement.Room)
-			writeAuthJSONError(w, http.StatusUnauthorized, "无效的认证令牌")
-			return
-		}
-
-		// 认证成功
-		s.logger.Printf("认证成功: IP: %s, 路径: %s, 房间: %s", clientIP, r.URL.Path, requirement.Room)
-		next.ServeHTTP(w, r)
+		s.logger.Printf("认证失败: 无效令牌。来自 IP: %s, 路径: %s, 房间: %s", clientIP, r.URL.Path, requirement.Room)
+		writeAuthJSONError(w, http.StatusUnauthorized, "无效的认证令牌")
 	}
 }
 

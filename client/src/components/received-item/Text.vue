@@ -44,7 +44,7 @@
                             </v-tooltip>
                             <v-tooltip bottom>
                                 <template v-slot:activator="{ on }">
-                                    <v-btn v-on="on" icon color="grey" class="timeline-card__icon-button" @click="qrDialogVisible = true">
+                                    <v-btn v-on="on" icon color="grey" class="timeline-card__icon-button" @click="openQrDialog">
                                         <v-icon>{{ mdiQrcode }}</v-icon>
                                     </v-btn>
                                 </template>
@@ -64,7 +64,6 @@
                 <v-expand-transition>
                     <div v-show="expand">
                         <v-divider class="my-2"></v-divider>
-                        <!-- Use v-text or properly sanitize if using v-html -->
                         <div ref="content" style="white-space: pre-wrap; word-break: break-all;">{{ decodedContent }}</div>
                     </div>
                 </v-expand-transition>
@@ -75,8 +74,11 @@
                 <v-card>
                     <v-card-title class="headline justify-center">{{ $t('scanToAccess') }}</v-card-title>
                     <v-card-text class="text-center pa-4">
-                        <qrcode-vue :value="contentUrl" :size="200" level="H" />
-                        <div class="text-caption mt-2" style="word-break: break-all;">{{ contentUrl }}</div>
+                        <v-progress-circular v-if="shareUrlLoading" indeterminate color="primary" class="my-8"></v-progress-circular>
+                        <template v-else>
+                            <qrcode-vue :value="shareContentUrl || contentUrl" :size="200" level="H" />
+                            <div class="text-caption mt-2" style="word-break: break-all;">{{ shareContentUrl || contentUrl }}</div>
+                        </template>
                     </v-card-text>
                     <v-card-actions>
                         <v-spacer></v-spacer>
@@ -102,11 +104,10 @@ import {
     mdiCellphone,
     mdiIpNetworkOutline,
     mdiQrcode,
-    mdiPound, // 添加ID图标
+    mdiPound,
 } from '@mdi/js';
-import { formatTimestamp } from '@/util.js';
+import { formatTimestamp, buildCleanAbsoluteRouteUrl, createShareLink } from '@/util.js';
 
-// Helper function to decode HTML entities
 function decodeHtmlEntities(text) {
     const textArea = document.createElement('textarea');
     textArea.innerHTML = text;
@@ -128,6 +129,8 @@ export default {
         return {
             expand: false,
             qrDialogVisible: false,
+            shareUrlLoading: false,
+            shareContentUrl: '',
             mdiChevronUp,
             mdiChevronDown,
             mdiContentCopy,
@@ -138,57 +141,54 @@ export default {
             mdiCellphone,
             mdiIpNetworkOutline,
             mdiQrcode,
-            mdiPound, // 添加ID图标
+            mdiPound,
         };
     },
     computed: {
-        // Decode content for display, preventing potential XSS
         decodedContent() {
             return decodeHtmlEntities(this.meta.content || '');
         },
-        // Decode content for preview
         decodedContentPreview() {
-            // Limit preview length if needed
-            const decoded = decodeHtmlEntities(this.meta.content || '');
-            return decoded; // You might want to truncate this further
+            return decodeHtmlEntities(this.meta.content || '');
         },
         contentUrl() {
-            const roomQuery = this.$root.room ? `?room=${this.$root.room}` : '';
+            const roomQuery = this.$root.room ? `?room=${encodeURIComponent(this.$root.room)}` : '';
             const id = this.meta?.id ?? '';
-            return this.buildAbsoluteRouteUrl(`content/${id}${roomQuery}`);
-        }
+            return buildCleanAbsoluteRouteUrl(this, `content/${id}${roomQuery}`);
+        },
     },
     methods: {
-        formatTimestamp, // Make formatter available
-        buildAbsoluteRouteUrl(path) {
-            const normalizedPath = String(path || '').replace(/^\/+/, '');
-            const baseURL = this.$http?.defaults?.baseURL || '';
-            const currentRoom = this.$root.room || '';
-            const authToken = typeof this.$root.getAuthTokenForRoom === 'function'
-                ? this.$root.getAuthTokenForRoom(currentRoom)
-                : '';
-
-            if (baseURL) {
-                const url = new URL(normalizedPath, `${baseURL.replace(/\/+$/, '')}/`);
-                if (authToken) {
-                    url.searchParams.set('auth', authToken);
-                }
-                return url.toString();
+        formatTimestamp,
+        async ensureContentShareUrl() {
+            if (this.shareContentUrl) {
+                return this.shareContentUrl;
             }
-
-            const prefix = this.$root.config?.server?.prefix || '';
-            const url = new URL(`${prefix}/${normalizedPath}`, `${window.location.origin}/`);
-            if (authToken) {
-                url.searchParams.set('auth', authToken);
+            const data = await createShareLink(this, {
+                type: 'content',
+                id: this.meta?.id,
+            });
+            this.shareContentUrl = data?.url || '';
+            return this.shareContentUrl;
+        },
+        async openQrDialog() {
+            this.qrDialogVisible = true;
+            this.shareUrlLoading = true;
+            try {
+                await this.ensureContentShareUrl();
+            } catch (error) {
+                console.error('生成分享链接失败:', error);
+                this.$toast(this.$t('copyFailedGeneral'));
+                this.shareContentUrl = this.contentUrl;
+            } finally {
+                this.shareUrlLoading = false;
             }
-            return url.toString();
         },
         deviceIcon(type) {
-            const lowerType = type.toLowerCase();
+            const lowerType = (type || '').toLowerCase();
             if (lowerType.includes('mobile') || lowerType.includes('phone') || lowerType.includes('tablet') || lowerType.includes('ios') || lowerType.includes('android')) {
                 return mdiCellphone;
             }
-            return mdiDesktopTower; // Default to desktop
+            return mdiDesktopTower;
         },
         copyToClipboard(textToCopy, successMessageKey = 'copySuccess', errorMessageKey = 'copyFailedGeneral') {
             if (navigator.clipboard && window.isSecureContext) {
@@ -200,10 +200,10 @@ export default {
                     });
             } else {
                 try {
-                    const textArea = document.createElement("textarea");
+                    const textArea = document.createElement('textarea');
                     textArea.value = textToCopy;
-                    textArea.style.position = "absolute";
-                    textArea.style.left = "-9999px";
+                    textArea.style.position = 'absolute';
+                    textArea.style.left = '-9999px';
                     document.body.appendChild(textArea);
                     textArea.select();
                     const successful = document.execCommand('copy');
@@ -223,8 +223,14 @@ export default {
         copyText() {
             this.copyToClipboard(this.decodedContent, 'copySuccess');
         },
-        copyLink() {
-            this.copyToClipboard(this.contentUrl, 'copySuccess');
+        async copyLink() {
+            try {
+                const url = await this.ensureContentShareUrl();
+                this.copyToClipboard(url, 'copySuccess');
+            } catch (error) {
+                console.error('复制分享链接失败:', error);
+                this.$toast(this.$t('copyFailedGeneral'));
+            }
         },
         deleteItem() {
             this.$http.delete(`revoke/${this.meta.id}`, {
@@ -240,7 +246,7 @@ export default {
             });
         },
     },
-}
+};
 </script>
 
 <style scoped>

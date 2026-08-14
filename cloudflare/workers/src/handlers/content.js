@@ -1,6 +1,7 @@
 import { corsHeaders } from '../cors';
 import { broadcastMessage, buildSenderDevice } from '../utils';
 import { ensureRoomAccess, normalizeRoomName } from '../auth';
+import { ensureRoomOrShareAccess } from '../share';
 
 function normalizeExpire(expireTime) {
   const numericExpire = Number(expireTime || 0);
@@ -209,13 +210,10 @@ export class ContentHandler {
     try {
       const { id } = request.params;
       const url = new URL(request.url);
+      const hasRequestedRoom = url.searchParams.has('room');
       const room = normalizeRoomName(url.searchParams.get('room'));
       const isJSON = prefersJSON(request, url);
       const forceDownload = url.searchParams.get('download') === 'true';
-      const authResult = ensureRoomAccess(request, env, room);
-      if (!authResult.ok) {
-        return authResult.response;
-      }
 
       console.log(`获取内容: ID ${id}, room: ${room}, isJSON: ${isJSON}`);
 
@@ -232,14 +230,18 @@ export class ContentHandler {
         });
       }
 
-      // 从 D1 获取消息
-      const query = 'SELECT * FROM messages WHERE id = ? AND room = ?';
-      const params = [parseInt(id), room];
+      // 先取内容，再按内容所在房间做「密码 OR 分享 token」鉴权
+      let result;
+      if (hasRequestedRoom) {
+        result = await env.DB.prepare('SELECT * FROM messages WHERE id = ? AND room = ?')
+          .bind(parseInt(id, 10), room)
+          .first();
+      } else {
+        result = await env.DB.prepare('SELECT * FROM messages WHERE id = ? ORDER BY id DESC LIMIT 1')
+          .bind(parseInt(id, 10))
+          .first();
+      }
 
-      console.log(`查询 SQL: ${query}, 参数:`, params);
-
-      const result = await env.DB.prepare(query).bind(...params).first();
-      
       console.log(`查询结果:`, result);
       
       if (!result) {
@@ -253,6 +255,15 @@ export class ContentHandler {
             ...corsHeaders
           }
         });
+      }
+
+      const contentRoom = normalizeRoomName(result.room || 'default');
+      const authResult = await ensureRoomOrShareAccess(request, env, contentRoom, {
+        shareType: 'content',
+        shareId: String(result.id),
+      });
+      if (!authResult.ok) {
+        return authResult.response;
       }
 
       if (result.type === 'text') {

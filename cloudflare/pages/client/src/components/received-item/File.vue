@@ -15,6 +15,7 @@
                     </template>
                 </div>
 
+                <!-- Row for Thumbnail, Title, Size/Expire, Buttons -->
                 <div class="d-flex flex-row align-center">
                     <v-img
                         v-if="meta.thumbnail && (!isPreviewableVideo && !isPreviewableAudio)"
@@ -24,12 +25,14 @@
                         height="2.5rem"
                         style="border-radius: 3px"
                     ></v-img>
+                        <!-- 为音频文件添加专门的图标 -->
                     <v-icon
                         v-else-if="isPreviewableAudio"
                         class="mr-3 flex-grow-0 hidden-sm-and-down"
                         size="2.5rem"
                         color="grey"
                     >{{ mdiMusicNote }}</v-icon>
+                    <!-- 为视频文件添加专门的图标 -->
                     <v-icon
                         v-else-if="isPreviewableVideo"
                         class="mr-3 flex-grow-0 hidden-sm-and-down"
@@ -62,9 +65,9 @@
                                         icon
                                         color="grey"
                                         class="timeline-card__icon-button"
-                                        :href="expired ? null : fileUrl"
-                                        :download="expired ? null : meta.name"
-                                        :disabled="expired"
+                                        :loading="downloading"
+                                        :disabled="expired || downloading"
+                                        @click="downloadFile"
                                     >
                                         <v-icon>{{ expired ? mdiDownloadOff : mdiDownload }}</v-icon>
                                     </v-btn>
@@ -72,7 +75,7 @@
                                 <span>{{ expired ? $t('expired') : $t('download') }}</span>
                             </v-tooltip>
 
-                            <template v-if="meta.thumbnail || isPreviewableImage || isPreviewableVideo || isPreviewableAudio || isPreviewableText">
+                            <template v-if="meta.thumbnail || isPreviewableVideo || isPreviewableAudio || isPreviewableText">
                                 <v-progress-circular
                                     v-if="loadingPreview"
                                     indeterminate
@@ -81,7 +84,7 @@
                                 <v-tooltip bottom>
                                     <template v-slot:activator="{ on }">
                                         <v-btn v-on="on" icon color="grey" class="timeline-card__icon-button" @click="!expired && previewFile()">
-                                            <v-icon>{{ previewIcon }}</v-icon>
+                                                    <v-icon>{{ previewIcon }}</v-icon>
                                         </v-btn>
                                     </template>
                                     <span>{{ $t('preview') }}</span>
@@ -99,7 +102,7 @@
 
                             <v-tooltip bottom>
                                 <template v-slot:activator="{ on }">
-                                    <v-btn v-on="on" icon color="grey" class="timeline-card__icon-button" @click="qrDialogVisible = true">
+                                    <v-btn v-on="on" icon color="grey" class="timeline-card__icon-button" @click="openQrDialog">
                                         <v-icon>{{ mdiQrcode }}</v-icon>
                                     </v-btn>
                                 </template>
@@ -117,7 +120,7 @@
                         </div>
                     </div>
                 </div>
-                <v-expand-transition v-if="meta.thumbnail || isPreviewableImage || isPreviewableVideo || isPreviewableAudio || isPreviewableText">
+                <v-expand-transition v-if="meta.thumbnail || isPreviewableVideo || isPreviewableAudio || isPreviewableText">
                     <div v-show="expand">
                         <v-divider class="my-2"></v-divider>
                         <video
@@ -136,18 +139,17 @@
                             controls
                             preload="metadata"
                         ></audio>
-                        <pre
-                            v-else-if="isPreviewableText"
-                            class="timeline-card__text-preview pa-4"
-                        >{{ displayedTextPreview }}</pre>
-                        <div v-if="isPreviewableText && hasTruncatedTextPreview" class="d-flex justify-space-between align-center mt-2">
-                            <div class="caption text--secondary">
-                                {{ $t('textPreviewTruncated', { limit: prettyFileSize(textPreviewDisplayLimit) }) }}
+                        <template v-else-if="isPreviewableText">
+                            <pre class="timeline-card__text-preview pa-4">{{ displayedTextPreview }}</pre>
+                            <div v-if="hasTruncatedTextPreview" class="d-flex justify-space-between align-center mt-2">
+                                <div class="caption text--secondary">
+                                    {{ $t('textPreviewTruncated', { limit: prettyFileSize(textPreviewDisplayLimit) }) }}
+                                </div>
+                                <v-btn small text color="primary" @click="toggleTextPreview">
+                                    {{ showFullTextPreview ? $t('collapseTextPreview') : $t('expandTextPreview') }}
+                                </v-btn>
                             </div>
-                            <v-btn small text color="primary" @click="toggleTextPreview">
-                                {{ showFullTextPreview ? $t('collapseTextPreview') : $t('expandTextPreview') }}
-                            </v-btn>
-                        </div>
+                        </template>
                         <img
                             v-else
                             :src="srcPreview"
@@ -158,12 +160,16 @@
                 </v-expand-transition>
             </v-card-text>
 
+            <!-- QR Code Dialog -->
             <v-dialog v-model="qrDialogVisible" max-width="250">
                 <v-card>
                     <v-card-title class="headline justify-center">{{ $t('scanToAccess') }}</v-card-title>
                     <v-card-text class="text-center pa-4">
-                        <qrcode-vue :value="contentUrl" :size="200" level="H" />
-                        <div class="text-caption mt-2" style="word-break: break-all;">{{ contentUrl }}</div>
+                        <v-progress-circular v-if="shareUrlLoading" indeterminate color="primary" class="my-8"></v-progress-circular>
+                        <template v-else>
+                            <qrcode-vue :value="shareContentUrl || contentUrl" :size="200" level="H" />
+                            <div class="text-caption mt-2" style="word-break: break-all;">{{ shareContentUrl || contentUrl }}</div>
+                        </template>
                     </v-card-text>
                     <v-card-actions>
                         <v-spacer></v-spacer>
@@ -179,6 +185,8 @@
 <script>
 import QrcodeVue from 'qrcode.vue';
 import {
+    buildCleanAbsoluteRouteUrl,
+    createShareLink,
     prettyFileSize,
     percentage,
     formatTimestamp,
@@ -223,6 +231,10 @@ export default {
             textPreview: '',
             showFullTextPreview: false,
             qrDialogVisible: false,
+            shareUrlLoading: false,
+            shareContentUrl: '',
+            shareFileUrl: '',
+            downloading: false,
             mdiContentCopy,
             mdiDownload,
             mdiDownloadOff,
@@ -247,9 +259,6 @@ export default {
         },
         isPreviewableVideo() {
             return this.meta.name.match(/\.(mp4|webm|ogv)$/gi);
-        },
-        isPreviewableImage() {
-            return this.meta.name.match(/\.(jpg|jpeg|png|gif|webp|svg|bmp|ico|avif)$/gi);
         },
         isPreviewableAudio() {
             return this.meta.name.match(/\.(mp3|wav|ogg|opus|m4a|flac)$/gi);
@@ -276,59 +285,103 @@ export default {
             return mdiImageSearchOutline;
         },
         contentUrl() {
-            const roomQuery = this.$root.room ? `?room=${this.$root.room}` : '';
+            const roomQuery = this.$root.room ? `?room=${encodeURIComponent(this.$root.room)}` : '';
             const id = this.meta?.id ?? '';
-            return this.buildAbsoluteRouteUrl(`content/${id}${roomQuery}`);
+            return buildCleanAbsoluteRouteUrl(this, `content/${id}${roomQuery}`);
         },
         fileUrl() {
             const cache = this.meta?.cache || '';
             const encodedFilename = encodeURIComponent(this.meta?.name || 'file');
-            return this.buildAbsoluteRouteUrl(`file/${cache}/${encodedFilename}`);
-        }
+            return buildCleanAbsoluteRouteUrl(this, `file/${cache}/${encodedFilename}`);
+        },
     },
     methods: {
         formatTimestamp,
-        buildAbsoluteRouteUrl(path) {
-            const normalizedPath = String(path || '').replace(/^\/+/, '');
-            const baseURL = this.$http?.defaults?.baseURL || '';
-            const currentRoom = this.$root.room || '';
-            const authToken = typeof this.$root.getAuthTokenForRoom === 'function'
-                ? this.$root.getAuthTokenForRoom(currentRoom)
-                : '';
-
-            if (baseURL) {
-                const url = new URL(normalizedPath, `${baseURL.replace(/\/+$/, '')}/`);
-                if (authToken) {
-                    url.searchParams.set('auth', authToken);
-                }
-                return url.toString();
-            }
-
-            const prefix = this.$root.config?.server?.prefix || '';
-            const url = new URL(`${prefix}/${normalizedPath}`, `${window.location.origin}/`);
-            if (authToken) {
-                url.searchParams.set('auth', authToken);
-            }
-            return url.toString();
+        prettyFileSize,
+        async requestShareLink(payload) {
+            const data = await createShareLink(this, payload);
+            return data?.url || '';
         },
-        previewFile() {
+        async ensureContentShareUrl() {
+            if (this.shareContentUrl) {
+                return this.shareContentUrl;
+            }
+            const url = await this.requestShareLink({
+                type: 'content',
+                id: this.meta?.id,
+            });
+            this.shareContentUrl = url;
+            return url;
+        },
+        async ensureFileShareUrl() {
+            if (this.shareFileUrl) {
+                return this.shareFileUrl;
+            }
+            const url = await this.requestShareLink({
+                type: 'file',
+                uuid: this.meta?.cache,
+            });
+            this.shareFileUrl = url;
+            return url;
+        },
+        async openQrDialog() {
+            this.qrDialogVisible = true;
+            this.shareUrlLoading = true;
+            try {
+                await this.ensureContentShareUrl();
+            } catch (error) {
+                console.error('生成分享链接失败:', error);
+                this.$toast(this.$t('copyFailedGeneral'));
+                this.shareContentUrl = this.contentUrl;
+            } finally {
+                this.shareUrlLoading = false;
+            }
+        },
+        async downloadFile() {
+            if (this.expired || this.downloading) {
+                return;
+            }
+            this.downloading = true;
+            try {
+                const url = await this.ensureFileShareUrl();
+                const anchor = document.createElement('a');
+                anchor.href = url;
+                anchor.download = this.meta?.name || 'file';
+                anchor.rel = 'noopener';
+                document.body.appendChild(anchor);
+                anchor.click();
+                document.body.removeChild(anchor);
+            } catch (error) {
+                console.error('下载失败:', error);
+                this.$toast(this.$t('fileFetchFailed'));
+            } finally {
+                this.downloading = false;
+            }
+        },
+        async previewFile() {
             if (this.expand) {
                 this.expand = false;
                 return;
-            } else if (this.srcPreview || this.textPreview) {
+            }
+            if (this.srcPreview || this.textPreview) {
                 this.expand = true;
                 return;
             }
             this.expand = true;
             if (this.isPreviewableVideo || this.isPreviewableAudio) {
-                this.srcPreview = this.fileUrl;
+                try {
+                    this.srcPreview = await this.ensureFileShareUrl();
+                } catch (error) {
+                    console.error('生成预览链接失败:', error);
+                    this.$toast(this.$t('fileFetchFailed'));
+                }
             } else if (this.isPreviewableText) {
                 this.showFullTextPreview = false;
                 this.loadingPreview = true;
                 this.loadedPreview = 0;
                 this.$http.get(`file/${this.meta.cache}/${encodeURIComponent(this.meta.name)}`, {
                     responseType: 'text',
-                    onDownloadProgress: e => {this.loadedPreview = e.loaded},
+                    onDownloadProgress: e => { this.loadedPreview = e.loaded; },
                 }).then(response => {
                     this.textPreview = typeof response.data === 'string' ? response.data : String(response.data || '');
                 }).catch(error => {
@@ -345,7 +398,7 @@ export default {
                 this.loadedPreview = 0;
                 this.$http.get(`file/${this.meta.cache}/${encodeURIComponent(this.meta.name)}`, {
                     responseType: 'arraybuffer',
-                    onDownloadProgress: e => {this.loadedPreview = e.loaded},
+                    onDownloadProgress: e => { this.loadedPreview = e.loaded; },
                 }).then(response => {
                     this.srcPreview = URL.createObjectURL(new Blob([response.data]));
                 }).catch(error => {
@@ -362,8 +415,14 @@ export default {
         toggleTextPreview() {
             this.showFullTextPreview = !this.showFullTextPreview;
         },
-        copyLink() {
-            this.copyToClipboard(this.contentUrl, 'copySuccess');
+        async copyLink() {
+            try {
+                const url = await this.ensureContentShareUrl();
+                this.copyToClipboard(url, 'copySuccess');
+            } catch (error) {
+                console.error('复制分享链接失败:', error);
+                this.$toast(this.$t('copyFailedGeneral'));
+            }
         },
         copyToClipboard(textToCopy, successMessageKey = 'copySuccess', errorMessageKey = 'copyFailedGeneral') {
             if (navigator.clipboard && window.isSecureContext) {
@@ -375,15 +434,14 @@ export default {
                     });
             } else {
                 try {
-                    const textArea = document.createElement("textarea");
+                    const textArea = document.createElement('textarea');
                     textArea.value = textToCopy;
-                    textArea.style.position = "absolute";
-                    textArea.style.left = "-9999px";
+                    textArea.style.position = 'absolute';
+                    textArea.style.left = '-9999px';
                     document.body.appendChild(textArea);
                     textArea.select();
                     const successful = document.execCommand('copy');
                     document.body.removeChild(textArea);
-
                     if (successful) {
                         this.$toast(this.$t(successMessageKey));
                     } else {
@@ -404,7 +462,7 @@ export default {
                     this.$http.delete(`file/${this.meta.cache}`).then(() => {
                         this.$toast(this.$t('deleteSuccessFile', { name: this.meta.name }));
                     }).catch(error => {
-                        console.error("删除物理文件失败:", error);
+                        console.error('删除物理文件失败:', error);
                         if (error.response && error.response.data.msg) {
                             this.$toast(this.$t('deleteFailedFileMsg', { msg: error.response.data.msg }));
                         } else {
@@ -412,7 +470,7 @@ export default {
                         }
                     });
                 } else {
-                     this.$toast(this.$t('deleteSuccessFile', { name: this.meta.name }));
+                    this.$toast(this.$t('deleteSuccessFile', { name: this.meta.name }));
                 }
             }).catch(error => {
                 if (error.response && error.response.data.msg) {
@@ -430,7 +488,7 @@ export default {
             return mdiDesktopTower;
         },
     },
-}
+};
 </script>
 
 <style scoped>
@@ -503,7 +561,7 @@ export default {
 }
 
 .timeline-card--dark .timeline-card__text-preview {
-    background: rgba(30, 41, 59, 0.92);
-    color: rgba(226, 232, 240, 0.94);
+    background: rgba(30, 41, 59, 0.88);
+    color: rgba(226, 232, 240, 0.92);
 }
 </style>

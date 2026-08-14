@@ -43,9 +43,24 @@ func printHelp() {
 
 }
 
+func isGoTestProcess() bool {
+	// go test 会注入 -test.* 参数；此时不应抢跑 flag.Parse，否则测试无法运行
+	for _, arg := range os.Args[1:] {
+		if strings.HasPrefix(arg, "-test.") {
+			return true
+		}
+	}
+	return false
+}
+
 func init() {
 	// 自定义帮助信息
 	flag.Usage = printHelp
+
+	// 测试进程跳过命令行解析，避免与 testing 框架冲突
+	if isGoTestProcess() {
+		return
+	}
 
 	// 解析命令行参数
 	flag.Parse()

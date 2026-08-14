@@ -6,6 +6,7 @@ import { FileHandler } from './handlers/file';
 import { ContentHandler } from './handlers/content';
 import { RoomsHandler } from './handlers/rooms';
 import { WebSocketHandler } from './handlers/websocket';
+import { ShareHandler } from './share';
 
 // 导入 Durable Objects
 export { WebSocketRoom } from './durable-objects/websocket-room';
@@ -23,6 +24,7 @@ router.options('*', handleCors);
 router.get('/api/server', handleServer);
 router.get('/api/rooms', RoomsHandler.list);
 router.post('/api/text', TextHandler.create);
+router.post('/api/share', ShareHandler.create);
 router.get('/api/content/latest', ContentHandler.getLatest);
 router.get('/api/content/latest.json', ContentHandler.getLatest);
 router.get('/api/content/:id', ContentHandler.getById);
