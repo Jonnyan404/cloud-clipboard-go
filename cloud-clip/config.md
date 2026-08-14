@@ -133,3 +133,38 @@ foobar
 $ curl  http://localhost:9501/content/1?auth=xxx
 foobar
 ```
+
+> 推荐 API / 脚本使用 `Authorization: Bearer`。`?auth=` 仅为兼容保留，不建议把房间密码写进可分享 URL。
+
+#### 短期分享链接（方案 A）
+
+用于浏览器复制链接 / 二维码 / `<a href>` 下载，**不暴露房间密码**。  
+现有 API 下载方式不变：继续可用房间密码（Header 或 `?auth=`）。
+
+```console
+# 需要已拥有房间访问权限（Authorization）
+$ curl -H "Authorization: Bearer xxxx" \
+  -H "Content-Type: application/json" \
+  -d '{"type":"content","id":"7"}' \
+  http://localhost:9501/share
+{"type":"content","id":"7","room":"default","ttl":900,"expiresAt":1710000000,"token":"...","url":"http://localhost:9501/content/7?t=..."}
+
+$ curl -H "Authorization: Bearer xxxx" \
+  -H "Content-Type: application/json" \
+  -d '{"type":"file","uuid":"530a16de-07cb-4835-ba26-64f5e8e1f300","ttl":600}' \
+  http://localhost:9501/share
+{"type":"file","uuid":"530a16de-...","room":"default","ttl":600,"expiresAt":1710000000,"token":"...","url":"http://localhost:9501/file/530a16de-.../image.png?t=..."}
+
+# 使用短期 token 访问（无需房间密码）
+$ curl "http://localhost:9501/content/7?t=..."
+$ curl -L "http://localhost:9501/file/530a16de-.../image.png?t=..." -o image.png
+
+# 旧 API 仍然有效
+$ curl -H "Authorization: Bearer xxxx" \
+  "http://localhost:9501/file/530a16de-.../image.png" -o image.png
+```
+
+说明：
+- `ttl` 可选，默认 900 秒（15 分钟），范围 60～86400
+- 未启用房间密码时，返回的 `url` 不含 `t`
+- 短期 token 仅授予对应 content/file 的读取权限，不能用于上传/删除

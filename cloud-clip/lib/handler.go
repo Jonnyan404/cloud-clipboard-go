@@ -894,7 +894,6 @@ func (s *ClipboardServer) handleContent(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "无效的内容 ID", http.StatusBadRequest)
 		return
 	}
-	token := extractAuthToken(r)
 	_, hasRequestedRoom := r.URL.Query()["room"]
 	requestedRoom := normalizeRoomName(r.URL.Query().Get("room"))
 	s.logger.Printf("处理内容请求, ID: %d, 房间参数存在: %t, JSON请求: %t", id, hasRequestedRoom, isJSONRequest)
@@ -911,7 +910,8 @@ func (s *ClipboardServer) handleContent(w http.ResponseWriter, r *http.Request) 
 			if hasRequestedRoom && messageRoom != requestedRoom {
 				continue
 			}
-			if !s.canAccessRoom(messageRoom, token) {
+			// 房间密码 或 针对该 content 的短期分享 token
+			if !s.canAccessContent(r, messageRoom, id) {
 				unauthorized = true
 				continue
 			}
@@ -997,8 +997,8 @@ func (s *ClipboardServer) handleContent(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
-	// 内容未找到时的响应格式也遵循JSON请求参数
-	if unauthorized && hasRequestedRoom {
+	// 鉴权失败优先于“未找到”，避免把缺密码/过期分享 token 误报成内容不存在
+	if unauthorized {
 		writeAuthJSONError(w, http.StatusUnauthorized, "无权访问该房间")
 		return
 	}
@@ -1045,6 +1045,7 @@ func (s *ClipboardServer) handleLatestContent(w http.ResponseWriter, r *http.Req
 	}
 
 	// 从后向前查找匹配房间的最新消息
+	// latest 不支持分享 token（无稳定资源 id），仅房间密码
 	unauthorized := false
 	for i := len(s.messageQueue.List) - 1; i >= 0; i-- {
 		msg := s.messageQueue.List[i]
@@ -1171,7 +1172,7 @@ func (s *ClipboardServer) handleLatestContent(w http.ResponseWriter, r *http.Req
 		}
 	}
 
-	if unauthorized && hasRequestedRoom {
+	if unauthorized {
 		writeAuthJSONError(w, http.StatusUnauthorized, "无权访问该房间")
 		return
 	}

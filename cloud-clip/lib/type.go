@@ -73,6 +73,7 @@ type ClipboardServer struct {
 	runMutex        sync.Mutex
 	parser          *uaparser.Parser // UA解析器实例
 	deviceHashSeed  uint32           // 将 deviceHashSeed 添加到服务器实例
+	shareSigningKey []byte           // 短期分享链接签名密钥
 
 	// 添加房间管理相关字段
 	roomStats         map[string]*RoomStat `json:"-"` // 房间统计信息，不序列化

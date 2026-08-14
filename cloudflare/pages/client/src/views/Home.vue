@@ -56,8 +56,12 @@
             <v-card>
                 <v-card-title class="headline justify-center">{{ $t('scanToAccess') }}</v-card-title>
                 <v-card-text class="text-center pa-4">
-                    <qrcode-vue :value="currentPageUrl" :size="200" level="H" />
-                    <div class="text-caption mt-2" style="word-break: break-all;">{{ currentPageUrl }}</div>
+                    <v-btn-toggle v-model="pageQrMode" mandatory dense class="mb-3">
+                        <v-btn small value="page">{{ $t('currentShare') }}</v-btn>
+                        <v-btn small value="latest">{{ $t('latestShare') }}</v-btn>
+                    </v-btn-toggle>
+                    <qrcode-vue :value="pageQrUrl" :size="200" level="H" />
+                    <div class="text-caption mt-2" style="word-break: break-all;">{{ pageQrUrl }}</div>
                 </v-card-text>
                 <v-card-actions>
                     <v-spacer></v-spacer>
@@ -91,6 +95,7 @@ export default {
     data() {
         return {
             pageQrDialogVisible: false,
+            pageQrMode: 'page',
             mdiLanConnect,
             mdiLanPending,
             mdiLanDisconnect,
@@ -107,10 +112,44 @@ export default {
             return `${current}/${limit}`;
         },
         currentPageUrl() {
-            return window.location.href;
+            const currentRoom = this.$root.room || '';
+            // 页面二维码只带 room，不暴露房间密码；扫码后由前端鉴权弹窗处理
+            const query = {};
+
+            if (currentRoom) {
+                query.room = currentRoom;
+            }
+
+            const resolved = this.$router.resolve({
+                path: '/',
+                query,
+            });
+            const url = new URL(window.location.pathname, window.location.origin);
+            url.hash = resolved.href.startsWith('#') ? resolved.href : `#${resolved.href}`;
+            return url.toString();
+        },
+        latestContentUrl() {
+            const currentRoom = this.$root.room || '';
+            const roomQuery = currentRoom ? `?room=${encodeURIComponent(currentRoom)}` : '';
+            return this.buildAbsoluteRouteUrl(`content/latest${roomQuery}`);
+        },
+        pageQrUrl() {
+            return this.pageQrMode === 'latest' ? this.latestContentUrl : this.currentPageUrl;
         },
     },
     methods: {
+        buildAbsoluteRouteUrl(path) {
+            const normalizedPath = String(path || '').replace(/^\/+/, '');
+            const baseURL = this.$http?.defaults?.baseURL || '';
+
+            // 不在 URL 中附带房间密码
+            if (baseURL) {
+                return new URL(normalizedPath, `${baseURL.replace(/\/+$/, '')}/`).toString();
+            }
+
+            const prefix = this.$root.config?.server?.prefix || '';
+            return new URL(`${prefix}/${normalizedPath}`, `${window.location.origin}/`).toString();
+        },
         focusComposer(type) {
             this.$nextTick(() => {
                 if (this.$refs.composer && typeof this.$refs.composer.focus === 'function') {

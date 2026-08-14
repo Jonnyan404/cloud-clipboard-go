@@ -113,17 +113,11 @@ export default {
         },
         currentPageUrl() {
             const currentRoom = this.$root.room || '';
-            const authToken = typeof this.$root.getAuthTokenForRoom === 'function'
-                ? this.$root.getAuthTokenForRoom(currentRoom)
-                : '';
+            // 页面二维码只带 room，不暴露房间密码；扫码后由前端鉴权弹窗处理
             const query = {};
 
             if (currentRoom) {
                 query.room = currentRoom;
-            }
-
-            if (authToken) {
-                query.auth = authToken;
             }
 
             const resolved = this.$router.resolve({
@@ -136,7 +130,7 @@ export default {
         },
         latestContentUrl() {
             const currentRoom = this.$root.room || '';
-            const roomQuery = currentRoom ? `?room=${currentRoom}` : '';
+            const roomQuery = currentRoom ? `?room=${encodeURIComponent(currentRoom)}` : '';
             return this.buildAbsoluteRouteUrl(`content/latest${roomQuery}`);
         },
         pageQrUrl() {
@@ -147,25 +141,14 @@ export default {
         buildAbsoluteRouteUrl(path) {
             const normalizedPath = String(path || '').replace(/^\/+/, '');
             const baseURL = this.$http?.defaults?.baseURL || '';
-            const currentRoom = this.$root.room || '';
-            const authToken = typeof this.$root.getAuthTokenForRoom === 'function'
-                ? this.$root.getAuthTokenForRoom(currentRoom)
-                : '';
 
+            // 不在 URL 中附带房间密码
             if (baseURL) {
-                const url = new URL(normalizedPath, `${baseURL.replace(/\/+$/, '')}/`);
-                if (authToken) {
-                    url.searchParams.set('auth', authToken);
-                }
-                return url.toString();
+                return new URL(normalizedPath, `${baseURL.replace(/\/+$/, '')}/`).toString();
             }
 
             const prefix = this.$root.config?.server?.prefix || '';
-            const url = new URL(`${prefix}/${normalizedPath}`, `${window.location.origin}/`);
-            if (authToken) {
-                url.searchParams.set('auth', authToken);
-            }
-            return url.toString();
+            return new URL(`${prefix}/${normalizedPath}`, `${window.location.origin}/`).toString();
         },
         focusComposer(type) {
             this.$nextTick(() => {
