@@ -125,5 +125,20 @@
     "otherRoomsLabel": "その他のルーム",
     "hideRoomBrowser": "ルームサイドバーを隠す",
     "dockLeft": "左側に固定",
-    "dockRight": "右側に固定"
-  }
+    "dockRight": "右側に固定",
+    "shareLinkSettings": "共有リンク設定",
+    "shareLinkSettingsHint": "スライダーで有効期限を設定し、アクセス回数も制限できます（0 は無制限）。",
+    "shareExpireIn": "リンク有効期限",
+    "shareMaxUses": "最大アクセス回数",
+    "shareMaxUsesHint": "0 は無制限。動画の Range 続き読みは回数に含みません。",
+    "generateAndCopy": "生成してコピー",
+    "generateQrCode": "QR コードを生成",
+    "shareUsesUnlimited": "回数無制限",
+    "shareUsesLimited": "最大 {count} 回",
+    "shareMetaSummary": "有効期限 {expiresAtText} · {usesText}",
+    "shareTtlMinLabel": "1 分",
+    "shareTtlMaxLabel": "24 時間",
+    "shareDurationMinutes": "{minutes} 分",
+    "shareDurationHours": "{hours} 時間",
+    "shareDurationHoursMinutes": "{hours} 時間 {minutes} 分"
+}

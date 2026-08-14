@@ -31,3 +31,14 @@ CREATE TABLE IF NOT EXISTS room_presence (
 
 CREATE INDEX IF NOT EXISTS idx_room_presence_room ON room_presence(room);
 CREATE INDEX IF NOT EXISTS idx_room_presence_updated_at ON room_presence(updatedAt);
+
+-- 分享链接使用次数（maxUses）
+CREATE TABLE IF NOT EXISTS share_token_usage (
+  jti TEXT PRIMARY KEY,
+  used INTEGER NOT NULL DEFAULT 0,
+  maxUses INTEGER NOT NULL,
+  exp INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_share_token_usage_exp ON share_token_usage(exp);
+

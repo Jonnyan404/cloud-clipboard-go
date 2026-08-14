@@ -74,6 +74,8 @@ type ClipboardServer struct {
 	parser          *uaparser.Parser // UA解析器实例
 	deviceHashSeed  uint32           // 将 deviceHashSeed 添加到服务器实例
 	shareSigningKey []byte           // 短期分享链接签名密钥
+	shareTokenUsage map[string]*shareUsageEntry // jti -> 使用计数（进程内）
+	shareUsageMutex sync.Mutex
 
 	// 添加房间管理相关字段
 	roomStats         map[string]*RoomStat `json:"-"` // 房间统计信息，不序列化
