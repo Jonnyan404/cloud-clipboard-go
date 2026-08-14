@@ -60,6 +60,62 @@ func TestShareTokenExpired(t *testing.T) {
 	}
 }
 
+func TestShareTokenMaxUses(t *testing.T) {
+	s := &ClipboardServer{
+		config: &Config{},
+	}
+	s.config.Server.Auth = "secret-pass"
+
+	token, _, err := s.issueShareToken("content", "7", "default", 600, 2)
+	if err != nil {
+		t.Fatalf("issue failed: %v", err)
+	}
+
+	req1 := httptest.NewRequest(http.MethodGet, "/content/7?t="+token, nil)
+	if !s.validateShareToken(req1, "content", "7", "default") {
+		t.Fatal("first use should succeed")
+	}
+	req2 := httptest.NewRequest(http.MethodGet, "/content/7?t="+token, nil)
+	if !s.validateShareToken(req2, "content", "7", "default") {
+		t.Fatal("second use should succeed")
+	}
+	req3 := httptest.NewRequest(http.MethodGet, "/content/7?t="+token, nil)
+	if s.validateShareToken(req3, "content", "7", "default") {
+		t.Fatal("third use should fail")
+	}
+}
+
+func TestShareTokenRangeContinuationDoesNotConsume(t *testing.T) {
+	s := &ClipboardServer{
+		config: &Config{},
+	}
+	s.config.Server.Auth = "secret-pass"
+
+	token, _, err := s.issueShareToken("file", "uuid-x", "default", 600, 1)
+	if err != nil {
+		t.Fatalf("issue failed: %v", err)
+	}
+
+	// first full GET consumes the only use
+	req1 := httptest.NewRequest(http.MethodGet, "/file/uuid-x/a.mp4?t="+token, nil)
+	if !s.validateShareToken(req1, "file", "uuid-x", "default") {
+		t.Fatal("initial get should succeed")
+	}
+
+	// range continuation should not require another use
+	req2 := httptest.NewRequest(http.MethodGet, "/file/uuid-x/a.mp4?t="+token, nil)
+	req2.Header.Set("Range", "bytes=1024-")
+	if !s.validateShareToken(req2, "file", "uuid-x", "default") {
+		t.Fatal("range continuation should not consume extra use")
+	}
+
+	// another full GET should fail
+	req3 := httptest.NewRequest(http.MethodGet, "/file/uuid-x/a.mp4?t="+token, nil)
+	if s.validateShareToken(req3, "file", "uuid-x", "default") {
+		t.Fatal("second full get should fail after maxUses=1")
+	}
+}
+
 func TestCanAccessRoomStillWorksWithoutShareToken(t *testing.T) {
 	s := &ClipboardServer{
 		config: &Config{},

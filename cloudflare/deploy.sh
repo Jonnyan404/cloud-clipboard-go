@@ -162,8 +162,8 @@ deploy_worker() {
     DEPLOY_OUTPUT=$(wrangler deploy --env="" 2>&1)
     
     # 提取 Worker URL
-    if echo "$DEPLOY_OUTPUT" | grep -q "https://"; then
-        WORKER_URL=$(echo "$DEPLOY_OUTPUT" | grep -o 'https://[^[:space:]]*' | head -1)
+    if echo "$DEPLOY_OUTPUT" | grep -q "workers.dev"; then
+        WORKER_URL=$(echo "$DEPLOY_OUTPUT" | grep -o 'https://[^[:space:]]*\.workers\.dev' | head -1)
         # 移除可能的尾部斜杠
         WORKER_URL=${WORKER_URL%/}
         info "Worker 部署成功: $WORKER_URL"

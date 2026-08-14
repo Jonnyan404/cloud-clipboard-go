@@ -125,5 +125,20 @@
     "otherRoomsLabel": "其他房間",
     "hideRoomBrowser": "隱藏房間側欄",
     "dockLeft": "停靠到左側",
-    "dockRight": "停靠到右側"
-  }
+    "dockRight": "停靠到右側",
+    "shareLinkSettings": "分享連結設定",
+    "shareLinkSettingsHint": "拖動滑桿設定有效期，並可限制存取次數（0 表示不限）。",
+    "shareExpireIn": "連結有效期",
+    "shareMaxUses": "最大存取次數",
+    "shareMaxUsesHint": "填 0 表示不限次數；影片續傳不額外計數。",
+    "generateAndCopy": "產生並複製",
+    "generateQrCode": "產生 QR 碼",
+    "shareUsesUnlimited": "不限次數",
+    "shareUsesLimited": "最多 {count} 次",
+    "shareMetaSummary": "有效期至 {expiresAtText} · {usesText}",
+    "shareTtlMinLabel": "1 分鐘",
+    "shareTtlMaxLabel": "24 小時",
+    "shareDurationMinutes": "{minutes} 分鐘",
+    "shareDurationHours": "{hours} 小時",
+    "shareDurationHoursMinutes": "{hours} 小時 {minutes} 分"
+}

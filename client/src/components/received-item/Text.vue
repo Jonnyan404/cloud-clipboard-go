@@ -36,7 +36,7 @@
                             </v-tooltip>
                             <v-tooltip bottom>
                                 <template v-slot:activator="{ on }">
-                                    <v-btn v-on="on" icon color="grey" class="timeline-card__icon-button" @click="copyLink">
+                                    <v-btn v-on="on" icon color="grey" class="timeline-card__icon-button" @click="openShareDialog('copy')">
                                         <v-icon>{{ mdiLinkVariant }}</v-icon>
                                     </v-btn>
                                 </template>
@@ -44,7 +44,7 @@
                             </v-tooltip>
                             <v-tooltip bottom>
                                 <template v-slot:activator="{ on }">
-                                    <v-btn v-on="on" icon color="grey" class="timeline-card__icon-button" @click="openQrDialog">
+                                    <v-btn v-on="on" icon color="grey" class="timeline-card__icon-button" @click="openShareDialog('qr')">
                                         <v-icon>{{ mdiQrcode }}</v-icon>
                                     </v-btn>
                                 </template>
@@ -69,8 +69,71 @@
                 </v-expand-transition>
             </v-card-text>
 
-            <!-- QR Code Dialog -->
-            <v-dialog v-model="qrDialogVisible" max-width="250">
+            <v-dialog v-model="shareDialogVisible" max-width="420" @keydown.enter.prevent="confirmShareDialog">
+                <v-card>
+                    <v-card-title class="headline">{{ $t('shareLinkSettings') }}</v-card-title>
+                    <v-card-text>
+                        <div class="body-2 mb-3 text--secondary">{{ $t('shareLinkSettingsHint') }}</div>
+                        <div class="mb-1 d-flex justify-space-between align-center">
+                            <span class="subtitle-2">{{ $t('shareExpireIn') }}</span>
+                            <span class="body-2 primary--text font-weight-medium">{{ shareTtlLabel }}</span>
+                        </div>
+                        <div class="share-ttl-control mb-2">
+                            <input
+                                class="share-ttl-range"
+                                type="range"
+                                :min="shareTtlMinMinutes"
+                                :max="shareTtlMaxMinutes"
+                                :step="1"
+                                :value="shareForm.ttlMinutes"
+                                :aria-label="$t('shareExpireIn')"
+                                :aria-valuemin="shareTtlMinMinutes"
+                                :aria-valuemax="shareTtlMaxMinutes"
+                                :aria-valuenow="shareForm.ttlMinutes"
+                                :aria-valuetext="shareTtlLabel"
+                                @input="onShareTtlInput"
+                            >
+                            <div class="share-ttl-progress" :style="{ width: shareTtlProgress + '%' }"></div>
+                        </div>
+                        <div class="d-flex flex-wrap mb-2" style="gap: 6px;">
+                            <v-chip
+                                v-for="preset in shareTtlPresets"
+                                :key="preset.minutes"
+                                small
+                                label
+                                :outlined="shareForm.ttlMinutes !== preset.minutes"
+                                :color="shareForm.ttlMinutes === preset.minutes ? 'primary' : undefined"
+                                class="share-ttl-chip"
+                                @click="shareForm.ttlMinutes = preset.minutes"
+                            >{{ preset.label }}</v-chip>
+                        </div>
+                        <div class="caption text--secondary d-flex justify-space-between mb-4">
+                            <span>{{ $t('shareTtlMinLabel') }}</span>
+                            <span>{{ $t('shareTtlMaxLabel') }}</span>
+                        </div>
+                        <v-text-field
+                            v-model.number="shareForm.maxUses"
+                            type="number"
+                            min="0"
+                            max="1000"
+                            :label="$t('shareMaxUses')"
+                            :hint="$t('shareMaxUsesHint')"
+                            persistent-hint
+                            dense
+                            outlined
+                        ></v-text-field>
+                    </v-card-text>
+                    <v-card-actions>
+                        <v-spacer></v-spacer>
+                        <v-btn text @click="shareDialogVisible = false">{{ $t('cancel') }}</v-btn>
+                        <v-btn color="primary" text :loading="shareUrlLoading" @click="confirmShareDialog">
+                            {{ shareDialogMode === 'qr' ? $t('generateQrCode') : $t('generateAndCopy') }}
+                        </v-btn>
+                    </v-card-actions>
+                </v-card>
+            </v-dialog>
+
+            <v-dialog v-model="qrDialogVisible" max-width="280">
                 <v-card>
                     <v-card-title class="headline justify-center">{{ $t('scanToAccess') }}</v-card-title>
                     <v-card-text class="text-center pa-4">
@@ -78,6 +141,9 @@
                         <template v-else>
                             <qrcode-vue :value="shareContentUrl || contentUrl" :size="200" level="H" />
                             <div class="text-caption mt-2" style="word-break: break-all;">{{ shareContentUrl || contentUrl }}</div>
+                            <div v-if="lastShareMeta" class="caption text--secondary mt-2">
+                                {{ $t('shareMetaSummary', lastShareMeta) }}
+                            </div>
                         </template>
                     </v-card-text>
                     <v-card-actions>
@@ -106,7 +172,20 @@ import {
     mdiQrcode,
     mdiPound,
 } from '@mdi/js';
-import { formatTimestamp, buildCleanAbsoluteRouteUrl, createShareLink } from '@/util.js';
+import {
+    formatTimestamp,
+    buildCleanAbsoluteRouteUrl,
+    createShareLink,
+    copyTextToClipboard,
+    SHARE_DEFAULT_TTL,
+    SHARE_DEFAULT_TTL_MINUTES,
+    SHARE_MIN_TTL_MINUTES,
+    SHARE_MAX_TTL_MINUTES,
+    normalizeShareTTL,
+    normalizeShareMaxUses,
+    minutesToShareTTL,
+    formatShareDuration,
+} from '@/util.js';
 
 function decodeHtmlEntities(text) {
     const textArea = document.createElement('textarea');
@@ -129,8 +208,17 @@ export default {
         return {
             expand: false,
             qrDialogVisible: false,
+            shareDialogVisible: false,
+            shareDialogMode: 'copy',
+            shareForm: {
+                ttlMinutes: SHARE_DEFAULT_TTL_MINUTES,
+                maxUses: 0,
+            },
+            shareTtlMinMinutes: SHARE_MIN_TTL_MINUTES,
+            shareTtlMaxMinutes: SHARE_MAX_TTL_MINUTES,
             shareUrlLoading: false,
             shareContentUrl: '',
+            lastShareMeta: null,
             mdiChevronUp,
             mdiChevronDown,
             mdiContentCopy,
@@ -156,29 +244,94 @@ export default {
             const id = this.meta?.id ?? '';
             return buildCleanAbsoluteRouteUrl(this, `content/${id}${roomQuery}`);
         },
+        needsShareProtection() {
+            // 仅全局加密或当前房间加密时，才需要短期 token 与有效期/次数设置
+            return Boolean(this.$root?.config?.auth);
+        },
+        shareTtlSeconds() {
+            return minutesToShareTTL(this.shareForm.ttlMinutes);
+        },
+        shareTtlLabel() {
+            return formatShareDuration(this.shareTtlSeconds, (key, params) => this.$t(key, params));
+        },
+        shareTtlProgress() {
+            const min = this.shareTtlMinMinutes;
+            const max = this.shareTtlMaxMinutes;
+            const value = Number(this.shareForm.ttlMinutes);
+            if (!Number.isFinite(value) || max <= min) {
+                return 0;
+            }
+            const ratio = (value - min) / (max - min);
+            return Math.max(0, Math.min(100, ratio * 100));
+        },
+        shareTtlPresets() {
+            return [
+                { minutes: 15, label: this.$t('shareDurationMinutes', { minutes: 15 }) },
+                { minutes: 60, label: this.$t('shareDurationHours', { hours: 1 }) },
+                { minutes: 360, label: this.$t('shareDurationHours', { hours: 6 }) },
+                { minutes: 1440, label: this.$t('shareDurationHours', { hours: 24 }) },
+            ];
+        },
     },
     methods: {
         formatTimestamp,
-        async ensureContentShareUrl() {
-            if (this.shareContentUrl) {
-                return this.shareContentUrl;
-            }
-            const data = await createShareLink(this, {
-                type: 'content',
-                id: this.meta?.id,
-            });
-            this.shareContentUrl = data?.url || '';
-            return this.shareContentUrl;
+        onShareTtlInput(event) {
+            const next = Number(event && event.target ? event.target.value : this.shareForm.ttlMinutes);
+            this.shareForm.ttlMinutes = Number.isFinite(next) ? next : SHARE_DEFAULT_TTL_MINUTES;
         },
-        async openQrDialog() {
-            this.qrDialogVisible = true;
+        openShareDialog(mode = 'copy') {
+            this.shareDialogMode = mode;
+            // 未加密场景：直接复制/展示公开链接，无需有效期与次数
+            if (!this.needsShareProtection) {
+                this.shareUnprotected(mode);
+                return;
+            }
+            this.shareForm = {
+                ttlMinutes: SHARE_DEFAULT_TTL_MINUTES,
+                maxUses: 0,
+            };
+            this.shareDialogVisible = true;
+        },
+        async shareUnprotected(mode = 'copy') {
+            const url = this.contentUrl;
+            this.shareContentUrl = url;
+            this.lastShareMeta = null;
+            if (mode === 'qr') {
+                this.qrDialogVisible = true;
+                return;
+            }
+            await this.copyToClipboard(url, 'copySuccess');
+        },
+        async confirmShareDialog() {
+            const ttl = normalizeShareTTL(this.shareTtlSeconds);
+            const maxUses = normalizeShareMaxUses(this.shareForm.maxUses);
             this.shareUrlLoading = true;
             try {
-                await this.ensureContentShareUrl();
+                const data = await createShareLink(this, {
+                    type: 'content',
+                    id: this.meta?.id,
+                    ttl,
+                    maxUses,
+                });
+                const url = data?.url || this.contentUrl;
+                this.shareContentUrl = url;
+                this.lastShareMeta = {
+                    ttl: data?.ttl ?? ttl,
+                    maxUses: data?.maxUses ?? maxUses,
+                    expiresAtText: formatTimestamp(data?.expiresAt || (Math.floor(Date.now() / 1000) + ttl)),
+                    usesText: (data?.maxUses ?? maxUses) > 0
+                        ? this.$t('shareUsesLimited', { count: data?.maxUses ?? maxUses })
+                        : this.$t('shareUsesUnlimited'),
+                };
+                this.shareDialogVisible = false;
+                if (this.shareDialogMode === 'qr') {
+                    this.qrDialogVisible = true;
+                } else {
+                    await this.copyToClipboard(url, 'copySuccess');
+                }
             } catch (error) {
                 console.error('生成分享链接失败:', error);
                 this.$toast(this.$t('copyFailedGeneral'));
-                this.shareContentUrl = this.contentUrl;
             } finally {
                 this.shareUrlLoading = false;
             }
@@ -190,47 +343,17 @@ export default {
             }
             return mdiDesktopTower;
         },
-        copyToClipboard(textToCopy, successMessageKey = 'copySuccess', errorMessageKey = 'copyFailedGeneral') {
-            if (navigator.clipboard && window.isSecureContext) {
-                navigator.clipboard.writeText(textToCopy)
-                    .then(() => this.$toast(this.$t(successMessageKey)))
-                    .catch(err => {
-                        console.error('使用 navigator.clipboard 复制失败:', err);
-                        this.$toast(this.$t(errorMessageKey));
-                    });
-            } else {
-                try {
-                    const textArea = document.createElement('textarea');
-                    textArea.value = textToCopy;
-                    textArea.style.position = 'absolute';
-                    textArea.style.left = '-9999px';
-                    document.body.appendChild(textArea);
-                    textArea.select();
-                    const successful = document.execCommand('copy');
-                    document.body.removeChild(textArea);
-                    if (successful) {
-                        this.$toast(this.$t(successMessageKey));
-                    } else {
-                        console.error('使用 document.execCommand 复制失败');
-                        this.$toast(this.$t(errorMessageKey));
-                    }
-                } catch (err) {
-                    console.error('复制时发生错误:', err);
-                    this.$toast(this.$t(errorMessageKey));
-                }
+        async copyToClipboard(textToCopy, successMessageKey = 'copySuccess', errorMessageKey = 'copyFailedGeneral') {
+            try {
+                await copyTextToClipboard(textToCopy);
+                this.$toast(this.$t(successMessageKey));
+            } catch (err) {
+                console.error('复制失败:', err);
+                this.$toast(this.$t(errorMessageKey));
             }
         },
         copyText() {
             this.copyToClipboard(this.decodedContent, 'copySuccess');
-        },
-        async copyLink() {
-            try {
-                const url = await this.ensureContentShareUrl();
-                this.copyToClipboard(url, 'copySuccess');
-            } catch (error) {
-                console.error('复制分享链接失败:', error);
-                this.$toast(this.$t('copyFailedGeneral'));
-            }
         },
         deleteItem() {
             this.$http.delete(`revoke/${this.meta.id}`, {
@@ -306,4 +429,86 @@ export default {
 .timeline-card--dark .timeline-card__icon-button {
     background: rgba(30, 41, 59, 0.92);
 }
+
+.share-ttl-control {
+    position: relative;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    padding: 0 2px;
+}
+
+.share-ttl-control::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 6px;
+    border-radius: 999px;
+    background: rgba(148, 163, 184, 0.35);
+}
+
+.share-ttl-progress {
+    position: absolute;
+    left: 0;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--v-primary-base, #1976d2);
+    pointer-events: none;
+    max-width: 100%;
+}
+
+.share-ttl-range {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    margin: 0;
+    appearance: none;
+    -webkit-appearance: none;
+    background: transparent;
+    height: 28px;
+    cursor: pointer;
+}
+
+.share-ttl-range:focus {
+    outline: none;
+}
+
+.share-ttl-range::-webkit-slider-runnable-track {
+    height: 6px;
+    background: transparent;
+    border-radius: 999px;
+}
+
+.share-ttl-range::-moz-range-track {
+    height: 6px;
+    background: transparent;
+    border-radius: 999px;
+}
+
+.share-ttl-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    margin-top: -6px;
+    border-radius: 50%;
+    background: var(--v-primary-base, #1976d2);
+    border: 2px solid #fff;
+    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.35);
+}
+
+.share-ttl-range::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--v-primary-base, #1976d2);
+    border: 2px solid #fff;
+    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.35);
+}
+
+.share-ttl-chip {
+    cursor: pointer;
+}
+
 </style>

@@ -1,5 +1,5 @@
 import Vue from 'vue';
-import Vuetify, { VSnackbar, VBtn, VIcon } from 'vuetify/lib';
+import Vuetify, { VSnackbar, VBtn, VIcon, VSlider, VChip } from 'vuetify/lib';
 import VuetifyToast from 'vuetify-toast-snackbar';
 
 const vuetify = new Vuetify({
@@ -14,6 +14,8 @@ Vue.use(Vuetify, {
         VSnackbar,
         VBtn,
         VIcon,
+        VSlider,
+        VChip,
     }
 });
 Vue.use(VuetifyToast, {

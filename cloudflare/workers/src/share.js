@@ -13,6 +13,7 @@ export const SHARE_TOKEN_QUERY_KEY = 't';
 export const DEFAULT_SHARE_TTL_SECONDS = 15 * 60;
 export const MIN_SHARE_TTL_SECONDS = 60;
 export const MAX_SHARE_TTL_SECONDS = 24 * 60 * 60;
+export const MAX_SHARE_MAX_USES = 1000;
 
 function normalizeShareTTL(ttl) {
   const value = Number(ttl);
@@ -24,6 +25,17 @@ function normalizeShareTTL(ttl) {
   }
   if (value > MAX_SHARE_TTL_SECONDS) {
     return MAX_SHARE_TTL_SECONDS;
+  }
+  return Math.floor(value);
+}
+
+function normalizeShareMaxUses(maxUses) {
+  const value = Number(maxUses);
+  if (!Number.isFinite(value) || value <= 0) {
+    return 0;
+  }
+  if (value > MAX_SHARE_MAX_USES) {
+    return MAX_SHARE_MAX_USES;
   }
   return Math.floor(value);
 }
@@ -54,6 +66,11 @@ function textToBytes(text) {
 
 async function sha256(bytes) {
   return new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
+}
+
+function newShareJTI() {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
 }
 
 async function getShareSigningKey(env) {
@@ -115,16 +132,154 @@ export async function parseShareToken(env, token) {
     const id = String(claims?.id || '').trim();
     const room = normalizeRoomName(claims?.room);
     const exp = Number(claims?.exp || 0);
+    const jti = String(claims?.jti || '').trim();
+    const maxUses = Number(claims?.mu || 0);
     if (!type || !id || !exp) {
       return null;
     }
     if (Math.floor(Date.now() / 1000) > exp) {
       return null;
     }
-    return { type, id, room, exp };
+    if (maxUses > 0 && !jti) {
+      return null;
+    }
+    return {
+      type,
+      id,
+      room,
+      exp,
+      jti,
+      maxUses: Number.isFinite(maxUses) && maxUses > 0 ? Math.floor(maxUses) : 0,
+    };
   } catch {
     return null;
   }
+}
+
+/**
+ * Range 续传 / HEAD 不计入次数，避免视频拖动进度条把次数耗尽。
+ */
+export function shouldConsumeShareUse(request) {
+  if (!request) {
+    return false;
+  }
+  const method = String(request.method || 'GET').toUpperCase();
+  if (method === 'HEAD') {
+    return false;
+  }
+  if (method !== 'GET') {
+    return false;
+  }
+  const rangeHeader = String(request.headers?.get?.('Range') || '').trim();
+  if (!rangeHeader) {
+    return true;
+  }
+  const lower = rangeHeader.toLowerCase();
+  if (!lower.startsWith('bytes=')) {
+    return true;
+  }
+  const spec = rangeHeader.slice('bytes='.length).trim();
+  if (!spec || spec.includes(',')) {
+    return true;
+  }
+  const startPart = spec.split('-')[0].trim();
+  return startPart === '' || startPart === '0';
+}
+
+let shareUsageTableReady = false;
+
+async function ensureShareUsageTable(env) {
+  if (!env?.DB || shareUsageTableReady) {
+    return Boolean(env?.DB);
+  }
+  await env.DB.prepare(`
+    CREATE TABLE IF NOT EXISTS share_token_usage (
+      jti TEXT PRIMARY KEY,
+      used INTEGER NOT NULL DEFAULT 0,
+      maxUses INTEGER NOT NULL,
+      exp INTEGER NOT NULL
+    )
+  `).run();
+  await env.DB.prepare(`
+    CREATE INDEX IF NOT EXISTS idx_share_token_usage_exp ON share_token_usage(exp)
+  `).run();
+  shareUsageTableReady = true;
+  return true;
+}
+
+/**
+ * 进程/边缘内存兜底（无 D1 时）；有 D1 时以 D1 为准。
+ */
+const memoryShareUsage = new Map();
+
+async function consumeShareUse(env, claims) {
+  if (!claims || !claims.maxUses || claims.maxUses <= 0) {
+    return true;
+  }
+  if (!claims.jti) {
+    return false;
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  if (claims.exp > 0 && claims.exp <= now) {
+    return false;
+  }
+
+  if (await ensureShareUsageTable(env)) {
+    // 清理少量过期记录
+    try {
+      await env.DB.prepare('DELETE FROM share_token_usage WHERE exp > 0 AND exp <= ?')
+        .bind(now)
+        .run();
+    } catch {
+      // ignore cleanup errors
+    }
+
+    const row = await env.DB.prepare('SELECT used, maxUses, exp FROM share_token_usage WHERE jti = ?')
+      .bind(claims.jti)
+      .first();
+
+    if (!row) {
+      await env.DB.prepare(
+        'INSERT INTO share_token_usage (jti, used, maxUses, exp) VALUES (?, 1, ?, ?)',
+      ).bind(claims.jti, claims.maxUses, claims.exp).run();
+      return true;
+    }
+
+    const used = Number(row.used || 0);
+    const maxUses = Math.max(Number(row.maxUses || 0), claims.maxUses);
+    const exp = Math.max(Number(row.exp || 0), claims.exp);
+    if (exp > 0 && exp <= now) {
+      await env.DB.prepare('DELETE FROM share_token_usage WHERE jti = ?').bind(claims.jti).run();
+      return false;
+    }
+    if (used >= maxUses) {
+      return false;
+    }
+    await env.DB.prepare(
+      'UPDATE share_token_usage SET used = ?, maxUses = ?, exp = ? WHERE jti = ?',
+    ).bind(used + 1, maxUses, exp, claims.jti).run();
+    return true;
+  }
+
+  // memory fallback
+  let entry = memoryShareUsage.get(claims.jti);
+  if (!entry) {
+    entry = { used: 0, maxUses: claims.maxUses, exp: claims.exp };
+    memoryShareUsage.set(claims.jti, entry);
+  } else {
+    entry.exp = Math.max(entry.exp || 0, claims.exp);
+    entry.maxUses = Math.max(entry.maxUses || 0, claims.maxUses);
+  }
+  if (entry.exp > 0 && entry.exp <= now) {
+    memoryShareUsage.delete(claims.jti);
+    return false;
+  }
+  if (entry.used >= entry.maxUses) {
+    return false;
+  }
+  entry.used += 1;
+  return true;
 }
 
 export async function validateShareToken(env, request, expectedType, expectedId, expectedRoom) {
@@ -132,9 +287,19 @@ export async function validateShareToken(env, request, expectedType, expectedId,
   if (!claims) {
     return false;
   }
-  return claims.type === expectedType
-    && claims.id === String(expectedId || '')
-    && claims.room === normalizeRoomName(expectedRoom);
+  if (claims.type !== expectedType
+    || claims.id !== String(expectedId || '')
+    || claims.room !== normalizeRoomName(expectedRoom)) {
+    return false;
+  }
+
+  if (claims.maxUses > 0 && shouldConsumeShareUse(request)) {
+    const ok = await consumeShareUse(env, claims);
+    if (!ok) {
+      return false;
+    }
+  }
+  return true;
 }
 
 export async function ensureRoomOrShareAccess(request, env, room, {
@@ -225,6 +390,22 @@ async function findFileMeta(env, uuid) {
   return null;
 }
 
+async function issueShareToken(env, { type, id, room, ttl, maxUses }) {
+  const expiresAt = Math.floor(Date.now() / 1000) + ttl;
+  const claims = {
+    typ: type,
+    id,
+    room,
+    exp: expiresAt,
+  };
+  if (maxUses > 0) {
+    claims.jti = newShareJTI();
+    claims.mu = maxUses;
+  }
+  const token = await signShareClaims(env, claims);
+  return { token, expiresAt };
+}
+
 export class ShareHandler {
   static async create(request, env) {
     try {
@@ -234,8 +415,9 @@ export class ShareHandler {
       const body = await request.json().catch(() => ({}));
       const shareType = String(body?.type || '').trim().toLowerCase();
       const ttl = normalizeShareTTL(body?.ttl);
+      const maxUses = normalizeShareMaxUses(body?.maxUses);
       const authToken = extractAuthToken(request);
-      const expiresAt = Math.floor(Date.now() / 1000) + ttl;
+      let expiresAt = Math.floor(Date.now() / 1000) + ttl;
 
       if (!shareType) {
         return jsonError(400, '缺少 type', 'Bad Request');
@@ -269,18 +451,22 @@ export class ShareHandler {
           room,
           ttl,
           expiresAt,
+          maxUses,
           url: target.toString(),
         };
 
         if (requirement.required) {
-          const token = await signShareClaims(env, {
-            typ: 'content',
+          const issued = await issueShareToken(env, {
+            type: 'content',
             id,
             room,
-            exp: expiresAt,
+            ttl,
+            maxUses,
           });
-          target.searchParams.set(SHARE_TOKEN_QUERY_KEY, token);
-          response.token = token;
+          expiresAt = issued.expiresAt;
+          response.expiresAt = expiresAt;
+          target.searchParams.set(SHARE_TOKEN_QUERY_KEY, issued.token);
+          response.token = issued.token;
           response.url = target.toString();
         }
 
@@ -322,18 +508,22 @@ export class ShareHandler {
           room,
           ttl,
           expiresAt,
+          maxUses,
           url: target.toString(),
         };
 
         if (requirement.required) {
-          const token = await signShareClaims(env, {
-            typ: 'file',
+          const issued = await issueShareToken(env, {
+            type: 'file',
             id: uuid,
             room,
-            exp: expiresAt,
+            ttl,
+            maxUses,
           });
-          target.searchParams.set(SHARE_TOKEN_QUERY_KEY, token);
-          response.token = token;
+          expiresAt = issued.expiresAt;
+          response.expiresAt = expiresAt;
+          target.searchParams.set(SHARE_TOKEN_QUERY_KEY, issued.token);
+          response.token = issued.token;
           response.url = target.toString();
         }
 

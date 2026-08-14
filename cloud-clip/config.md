@@ -166,5 +166,16 @@ $ curl -H "Authorization: Bearer xxxx" \
 
 说明：
 - `ttl` 可选，默认 900 秒（15 分钟），范围 60～86400
+- `maxUses` 可选，默认 `0`（不限次数）；正整数表示最多完整访问次数，范围 1～1000
+  - 一次完整 GET（无 Range，或 `bytes=0-...`）计 1 次
+  - 视频/文件的 Range 续传（`bytes>0`）与 HEAD 不计入次数
+  - 次数在服务端按 token 的 `jti` 计数（Go 进程内存；Cloudflare 优先 D1）
 - 未启用房间密码时，返回的 `url` 不含 `t`
 - 短期 token 仅授予对应 content/file 的读取权限，不能用于上传/删除
+
+```console
+# 15 分钟、最多打开 3 次
+$ curl -H "Authorization: Bearer xxxx" -H "Content-Type: application/json" \
+  -d '{"type":"content","id":"7","ttl":900,"maxUses":3}' \
+  http://localhost:9501/share
+```

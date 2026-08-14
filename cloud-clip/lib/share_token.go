@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -19,21 +20,31 @@ const (
 	defaultShareTTLSeconds = 15 * 60
 	maxShareTTLSeconds     = 24 * 60 * 60
 	minShareTTLSeconds     = 60
+	maxShareMaxUses        = 1000
 	shareTokenQueryKey     = "t"
 )
 
 type shareClaims struct {
-	Type string `json:"typ"` // content | file
-	ID   string `json:"id"`  // content id or file uuid
-	Room string `json:"room"`
-	Exp  int64  `json:"exp"`
+	Type    string `json:"typ"` // content | file
+	ID      string `json:"id"`  // content id or file uuid
+	Room    string `json:"room"`
+	Exp     int64  `json:"exp"`
+	JTI     string `json:"jti,omitempty"` // token id when usage-limited
+	MaxUses int    `json:"mu,omitempty"`  // 0 = unlimited
 }
 
 type shareRequest struct {
-	Type string `json:"type"`
-	ID   string `json:"id"`
-	UUID string `json:"uuid"`
-	TTL  int    `json:"ttl"`
+	Type    string `json:"type"`
+	ID      string `json:"id"`
+	UUID    string `json:"uuid"`
+	TTL     int    `json:"ttl"`
+	MaxUses int    `json:"maxUses"`
+}
+
+type shareUsageEntry struct {
+	Used    int
+	MaxUses int
+	Exp     int64
 }
 
 func (s *ClipboardServer) initShareSigningKey() {
@@ -81,6 +92,12 @@ func (s *ClipboardServer) initShareSigningKey() {
 	s.shareSigningKey = derived
 }
 
+func (s *ClipboardServer) ensureShareUsageMap() {
+	if s.shareTokenUsage == nil {
+		s.shareTokenUsage = make(map[string]*shareUsageEntry)
+	}
+}
+
 func extractShareToken(r *http.Request) string {
 	if r == nil {
 		return ""
@@ -99,6 +116,25 @@ func normalizeShareTTL(ttl int) int {
 		return maxShareTTLSeconds
 	}
 	return ttl
+}
+
+// normalizeShareMaxUses: 0 = unlimited; clamp positive values to [1, maxShareMaxUses]
+func normalizeShareMaxUses(maxUses int) int {
+	if maxUses <= 0 {
+		return 0
+	}
+	if maxUses > maxShareMaxUses {
+		return maxShareMaxUses
+	}
+	return maxUses
+}
+
+func newShareJTI() (string, error) {
+	buf := make([]byte, 16)
+	if _, err := rand.Read(buf); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(buf), nil
 }
 
 func (s *ClipboardServer) signShareClaims(claims shareClaims) (string, error) {
@@ -150,14 +186,110 @@ func (s *ClipboardServer) parseShareToken(token string) (*shareClaims, bool) {
 	claims.Type = strings.TrimSpace(claims.Type)
 	claims.ID = strings.TrimSpace(claims.ID)
 	claims.Room = normalizeRoomName(claims.Room)
+	claims.JTI = strings.TrimSpace(claims.JTI)
 	if claims.Type == "" || claims.ID == "" || claims.Exp <= 0 {
 		return nil, false
 	}
 	if time.Now().Unix() > claims.Exp {
 		return nil, false
 	}
+	if claims.MaxUses < 0 {
+		claims.MaxUses = 0
+	}
+	if claims.MaxUses > 0 && claims.JTI == "" {
+		return nil, false
+	}
 
 	return &claims, true
+}
+
+// shouldConsumeShareUse decides whether this HTTP request should count against maxUses.
+// Range continuations (bytes starting > 0) and non-GET methods do not consume.
+func shouldConsumeShareUse(r *http.Request) bool {
+	if r == nil {
+		return false
+	}
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		return false
+	}
+	// HEAD is used for probes; do not burn uses.
+	if r.Method == http.MethodHead {
+		return false
+	}
+	rangeHeader := strings.TrimSpace(r.Header.Get("Range"))
+	if rangeHeader == "" {
+		return true
+	}
+	// Only count the first segment of a download / media open.
+	// e.g. "bytes=0-1023" or "bytes=0-" consumes; "bytes=1024-" does not.
+	lower := strings.ToLower(rangeHeader)
+	if !strings.HasPrefix(lower, "bytes=") {
+		return true
+	}
+	spec := strings.TrimSpace(rangeHeader[len("bytes="):])
+	if spec == "" {
+		return true
+	}
+	// multi-range: treat as consume to be safe
+	if strings.Contains(spec, ",") {
+		return true
+	}
+	startPart := strings.SplitN(spec, "-", 2)[0]
+	startPart = strings.TrimSpace(startPart)
+	if startPart == "" || startPart == "0" {
+		return true
+	}
+	return false
+}
+
+func (s *ClipboardServer) consumeShareUse(claims *shareClaims) bool {
+	if claims == nil || claims.MaxUses <= 0 {
+		return true
+	}
+	if claims.JTI == "" {
+		return false
+	}
+
+	now := time.Now().Unix()
+	s.shareUsageMutex.Lock()
+	defer s.shareUsageMutex.Unlock()
+	s.ensureShareUsageMap()
+
+	// opportunistic cleanup of a few expired entries
+	if len(s.shareTokenUsage) > 256 {
+		for k, v := range s.shareTokenUsage {
+			if v == nil || v.Exp <= now {
+				delete(s.shareTokenUsage, k)
+			}
+		}
+	}
+
+	entry, ok := s.shareTokenUsage[claims.JTI]
+	if !ok || entry == nil {
+		entry = &shareUsageEntry{
+			Used:    0,
+			MaxUses: claims.MaxUses,
+			Exp:     claims.Exp,
+		}
+		s.shareTokenUsage[claims.JTI] = entry
+	} else {
+		if entry.Exp < claims.Exp {
+			entry.Exp = claims.Exp
+		}
+		if entry.MaxUses < claims.MaxUses {
+			entry.MaxUses = claims.MaxUses
+		}
+	}
+
+	if entry.Exp > 0 && entry.Exp <= now {
+		delete(s.shareTokenUsage, claims.JTI)
+		return false
+	}
+	if entry.Used >= entry.MaxUses {
+		return false
+	}
+	entry.Used++
+	return true
 }
 
 func (s *ClipboardServer) validateShareToken(r *http.Request, expectedType, expectedID, expectedRoom string) bool {
@@ -174,6 +306,12 @@ func (s *ClipboardServer) validateShareToken(r *http.Request, expectedType, expe
 	}
 	if normalizeRoomName(expectedRoom) != claims.Room {
 		return false
+	}
+
+	if claims.MaxUses > 0 && shouldConsumeShareUse(r) {
+		if !s.consumeShareUse(claims) {
+			return false
+		}
 	}
 	return true
 }
@@ -241,14 +379,30 @@ func (s *ClipboardServer) findContentForShare(contentID int, preferredRoom strin
 	return "", "", "", false
 }
 
-func (s *ClipboardServer) handle_share(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		writeAuthJSONError(w, http.StatusMethodNotAllowed, "仅允许 POST 请求")
-		return
+func (s *ClipboardServer) issueShareToken(shareType, id, room string, ttl, maxUses int) (token string, expiresAt int64, err error) {
+	expiresAt = time.Now().Unix() + int64(ttl)
+	claims := shareClaims{
+		Type:    shareType,
+		ID:      id,
+		Room:    room,
+		Exp:     expiresAt,
+		MaxUses: maxUses,
 	}
+	if maxUses > 0 {
+		jti, jerr := newShareJTI()
+		if jerr != nil {
+			return "", 0, jerr
+		}
+		claims.JTI = jti
+	}
+	token, err = s.signShareClaims(claims)
+	if err != nil {
+		return "", 0, err
+	}
+	return token, expiresAt, nil
+}
 
-	var req shareRequest
-	decoder := json.NewDecoder(r.Body)
+func (s *ClipboardServer) handle_share(w http.ResponseWriter, r *http.Request) {
 	// 与 authMiddleware 保持一致的 CORS 行为，便于前后端分离调用
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
@@ -257,6 +411,13 @@ func (s *ClipboardServer) handle_share(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
+	if r.Method != http.MethodPost {
+		writeAuthJSONError(w, http.StatusMethodNotAllowed, "仅允许 POST 请求")
+		return
+	}
+
+	var req shareRequest
+	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&req); err != nil && err.Error() != "EOF" {
 		writeAuthJSONError(w, http.StatusBadRequest, "无效的请求体")
@@ -272,6 +433,7 @@ func (s *ClipboardServer) handle_share(w http.ResponseWriter, r *http.Request) {
 	requestedRoom := normalizeRoomName(r.URL.Query().Get("room"))
 	_, hasRequestedRoom := r.URL.Query()["room"]
 	ttl := normalizeShareTTL(req.TTL)
+	maxUses := normalizeShareMaxUses(req.MaxUses)
 	authToken := extractAuthToken(r)
 
 	switch shareType {
@@ -289,7 +451,6 @@ func (s *ClipboardServer) handle_share(w http.ResponseWriter, r *http.Request) {
 
 		room, _, _, found := s.findContentForShare(contentID, requestedRoom, hasRequestedRoom)
 		if !found {
-			// 未指定 room 时再尝试一次全表匹配失败即为不存在
 			writeAuthJSONError(w, http.StatusNotFound, "内容未找到")
 			return
 		}
@@ -311,19 +472,17 @@ func (s *ClipboardServer) handle_share(w http.ResponseWriter, r *http.Request) {
 			"room":      room,
 			"ttl":       ttl,
 			"expiresAt": expiresAt,
+			"maxUses":   maxUses,
 		}
 
 		if requirement.Required {
-			token, err := s.signShareClaims(shareClaims{
-				Type: "content",
-				ID:   idStr,
-				Room: room,
-				Exp:  expiresAt,
-			})
+			token, exp, err := s.issueShareToken("content", idStr, room, ttl, maxUses)
 			if err != nil {
 				writeAuthJSONError(w, http.StatusInternalServerError, "生成分享令牌失败")
 				return
 			}
+			expiresAt = exp
+			response["expiresAt"] = expiresAt
 			query.Set(shareTokenQueryKey, token)
 			response["token"] = token
 		}
@@ -378,19 +537,17 @@ func (s *ClipboardServer) handle_share(w http.ResponseWriter, r *http.Request) {
 			"room":      room,
 			"ttl":       ttl,
 			"expiresAt": expiresAt,
+			"maxUses":   maxUses,
 		}
 
 		if requirement.Required {
-			token, err := s.signShareClaims(shareClaims{
-				Type: "file",
-				ID:   fileUUID,
-				Room: room,
-				Exp:  expiresAt,
-			})
+			token, exp, err := s.issueShareToken("file", fileUUID, room, ttl, maxUses)
 			if err != nil {
 				writeAuthJSONError(w, http.StatusInternalServerError, "生成分享令牌失败")
 				return
 			}
+			expiresAt = exp
+			response["expiresAt"] = expiresAt
 			query.Set(shareTokenQueryKey, token)
 			response["token"] = token
 		}
