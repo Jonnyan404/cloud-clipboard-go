@@ -232,12 +232,8 @@ export class WebSocketRoom {
           historyMessage.data.uuid = row.uuid;
           historyMessage.data.url = row.url;
           
-          // 处理过期时间
-          let expireTime = row.expireTime;
-          if (expireTime && expireTime.toString().length === 10) {
-            expireTime = expireTime * 1000;
-          }
-          historyMessage.data.expire = expireTime;
+          // 处理过期时间：与实时消息保持一致，统一使用 Unix 秒
+          historyMessage.data.expire = Number(row.expireTime) || 0;
           historyMessage.data.cache = row.uuid;
         }
         
