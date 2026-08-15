@@ -58,6 +58,21 @@ func extractAuthToken(r *http.Request) string {
 	return r.URL.Query().Get("auth")
 }
 
+// extractWebSocketToken 提取 WebSocket 握手使用的 token。
+// 优先取 Authorization / ?auth= 以兼容旧客户端，其次取 Sec-WebSocket-Protocol 子协议，
+// 避免凭据出现在 URL 中泄漏到访问日志。
+func extractWebSocketToken(r *http.Request) string {
+	if token := extractAuthToken(r); token != "" {
+		return token
+	}
+	for _, p := range strings.Split(r.Header.Get("Sec-WebSocket-Protocol"), ",") {
+		if p = strings.TrimSpace(p); p != "" {
+			return p
+		}
+	}
+	return ""
+}
+
 func extractAuthTokens(r *http.Request) []string {
 	tokens := []string{}
 	pushToken := func(token string) {
@@ -118,6 +133,10 @@ func (s *ClipboardServer) resolveRoomAuth(room string) RoomAuthRequirement {
 func (s *ClipboardServer) tokenMatchesRoom(room string, token string) bool {
 	if token == "" {
 		return false
+	}
+
+	if s.validateRoomSessionToken(room, token) {
+		return true
 	}
 
 	globalPassword := normalizeAuthValue(s.config.Server.Auth)

@@ -10,7 +10,7 @@ export class TextHandler {
       const url = new URL(request.url);
       const room = normalizeRoomName(url.searchParams.get('room'));
       const targetMessageId = url.searchParams.get('id');
-      const authResult = ensureRoomAccess(request, env, room);
+      const authResult = await ensureRoomAccess(request, env, room);
       if (!authResult.ok) {
         console.log('文本创建请求认证失败');
         return authResult.response;

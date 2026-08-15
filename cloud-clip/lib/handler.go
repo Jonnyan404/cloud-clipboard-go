@@ -15,6 +15,120 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// roomSessionTTLSeconds 房间会话令牌的有效期，默认 1 小时。
+const roomSessionTTLSeconds = 60 * 60
+
+func (s *ClipboardServer) handleAuthToken(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "仅允许 POST 请求", http.StatusMethodNotAllowed)
+		return
+	}
+
+	room := normalizeRoomName(r.URL.Query().Get("room"))
+	if room == "" {
+		room = "default"
+	}
+
+	var req struct {
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "无效的请求体",
+		})
+		return
+	}
+
+	password := strings.TrimSpace(req.Password)
+	if password == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "密码不能为空",
+		})
+		return
+	}
+
+	if !s.tokenMatchesRoom(room, password) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "密码不正确",
+		})
+		return
+	}
+
+	// 使用全局密码登录时，签发对所有房间有效的全局会话令牌
+	scope := ""
+	if globalPassword := normalizeAuthValue(s.config.Server.Auth); globalPassword != "" && password == globalPassword {
+		scope = "global"
+	}
+
+	token, err := s.issueRoomSessionToken(room, roomSessionTTLSeconds, scope)
+	if err != nil {
+		s.logger.Printf("错误: 签发房间会话令牌失败: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "令牌签发失败",
+		})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"token":     token,
+		"expiresAt": time.Now().Unix() + roomSessionTTLSeconds,
+		"scope":     scope,
+	})
+}
+
+// handleAuthTokenRefresh 使用仍有效的会话令牌签发新令牌，无需密码即可静默续期。
+func (s *ClipboardServer) handleAuthTokenRefresh(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "仅允许 POST 请求", http.StatusMethodNotAllowed)
+		return
+	}
+
+	room := normalizeRoomName(r.URL.Query().Get("room"))
+	if room == "" {
+		room = "default"
+	}
+
+	token := extractAuthToken(r)
+	claims, ok := s.parseRoomSessionToken(token)
+	if !ok || !s.validateRoomSessionToken(room, token) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "会话令牌无效或已过期",
+		})
+		return
+	}
+
+	// 续签时保留原令牌的 scope，避免全局会话降级为房间专属
+	newToken, err := s.issueRoomSessionToken(room, roomSessionTTLSeconds, claims.Scope)
+	if err != nil {
+		s.logger.Printf("错误: 续签房间会话令牌失败: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "令牌续签失败",
+		})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"token":     newToken,
+		"expiresAt": time.Now().Unix() + roomSessionTTLSeconds,
+		"scope":     claims.Scope,
+	})
+}
+
 func (s *ClipboardServer) handle_server(w http.ResponseWriter, r *http.Request) {
 	s.logger.Printf("处理 /server 请求，来自: %s", get_remote_ip(r))
 	authNeeded := false
@@ -63,7 +177,7 @@ func (s *ClipboardServer) handle_push(w http.ResponseWriter, r *http.Request) {
 	requirement := s.resolveRoomAuth(room)
 	authNeeded := requirement.Required
 	if authNeeded {
-		token := extractAuthToken(r)
+		token := extractWebSocketToken(r)
 		if token == "" {
 			s.logger.Printf("WebSocket 认证失败: 未提供 token。来自 IP: %s, 房间: %s", ip, room)
 			http.Error(w, "Unauthorized: Missing token", http.StatusUnauthorized)
@@ -77,7 +191,14 @@ func (s *ClipboardServer) handle_push(w http.ResponseWriter, r *http.Request) {
 		s.logger.Printf("WebSocket 认证成功。来自 IP: %s, 房间: %s", ip, room)
 	}
 
-	conn, err := upgrader.Upgrade(w, r, nil)
+	// 回显客户端通过 Sec-WebSocket-Protocol 子协议提供的 token，避免 token 出现在 URL/访问日志中。
+	// 浏览器要求服务端必须回选一个子协议，否则握手会被判定失败。
+	respHeader := http.Header{}
+	if proto := r.Header.Get("Sec-WebSocket-Protocol"); proto != "" {
+		respHeader.Set("Sec-WebSocket-Protocol", strings.TrimSpace(strings.Split(proto, ",")[0]))
+	}
+
+	conn, err := upgrader.Upgrade(w, r, respHeader)
 	if err != nil {
 		s.logger.Printf("错误: WebSocket 升级失败: %v", err)
 		return

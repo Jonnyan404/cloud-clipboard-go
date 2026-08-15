@@ -1,6 +1,6 @@
 import { corsHeaders } from './cors';
 import {
-  canAccessRoom,
+  canAccessRoomAsync,
   extractAuthToken,
   jsonError,
   normalizeAuthValue,
@@ -314,7 +314,7 @@ export async function ensureRoomOrShareAccess(request, env, room, {
     return { ok: true, room: normalizedRoom, token, requirement };
   }
 
-  if (token && canAccessRoom(env, normalizedRoom, token)) {
+  if (token && await canAccessRoomAsync(env, normalizedRoom, token)) {
     return { ok: true, room: normalizedRoom, token, requirement };
   }
 
@@ -435,7 +435,7 @@ export class ShareHandler {
         }
 
         const room = normalizeRoomName(row.room || 'default');
-        if (!canAccessRoom(env, room, authToken)) {
+        if (!await canAccessRoomAsync(env, room, authToken)) {
           return jsonError(401, '无权访问该房间', 'Unauthorized');
         }
 
@@ -495,7 +495,7 @@ export class ShareHandler {
         if (hasRequestedRoom && room !== requestedRoom) {
           return jsonError(404, '文件未找到或已过期', 'Not Found');
         }
-        if (!canAccessRoom(env, room, authToken)) {
+        if (!await canAccessRoomAsync(env, room, authToken)) {
           return jsonError(401, '无权访问该房间', 'Unauthorized');
         }
 

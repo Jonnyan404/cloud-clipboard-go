@@ -312,6 +312,8 @@ func (s *ClipboardServer) setupRoutes() {
 
 	// HTTP 路由
 	mux.HandleFunc(prefix+"/server", s.handle_server)
+	mux.HandleFunc(prefix+"/auth/token", s.handleAuthToken)
+	mux.HandleFunc(prefix+"/auth/token/refresh", s.handleAuthTokenRefresh)
 	mux.HandleFunc(prefix+"/push", s.handle_push)
 	mux.HandleFunc(prefix+"/rooms", s.handleRooms)
 	// /share 在 handler 内按目标资源所在房间鉴权（支持 body 中的 file uuid）

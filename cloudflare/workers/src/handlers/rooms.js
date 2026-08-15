@@ -1,5 +1,5 @@
 import { corsHeaders } from '../cors';
-import { canAccessRoom, extractAuthTokens, hasRoomAuthEntry, normalizeRoomName, parseRoomAuth } from '../auth';
+import { canAccessRoomAsync, extractAuthTokens, hasRoomAuthEntry, normalizeRoomName, parseRoomAuth } from '../auth';
 
 function toDisplayRoom(room) {
   return normalizeRoomName(room) === 'default' ? '' : normalizeRoomName(room);
@@ -87,7 +87,9 @@ export class RoomsHandler {
       const roomEntries = await Promise.all(Array.from(roomMap.values())
         .map(async row => {
           const normalizedRoom = row.room;
-          if (!canAccessRoom(env, normalizedRoom, '') && !tokens.some(token => canAccessRoom(env, normalizedRoom, token))) {
+          const hasGlobalAccess = await canAccessRoomAsync(env, normalizedRoom, '');
+          const hasTokenAccess = await Promise.all(tokens.map(token => canAccessRoomAsync(env, normalizedRoom, token)));
+          if (!hasGlobalAccess && !hasTokenAccess.some(Boolean)) {
             return null;
           }
           const messageLastActive = Number(row.messageLastActive || 0);

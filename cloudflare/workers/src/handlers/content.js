@@ -118,7 +118,7 @@ export class ContentHandler {
       const room = normalizeRoomName(url.searchParams.get('room'));
       const isJSON = prefersJSON(request, url);
       const forceDownload = url.searchParams.get('download') === 'true';
-      const authResult = ensureRoomAccess(request, env, room);
+      const authResult = await ensureRoomAccess(request, env, room);
       if (!authResult.ok) {
         return authResult.response;
       }
@@ -306,7 +306,7 @@ export class ContentHandler {
       const { id } = request.params;
       const url = new URL(request.url);
       const room = normalizeRoomName(url.searchParams.get('room'));
-      const authResult = ensureRoomAccess(request, env, room);
+      const authResult = await ensureRoomAccess(request, env, room);
       if (!authResult.ok) {
         return authResult.response;
       }
@@ -381,7 +381,7 @@ export class ContentHandler {
     try {
       const url = new URL(request.url);
       const room = normalizeRoomName(url.searchParams.get('room'));
-      const authResult = ensureRoomAccess(request, env, room);
+      const authResult = await ensureRoomAccess(request, env, room);
       if (!authResult.ok) {
         return authResult.response;
       }

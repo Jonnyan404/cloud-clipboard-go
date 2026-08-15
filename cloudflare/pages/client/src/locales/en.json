@@ -27,6 +27,7 @@
     "authRequired": "Authentication Required",
     "authPrompt": "This clipboard service is not public. Please enter the password to continue.",
     "authInvalid": "Incorrect password. Please try again.",
+    "authExpired": "Authentication expired. Please re-enter your password.",
     "password": "Password",
     "submit": "Submit",
     "clipboardRoom": "Clipboard Room",
