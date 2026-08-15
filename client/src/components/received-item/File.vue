@@ -491,13 +491,24 @@ export default {
             this.shareFileUrl = data?.url || '';
             return this.shareFileUrl;
         },
+        async ensureFileDownloadUrl() {
+            const url = await this.ensureFileShareUrl();
+            if (!url) {
+                return '';
+            }
+            // 附加 download=true，让服务端返回 Content-Disposition: attachment，
+            // 同源/跨源都能触发直接下载，而非浏览器内联预览
+            const downloadUrl = new URL(url, window.location.origin);
+            downloadUrl.searchParams.set('download', 'true');
+            return downloadUrl.toString();
+        },
         async downloadFile() {
             if (this.expired || this.downloading) {
                 return;
             }
             this.downloading = true;
             try {
-                const url = await this.ensureFileShareUrl();
+                const url = await this.ensureFileDownloadUrl();
                 const anchor = document.createElement('a');
                 anchor.href = url;
                 anchor.download = this.meta?.name || 'file';
