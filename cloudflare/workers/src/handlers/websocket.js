@@ -1,5 +1,5 @@
 import { corsHeaders } from '../cors';
-import { ensureRoomAccess, normalizeRoomName } from '../auth';
+import { ensureRoomAccess, extractWebSocketToken, normalizeRoomName } from '../auth';
 
 export class WebSocketHandler {
   static async connect(request, env) {
@@ -8,7 +8,7 @@ export class WebSocketHandler {
       const room = normalizeRoomName(url.searchParams.get('room'));
       
       console.log(`WebSocket 连接请求: room=${room}, url=${url.toString()}`);
-      const authResult = ensureRoomAccess(request, env, room);
+      const authResult = await ensureRoomAccess(request, env, room, extractWebSocketToken(request));
       if (!authResult.ok) {
         console.log('WebSocket 认证失败');
         return authResult.response;

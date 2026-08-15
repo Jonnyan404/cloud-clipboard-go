@@ -99,11 +99,20 @@ export class WebSocketRoom {
 
       console.log(`WebSocket 会话 ${sessionId} 初始化完成`);
 
-      // 返回 WebSocket 响应
-      return new Response(null, {
+      // 回显客户端通过 Sec-WebSocket-Protocol 子协议提供的 token，避免 token 出现在 URL/访问日志中。
+      // 浏览器要求服务端必须回选一个子协议，否则握手会被判定失败。
+      const response = new Response(null, {
         status: 101,
         webSocket: client,
       });
+      const requestedProtocols = request.headers.get('Sec-WebSocket-Protocol');
+      if (requestedProtocols) {
+        const subprotocol = requestedProtocols.split(',')[0].trim();
+        if (subprotocol) {
+          response.headers.set('Sec-WebSocket-Protocol', subprotocol);
+        }
+      }
+      return response;
 
     } catch (error) {
       console.error('WebSocket 升级失败:', error);

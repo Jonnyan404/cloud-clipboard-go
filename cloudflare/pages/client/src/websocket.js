@@ -2,10 +2,11 @@ import { config } from './config';
 
 const ROOM_AUTH_CACHE_KEY = 'roomAuthCache';
 const DEFAULT_ROOM_KEY = '__default__';
+const GLOBAL_ROOM_KEY = '__global__';
 
 function loadRoomAuthCache() {
     try {
-        const raw = localStorage.getItem(ROOM_AUTH_CACHE_KEY);
+        const raw = sessionStorage.getItem(ROOM_AUTH_CACHE_KEY);
         if (!raw) {
             return {};
         }
@@ -23,12 +24,14 @@ export default {
             websocket: null,
             websocketConnecting: false,
             authCode: '',
+            inputPassword: '',
             authCodeDialog: false,
             authPendingRoom: '',
             authCodeError: '',
             authDialogLoading: false,
             roomAuthCache: loadRoomAuthCache(),
             roomProtectionCache: {},
+            authRefreshTimer: null,
             room: this.$router.currentRoute.query.room || '',
             roomInput: '',
             roomDialog: false,
@@ -70,12 +73,15 @@ export default {
                 },
                 forbidden: () => {
                     this.clearAuthTokenForRoom(this.room);
+                    this.$toast.error(this.$t('authExpired'));
+                    this.openAuthDialog(this.room);
                 },
             },
         };
     },
     watch: {
         room() {
+            this.clearAuthRefreshTimer();
             this.authCode = this.getAuthTokenForRoom(this.room);
             this.disconnect();
             this.connect();
@@ -91,12 +97,43 @@ export default {
             return normalizedRoom || DEFAULT_ROOM_KEY;
         },
         persistRoomAuthCache() {
-            localStorage.setItem(ROOM_AUTH_CACHE_KEY, JSON.stringify(this.roomAuthCache));
+            sessionStorage.setItem(ROOM_AUTH_CACHE_KEY, JSON.stringify(this.roomAuthCache));
+        },
+        getGlobalAuthToken() {
+            const entry = this.roomAuthCache[GLOBAL_ROOM_KEY];
+            if (typeof entry === 'string') {
+                return entry;
+            }
+            if (entry && typeof entry === 'object' && typeof entry.token === 'string') {
+                return entry.token;
+            }
+            return '';
+        },
+        // 返回指定房间实际使用的缓存条目（专属优先，其次全局令牌），用于读 token / 调度续期
+        getEffectiveAuthEntry(room = this.room) {
+            const now = Math.floor(Date.now() / 1000);
+            const read = key => {
+                const entry = this.roomAuthCache[key];
+                if (typeof entry === 'string' && entry) {
+                    return { token: entry, expiresAt: 0, key };
+                }
+                if (entry && typeof entry === 'object' && typeof entry.token === 'string' && entry.token) {
+                    const expiresAt = Number(entry.expiresAt) || 0;
+                    // 已过期的专属令牌视为不存在，回退使用全局令牌
+                    if (expiresAt > 0 && expiresAt <= now) {
+                        return null;
+                    }
+                    return { token: entry.token, expiresAt, key };
+                }
+                return null;
+            };
+            return read(this.getRoomStorageKey(room)) || read(GLOBAL_ROOM_KEY);
         },
         getAuthTokenForRoom(room = this.room) {
-            return this.roomAuthCache[this.getRoomStorageKey(room)] || '';
+            const effective = this.getEffectiveAuthEntry(room);
+            return effective ? effective.token : '';
         },
-        cacheAuthTokenForRoom(room, token) {
+        cacheAuthTokenForRoom(room, token, expiresAt = 0) {
             const normalizedToken = (token || '').trim();
             const key = this.getRoomStorageKey(room);
 
@@ -105,12 +142,21 @@ export default {
                 return;
             }
 
-            this.$set(this.roomAuthCache, key, normalizedToken);
+            const existing = this.roomAuthCache[key];
+            const effectiveExpiresAt = Number(expiresAt) > 0
+                ? Number(expiresAt)
+                : (existing && typeof existing === 'object' && Number(existing.expiresAt) > 0 ? Number(existing.expiresAt) : 0);
+
+            this.$set(this.roomAuthCache, key, {
+                token: normalizedToken,
+                expiresAt: effectiveExpiresAt,
+            });
             this.persistRoomAuthCache();
 
             if (this.normalizeRoomName(room) === this.normalizeRoomName(this.room)) {
                 this.authCode = normalizedToken;
             }
+            this.scheduleAuthRefresh(room);
         },
         clearAuthTokenForRoom(room = this.room) {
             const key = this.getRoomStorageKey(room);
@@ -121,12 +167,32 @@ export default {
 
             if (this.normalizeRoomName(room) === this.normalizeRoomName(this.room)) {
                 this.authCode = '';
+                this.clearAuthRefreshTimer();
             }
+        },
+        getKnownAuthTokensForRoom(room = this.room) {
+            const tokens = [];
+            const pushToken = token => {
+                const normalizedToken = (token || '').trim();
+                if (normalizedToken && !tokens.includes(normalizedToken)) {
+                    tokens.push(normalizedToken);
+                }
+            };
+
+            // 房间专属 token 优先；无专属 token 时回退使用全局令牌
+            pushToken(this.getAuthTokenForRoom(room));
+            pushToken(this.getGlobalAuthToken());
+
+            return tokens;
         },
         getKnownAuthTokens(room = this.room) {
             const tokens = [];
             const pushToken = token => {
-                const normalizedToken = (token || '').trim();
+                let value = token;
+                if (token && typeof token === 'object' && typeof token.token === 'string') {
+                    value = token.token;
+                }
+                const normalizedToken = String(value || '').trim();
                 if (normalizedToken && !tokens.includes(normalizedToken)) {
                     tokens.push(normalizedToken);
                 }
@@ -137,6 +203,73 @@ export default {
             Object.values(this.roomAuthCache).forEach(pushToken);
 
             return tokens;
+        },
+        clearAuthRefreshTimer() {
+            if (this.authRefreshTimer) {
+                clearTimeout(this.authRefreshTimer);
+                this.authRefreshTimer = null;
+            }
+        },
+        scheduleAuthRefresh(room = this.room) {
+            this.clearAuthRefreshTimer();
+            const normalizedRoom = this.normalizeRoomName(room);
+            if (normalizedRoom !== this.normalizeRoomName(this.room)) {
+                return;
+            }
+
+            const effective = this.getEffectiveAuthEntry(normalizedRoom);
+            const token = effective ? effective.token : '';
+            const expiresAt = effective ? effective.expiresAt : 0;
+            if (!token || !expiresAt) {
+                return;
+            }
+
+            const remainingSeconds = expiresAt - Math.floor(Date.now() / 1000);
+            // 不足 60 秒则不再调度，交由 401 兜底处理
+            if (remainingSeconds <= 60) {
+                return;
+            }
+            // 到期前 60 秒静默续签，避免频繁刷新
+            const delay = Math.max(0, Math.min((remainingSeconds - 60) * 1000, 24 * 60 * 60 * 1000));
+            this.authRefreshTimer = setTimeout(async () => {
+                this.authRefreshTimer = null;
+                const refreshed = await this.refreshRoomSessionToken(normalizedRoom);
+                if (refreshed && refreshed.token) {
+                    // 续签结果按 scope 放回对应缓存，保持全局/房间语义
+                    const cacheRoom = refreshed.scope === 'global' ? GLOBAL_ROOM_KEY : effective.key;
+                    this.cacheAuthTokenForRoom(cacheRoom, refreshed.token, refreshed.expiresAt);
+                    this.scheduleAuthRefresh(normalizedRoom);
+                } else {
+                    this.clearAuthTokenForRoom(normalizedRoom);
+                    if (normalizedRoom === this.normalizeRoomName(this.room)) {
+                        this.$toast.error(this.$t('authExpired'));
+                        this.openAuthDialog(normalizedRoom);
+                    }
+                }
+            }, delay);
+        },
+        async refreshRoomSessionToken(room) {
+            const normalizedRoom = this.normalizeRoomName(room);
+            const currentToken = this.getAuthTokenForRoom(normalizedRoom);
+            if (!currentToken) {
+                return null;
+            }
+
+            try {
+                const response = await this.$http.post('auth/token/refresh', null, {
+                    params: new URLSearchParams([['room', normalizedRoom]]),
+                    __skipRoomAuthHandling: true,
+                });
+                const data = response.data || {};
+                return {
+                    token: data.token || null,
+                    expiresAt: Number(data.expiresAt) || 0,
+                    scope: data.scope === 'global' ? 'global' : '',
+                };
+            } catch (error) {
+                console.error('Failed to refresh session token:', error);
+                return null;
+            }
         },
         getRequestRoom(config = {}) {
             if (config.params instanceof URLSearchParams) {
@@ -185,7 +318,7 @@ export default {
         openAuthDialog(room, initialToken = '') {
             this.authPendingRoom = this.normalizeRoomName(room);
             this.roomDialog = false;
-            this.authCode = initialToken || this.getAuthTokenForRoom(room) || '';
+            this.inputPassword = '';
             this.authCodeError = '';
             this.authDialogLoading = false;
             this.authCodeDialog = true;
@@ -197,11 +330,10 @@ export default {
                 return '';
             }
 
-            const candidateTokens = this.getKnownAuthTokens(normalizedRoom);
+            const candidateTokens = this.getKnownAuthTokensForRoom(normalizedRoom);
             for (const token of candidateTokens) {
                 const verified = await this.verifyRoomAccess(normalizedRoom, token);
                 if (verified) {
-                    this.cacheAuthTokenForRoom(normalizedRoom, token);
                     return token;
                 }
             }
@@ -219,16 +351,24 @@ export default {
                 return false;
             }
 
+            const targetQuery = normalizedRoom ? { room: normalizedRoom } : {};
+            const currentQuery = this.$router.currentRoute.query;
+            
+            // Check if already at target location to avoid NavigationDuplicated error
+            if (normalizedRoom === this.normalizeRoomName(currentQuery.room || 'default')) {
+                return true;
+            }
+
             await this.$router.push({
                 path: '/',
-                query: normalizedRoom ? { room: normalizedRoom } : {},
+                query: targetQuery,
             });
             return true;
         },
         async submitAuthCodeForPendingRoom() {
             const targetRoom = this.authPendingRoom || this.normalizeRoomName(this.room);
-            const token = (this.authCode || '').trim();
-            if (!token || this.authDialogLoading) {
+            const password = (this.inputPassword || '').trim();
+            if (!password || this.authDialogLoading) {
                 return;
             }
 
@@ -236,13 +376,30 @@ export default {
             this.authCodeError = '';
 
             try {
-                const verified = await this.verifyRoomAccess(targetRoom, token);
+                // 1. 验证密码是否正确
+                const verified = await this.verifyRoomAccess(targetRoom, password);
                 if (!verified) {
                     this.authCodeError = this.$t('authInvalid');
                     return;
                 }
 
-                this.cacheAuthTokenForRoom(targetRoom, token);
+                // 2. 用验证过的密码获取 room session token
+                const session = await this.obtainRoomSessionToken(targetRoom, password);
+                if (!session || !session.token) {
+                    this.authCodeError = this.$t('connectionFailedRetry');
+                    return;
+                }
+
+                // 3. 只缓存 session token，不缓存原始密码。
+                //    全局 scope 的令牌存入全局缓存，所有房间回退复用。
+                if (session.scope === 'global') {
+                    this.cacheAuthTokenForRoom(GLOBAL_ROOM_KEY, session.token, session.expiresAt);
+                } else {
+                    this.cacheAuthTokenForRoom(targetRoom, session.token, session.expiresAt);
+                }
+                // 全局令牌缓存到 __global__ 时不会触发续期调度，这里显式调度当前房间
+                this.scheduleAuthRefresh(targetRoom);
+                this.inputPassword = '';
                 this.authCodeDialog = false;
                 this.authPendingRoom = '';
 
@@ -258,6 +415,26 @@ export default {
                 this.authCodeError = this.$t('connectionFailedRetry');
             } finally {
                 this.authDialogLoading = false;
+            }
+        },
+        async obtainRoomSessionToken(room, password) {
+            const normalizedRoom = this.normalizeRoomName(room);
+            try {
+                const response = await this.$http.post('auth/token', {
+                    password: password,
+                }, {
+                    params: new URLSearchParams([['room', normalizedRoom]]),
+                    __skipRoomAuthHandling: true,
+                });
+                const data = response.data || {};
+                return {
+                    token: data.token || null,
+                    expiresAt: Number(data.expiresAt) || 0,
+                    scope: data.scope === 'global' ? 'global' : '',
+                };
+            } catch (error) {
+                console.error('Failed to obtain session token:', error);
+                return null;
             }
         },
         handleHttpUnauthorized(config = {}) {
@@ -304,11 +481,10 @@ export default {
                         wsUrl.port = location.port;
                     }
 
-                    if (resolvedToken) {
-                        wsUrl.searchParams.set('auth', resolvedToken);
-                    }
                     wsUrl.searchParams.set('room', currentRoom);
-                    const socket = new WebSocket(wsUrl);
+                    // 通过 WebSocket 子协议传递 token，避免凭据出现在 URL/访问日志中
+                    const protocols = resolvedToken ? [resolvedToken] : [];
+                    const socket = new WebSocket(wsUrl, protocols);
                     socket.onopen = () => resolve(socket);
                     socket.onerror = reject;
                 });
@@ -329,7 +505,7 @@ export default {
                         this.$toast(this.$t('reconnectingServer', { retry: this.retry }));
                         setTimeout(() => this.connect(), 3000);
                     } else if (this.getAuthTokenForRoom(this.room)) {
-                        this.openAuthDialog(this.room, this.getAuthTokenForRoom(this.room));
+                        this.openAuthDialog(this.room);
                     }
                 };
                 ws.onmessage = e => {

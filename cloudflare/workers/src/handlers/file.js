@@ -137,7 +137,7 @@ export class FileHandler {
     try {
       const url = new URL(request.url);
       const room = normalizeRoomName(url.searchParams.get('room'));
-      const authResult = ensureRoomAccess(request, env, room);
+      const authResult = await ensureRoomAccess(request, env, room);
       if (!authResult.ok) {
         return authResult.response;
       }
@@ -256,7 +256,7 @@ export class FileHandler {
     try {
       const url = new URL(request.url);
       const room = normalizeRoomName(url.searchParams.get('room'));
-      const authResult = ensureRoomAccess(request, env, room);
+      const authResult = await ensureRoomAccess(request, env, room);
       if (!authResult.ok) {
         return authResult.response;
       }
@@ -342,7 +342,7 @@ export class FileHandler {
     try {
       const url = new URL(request.url);
       const room = normalizeRoomName(url.searchParams.get('room'));
-      const authResult = ensureRoomAccess(request, env, room);
+      const authResult = await ensureRoomAccess(request, env, room);
       if (!authResult.ok) {
         return authResult.response;
       }
@@ -391,7 +391,7 @@ export class FileHandler {
     try {
       const url = new URL(request.url);
       const room = normalizeRoomName(url.searchParams.get('room'));
-      const authResult = ensureRoomAccess(request, env, room);
+      const authResult = await ensureRoomAccess(request, env, room);
       if (!authResult.ok) {
         return authResult.response;
       }
@@ -454,7 +454,7 @@ export class FileHandler {
     try {
       const url = new URL(request.url);
       const room = normalizeRoomName(url.searchParams.get('room'));
-      const authResult = ensureRoomAccess(request, env, room);
+      const authResult = await ensureRoomAccess(request, env, room);
       if (!authResult.ok) {
         return authResult.response;
       }
@@ -592,7 +592,7 @@ export class FileHandler {
         }
       }
 
-      const authResult = ensureRoomAccess(request, env, room);
+      const authResult = await ensureRoomAccess(request, env, room);
       if (!authResult.ok) {
         return authResult.response;
       }

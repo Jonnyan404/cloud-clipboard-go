@@ -27,6 +27,7 @@
     "authRequired": "需要認證",
     "authPrompt": "此剪貼簿服務並非公開，請輸入密碼以繼續連線。",
     "authInvalid": "密碼不正確，請再試一次。",
+    "authExpired": "認證已過期，請重新輸入密碼。",
     "password": "密碼",
     "submit": "提交",
     "clipboardRoom": "剪貼簿房間",

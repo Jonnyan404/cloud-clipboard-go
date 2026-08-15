@@ -25,9 +25,10 @@ const (
 )
 
 type shareClaims struct {
-	Type    string `json:"typ"` // content | file
-	ID      string `json:"id"`  // content id or file uuid
-	Room    string `json:"room"`
+	Type    string `json:"typ"`           // content | file | room_session
+	ID      string `json:"id"`            // content id or file uuid or room
+	Room    string `json:"room"`          // 绑定的房间（默认房间为空串）
+	Scope   string `json:"sc,omitempty"`  // room_session 的 scope: ""=房间专属, "global"=全局所有房间
 	Exp     int64  `json:"exp"`
 	JTI     string `json:"jti,omitempty"` // token id when usage-limited
 	MaxUses int    `json:"mu,omitempty"`  // 0 = unlimited
@@ -201,6 +202,59 @@ func (s *ClipboardServer) parseShareToken(token string) (*shareClaims, bool) {
 	}
 
 	return &claims, true
+}
+
+// issueRoomSessionToken 签发房间会话令牌。
+// scope 为 "global" 时签发全局会话令牌（对所有房间有效），否则按 room 绑定。
+func (s *ClipboardServer) issueRoomSessionToken(room string, ttlSeconds int, scope string) (string, error) {
+	if ttlSeconds <= 0 {
+		ttlSeconds = 60 * 60
+	}
+	if ttlSeconds > 24*60*60 {
+		ttlSeconds = 24 * 60 * 60
+	}
+
+	claims := shareClaims{
+		Type:  "room_session",
+		ID:    normalizeRoomName(room),
+		Room:  normalizeRoomName(room),
+		Scope: scope,
+		Exp:   time.Now().Unix() + int64(ttlSeconds),
+	}
+	return s.signShareClaims(claims)
+}
+
+// parseRoomSessionToken 解析并校验会话令牌（不含房间匹配），返回 claims。
+func (s *ClipboardServer) parseRoomSessionToken(token string) (*shareClaims, bool) {
+	if strings.TrimSpace(token) == "" {
+		return nil, false
+	}
+	claims, ok := s.parseShareToken(token)
+	if !ok {
+		return nil, false
+	}
+	if claims.Type != "room_session" {
+		return nil, false
+	}
+	return claims, true
+}
+
+func (s *ClipboardServer) validateRoomSessionToken(room, token string) bool {
+	claims, ok := s.parseRoomSessionToken(token)
+	if !ok {
+		return false
+	}
+	// 全局会话令牌对所有房间有效
+	if claims.Scope == "global" {
+		return true
+	}
+	if normalizeRoomName(room) != claims.Room {
+		return false
+	}
+	if normalizeRoomName(claims.ID) != normalizeRoomName(room) {
+		return false
+	}
+	return true
 }
 
 // shouldConsumeShareUse decides whether this HTTP request should count against maxUses.

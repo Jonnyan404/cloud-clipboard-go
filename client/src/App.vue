@@ -468,7 +468,7 @@
                         {{ $t('room') }}: {{ getRoomDisplayName({ name: $root.authPendingRoom || $root.room }) }}
                     </p>
                     <v-text-field
-                        v-model="$root.authCode"
+                        v-model="$root.inputPassword"
                         :label="$t('password')"
                         :loading="$root.authDialogLoading"
                         :disabled="$root.authDialogLoading"

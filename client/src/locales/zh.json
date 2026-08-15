@@ -27,6 +27,7 @@
     "authRequired": "需要认证",
     "authPrompt": "这个剪贴板服务并不是公开的，请输入密码以继续连接。",
     "authInvalid": "密码不正确，请重试。",
+    "authExpired": "认证已过期，请重新输入密码。",
     "password": "密码",
     "submit": "提交",
     "clipboardRoom": "剪贴板房间",

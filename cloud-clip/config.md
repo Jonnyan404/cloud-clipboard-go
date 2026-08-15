@@ -136,7 +136,32 @@ foobar
 
 > 推荐 API / 脚本使用 `Authorization: Bearer`。`?auth=` 仅为兼容保留，不建议把房间密码写进可分享 URL。
 
-#### 短期分享链接（方案 A）
+#### 房间会话令牌
+
+Web 前端会用密码换取短期会话令牌，只缓存令牌而非密码，到期前自动续签。
+
+```console
+# 用房间密码换取会话令牌（有效期 1 小时）
+$ curl -H "Content-Type: application/json" \
+  -d '{"password":"room-pass"}' \
+  "http://localhost:9501/auth/token?room=default"
+{"token":"...","expiresAt":1710003600,"scope":"global"}
+
+# 用仍有效的令牌续签（无需密码），浏览器在到期前 60 秒自动调用
+$ curl -H "Authorization: Bearer <token>" \
+  -X POST "http://localhost:9501/auth/token/refresh?room=default"
+{"token":"...","expiresAt":1710007200,"scope":"global"}
+```
+
+说明：
+- `POST /auth/token` 仅接受 JSON `{"password":"..."}`，密码正确返回 `token` 与 `expiresAt`
+- `scope` 字段表示令牌作用域：用**全局密码**（`server.auth`）登录返回 `"global"`，该令牌对所有房间有效，进入任意受保护房间无需再次输入密码；用**房间专属密码**（`roomAuth`）登录返回 `""`（房间专属）
+- 令牌续签时保留原作用域，全局令牌不会在刷新时降级为房间专属
+- `POST /auth/token/refresh` 通过 `Authorization: Bearer` 携带当前令牌，有效则签发新令牌；无效或缺失返回 401
+- 会话令牌等价于对应房间密码，仅用于浏览器内部，勿放入可分享 URL
+- WebSocket 握手（`/push`）优先使用 `Sec-WebSocket-Protocol` 子协议传递令牌（避免凭据进入 URL/访问日志）；`?auth=` 与 `Authorization` 仍作为兼容兜底
+
+#### 短期分享链接
 
 用于浏览器复制链接 / 二维码 / `<a href>` 下载，**不暴露房间密码**。  
 现有 API 下载方式不变：继续可用房间密码（Header 或 `?auth=`）。

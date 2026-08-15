@@ -1,8 +1,12 @@
 package lib
 
 import (
+	"encoding/json"
+	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -116,6 +120,55 @@ func TestShareTokenRangeContinuationDoesNotConsume(t *testing.T) {
 	}
 }
 
+func TestRoomSessionTokenAuth(t *testing.T) {
+	s := &ClipboardServer{
+		config: &Config{},
+	}
+	s.config.Server.Auth = "room-pass"
+
+	token, err := s.issueRoomSessionToken("default", 600, "")
+	if err != nil {
+		t.Fatalf("issue session token failed: %v", err)
+	}
+	if token == "" {
+		t.Fatal("session token empty")
+	}
+
+	if !s.validateRoomSessionToken("default", token) {
+		t.Fatal("expected valid room session token")
+	}
+	if s.validateRoomSessionToken("private", token) {
+		t.Fatal("session should not validate for wrong room")
+	}
+
+	// 全局 scope 的会话令牌应通行所有房间
+	globalToken, err := s.issueRoomSessionToken("default", 600, "global")
+	if err != nil {
+		t.Fatalf("issue global session token failed: %v", err)
+	}
+	if !s.validateRoomSessionToken("default", globalToken) {
+		t.Fatal("global token should validate for the issuing room")
+	}
+	if !s.validateRoomSessionToken("private", globalToken) {
+		t.Fatal("global token should validate for any room")
+	}
+	if !s.validateRoomSessionToken("finance", globalToken) {
+		t.Fatal("global token should validate for any other room")
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/file/u/a", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	if !s.canAccessFile(req, "default", "u") {
+		t.Fatal("session token should allow access")
+	}
+
+	globalReq := httptest.NewRequest(http.MethodGet, "/file/u/a", nil)
+	globalReq.Header.Set("Authorization", "Bearer "+globalToken)
+	if !s.canAccessFile(globalReq, "finance", "u") {
+		t.Fatal("global session token should allow access to any room")
+	}
+}
+
 func TestCanAccessRoomStillWorksWithoutShareToken(t *testing.T) {
 	s := &ClipboardServer{
 		config: &Config{},
@@ -131,5 +184,162 @@ func TestCanAccessRoomStillWorksWithoutShareToken(t *testing.T) {
 	req2.Header.Set("Authorization", "Bearer room-pass")
 	if !s.canAccessFile(req2, "default", "u") {
 		t.Fatal("bearer auth should still work")
+	}
+}
+
+func TestHandleAuthToken(t *testing.T) {
+	s := &ClipboardServer{
+		config: &Config{},
+		logger: log.New(io.Discard, "", 0),
+	}
+	s.config.Server.Auth = "room-pass"
+
+	// Test successful token issuance
+	reqBody := strings.NewReader(`{"password":"room-pass"}`)
+	req := httptest.NewRequest(http.MethodPost, "/auth/token?room=default", reqBody)
+	w := httptest.NewRecorder()
+	s.handleAuthToken(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	var resp struct {
+		Token string `json:"token"`
+		Scope string `json:"scope"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if resp.Token == "" {
+		t.Fatal("token should not be empty")
+	}
+	if resp.Scope != "global" {
+		t.Fatalf("expected global scope when using global password, got %q", resp.Scope)
+	}
+
+	// Verify the token can access the room
+	if !s.validateRoomSessionToken("default", resp.Token) {
+		t.Fatal("issued token should validate for the room")
+	}
+	// 全局密码换来的会话令牌应通行其他房间
+	if !s.validateRoomSessionToken("finance", resp.Token) {
+		t.Fatal("global-scope token should validate for other rooms")
+	}
+
+	// Test wrong password
+	reqBody = strings.NewReader(`{"password":"wrong-pass"}`)
+	req = httptest.NewRequest(http.MethodPost, "/auth/token?room=default", reqBody)
+	w = httptest.NewRecorder()
+	s.handleAuthToken(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 for wrong password, got %d", w.Code)
+	}
+
+	// Test empty password
+	reqBody = strings.NewReader(`{"password":""}`)
+	req = httptest.NewRequest(http.MethodPost, "/auth/token?room=default", reqBody)
+	w = httptest.NewRecorder()
+	s.handleAuthToken(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 for empty password, got %d", w.Code)
+	}
+
+	// 房间专属密码换来的令牌应为房间专属 scope，且不能通行其他房间
+	s.config.Server.RoomAuth = map[string]string{"private": "private-pass"}
+	reqBody = strings.NewReader(`{"password":"private-pass"}`)
+	req = httptest.NewRequest(http.MethodPost, "/auth/token?room=private", reqBody)
+	w = httptest.NewRecorder()
+	s.handleAuthToken(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 for room password, got %d", w.Code)
+	}
+	var roomResp struct {
+		Token string `json:"token"`
+		Scope string `json:"scope"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&roomResp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if roomResp.Scope != "" {
+		t.Fatalf("expected room-specific scope for room password, got %q", roomResp.Scope)
+	}
+	if !s.validateRoomSessionToken("private", roomResp.Token) {
+		t.Fatal("room token should validate for its room")
+	}
+	if s.validateRoomSessionToken("finance", roomResp.Token) {
+		t.Fatal("room token should NOT validate for other rooms")
+	}
+}
+
+func TestHandleAuthTokenRefresh(t *testing.T) {
+	s := &ClipboardServer{
+		config: &Config{},
+		logger: log.New(io.Discard, "", 0),
+	}
+	s.config.Server.Auth = "room-pass"
+
+	// 先签发一个有效令牌
+	req := httptest.NewRequest(http.MethodPost, "/auth/token?room=default", strings.NewReader(`{"password":"room-pass"}`))
+	w := httptest.NewRecorder()
+	s.handleAuthToken(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	var issued struct {
+		Token string `json:"token"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&issued); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if issued.Token == "" {
+		t.Fatal("token should not be empty")
+	}
+
+	// 有效令牌 -> 续签成功
+	refreshReq := httptest.NewRequest(http.MethodPost, "/auth/token/refresh?room=default", nil)
+	refreshReq.Header.Set("Authorization", "Bearer "+issued.Token)
+	w2 := httptest.NewRecorder()
+	s.handleAuthTokenRefresh(w2, refreshReq)
+	if w2.Code != http.StatusOK {
+		t.Fatalf("expected 200 for refresh, got %d", w2.Code)
+	}
+
+	var refreshed struct {
+		Token     string `json:"token"`
+		ExpiresAt int64  `json:"expiresAt"`
+	}
+	if err := json.NewDecoder(w2.Body).Decode(&refreshed); err != nil {
+		t.Fatalf("failed to decode refresh response: %v", err)
+	}
+	if refreshed.Token == "" {
+		t.Fatal("refreshed token should not be empty")
+	}
+	if refreshed.ExpiresAt <= time.Now().Unix() {
+		t.Fatal("expiresAt should be in the future")
+	}
+	if !s.validateRoomSessionToken("default", refreshed.Token) {
+		t.Fatal("refreshed token should validate for the room")
+	}
+
+	// 无效令牌 -> 401
+	badReq := httptest.NewRequest(http.MethodPost, "/auth/token/refresh?room=default", nil)
+	badReq.Header.Set("Authorization", "Bearer invalid-token")
+	w3 := httptest.NewRecorder()
+	s.handleAuthTokenRefresh(w3, badReq)
+	if w3.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 for invalid token, got %d", w3.Code)
+	}
+
+	// 缺少令牌 -> 401
+	w4 := httptest.NewRecorder()
+	s.handleAuthTokenRefresh(w4, httptest.NewRequest(http.MethodPost, "/auth/token/refresh?room=default", nil))
+	if w4.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 for missing token, got %d", w4.Code)
 	}
 }
