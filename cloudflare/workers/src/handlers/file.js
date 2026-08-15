@@ -414,8 +414,23 @@ export class FileHandler {
       const upload = env.R2_BUCKET.resumeMultipartUpload(key, uploadId);
       const completedObject = await upload.complete(parts.sort((left, right) => left.partNumber - right.partNumber));
       const uuid = extractUuidFromKey(key);
-      const fileName = completedObject.customMetadata?.originalName || body?.name || uuid || 'file';
-      const expireTime = Number(completedObject.customMetadata?.expireTime || 0);
+
+      // complete() 的响应可能不携带 customMetadata，用 head() 读取权威元数据，
+      // 避免 expireTime 丢失导致前端立即显示“已过期”
+      let storedExpireTime = 0;
+      let storedName = '';
+      try {
+        const headObject = await env.R2_BUCKET.head(key);
+        storedExpireTime = Number(headObject?.customMetadata?.expireTime || 0);
+        storedName = String(headObject?.customMetadata?.originalName || '');
+      } catch (headError) {
+        console.warn('[multipart] head metadata failed:', headError?.stack || headError);
+      }
+      const expireSeconds = env.FILE_EXPIRE ? parseInt(env.FILE_EXPIRE, 10) : 3600;
+      const expireTime = storedExpireTime > 0
+        ? storedExpireTime
+        : Math.floor(Date.now() / 1000) + expireSeconds;
+      const fileName = storedName || body?.name || uuid || 'file';
       const fileSize = Number(completedObject.size || body?.size || 0);
 
       console.log('[multipart] completed', {
