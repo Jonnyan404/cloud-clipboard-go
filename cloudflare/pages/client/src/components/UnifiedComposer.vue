@@ -201,28 +201,69 @@ export default {
                     return;
                 }
 
-                const response = await this.$http.post('upload/chunk', file.name, {
-                    headers: { 'Content-Type': 'text/plain' },
-                    params: new URLSearchParams([['room', this.$root.room]]),
-                });
-                const uuid = response.data.result.uuid;
-
-                let uploadedSize = 0;
-                while (uploadedSize < file.size) {
-                    const chunk = file.slice(uploadedSize, uploadedSize + chunkSize);
-                    await this.$http.post(`upload/chunk/${uuid}`, chunk, {
-                        headers: { 'Content-Type': 'application/octet-stream' },
-                        onUploadProgress: event => this.$set(this.uploadedSizes, index, uploadedSize + event.loaded),
-                    });
-                    uploadedSize += chunkSize;
-                }
-
-                await this.$http.post(`upload/finish/${uuid}`, null, {
-                    params: new URLSearchParams([['room', this.$root.room]]),
-                });
+                await this.uploadMultipartFile(file, index, chunkSize);
             }));
 
             this.$root.send.files.splice(0);
+        },
+        async uploadMultipartFile(file, index, chunkSize) {
+            let session = null;
+            try {
+                const initResponse = await this.$http.post('upload/multipart/create', {
+                    name: file.name,
+                    size: file.size,
+                    type: file.type || 'application/octet-stream',
+                }, {
+                    headers: { 'Content-Type': 'application/json' },
+                    params: new URLSearchParams([['room', this.$root.room]]),
+                });
+                session = initResponse.data.result;
+
+                const parts = [];
+                let uploadedSize = 0;
+                while (uploadedSize < file.size) {
+                    const chunk = file.slice(uploadedSize, uploadedSize + chunkSize);
+                    const partNumber = parts.length + 1;
+                    const partResponse = await this.$http.put(`upload/multipart/${partNumber}`, chunk, {
+                        headers: { 'Content-Type': 'application/octet-stream' },
+                        params: new URLSearchParams([
+                            ['room', this.$root.room],
+                            ['uploadId', session.uploadId],
+                            ['key', session.key],
+                        ]),
+                        onUploadProgress: e => this.$set(this.uploadedSizes, index, uploadedSize + e.loaded),
+                    });
+                    parts.push(partResponse.data.result || partResponse.data);
+                    uploadedSize += chunk.size;
+                    this.$set(this.uploadedSizes, index, uploadedSize);
+                }
+
+                await this.$http.post('upload/multipart/complete', {
+                    uploadId: session.uploadId,
+                    key: session.key,
+                    name: file.name,
+                    size: file.size,
+                    parts,
+                }, {
+                    headers: { 'Content-Type': 'application/json' },
+                    params: new URLSearchParams([['room', this.$root.room]]),
+                });
+            } catch (error) {
+                if (session && session.uploadId && session.key) {
+                    try {
+                        await this.$http.delete('upload/multipart', {
+                            params: new URLSearchParams([
+                                ['room', this.$root.room],
+                                ['uploadId', session.uploadId],
+                                ['key', session.key],
+                            ]),
+                        });
+                    } catch (abortError) {
+                        console.error('取消分片上传失败:', abortError);
+                    }
+                }
+                throw error;
+            }
         },
         async sendAll() {
             try {
@@ -235,8 +276,9 @@ export default {
                 this.$toast(this.$t('sendSuccess'));
                 this.focus();
             } catch (error) {
-                if (error.response && error.response.data.msg) {
-                    this.$toast(this.$t('sendFailedMsg', { msg: error.response.data.msg }));
+                const errorMessage = error?.response?.data?.msg || error?.response?.data?.message || error?.message;
+                if (errorMessage) {
+                    this.$toast(this.$t('sendFailedMsg', { msg: errorMessage }));
                 } else {
                     this.$toast(this.$t('sendFailed'));
                 }

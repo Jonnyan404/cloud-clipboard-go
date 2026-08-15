@@ -39,6 +39,13 @@
                         size="2.5rem"
                         color="grey"
                     >{{ mdiMovie }}</v-icon>
+                    <!-- 为图片文件添加专门的图标（Cloudflare 无缩略图，按扩展名识别） -->
+                    <v-icon
+                        v-else-if="isPreviewableImage"
+                        class="mr-3 flex-grow-0 hidden-sm-and-down"
+                        size="2.5rem"
+                        color="grey"
+                    >{{ mdiImage }}</v-icon>
                     <div class="flex-grow-1 mr-2" style="min-width: 0">
                         <div
                             class="title text-truncate text--primary timeline-card__title"
@@ -75,7 +82,7 @@
                                 <span>{{ expired ? $t('expired') : $t('download') }}</span>
                             </v-tooltip>
 
-                            <template v-if="meta.thumbnail || isPreviewableVideo || isPreviewableAudio || isPreviewableText">
+                            <template v-if="meta.thumbnail || isPreviewableImage || isPreviewableVideo || isPreviewableAudio || isPreviewableText">
                                 <v-progress-circular
                                     v-if="loadingPreview"
                                     indeterminate
@@ -120,7 +127,7 @@
                         </div>
                     </div>
                 </div>
-                <v-expand-transition v-if="meta.thumbnail || isPreviewableVideo || isPreviewableAudio || isPreviewableText">
+                <v-expand-transition v-if="meta.thumbnail || isPreviewableImage || isPreviewableVideo || isPreviewableAudio || isPreviewableText">
                     <div v-show="expand">
                         <v-divider class="my-2"></v-divider>
                         <video
@@ -283,6 +290,7 @@ import {
     mdiQrcode,
     mdiMusicNote,
     mdiMovie,
+    mdiImage,
     mdiTextBoxSearchOutline,
     mdiPound,
 } from '@mdi/js';
@@ -348,6 +356,9 @@ export default {
         },
         isPreviewableAudio() {
             return this.meta.name.match(/\.(mp3|wav|ogg|opus|m4a|flac)$/gi);
+        },
+        isPreviewableImage() {
+            return this.meta.name.match(/\.(jpe?g|png|gif|webp|bmp|svg|ico|avif)$/gi);
         },
         isPreviewableText() {
             return this.meta.name.match(/\.(txt|text|md|markdown|json|log|csv|tsv|ya?ml|xml|ini|conf|cfg|toml|properties|env|gitignore|dockerfile|js|jsx|mjs|cjs|ts|tsx|vue|css|scss|sass|less|html|htm|sql|sh|bash|zsh|fish|ps1|bat|cmd|go|py|java|kt|kts|rb|php|rs|c|cc|cpp|cxx|h|hh|hpp|hxx|swift|proto)$/gi);
@@ -491,13 +502,24 @@ export default {
             this.shareFileUrl = data?.url || '';
             return this.shareFileUrl;
         },
+        async ensureFileDownloadUrl() {
+            const url = await this.ensureFileShareUrl();
+            if (!url) {
+                return '';
+            }
+            // 附加 download=true，让服务端返回 Content-Disposition: attachment，
+            // 同源/跨源都能触发直接下载，而非浏览器内联预览
+            const downloadUrl = new URL(url, window.location.origin);
+            downloadUrl.searchParams.set('download', 'true');
+            return downloadUrl.toString();
+        },
         async downloadFile() {
             if (this.expired || this.downloading) {
                 return;
             }
             this.downloading = true;
             try {
-                const url = await this.ensureFileShareUrl();
+                const url = await this.ensureFileDownloadUrl();
                 const anchor = document.createElement('a');
                 anchor.href = url;
                 anchor.download = this.meta?.name || 'file';
