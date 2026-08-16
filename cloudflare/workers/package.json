@@ -16,7 +16,9 @@
   },
   "overrides": {
     "miniflare": {
-      "undici": "7.24.0"
+      "undici": "7.29.0",
+      "ws": "8.21.0",
+      "sharp": "0.35.0"
     }
   }
 }
