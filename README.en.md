@@ -140,7 +140,7 @@ opkg install ./luci-app-cloud-clipboard_<version>_all.ipk
 ### 6️⃣ Build from Source
 
 ```bash
-# Requirements: Node.js >= 22.12, Go >= 1.22
+# Requirements: Node.js >= 22.12, Go >= 1.25
 
 # 1. Build the frontend
 cd client

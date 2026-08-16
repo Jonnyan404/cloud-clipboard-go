@@ -17,6 +17,7 @@ cloudflare/pages/server*
 cloudflare/node_modules
 .kotlin/
 *.keystore
+.kilo
 clipboard-monitor
 clipboard-monitor/src-tauri/target/
 openwrt/build/

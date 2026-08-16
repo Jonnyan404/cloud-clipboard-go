@@ -141,7 +141,7 @@ opkg install ./luci-app-cloud-clipboard_<version>_all.ipk
 ### 6️⃣ 从源代码构建
 
 ```bash
-# 前置要求：Node.js >= 22.12、Go >= 1.22
+# 前置要求：Node.js >= 22.12、Go >= 1.25
 
 # 1. 构建前端
 cd client
