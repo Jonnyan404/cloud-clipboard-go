@@ -7,7 +7,7 @@ RUN npm install
 RUN npm run build
 
 # 后端构建阶段
-FROM golang:1.23-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 # 设置工作目录
 WORKDIR /app

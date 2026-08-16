@@ -1,8 +1,6 @@
 module github.com/jonnyan404/cloud-clipboard-go/cloud-clip
 
-go 1.23.0
-
-toolchain go1.23.9
+go 1.25.0
 
 require (
 	github.com/andybalholm/brotli v1.1.1
@@ -11,7 +9,7 @@ require (
 	github.com/klauspost/compress v1.18.0
 	github.com/spaolacci/murmur3 v1.1.0
 	github.com/ua-parser/uap-go v0.0.0-20250326155420-f7f5a2f9f5bc
-	golang.org/x/image v0.27.0
+	golang.org/x/image v0.41.0
 	golang.org/x/mobile v0.0.0-20250218173823-21e291c9c26e
 )
 
