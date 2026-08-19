@@ -18,10 +18,10 @@ export function parseUserAgent(uaString = '') {
   const isMobile = !isTablet && /Mobile|iPhone|Android/i.test(ua);
   const isBot = /bot|crawler|spider|curl|wget/i.test(ua);
 
-  let type = 'Desktop';
-  if (isBot) type = 'Bot';
-  else if (isTablet) type = 'Tablet';
-  else if (isMobile) type = 'Mobile';
+  let type = 'desktop';
+  if (isBot) type = 'other';
+  else if (isTablet) type = 'tablet';
+  else if (isMobile) type = 'smartphone';
 
   let os = 'Unknown';
   if (/Windows NT 10\.0/i.test(ua)) os = 'Windows 10';
