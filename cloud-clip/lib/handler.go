@@ -211,7 +211,7 @@ func (s *ClipboardServer) handle_push(w http.ResponseWriter, r *http.Request) {
 	clientUA := s.parser.Parse(userAgent)
 	deviceMeta := DeviceMeta{
 		ID:      deviceID,
-		Type:    clientUA.Device.Family,
+		Type:    detectDeviceType(userAgent),
 		Device:  strings.TrimSpace(fmt.Sprintf("%s %s %s", clientUA.Device.Brand, clientUA.Device.Model, clientUA.Os.Family)),
 		OS:      fmt.Sprintf("%s %s", clientUA.Os.Family, clientUA.Os.Major),
 		Browser: fmt.Sprintf("%s %s", clientUA.UserAgent.Family, clientUA.UserAgent.Major),

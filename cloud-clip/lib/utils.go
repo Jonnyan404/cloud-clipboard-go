@@ -297,11 +297,28 @@ func (r *ReceiveHolder) SenderDevice() map[string]string {
 	return nil
 }
 
+// detectDeviceType 将 User-Agent 归类为 desktop / smartphone / tablet，
+// 与前端 Device.vue 期望的类型保持一致。
+func detectDeviceType(uaString string) string {
+	ua := strings.ToLower(uaString)
+	isTablet := strings.Contains(ua, "ipad") || strings.Contains(ua, "tablet") ||
+		strings.Contains(ua, "playbook") || strings.Contains(ua, "silk") || strings.Contains(ua, "kindle")
+	isMobile := !isTablet && (strings.Contains(ua, "mobile") || strings.Contains(ua, "iphone") || strings.Contains(ua, "android"))
+	switch {
+	case isTablet:
+		return "tablet"
+	case isMobile:
+		return "smartphone"
+	default:
+		return "desktop"
+	}
+}
+
 // parse_user_agent 现在使用 s.parser
 func (s *ClipboardServer) parse_user_agent(uaString string) map[string]string {
 	client := s.parser.Parse(uaString) // 使用实例化的解析器
 	return map[string]string{
-		"type":    client.Device.Family,
+		"type":    detectDeviceType(uaString),
 		"os":      fmt.Sprintf("%s %s", client.Os.Family, client.Os.Major),
 		"browser": fmt.Sprintf("%s %s", client.UserAgent.Family, client.UserAgent.Major),
 	}
