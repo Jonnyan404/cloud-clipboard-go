@@ -446,12 +446,6 @@ docker pull jonnyan404/cloud-clipboard-go:latest
 
 ---
 
-## 📊 Star 历史
-
-[![Star History Chart](https://api.star-history.com/svg?repos=Jonnyan404/cloud-clipboard-go&type=Date)](https://www.star-history.com/#Jonnyan404/cloud-clipboard-go&Date)
-
----
-
 ## 📄 许可证
 
 MIT License - 详见 [LICENSE](LICENSE)
