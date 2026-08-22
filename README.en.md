@@ -443,11 +443,6 @@ The frontend (client) and backend (cloud-clip) in this project are forked and ad
 
 ---
 
-## 📊 Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=Jonnyan404/cloud-clipboard-go&type=Date)](https://www.star-history.com/#Jonnyan404/cloud-clipboard-go&Date)
-
----
 
 ## 📄 License
 
