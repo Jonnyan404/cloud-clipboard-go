@@ -42,6 +42,7 @@
     "send": "Send",
     "selectFileToSend": "Select file to send",
     "dragDropPasteTip": "(Drag & drop and Ctrl+V paste screenshot supported)",
+    "sendShortcutTip": "Press {keys} to send",
     "fileSizeLimit": "File size limit: {limit}",
     "textMessage": "Text Message",
     "copyText": "Copy Text",

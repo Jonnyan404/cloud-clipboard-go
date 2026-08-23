@@ -42,6 +42,7 @@
     "send": "发送",
     "selectFileToSend": "选择要发送的文件",
     "dragDropPasteTip": "（支持拖拽和 Ctrl+V 粘贴截图）",
+    "sendShortcutTip": "按 {keys} 发送",
     "fileSizeLimit": "文件大小限制：{limit}",
     "textMessage": "文本消息",
     "copyText": "复制文本",

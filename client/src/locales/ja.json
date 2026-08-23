@@ -42,6 +42,7 @@
     "send": "送信",
     "selectFileToSend": "送信するファイルを選択",
     "dragDropPasteTip": "（ドラッグ＆ドロップと Ctrl+V でのスクリーンショット貼り付けをサポート）",
+    "sendShortcutTip": "{keys} で送信",
     "fileSizeLimit": "ファイルサイズ制限：{limit}",
     "textMessage": "テキストメッセージ",
     "copyText": "テキストをコピー",
