@@ -22,6 +22,8 @@
                 :hide-details="true"
                 class="unified-composer__textarea"
                 :style="composerTextareaStyle"
+                @keydown.ctrl.enter.prevent="onSendShortcut"
+                @keydown.meta.enter.prevent="onSendShortcut"
             ></v-textarea>
 
             <div class="unified-composer__meta px-1 pb-2">
@@ -60,6 +62,7 @@
                     </v-btn>
                     <div class="caption text--secondary ml-2 unified-composer__hint">
                         {{ footerHint }}
+                        <span class="unified-composer__shortcut">{{ sendShortcutLabel }}</span>
                     </div>
                 </div>
 
@@ -101,6 +104,7 @@ export default {
             progress: false,
             dragover: false,
             uploadedSizes: [],
+            isMac: /mac|iphone|ipad|ipod/i.test(navigator.userAgent || ''),
             mdiPaperclip,
             mdiQrcode,
             mdiSend,
@@ -124,6 +128,11 @@ export default {
                 return this.$t('composerFilesSelected', { count: this.$root.send.files.length });
             }
             return this.$t('dragDropPasteTip');
+        },
+        sendShortcutLabel() {
+            return this.$t('sendShortcutTip', {
+                keys: this.isMac ? '⌘+Enter' : 'Ctrl+Enter',
+            });
         },
         textLimitLabel() {
             return this.$t('composerTextLimit', {
@@ -155,6 +164,11 @@ export default {
         },
         openFilePicker() {
             this.$refs.selectFile.click();
+        },
+        onSendShortcut() {
+            if (!this.sendDisabled) {
+                this.sendAll();
+            }
         },
         removeFile(index) {
             this.$root.send.files.splice(index, 1);
@@ -372,6 +386,10 @@ export default {
     line-height: 1.4;
     min-width: 0;
     word-break: break-word;
+}
+
+.unified-composer__shortcut {
+    white-space: nowrap;
 }
 
 .unified-composer__send {

@@ -287,9 +287,13 @@ jobs:
           TAG_NAME: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          test -f "formula/${FORMULA_NAME}.rb" || { echo "::error::Formula file not found" && exit 1; }
+          # upload-artifact 以所有 glob 的公共祖先(dist/)为根存储，
+          # 下载后的相对路径不确定，用 find 定位以兼容任意嵌套层级
+          FORMULA_FILE="$(find formula -type f -name "${FORMULA_NAME}.rb" | head -1)"
+          test -n "${FORMULA_FILE}" || { echo "::error::Formula file not found" && exit 1; }
+          echo "Found formula at: ${FORMULA_FILE}"
           git clone "https://x-access-token:${TAP_TOKEN}@github.com/Jonnyan404/homebrew-tap.git" tap
-          cp "formula/${FORMULA_NAME}.rb" "tap/Formula/${FORMULA_NAME}.rb"
+          cp "${FORMULA_FILE}" "tap/Formula/${FORMULA_NAME}.rb"
           cd tap
           if [ -z "$(git status --porcelain)" ]; then
             echo "Formula unchanged, nothing to push"

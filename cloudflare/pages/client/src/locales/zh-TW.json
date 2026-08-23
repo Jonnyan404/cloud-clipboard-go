@@ -42,6 +42,7 @@
     "send": "傳送",
     "selectFileToSend": "選擇要傳送的檔案",
     "dragDropPasteTip": "（支援拖曳和 Ctrl+V 貼上螢幕截圖）",
+    "sendShortcutTip": "按 {keys} 發送",
     "fileSizeLimit": "檔案大小限制：{limit}",
     "textMessage": "文字訊息",
     "copyText": "複製文字",
