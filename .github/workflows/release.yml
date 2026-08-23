@@ -89,6 +89,15 @@ jobs:
             dist/*.rpm
             dist/checksums.txt
             dist/CHANGELOG.md
+      - name: Upload Homebrew formula
+        uses: actions/upload-artifact@v4
+        with:
+          name: homebrew-formula
+          # GoReleaser 在 --skip=publish 模式下仍会将 formula 渲染到本地，
+          # v2 渲染路径为 dist/homebrew/<directory>/<name>.rb（兼容旧版无 homebrew 前缀的路径）
+          path: |
+            dist/homebrew/**/*.rb
+            dist/Formula/**/*.rb
 
   # ====================================================================
   # Job 3: Build Per-Architecture Android APKs
@@ -256,7 +265,44 @@ jobs:
           body_path: "artifacts/goreleaser-dist/CHANGELOG.md"
 
   # ====================================================================
-  # Job 6: Build and Push Docker Images
+  # Job 6: Sync Homebrew Tap
+  # GoReleaser 以 --skip=publish 运行（Release 由 softprops 创建），
+  # brews 推送被一并跳过，这里在 Release 资产就绪后手动补推 formula，
+  # 必须放在 release 之后，否则用户安装时下载链接会 404
+  # ====================================================================
+  homebrew-tap-sync:
+    name: Sync Homebrew Tap
+    runs-on: ubuntu-latest
+    needs: release
+    steps:
+      - name: Download formula artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: homebrew-formula
+          path: formula
+      - name: Push formula to Homebrew tap
+        env:
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+          FORMULA_NAME: cloud-clipboard-go
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          test -f "formula/${FORMULA_NAME}.rb" || { echo "::error::Formula file not found" && exit 1; }
+          git clone "https://x-access-token:${TAP_TOKEN}@github.com/Jonnyan404/homebrew-tap.git" tap
+          cp "formula/${FORMULA_NAME}.rb" "tap/Formula/${FORMULA_NAME}.rb"
+          cd tap
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "Formula unchanged, nothing to push"
+            exit 0
+          fi
+          git config user.name "goreleaserbot"
+          git config user.email "goreleaser@carlosbecker.com"
+          git add "Formula/${FORMULA_NAME}.rb"
+          git commit -m "Brew formula update for ${FORMULA_NAME} version ${TAG_NAME}"
+          git push
+
+  # ====================================================================
+  # Job 7: Build and Push Docker Images
   # ====================================================================
   docker:
     name: Build and Push Docker
