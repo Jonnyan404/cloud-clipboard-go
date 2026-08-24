@@ -17,7 +17,9 @@
         "auth": false, // 全局入口密码。只要设置了就对所有房间生效，保证旧密码升级后仍可用
         "roomAuth": {
             "private": "", // 空字符串表示该房间只接受全局 auth
-            "finance": "finance-pass" // 非空字符串表示该房间额外接受独立密码
+            "finance": "finance-pass", // 非空字符串表示该房间额外接受独立密码
+            "keep": {"password": "kp", "fileExpire": 0}, // 对象形式：password 为房间密码；fileExpire: 0=该房间文件永不过期，>0=覆盖 file.expire 秒数，不填=使用全局 file.expire
+            "archive": {"fileExpire": 604800} // 也可以只配置 fileExpire（无独立密码）
         },
         "historyFile": null, // 自定义历史记录存储路径，默认为当前目录的 history.json
         "storageDir": null, // 自定义文件存储目录，默认为临时文件夹的.cloud-clipboard-storage目录
@@ -45,6 +47,7 @@
 > 如果设置了 `server.auth`，它始终作为全局入口密码，对所有房间生效。
 > `server.roomAuth` 不会让 `server.auth` 失效；它只是给指定房间增加一个额外可用密码。
 > `server.roomAuth` 中值为空字符串时，该房间只接受全局 `server.auth`；值为非空字符串时，该房间同时接受全局 `server.auth` 和该房间自己的密码。
+> 值也可以是对象 `{ "password": "xx", "fileExpire": N }`：`fileExpire` 为 `0` 表示该房间上传的文件永不过期；大于 `0` 表示覆盖全局 `file.expire`（秒）；不填表示沿用全局。注意 `fileExpire` 只影响修改配置之后上传的文件；历史条数轮转删除不受其影响。
 > 未通过认证的用户不会在房间列表里看到受保护房间。
 
 

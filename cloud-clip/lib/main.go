@@ -260,9 +260,10 @@ func (s *ClipboardServer) filterHistoryMessagesLocked() {
 		if msg.Data.FileReceive != nil {
 			fileRec := msg.Data.FileReceive
 			fileInfo, existsInMap := s.uploadFileMap[fileRec.Cache]
-			if !existsInMap || fileInfo.ExpireTime < now {
+			expired := fileInfo.ExpireTime > 0 && fileInfo.ExpireTime < now
+			if !existsInMap || expired {
 				s.logger.Printf("从历史记录中过滤掉文件消息: %s (UUID: %s)，原因: 文件不存在或已过期。", fileRec.Name, fileRec.Cache)
-				if existsInMap && fileInfo.ExpireTime < now {
+				if existsInMap && expired {
 					delete(s.uploadFileMap, fileRec.Cache)
 				}
 				continue
@@ -514,7 +515,8 @@ func (s *ClipboardServer) performCleanExpiredFiles() {
 	// 注意：并发访问 s.uploadFileMap 需要加锁
 	// s.mapMutex.Lock() // 假设有一个用于保护 map 的锁
 	for uuid, fileInfo := range s.uploadFileMap {
-		if fileInfo.ExpireTime < currentTime {
+		// ExpireTime <= 0 表示永不过期（房间级 roomAuth.fileExpire=0）
+		if fileInfo.ExpireTime > 0 && fileInfo.ExpireTime < currentTime {
 			toRemove = append(toRemove, uuid)
 		}
 	}

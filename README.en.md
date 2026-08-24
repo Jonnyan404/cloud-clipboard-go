@@ -220,7 +220,7 @@ services:
       PREFIX: ${PREFIX:-} # Subpath, useful with nginx. Example: /cloud-clipboard
       MESSAGE_NUM: ${MESSAGE_NUM:-} # History record count, default 10.
       AUTH_PASSWORD: ${AUTH_PASSWORD:-} # Global access password. Default false.
-      ROOM_AUTH_JSON: '${ROOM_AUTH_JSON:-{}}' # Room password JSON, for example {"finance":"finance-pass","ops":""}
+      ROOM_AUTH_JSON: '${ROOM_AUTH_JSON:-{}}' # Room password JSON, value is a string or object {"finance":"finance-pass","keep":{"password":"kp","fileExpire":0}}, fileExpire: 0=files never expire,>0=override FILE_EXPIRE in seconds
       TEXT_LIMIT: ${TEXT_LIMIT:-} # Text length limit, default 4096.
       FILE_EXPIRE: ${FILE_EXPIRE:-} # File expiration in seconds, default 3600.
       FILE_LIMIT: ${FILE_LIMIT:-} # File size limit in bytes, default 104857600.
@@ -239,7 +239,35 @@ Run:
 docker compose up -d
 ```
 
-`ROOM_AUTH_JSON` must be a valid JSON object. If a room value is an empty string, that room falls back to `AUTH_PASSWORD`.
+`ROOM_AUTH_JSON` must be a valid JSON object. Each room value supports two forms:
+
+1. **String/number** (legacy format): acts only as an extra password for that room;
+2. **Object** `{ "password": "xx", "fileExpire": N }`: configures both the password and the file expiration policy for that room.
+
+`fileExpire` values:
+
+| Value | Meaning |
+| --- | --- |
+| omitted | Use the global `FILE_EXPIRE` (default behavior) |
+| `0` | Files uploaded to this room **never expire** |
+| `> 0` | Override the global `FILE_EXPIRE`, in seconds |
+
+Example:
+
+```bash
+ROOM_AUTH_JSON='{
+  "finance": {"password": "finance-pass", "fileExpire": 0},
+  "archive": {"fileExpire": 604800},
+  "private": "",
+  "tmp": "quick-pass"
+}' docker compose up -d
+```
+
+Meaning:
+
+- `finance` room password `finance-pass`, files never expire;
+- `archive` room has no extra password (falls back to the global one), files are kept for 7 days;
+- `private` room has no extra password; `tmp` room has extra password `quick-pass` — both use the global `FILE_EXPIRE`.
 
 Additional notes:
 
@@ -247,6 +275,8 @@ Additional notes:
 - The entrypoint still accepts the legacy variable name `ROOM_AUTH`, but the Compose example and later docs use `ROOM_AUTH_JSON` consistently.
 - If you use a `.env` file, keep the same `${VAR:-}` mapping and only fill in the actual values.
 - The image explicitly installs `nc`, and the Compose health check only verifies the listening port inside the container. It is unrelated to `PREFIX` or HTTP/HTTPS settings.
+- **`fileExpire` only affects files uploaded after the configuration change**: existing files keep their original expiration time.
+- History rotation is unaffected by `fileExpire`: once a room exceeds the message limit, the oldest files are still cleaned up.
 
 Example:
 

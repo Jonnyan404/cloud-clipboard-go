@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -11,7 +12,54 @@ type RoomAuthRequirement struct {
 	Room     string
 	Required bool
 	Password string
+	// FileExpire: nil=使用全局 file.expire；0=该房间文件永不过期；>0=覆盖过期秒数
+	FileExpire *int64
 }
+
+// RoomAuthEntry 单个房间的认证与文件留存配置。
+// 配置值支持三种 JSON 形式（UnmarshalJSON 兼容）：
+//
+//	"password"                       -> 仅密码（旧格式）
+//	12345                            -> 数字密码
+//	{"password": "x", "fileExpire": 0} -> 密码 + 文件过期覆盖（fileExpire: 0=永不过期，>0=秒数，<0=回退全局）
+type RoomAuthEntry struct {
+	Password   string `json:"password"`
+	FileExpire *int64 `json:"fileExpire"`
+}
+
+func (e *RoomAuthEntry) UnmarshalJSON(data []byte) error {
+	trimmed := bytes.TrimSpace(data)
+
+	var strVal string
+	if err := json.Unmarshal(trimmed, &strVal); err == nil {
+		e.Password = strings.TrimSpace(strVal)
+		return nil
+	}
+
+	var numVal json.Number
+	if err := json.Unmarshal(trimmed, &numVal); err == nil {
+		e.Password = numVal.String()
+		return nil
+	}
+
+	var obj struct {
+		Password   interface{} `json:"password"`
+		FileExpire *float64    `json:"fileExpire"`
+	}
+	if err := json.Unmarshal(trimmed, &obj); err != nil {
+		return err
+	}
+	if obj.Password != nil {
+		e.Password = normalizeAuthValue(obj.Password)
+	}
+	if obj.FileExpire != nil {
+		v := int64(*obj.FileExpire)
+		e.FileExpire = &v
+	}
+	return nil
+}
+
+type RoomAuthConfig map[string]RoomAuthEntry
 
 func normalizeAuthValue(auth interface{}) string {
 	switch value := auth.(type) {
@@ -32,14 +80,14 @@ func normalizeAuthValue(auth interface{}) string {
 	return ""
 }
 
-func normalizeRoomAuthConfig(roomAuth map[string]string) map[string]string {
+func normalizeRoomAuthConfig(roomAuth RoomAuthConfig) RoomAuthConfig {
 	if len(roomAuth) == 0 {
-		return map[string]string{}
+		return RoomAuthConfig{}
 	}
 
-	normalized := make(map[string]string, len(roomAuth))
-	for room, password := range roomAuth {
-		normalized[normalizeRoomName(room)] = password
+	normalized := make(RoomAuthConfig, len(roomAuth))
+	for room, entry := range roomAuth {
+		normalized[normalizeRoomName(room)] = entry
 	}
 
 	return normalized
@@ -113,21 +161,31 @@ func extractAuthTokens(r *http.Request) []string {
 func (s *ClipboardServer) resolveRoomAuth(room string) RoomAuthRequirement {
 	normalizedRoom := normalizeRoomName(room)
 	globalPassword := normalizeAuthValue(s.config.Server.Auth)
-	roomPassword, hasRoomPassword := s.config.Server.RoomAuth[normalizedRoom]
+	entry, _ := s.config.Server.RoomAuth[normalizedRoom]
 
-	if roomPassword != "" {
-		return RoomAuthRequirement{Room: normalizedRoom, Required: true, Password: roomPassword}
+	if entry.Password != "" {
+		return RoomAuthRequirement{Room: normalizedRoom, Required: true, Password: entry.Password, FileExpire: entry.FileExpire}
 	}
 
 	if globalPassword != "" {
-		return RoomAuthRequirement{Room: normalizedRoom, Required: true, Password: globalPassword}
+		return RoomAuthRequirement{Room: normalizedRoom, Required: true, Password: globalPassword, FileExpire: entry.FileExpire}
 	}
 
-	if hasRoomPassword {
-		return RoomAuthRequirement{Room: normalizedRoom}
-	}
+	return RoomAuthRequirement{Room: normalizedRoom, FileExpire: entry.FileExpire}
+}
 
-	return RoomAuthRequirement{Room: normalizedRoom}
+// resolveFileExpireSeconds 返回指定房间文件上传生效的过期秒数：0 表示永不过期，>0 为秒数
+func (s *ClipboardServer) resolveFileExpireSeconds(room string) int64 {
+	global := int64(s.config.File.Expire)
+	fileExpire := s.resolveRoomAuth(room).FileExpire
+	if fileExpire == nil {
+		return global
+	}
+	if *fileExpire < 0 {
+		s.logger.Printf("配置警告: 房间 '%s' 的 roomAuth.fileExpire 为负数 (%d)，已回退为全局 file.expire", normalizeRoomName(room), *fileExpire)
+		return global
+	}
+	return *fileExpire
 }
 
 func (s *ClipboardServer) tokenMatchesRoom(room string, token string) bool {
@@ -145,8 +203,8 @@ func (s *ClipboardServer) tokenMatchesRoom(room string, token string) bool {
 	}
 
 	normalizedRoom := normalizeRoomName(room)
-	if roomPassword, ok := s.config.Server.RoomAuth[normalizedRoom]; ok && roomPassword != "" {
-		return token == roomPassword
+	if entry, ok := s.config.Server.RoomAuth[normalizedRoom]; ok && entry.Password != "" {
+		return token == entry.Password
 	}
 
 	return false

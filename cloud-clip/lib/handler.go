@@ -375,7 +375,8 @@ func (s *ClipboardServer) handle_file(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 检查文件是否已过期 (双重检查，因为 cleanExpiredFilesLoop 是异步的)
-	if fileInfo.ExpireTime < time.Now().Unix() {
+	// ExpireTime <= 0 表示永不过期
+	if fileInfo.ExpireTime > 0 && fileInfo.ExpireTime < time.Now().Unix() {
 		s.logger.Printf("尝试访问已过期的文件: %s (UUID: %s)", fileInfo.Name, uuid)
 		// 从 map 中移除并尝试删除文件
 		s.runMutex.Lock()
@@ -585,7 +586,13 @@ func (s *ClipboardServer) handle_upload(w http.ResponseWriter, r *http.Request) 
 		s.logger.Printf("初始化分块上传: %s, 生成UUID: %s", filename, uuid)
 
 		// 创建文件信息直接记录到 uploadFileMap 中
-		expireTime := time.Now().Unix() + int64(s.config.File.Expire)
+		// 房间级 fileExpire 覆盖全局 file.expire（0=永不过期）
+		var expireTime int64
+		if expireSeconds := s.resolveFileExpireSeconds(room); expireSeconds > 0 {
+			expireTime = time.Now().Unix() + expireSeconds
+		} else {
+			expireTime = 0
+		}
 		s.runMutex.Lock()
 		s.uploadFileMap[uuid] = File{
 			Name:       filename,
@@ -652,7 +659,13 @@ func (s *ClipboardServer) handle_upload(w http.ResponseWriter, r *http.Request) 
 	}
 
 	timestamp := time.Now().Unix()
-	expireTime := timestamp + int64(s.config.File.Expire)
+	// 房间级 fileExpire 覆盖全局 file.expire（0=永不过期）
+	var expireTime int64
+	if expireSeconds := s.resolveFileExpireSeconds(room); expireSeconds > 0 {
+		expireTime = timestamp + expireSeconds
+	} else {
+		expireTime = 0
+	}
 
 	// 创建文件信息
 	fileInfo := File{

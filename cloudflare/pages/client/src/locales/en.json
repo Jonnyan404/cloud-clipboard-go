@@ -52,6 +52,7 @@
     "fileSize": "File Size",
     "expiredAt": "Expired at {time}",
     "willExpireAt": "Will expire at {time}",
+    "neverExpires": "Never expires",
     "download": "Download",
     "expired": "Expired",
     "preview": "Preview",
