@@ -6,7 +6,11 @@ compatibility_flags = ["nodejs_compat"]
 # 环境变量
 [vars]
 AUTH_PASSWORD = "123"
-ROOM_AUTH = "{\"private\":\"\",\"finance\":\"finance-pass\"}"
+# 房间认证配置。值支持两种形式：
+#   字符串/数字: 仅密码（旧格式）
+#   对象: {"password": "xx", "fileExpire": 0}
+#     fileExpire: 0=该房间文件永不过期；>0=覆盖 FILE_EXPIRE 的秒数；不填=使用全局 FILE_EXPIRE
+ROOM_AUTH = "{\"private\":\"\",\"finance\":{\"password\":\"finance-pass\",\"fileExpire\":0},\"tmp\":\"quick-pass\"}"
 ROOM_LIST = "true"
 HISTORY_LIMIT = "50"
 TEXT_LIMIT = "40960"

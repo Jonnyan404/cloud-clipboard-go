@@ -69,7 +69,7 @@ func (s *ClipboardServer) initShareSigningKey() {
 				_, _ = h.Write([]byte{0})
 				_, _ = h.Write([]byte(room))
 				_, _ = h.Write([]byte{0})
-				_, _ = h.Write([]byte(s.config.Server.RoomAuth[room]))
+				_, _ = h.Write([]byte(s.config.Server.RoomAuth[room].Password))
 			}
 		}
 	}

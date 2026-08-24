@@ -20,10 +20,10 @@ type Config struct {
 		HistoryFile string      `json:"historyFile"` // 添加历史文件路径
 		StorageDir  string      `json:"storageDir"`  // 添加存储目录路径
 		// Auth    string `json:"auth"`
-		Auth     interface{}       `json:"auth"` //done
-		RoomAuth map[string]string `json:"roomAuth"`
-		Cert     string            `json:"cert"`
-		Key      string            `json:"key"`
+		Auth     interface{}    `json:"auth"` //done
+		RoomAuth RoomAuthConfig `json:"roomAuth"`
+		Cert     string         `json:"cert"`
+		Key      string         `json:"key"`
 
 		// 添加房间相关配置
 		RoomList    bool `json:"roomList"`    // 是否启用房间列表功能
@@ -93,10 +93,10 @@ func defaultConfig() *Config {
 			History     int               `json:"history"`
 			HistoryFile string            `json:"historyFile"`
 			StorageDir  string            `json:"storageDir"`
-			Auth        interface{}       `json:"auth"`
-			RoomAuth    map[string]string `json:"roomAuth"`
-			Cert        string            `json:"cert"`
-			Key         string            `json:"key"`
+			Auth        interface{}    `json:"auth"`
+			RoomAuth    RoomAuthConfig `json:"roomAuth"`
+			Cert        string         `json:"cert"`
+			Key         string         `json:"key"`
 			RoomList    bool              `json:"roomList"`
 			RoomCleanup int               `json:"roomCleanup"`
 		}{
@@ -107,7 +107,7 @@ func defaultConfig() *Config {
 			HistoryFile: historyFile,
 			StorageDir:  storageDir,
 			Auth:        false,
-			RoomAuth:    map[string]string{},
+			RoomAuth:    RoomAuthConfig{},
 			Cert:        "",
 			Key:         "",
 			RoomList:    false, // 默认关闭房间列表功能

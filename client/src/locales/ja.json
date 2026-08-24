@@ -53,6 +53,7 @@
     "fileSize": "ファイルサイズ",
     "expiredAt": "{time} に期限切れ",
     "willExpireAt": "{time} に期限切れになります",
+    "neverExpires": "無期限",
     "download": "ダウンロード",
     "expired": "期限切れ",
     "preview": "プレビュー",

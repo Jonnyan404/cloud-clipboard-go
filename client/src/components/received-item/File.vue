@@ -49,7 +49,7 @@
                             {{meta.size | prettyFileSize}}
                             <template v-if="$vuetify.breakpoint.smAndDown"><br></template>
                             <template v-else>|</template>
-                            {{ expired ? $t('expiredAt', { time: formatTimestamp(meta.expire) }) : $t('willExpireAt', { time: formatTimestamp(meta.expire) }) }}
+                            {{ meta.expire > 0 ? (expired ? $t('expiredAt', { time: formatTimestamp(meta.expire) }) : $t('willExpireAt', { time: formatTimestamp(meta.expire) })) : $t('neverExpires') }}
                         </div>
                     </div>
 
@@ -341,6 +341,9 @@ export default {
     },
     computed: {
         expired() {
+            if (!this.meta.expire || this.meta.expire <= 0) {
+                return false;
+            }
             return this.$root.date.getTime() / 1000 > this.meta.expire;
         },
         isPreviewableVideo() {

@@ -52,6 +52,7 @@
     "fileSize": "文件大小",
     "expiredAt": "已于 {time} 过期",
     "willExpireAt": "将于 {time} 过期",
+    "neverExpires": "永久有效",
     "download": "下载",
     "expired": "已过期",
     "preview": "预览",

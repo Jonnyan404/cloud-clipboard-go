@@ -249,7 +249,7 @@ func TestHandleAuthToken(t *testing.T) {
 	}
 
 	// 房间专属密码换来的令牌应为房间专属 scope，且不能通行其他房间
-	s.config.Server.RoomAuth = map[string]string{"private": "private-pass"}
+	s.config.Server.RoomAuth = RoomAuthConfig{"private": RoomAuthEntry{Password: "private-pass"}}
 	reqBody = strings.NewReader(`{"password":"private-pass"}`)
 	req = httptest.NewRequest(http.MethodPost, "/auth/token?room=private", reqBody)
 	w = httptest.NewRecorder()

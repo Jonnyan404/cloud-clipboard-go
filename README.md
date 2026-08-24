@@ -221,7 +221,7 @@ services:
       PREFIX: ${PREFIX:-} #子路径,可配合nginx使用,格式: /cloud-clipboard
       MESSAGE_NUM: ${MESSAGE_NUM:-} #历史记录的数量,默认为10
       AUTH_PASSWORD: ${AUTH_PASSWORD:-} #访问密码,默认为false,可自定义字符串密码
-      ROOM_AUTH_JSON: '${ROOM_AUTH_JSON:-{}}' #房间密码JSON, 例如 {"finance":"finance-pass","ops":""}
+      ROOM_AUTH_JSON: '${ROOM_AUTH_JSON:-{}}' #房间密码JSON,值为字符串或对象 {"finance":"finance-pass","keep":{"password":"kp","fileExpire":0}}, fileExpire: 0=文件永不过期,>0=覆盖FILE_EXPIRE秒数
       TEXT_LIMIT: ${TEXT_LIMIT:-} #文本长度限制,默认为4096(2048个汉字),可设置为其他长度
       FILE_EXPIRE: ${FILE_EXPIRE:-} #文件过期时间,默认为3600(1小时),可设置为其他时间,单位为秒
       FILE_LIMIT: ${FILE_LIMIT:-} #文件大小限制,默认为104857600(100MB),可设置为其他大小,单位为字节
@@ -240,7 +240,35 @@ services:
 docker compose up -d
 ```
 
-`ROOM_AUTH_JSON` 需要是合法的 JSON 对象，值为空字符串时表示该房间沿用 `AUTH_PASSWORD`。
+`ROOM_AUTH_JSON` 需要是合法的 JSON 对象。每个房间的值支持两种形式：
+
+1. **字符串/数字**（旧格式）：仅作为该房间的额外密码；
+2. **对象** `{ "password": "xx", "fileExpire": N }`：同时配置密码与该房间文件的过期策略。
+
+`fileExpire` 字段说明：
+
+| 取值 | 含义 |
+| --- | --- |
+| 不填 | 使用全局 `FILE_EXPIRE`（默认行为） |
+| `0` | 该房间上传的文件**永不过期** |
+| `> 0` | 覆盖全局 `FILE_EXPIRE`，单位秒 |
+
+示例：
+
+```bash
+ROOM_AUTH_JSON='{
+  "finance": {"password": "finance-pass", "fileExpire": 0},
+  "archive": {"fileExpire": 604800},
+  "private": "",
+  "tmp": "quick-pass"
+}' docker compose up -d
+```
+
+含义：
+
+- `finance` 房间密码 `finance-pass`，文件永不过期；
+- `archive` 房间无独立密码（沿用全局），文件保留 7 天；
+- `private` 房间无独立密码；`tmp` 房间额外密码 `quick-pass`——两者文件均按全局 `FILE_EXPIRE` 过期。
 
 补充说明：
 
@@ -248,6 +276,8 @@ docker compose up -d
 - 入口脚本仍兼容旧变量名 `ROOM_AUTH`，但 Compose 示例和后续文档统一使用 `ROOM_AUTH_JSON`。
 - 如果你使用 `.env` 文件，建议保持与上面的 `${VAR:-}` 模板对应，只填写右侧的实际值。
 - 镜像内显式安装了 `nc`，Compose 健康检查只检查容器内监听端口，和 `PREFIX`、HTTP/HTTPS 配置无关。
+- **`fileExpire` 只影响修改配置之后上传的文件**，已上传文件的过期时间不会回溯变更；
+- 历史条数轮转删除不受 `fileExpire` 影响：房间消息数超过上限时，最旧的文件仍会被清理。
 
 示例：
 

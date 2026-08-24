@@ -33,6 +33,18 @@ function getFileLimit(env) {
   return env.FILE_LIMIT ? parseInt(env.FILE_LIMIT, 10) : 104857600;
 }
 
+// 按房间策略计算文件的绝对过期时间戳：
+//   fileExpire === 0        -> 返回 0（永不过期，读取端对 <=0 放行）
+//   fileExpire > 0          -> 覆盖全局 FILE_EXPIRE
+//   undefined/非法          -> 使用全局 FILE_EXPIRE
+function resolveExpireTime(currentTime, env, fileExpire) {
+  if (fileExpire === 0) {
+    return 0;
+  }
+  const seconds = fileExpire > 0 ? fileExpire : (env.FILE_EXPIRE ? parseInt(env.FILE_EXPIRE, 10) : 3600);
+  return currentTime + seconds;
+}
+
 function getMultipartPartSize(env) {
   const fileLimit = getFileLimit(env);
   if (!Number.isFinite(fileLimit) || fileLimit <= MULTIPART_MIN_PART_SIZE) {
@@ -215,8 +227,7 @@ export class FileHandler {
 
       const uuid = generateUUID();
       const currentTime = Math.floor(Date.now() / 1000);
-      const expireSeconds = env.FILE_EXPIRE ? parseInt(env.FILE_EXPIRE) : 3600;
-      const expireTime = currentTime + expireSeconds;
+      const expireTime = resolveExpireTime(currentTime, env, authResult.requirement?.fileExpire);
 
       // 上传文件到 R2
       await env.R2_BUCKET.put(createFileKey(uuid), fileBody, buildMultipartOptions({ room, fileName, fileType, expireTime }));
@@ -299,8 +310,7 @@ export class FileHandler {
 
       const uuid = generateUUID();
       const key = createFileKey(uuid);
-      const expireSeconds = env.FILE_EXPIRE ? parseInt(env.FILE_EXPIRE) : 3600;
-      const expireTime = Math.floor(Date.now() / 1000) + expireSeconds;
+      const expireTime = resolveExpireTime(Math.floor(Date.now() / 1000), env, authResult.requirement?.fileExpire);
       const upload = await env.R2_BUCKET.createMultipartUpload(key, buildMultipartOptions({ room, fileName, fileType, expireTime }));
       const partSize = getMultipartPartSize(env);
 
@@ -417,19 +427,25 @@ export class FileHandler {
 
       // complete() 的响应可能不携带 customMetadata，用 head() 读取权威元数据，
       // 避免 expireTime 丢失导致前端立即显示“已过期”
-      let storedExpireTime = 0;
+      let storedExpireTime = null;
       let storedName = '';
       try {
         const headObject = await env.R2_BUCKET.head(key);
-        storedExpireTime = Number(headObject?.customMetadata?.expireTime || 0);
+        const rawExpire = headObject?.customMetadata?.expireTime;
+        if (rawExpire !== undefined && rawExpire !== null && String(rawExpire).trim() !== '') {
+          const numeric = Number(rawExpire);
+          if (Number.isFinite(numeric)) {
+            storedExpireTime = Math.floor(numeric);
+          }
+        }
         storedName = String(headObject?.customMetadata?.originalName || '');
       } catch (headError) {
         console.warn('[multipart] head metadata failed:', headError?.stack || headError);
       }
-      const expireSeconds = env.FILE_EXPIRE ? parseInt(env.FILE_EXPIRE, 10) : 3600;
-      const expireTime = storedExpireTime > 0
+      // 创建分片时写入的元数据（含 0=永久）优先；仅当元数据缺失时才按当前房间策略/全局值补算
+      const expireTime = storedExpireTime !== null
         ? storedExpireTime
-        : Math.floor(Date.now() / 1000) + expireSeconds;
+        : resolveExpireTime(Math.floor(Date.now() / 1000), env, authResult.requirement?.fileExpire);
       const fileName = storedName || body?.name || uuid || 'file';
       const fileSize = Number(completedObject.size || body?.size || 0);
 

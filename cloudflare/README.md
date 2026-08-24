@@ -78,7 +78,7 @@ FILE_EXPIRE = "3600"
 | 变量 | 默认值 | 类型 | 说明 |
 | --- | --- | --- | --- |
 | `AUTH_PASSWORD` | `"123"` | 字符串或布尔语义 | 全局入口密码。只要设置了就对所有房间生效，保证旧密码升级后仍可用 |
-| `ROOM_AUTH` | `{"private":"","finance":"finance-pass"}` | JSON 字符串 | 房间级密码映射。不会让 `AUTH_PASSWORD` 失效，而是为指定房间增加额外可用密码 |
+| `ROOM_AUTH` | `{"private":"","finance":"finance-pass"}` | JSON 字符串 | 房间级密码映射。不会让 `AUTH_PASSWORD` 失效，而是为指定房间增加额外可用密码。值也支持对象形式 `{ "password": "xx", "fileExpire": N }`，可同时配置该房间文件的过期策略（见下方 roomAuth 说明） |
 | `ROOM_LIST` | `"false"` | 布尔语义字符串 | 是否启用房间列表功能，支持 `1`、`true`、`yes`、`on` |
 | `HISTORY_LIMIT` | `"50"` | 整数字符串 | 每个房间保留的历史消息条数 |
 | `TEXT_LIMIT` | `"40960"` | 整数字符串 | 单条文本消息最大长度 |
@@ -89,17 +89,38 @@ FILE_EXPIRE = "3600"
 
 `ROOM_AUTH` 需要是一个 JSON 字符串，对应后端的 `server.roomAuth`。
 
+每个房间的值支持两种形式：
+
+1. **字符串/数字**（旧格式）：仅作为该房间的额外密码；
+2. **对象** `{ "password": "xx", "fileExpire": N }`：同时配置密码与该房间文件的过期策略。
+
 示例：
 
 ```toml
-ROOM_AUTH = "{\"private\":\"\",\"finance\":\"finance-pass\",\"ops\":\"ops-pass\"}"
+ROOM_AUTH = "{\"finance\":{\"password\":\"finance-pass\",\"fileExpire\":0},\"archive\":{\"fileExpire\":604800},\"private\":\"\",\"ops\":\"ops-pass\"}"
 ```
 
 含义：
 
+- `finance` 房间额外密码 `finance-pass`，且该房间上传的**文件永不过期**（`fileExpire: 0`）；
+- `archive` 房间无独立密码，文件保留 7 天（覆盖全局 `FILE_EXPIRE`）；
 - `private: ""` 表示 `private` 房间只接受全局 `AUTH_PASSWORD`
-- `finance: "finance-pass"` 表示 `finance` 房间同时接受全局 `AUTH_PASSWORD` 和 `finance-pass`
 - `ops: "ops-pass"` 表示 `ops` 房间同时接受全局 `AUTH_PASSWORD` 和 `ops-pass`
+
+`fileExpire` 取值：
+
+| 取值 | 含义 |
+| --- | --- |
+| 不填 | 使用全局 `FILE_EXPIRE`（默认行为） |
+| `0` | 该房间上传的文件**永不过期** |
+| `> 0` | 覆盖全局 `FILE_EXPIRE`，单位秒 |
+| `< 0` 或非法 | 视为配置错误，回退全局 `FILE_EXPIRE` 并输出警告日志 |
+
+注意事项：
+
+- **`fileExpire` 只影响修改配置之后上传的文件**：过期时间在上传瞬间写入 R2 元数据和 D1 记录，之后修改 ROOM_AUTH 不会回溯变更已有文件；
+- 历史条数轮转删除不受 `fileExpire` 影响：房间消息数超过 `HISTORY_LIMIT` 时，最旧的文件仍会被清理。低频房间配合 `fileExpire: 0` 约等于永久保存；
+- 前端会把永久文件显示为“永久有效”。
 
 如果你想修改这些变量，有两种方式：
 

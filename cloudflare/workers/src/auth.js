@@ -99,7 +99,41 @@ export function normalizeAuthValue(value) {
     return value.trim();
   }
 
+  if (typeof value === 'number' && !Number.isFinite(value)) {
+    return '';
+  }
+
   return String(value);
+}
+
+// 解析房间配置里的 fileExpire 字段：
+//   未定义 -> undefined（使用全局 FILE_EXPIRE）
+//   0      -> 0（该房间文件永不过期）
+//   >0     -> 覆盖全局过期秒数
+//   其它    -> 视为非法配置，回退全局值并告警
+function parseFileExpireValue(room, value) {
+  if (value === undefined || value === null || value === false) {
+    return undefined;
+  }
+  const numeric = typeof value === 'number' ? value : Number(String(value).trim());
+  if (Number.isFinite(numeric) && numeric >= 0) {
+    return Math.floor(numeric);
+  }
+  console.warn(`ROOM_AUTH 配置警告: 房间 '${room}' 的 fileExpire 非法 (${JSON.stringify(value)})，已回退为全局 FILE_EXPIRE`);
+  return undefined;
+}
+
+// 单个房间的 ROOM_AUTH 值支持两种形式：
+//   字符串/数字                 -> 仅密码（旧格式，完全兼容）
+//   对象 {password, fileExpire} -> 密码 + 文件过期覆盖策略
+function parseRoomAuthEntry(room, value) {
+  if (value !== null && typeof value === 'object') {
+    return {
+      password: normalizeAuthValue(value.password),
+      fileExpire: parseFileExpireValue(room, value.fileExpire),
+    };
+  }
+  return { password: normalizeAuthValue(value), fileExpire: undefined };
 }
 
 export function parseRoomAuth(env) {
@@ -108,11 +142,13 @@ export function parseRoomAuth(env) {
     return {};
   }
 
+  const reduce = entries => entries.reduce((acc, [room, value]) => {
+    acc[normalizeRoomName(room)] = parseRoomAuthEntry(room, value);
+    return acc;
+  }, {});
+
   if (typeof roomAuth === 'object') {
-    return Object.entries(roomAuth).reduce((acc, [room, password]) => {
-      acc[normalizeRoomName(room)] = normalizeAuthValue(password);
-      return acc;
-    }, {});
+    return reduce(Object.entries(roomAuth));
   }
 
   try {
@@ -121,10 +157,7 @@ export function parseRoomAuth(env) {
       return {};
     }
 
-    return Object.entries(parsed).reduce((acc, [room, password]) => {
-      acc[normalizeRoomName(room)] = normalizeAuthValue(password);
-      return acc;
-    }, {});
+    return reduce(Object.entries(parsed));
   } catch (error) {
     console.error('ROOM_AUTH 解析失败:', error);
     return {};
@@ -135,22 +168,19 @@ export function resolveRoomAuth(env, room) {
   const normalizedRoom = normalizeRoomName(room);
   const globalPassword = normalizeAuthValue(env.AUTH_PASSWORD);
   const roomAuth = parseRoomAuth(env);
-  const hasRoomPassword = Object.prototype.hasOwnProperty.call(roomAuth, normalizedRoom);
-  const roomPassword = hasRoomPassword ? normalizeAuthValue(roomAuth[normalizedRoom]) : '';
+  const hasRoomEntry = Object.prototype.hasOwnProperty.call(roomAuth, normalizedRoom);
+  const entry = hasRoomEntry ? roomAuth[normalizedRoom] : { password: '', fileExpire: undefined };
+  const roomPassword = entry.password;
 
   if (roomPassword) {
-    return { room: normalizedRoom, required: true, password: roomPassword };
+    return { room: normalizedRoom, required: true, password: roomPassword, fileExpire: entry.fileExpire };
   }
 
   if (globalPassword) {
-    return { room: normalizedRoom, required: true, password: globalPassword };
+    return { room: normalizedRoom, required: true, password: globalPassword, fileExpire: entry.fileExpire };
   }
 
-  if (hasRoomPassword) {
-    return { room: normalizedRoom, required: false, password: '' };
-  }
-
-  return { room: normalizedRoom, required: false, password: '' };
+  return { room: normalizedRoom, required: false, password: '', fileExpire: entry.fileExpire };
 }
 
 export function tokenMatchesRoom(env, room, token) {
@@ -167,7 +197,7 @@ export function tokenMatchesRoom(env, room, token) {
   const normalizedRoom = normalizeRoomName(room);
   const roomAuth = parseRoomAuth(env);
   const roomPassword = Object.prototype.hasOwnProperty.call(roomAuth, normalizedRoom)
-    ? normalizeAuthValue(roomAuth[normalizedRoom])
+    ? roomAuth[normalizedRoom].password
     : '';
 
   return !!roomPassword && normalizedToken === roomPassword;

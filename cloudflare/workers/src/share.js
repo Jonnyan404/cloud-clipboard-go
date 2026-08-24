@@ -77,7 +77,7 @@ async function getShareSigningKey(env) {
   const material = ['cloud-clipboard-share-v1', normalizeAuthValue(env.AUTH_PASSWORD)];
   const roomAuth = parseRoomAuth(env);
   Object.keys(roomAuth).sort().forEach(room => {
-    material.push(room, normalizeAuthValue(roomAuth[room]));
+    material.push(room, normalizeAuthValue(roomAuth[room].password));
   });
   if (env.SHARE_SIGNING_SECRET) {
     material.push(String(env.SHARE_SIGNING_SECRET));
