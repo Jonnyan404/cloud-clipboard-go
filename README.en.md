@@ -175,14 +175,6 @@ Then run:
 docker compose up -d
 ```
 
-You can also override it temporarily:
-
-```bash
-ROOM_AUTH_JSON='{"finance":"new-pass","ops":"ops-pass"}' docker compose up -d
-```
-
-Note: the Docker image only auto-generates [cloud-clip/config.json](./cloud-clip/config.json) when it does not already exist. If you mounted an existing `config.json`, updating environment variables will not rewrite it automatically. In that case, delete the file and recreate the container, or edit `server.roomAuth` manually.
-
 ```bash
 # Option 2: Docker CLI
 docker run -d \
