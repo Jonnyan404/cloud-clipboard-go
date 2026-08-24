@@ -167,9 +167,15 @@ npm install -g wrangler
 # 2. 登录 Cloudflare
 wrangler login
 
-# 3. 执行部署脚本
-cd cloudflare
+# 3. 自定义模板参数(环境变量部分,其它不要动)
+git clone https://github.com/Jonnyan404/cloud-clipboard-go
+cd cloud-clipboard-go/cloudflare/workers
+vim wrangler.toml.template
+
+# 4. 执行部署脚本
+cd ..
 ./deploy.sh
+
 ```
 
 **部署包含**：
