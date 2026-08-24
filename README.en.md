@@ -166,9 +166,15 @@ npm install -g wrangler
 # 2. Log in to Cloudflare
 wrangler login
 
-# 3. Run the deployment script
-cd cloudflare
+# 3. Custom template parameters (environmental variables section, don‘t move anything else)
+git clone https://github.com/Jonnyan404/cloud-clipboard-go
+cd cloud-clipboard-go/cloudflare/workers
+vim wrangler.toml.template
+
+# 4. Run the deployment script
+cd ..
 ./deploy.sh
+
 ```
 
 **Deployment includes**:
