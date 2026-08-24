@@ -176,15 +176,6 @@ ROOM_AUTH_JSON={"finance":"finance-pass","private":""}
 docker compose up -d
 ```
 
-也可以临时覆盖：
-
-```bash
-ROOM_AUTH_JSON='{"finance":"new-pass","ops":"ops-pass"}' docker compose up -d
-```
-
-注意：Docker 镜像启动时只会在不存在 [cloud-clip/config.json](cloud-clip/config.json) 时自动生成配置。若你已挂载旧的 `config.json`，修改环境变量后需要删除该文件重建，或直接手动修改其中的 `server.roomAuth`。
-
-
 ```bash
 # 方式二：Docker 命令行
 docker run -d \
