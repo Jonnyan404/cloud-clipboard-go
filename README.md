@@ -73,10 +73,119 @@
 - [【阿里云】2核2G云服务器新老同享 99元/年，续费同价](https://www.aliyun.com/daily-act/ecs/activity_selection?userCode=79h2wrag)
 
 
-```bash
-# 方式一：Docker Compose（推荐）
-docker compose up -d
+以仓库根目录现有的 `docker-compose.yml` 为准。镜像启动时会由入口脚本按这些环境变量生成配置文件，因此文档中的变量写法也应与它保持一致。
 
+按需修改根目录 `docker-compose.yml`：
+
+```yaml
+services:
+  cloud-clipboard-go:
+    container_name: cloud-clipboard-go
+    restart: always
+    ports:
+      - "9501:9501"
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 \"${LISTEN_PORT:-9501}\" || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    environment:
+      LISTEN_IP: ${LISTEN_IP:-} #默认为0.0.0.0,可设置为 127.0.0.1 不懂勿动
+      LISTEN_IP6: ${LISTEN_IP6:-} #默认为空,ipv6地址,可设置为::,不懂勿动
+      LISTEN_PORT: ${LISTEN_PORT:-} #默认为9501,可设置为其他端口
+      PREFIX: ${PREFIX:-} #子路径,可配合nginx使用,格式: /cloud-clipboard
+      MESSAGE_NUM: ${MESSAGE_NUM:-} #历史记录的数量,默认为10
+      AUTH_PASSWORD: ${AUTH_PASSWORD:-} #访问密码,默认为false,可自定义字符串密码
+      ROOM_AUTH_JSON: '${ROOM_AUTH_JSON:-{}}' #房间密码JSON,值为字符串或对象 {"finance":"finance-pass","keep":{"password":"kp","fileExpire":0}}, fileExpire: 0=文件永不过期,>0=覆盖FILE_EXPIRE秒数
+      TEXT_LIMIT: ${TEXT_LIMIT:-} #文本长度限制,默认为4096(2048个汉字),可设置为其他长度
+      FILE_EXPIRE: ${FILE_EXPIRE:-} #文件过期时间,默认为3600(1小时),可设置为其他时间,单位为秒
+      FILE_LIMIT: ${FILE_LIMIT:-} #文件大小限制,默认为104857600(100MB),可设置为其他大小,单位为字节
+      MKCERT_DOMAIN_OR_IP: ${MKCERT_DOMAIN_OR_IP:-} #mkcert域名或IP,默认为空,可设置为其他域名或IP,多个用空格分隔,仅域名支持通配符*
+      MANUAL_KEY_PATH: ${MANUAL_KEY_PATH:-} #手动设置证书路径,默认为空,该参数优先级高于MKCERT_DOMAIN_OR_IP
+      MANUAL_CERT_PATH: ${MANUAL_CERT_PATH:-} #手动设置证书路径,默认为空,该参数优先级高于MKCERT_DOMAIN_OR_IP
+      ROOM_LIST: ${ROOM_LIST:-} #是否启用房间列表展示功能,默认false
+    volumes:
+      - /path/your/dir/data:/app/server-node/data #请注意修改为你自己的目录
+    image: jonnyan404/cloud-clipboard-go:latest
+```
+
+运行：
+
+```bash
+docker compose up -d
+```
+
+`ROOM_AUTH_JSON` 需要是合法的 JSON 对象。每个房间的值支持两种形式：
+
+1. **字符串/数字**（旧格式）：仅作为该房间的额外密码；
+2. **对象** `{ "password": "xx", "fileExpire": N }`：同时配置密码与该房间文件的过期策略。
+
+`fileExpire` 字段说明：
+
+| 取值 | 含义 |
+| --- | --- |
+| 不填 | 使用全局 `FILE_EXPIRE`（默认行为） |
+| `0` | 该房间上传的文件**永不过期** |
+| `> 0` | 覆盖全局 `FILE_EXPIRE`，单位秒 |
+
+示例：
+
+```bash
+ROOM_AUTH_JSON='{
+  "finance": {"password": "finance-pass", "fileExpire": 0},
+  "archive": {"fileExpire": 604800},
+  "private": "",
+  "tmp": "quick-pass"
+}' docker compose up -d
+```
+
+含义：
+
+- `finance` 房间密码 `finance-pass`，文件永不过期；
+- `archive` 房间无独立密码（沿用全局），文件保留 7 天；
+- `private` 房间无独立密码；`tmp` 房间额外密码 `quick-pass`——两者文件均按全局 `FILE_EXPIRE` 过期。
+
+补充说明：
+
+- 当前 Docker Compose 文档变量名以 `ROOM_AUTH_JSON` 为准。
+- 入口脚本仍兼容旧变量名 `ROOM_AUTH`，但 Compose 示例和后续文档统一使用 `ROOM_AUTH_JSON`。
+- 如果你使用 `.env` 文件，建议保持与上面的 `${VAR:-}` 模板对应，只填写右侧的实际值。
+- 镜像内显式安装了 `nc`，Compose 健康检查只检查容器内监听端口，和 `PREFIX`、HTTP/HTTPS 配置无关。
+- **`fileExpire` 只影响修改配置之后上传的文件**，已上传文件的过期时间不会回溯变更；
+- 历史条数轮转删除不受 `fileExpire` 影响：房间消息数超过上限时，最旧的文件仍会被清理。
+
+示例：
+
+```yaml
+environment:
+  AUTH_PASSWORD: 'global-pass'
+  ROOM_AUTH_JSON: '{"finance":"finance-pass","private":""}'
+```
+
+如果你想通过变量动态修改 `roomAuth`，推荐配合 `.env` 文件：
+
+```env
+AUTH_PASSWORD=global-pass
+ROOM_AUTH_JSON={"finance":"finance-pass","private":""}
+```
+
+然后执行：
+
+```bash
+docker compose up -d
+```
+
+也可以临时覆盖：
+
+```bash
+ROOM_AUTH_JSON='{"finance":"new-pass","ops":"ops-pass"}' docker compose up -d
+```
+
+注意：Docker 镜像启动时只会在不存在 [cloud-clip/config.json](cloud-clip/config.json) 时自动生成配置。若你已挂载旧的 `config.json`，修改环境变量后需要删除该文件重建，或直接手动修改其中的 `server.roomAuth`。
+
+
+```bash
 # 方式二：Docker 命令行
 docker run -d \
   --name=cloud-clipboard-go \
@@ -198,121 +307,6 @@ cd ..
 详见：[Cloudflare 部署文档](./cloudflare/README.md)
 
 ---
-
-## 📋 部署指南
-
-### Docker Compose 配置
-
-以仓库根目录现有的 `docker-compose.yml` 为准。镜像启动时会由入口脚本按这些环境变量生成配置文件，因此文档中的变量写法也应与它保持一致。
-
-按需修改根目录 `docker-compose.yml`：
-
-```yaml
-services:
-  cloud-clipboard-go:
-    container_name: cloud-clipboard-go
-    restart: always
-    ports:
-      - "9501:9501"
-    healthcheck:
-      test: ["CMD-SHELL", "nc -z 127.0.0.1 \"${LISTEN_PORT:-9501}\" || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
-    environment:
-      LISTEN_IP: ${LISTEN_IP:-} #默认为0.0.0.0,可设置为 127.0.0.1 不懂勿动
-      LISTEN_IP6: ${LISTEN_IP6:-} #默认为空,ipv6地址,可设置为::,不懂勿动
-      LISTEN_PORT: ${LISTEN_PORT:-} #默认为9501,可设置为其他端口
-      PREFIX: ${PREFIX:-} #子路径,可配合nginx使用,格式: /cloud-clipboard
-      MESSAGE_NUM: ${MESSAGE_NUM:-} #历史记录的数量,默认为10
-      AUTH_PASSWORD: ${AUTH_PASSWORD:-} #访问密码,默认为false,可自定义字符串密码
-      ROOM_AUTH_JSON: '${ROOM_AUTH_JSON:-{}}' #房间密码JSON,值为字符串或对象 {"finance":"finance-pass","keep":{"password":"kp","fileExpire":0}}, fileExpire: 0=文件永不过期,>0=覆盖FILE_EXPIRE秒数
-      TEXT_LIMIT: ${TEXT_LIMIT:-} #文本长度限制,默认为4096(2048个汉字),可设置为其他长度
-      FILE_EXPIRE: ${FILE_EXPIRE:-} #文件过期时间,默认为3600(1小时),可设置为其他时间,单位为秒
-      FILE_LIMIT: ${FILE_LIMIT:-} #文件大小限制,默认为104857600(100MB),可设置为其他大小,单位为字节
-      MKCERT_DOMAIN_OR_IP: ${MKCERT_DOMAIN_OR_IP:-} #mkcert域名或IP,默认为空,可设置为其他域名或IP,多个用空格分隔,仅域名支持通配符*
-      MANUAL_KEY_PATH: ${MANUAL_KEY_PATH:-} #手动设置证书路径,默认为空,该参数优先级高于MKCERT_DOMAIN_OR_IP
-      MANUAL_CERT_PATH: ${MANUAL_CERT_PATH:-} #手动设置证书路径,默认为空,该参数优先级高于MKCERT_DOMAIN_OR_IP
-      ROOM_LIST: ${ROOM_LIST:-} #是否启用房间列表展示功能,默认false
-    volumes:
-      - /path/your/dir/data:/app/server-node/data #请注意修改为你自己的目录
-    image: jonnyan404/cloud-clipboard-go:latest
-```
-
-运行：
-
-```bash
-docker compose up -d
-```
-
-`ROOM_AUTH_JSON` 需要是合法的 JSON 对象。每个房间的值支持两种形式：
-
-1. **字符串/数字**（旧格式）：仅作为该房间的额外密码；
-2. **对象** `{ "password": "xx", "fileExpire": N }`：同时配置密码与该房间文件的过期策略。
-
-`fileExpire` 字段说明：
-
-| 取值 | 含义 |
-| --- | --- |
-| 不填 | 使用全局 `FILE_EXPIRE`（默认行为） |
-| `0` | 该房间上传的文件**永不过期** |
-| `> 0` | 覆盖全局 `FILE_EXPIRE`，单位秒 |
-
-示例：
-
-```bash
-ROOM_AUTH_JSON='{
-  "finance": {"password": "finance-pass", "fileExpire": 0},
-  "archive": {"fileExpire": 604800},
-  "private": "",
-  "tmp": "quick-pass"
-}' docker compose up -d
-```
-
-含义：
-
-- `finance` 房间密码 `finance-pass`，文件永不过期；
-- `archive` 房间无独立密码（沿用全局），文件保留 7 天；
-- `private` 房间无独立密码；`tmp` 房间额外密码 `quick-pass`——两者文件均按全局 `FILE_EXPIRE` 过期。
-
-补充说明：
-
-- 当前 Docker Compose 文档变量名以 `ROOM_AUTH_JSON` 为准。
-- 入口脚本仍兼容旧变量名 `ROOM_AUTH`，但 Compose 示例和后续文档统一使用 `ROOM_AUTH_JSON`。
-- 如果你使用 `.env` 文件，建议保持与上面的 `${VAR:-}` 模板对应，只填写右侧的实际值。
-- 镜像内显式安装了 `nc`，Compose 健康检查只检查容器内监听端口，和 `PREFIX`、HTTP/HTTPS 配置无关。
-- **`fileExpire` 只影响修改配置之后上传的文件**，已上传文件的过期时间不会回溯变更；
-- 历史条数轮转删除不受 `fileExpire` 影响：房间消息数超过上限时，最旧的文件仍会被清理。
-
-示例：
-
-```yaml
-environment:
-  AUTH_PASSWORD: 'global-pass'
-  ROOM_AUTH_JSON: '{"finance":"finance-pass","private":""}'
-```
-
-如果你想通过变量动态修改 `roomAuth`，推荐配合 `.env` 文件：
-
-```env
-AUTH_PASSWORD=global-pass
-ROOM_AUTH_JSON={"finance":"finance-pass","private":""}
-```
-
-然后执行：
-
-```bash
-docker compose up -d
-```
-
-也可以临时覆盖：
-
-```bash
-ROOM_AUTH_JSON='{"finance":"new-pass","ops":"ops-pass"}' docker compose up -d
-```
-
-注意：Docker 镜像启动时只会在不存在 [cloud-clip/config.json](cloud-clip/config.json) 时自动生成配置。若你已挂载旧的 `config.json`，修改环境变量后需要删除该文件重建，或直接手动修改其中的 `server.roomAuth`。
 
 ### 二进制文件参数
 
