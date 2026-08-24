@@ -72,10 +72,118 @@
 - [Tencent Cloud: 2 vCPU / 2 GB server from CNY 99/year](https://cloud.tencent.com/act/cps/redirect?redirect=6150&cps_key=0b1dfaf9bb573dac05abef76202dc8cc&from=console)
 - [Alibaba Cloud: 2 vCPU / 2 GB server from CNY 99/year](https://www.aliyun.com/daily-act/ecs/activity_selection?userCode=79h2wrag)
 
-```bash
-# Option 1: Docker Compose (Recommended)
-docker compose up -d
+Use the existing `docker-compose.yml` in the repository root as the source of truth. The image entrypoint generates the runtime configuration from these environment variables, so the documentation should follow the same naming.
 
+Adjust the root `docker-compose.yml` as needed:
+
+```yaml
+services:
+  cloud-clipboard-go:
+    container_name: cloud-clipboard-go
+    restart: always
+    ports:
+      - "9501:9501"
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 \"${LISTEN_PORT:-9501}\" || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    environment:
+      LISTEN_IP: ${LISTEN_IP:-} # Defaults to 0.0.0.0. Leave unchanged unless you know you need 127.0.0.1.
+      LISTEN_IP6: ${LISTEN_IP6:-} # Defaults to empty. Set :: for IPv6 if needed.
+      LISTEN_PORT: ${LISTEN_PORT:-} # Defaults to 9501. Change if you need another port.
+      PREFIX: ${PREFIX:-} # Subpath, useful with nginx. Example: /cloud-clipboard
+      MESSAGE_NUM: ${MESSAGE_NUM:-} # History record count, default 10.
+      AUTH_PASSWORD: ${AUTH_PASSWORD:-} # Global access password. Default false.
+      ROOM_AUTH_JSON: '${ROOM_AUTH_JSON:-{}}' # Room password JSON, value is a string or object {"finance":"finance-pass","keep":{"password":"kp","fileExpire":0}}, fileExpire: 0=files never expire,>0=override FILE_EXPIRE in seconds
+      TEXT_LIMIT: ${TEXT_LIMIT:-} # Text length limit, default 4096.
+      FILE_EXPIRE: ${FILE_EXPIRE:-} # File expiration in seconds, default 3600.
+      FILE_LIMIT: ${FILE_LIMIT:-} # File size limit in bytes, default 104857600.
+      MKCERT_DOMAIN_OR_IP: ${MKCERT_DOMAIN_OR_IP:-} # mkcert domain or IP. Separate multiple values with spaces. Wildcards are supported for domains only.
+      MANUAL_KEY_PATH: ${MANUAL_KEY_PATH:-} # Manual key path. Higher priority than MKCERT_DOMAIN_OR_IP.
+      MANUAL_CERT_PATH: ${MANUAL_CERT_PATH:-} # Manual certificate path. Higher priority than MKCERT_DOMAIN_OR_IP.
+      ROOM_LIST: ${ROOM_LIST:-} # Whether to enable room list display. Default false.
+    volumes:
+      - /path/your/dir/data:/app/server-node/data # Replace with your own directory
+    image: jonnyan404/cloud-clipboard-go:latest
+```
+
+Run:
+
+```bash
+docker compose up -d
+```
+
+`ROOM_AUTH_JSON` must be a valid JSON object. Each room value supports two forms:
+
+1. **String/number** (legacy format): acts only as an extra password for that room;
+2. **Object** `{ "password": "xx", "fileExpire": N }`: configures both the password and the file expiration policy for that room.
+
+`fileExpire` values:
+
+| Value | Meaning |
+| --- | --- |
+| omitted | Use the global `FILE_EXPIRE` (default behavior) |
+| `0` | Files uploaded to this room **never expire** |
+| `> 0` | Override the global `FILE_EXPIRE`, in seconds |
+
+Example:
+
+```bash
+ROOM_AUTH_JSON='{
+  "finance": {"password": "finance-pass", "fileExpire": 0},
+  "archive": {"fileExpire": 604800},
+  "private": "",
+  "tmp": "quick-pass"
+}' docker compose up -d
+```
+
+Meaning:
+
+- `finance` room password `finance-pass`, files never expire;
+- `archive` room has no extra password (falls back to the global one), files are kept for 7 days;
+- `private` room has no extra password; `tmp` room has extra password `quick-pass` — both use the global `FILE_EXPIRE`.
+
+Additional notes:
+
+- The Docker Compose variable name is now standardized as `ROOM_AUTH_JSON`.
+- The entrypoint still accepts the legacy variable name `ROOM_AUTH`, but the Compose example and later docs use `ROOM_AUTH_JSON` consistently.
+- If you use a `.env` file, keep the same `${VAR:-}` mapping and only fill in the actual values.
+- The image explicitly installs `nc`, and the Compose health check only verifies the listening port inside the container. It is unrelated to `PREFIX` or HTTP/HTTPS settings.
+- **`fileExpire` only affects files uploaded after the configuration change**: existing files keep their original expiration time.
+- History rotation is unaffected by `fileExpire`: once a room exceeds the message limit, the oldest files are still cleaned up.
+
+Example:
+
+```yaml
+environment:
+  AUTH_PASSWORD: 'global-pass'
+  ROOM_AUTH_JSON: '{"finance":"finance-pass","private":""}'
+```
+
+If you want to change `roomAuth` through variables dynamically, use a `.env` file:
+
+```env
+AUTH_PASSWORD=global-pass
+ROOM_AUTH_JSON={"finance":"finance-pass","private":""}
+```
+
+Then run:
+
+```bash
+docker compose up -d
+```
+
+You can also override it temporarily:
+
+```bash
+ROOM_AUTH_JSON='{"finance":"new-pass","ops":"ops-pass"}' docker compose up -d
+```
+
+Note: the Docker image only auto-generates [cloud-clip/config.json](./cloud-clip/config.json) when it does not already exist. If you mounted an existing `config.json`, updating environment variables will not rewrite it automatically. In that case, delete the file and recreate the container, or edit `server.roomAuth` manually.
+
+```bash
 # Option 2: Docker CLI
 docker run -d \
   --name=cloud-clipboard-go \
@@ -197,121 +305,6 @@ cd ..
 See also: [Cloudflare Deployment Documentation](./cloudflare/README.md)
 
 ---
-
-## 📋 Deployment Guide
-
-### Docker Compose Configuration
-
-Use the existing `docker-compose.yml` in the repository root as the source of truth. The image entrypoint generates the runtime configuration from these environment variables, so the documentation should follow the same naming.
-
-Adjust the root `docker-compose.yml` as needed:
-
-```yaml
-services:
-  cloud-clipboard-go:
-    container_name: cloud-clipboard-go
-    restart: always
-    ports:
-      - "9501:9501"
-    healthcheck:
-      test: ["CMD-SHELL", "nc -z 127.0.0.1 \"${LISTEN_PORT:-9501}\" || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
-    environment:
-      LISTEN_IP: ${LISTEN_IP:-} # Defaults to 0.0.0.0. Leave unchanged unless you know you need 127.0.0.1.
-      LISTEN_IP6: ${LISTEN_IP6:-} # Defaults to empty. Set :: for IPv6 if needed.
-      LISTEN_PORT: ${LISTEN_PORT:-} # Defaults to 9501. Change if you need another port.
-      PREFIX: ${PREFIX:-} # Subpath, useful with nginx. Example: /cloud-clipboard
-      MESSAGE_NUM: ${MESSAGE_NUM:-} # History record count, default 10.
-      AUTH_PASSWORD: ${AUTH_PASSWORD:-} # Global access password. Default false.
-      ROOM_AUTH_JSON: '${ROOM_AUTH_JSON:-{}}' # Room password JSON, value is a string or object {"finance":"finance-pass","keep":{"password":"kp","fileExpire":0}}, fileExpire: 0=files never expire,>0=override FILE_EXPIRE in seconds
-      TEXT_LIMIT: ${TEXT_LIMIT:-} # Text length limit, default 4096.
-      FILE_EXPIRE: ${FILE_EXPIRE:-} # File expiration in seconds, default 3600.
-      FILE_LIMIT: ${FILE_LIMIT:-} # File size limit in bytes, default 104857600.
-      MKCERT_DOMAIN_OR_IP: ${MKCERT_DOMAIN_OR_IP:-} # mkcert domain or IP. Separate multiple values with spaces. Wildcards are supported for domains only.
-      MANUAL_KEY_PATH: ${MANUAL_KEY_PATH:-} # Manual key path. Higher priority than MKCERT_DOMAIN_OR_IP.
-      MANUAL_CERT_PATH: ${MANUAL_CERT_PATH:-} # Manual certificate path. Higher priority than MKCERT_DOMAIN_OR_IP.
-      ROOM_LIST: ${ROOM_LIST:-} # Whether to enable room list display. Default false.
-    volumes:
-      - /path/your/dir/data:/app/server-node/data # Replace with your own directory
-    image: jonnyan404/cloud-clipboard-go:latest
-```
-
-Run:
-
-```bash
-docker compose up -d
-```
-
-`ROOM_AUTH_JSON` must be a valid JSON object. Each room value supports two forms:
-
-1. **String/number** (legacy format): acts only as an extra password for that room;
-2. **Object** `{ "password": "xx", "fileExpire": N }`: configures both the password and the file expiration policy for that room.
-
-`fileExpire` values:
-
-| Value | Meaning |
-| --- | --- |
-| omitted | Use the global `FILE_EXPIRE` (default behavior) |
-| `0` | Files uploaded to this room **never expire** |
-| `> 0` | Override the global `FILE_EXPIRE`, in seconds |
-
-Example:
-
-```bash
-ROOM_AUTH_JSON='{
-  "finance": {"password": "finance-pass", "fileExpire": 0},
-  "archive": {"fileExpire": 604800},
-  "private": "",
-  "tmp": "quick-pass"
-}' docker compose up -d
-```
-
-Meaning:
-
-- `finance` room password `finance-pass`, files never expire;
-- `archive` room has no extra password (falls back to the global one), files are kept for 7 days;
-- `private` room has no extra password; `tmp` room has extra password `quick-pass` — both use the global `FILE_EXPIRE`.
-
-Additional notes:
-
-- The Docker Compose variable name is now standardized as `ROOM_AUTH_JSON`.
-- The entrypoint still accepts the legacy variable name `ROOM_AUTH`, but the Compose example and later docs use `ROOM_AUTH_JSON` consistently.
-- If you use a `.env` file, keep the same `${VAR:-}` mapping and only fill in the actual values.
-- The image explicitly installs `nc`, and the Compose health check only verifies the listening port inside the container. It is unrelated to `PREFIX` or HTTP/HTTPS settings.
-- **`fileExpire` only affects files uploaded after the configuration change**: existing files keep their original expiration time.
-- History rotation is unaffected by `fileExpire`: once a room exceeds the message limit, the oldest files are still cleaned up.
-
-Example:
-
-```yaml
-environment:
-  AUTH_PASSWORD: 'global-pass'
-  ROOM_AUTH_JSON: '{"finance":"finance-pass","private":""}'
-```
-
-If you want to change `roomAuth` through variables dynamically, use a `.env` file:
-
-```env
-AUTH_PASSWORD=global-pass
-ROOM_AUTH_JSON={"finance":"finance-pass","private":""}
-```
-
-Then run:
-
-```bash
-docker compose up -d
-```
-
-You can also override it temporarily:
-
-```bash
-ROOM_AUTH_JSON='{"finance":"new-pass","ops":"ops-pass"}' docker compose up -d
-```
-
-Note: the Docker image only auto-generates [cloud-clip/config.json](./cloud-clip/config.json) when it does not already exist. If you mounted an existing `config.json`, updating environment variables will not rewrite it automatically. In that case, delete the file and recreate the container, or edit `server.roomAuth` manually.
 
 ### Binary Command-line Parameters
 
