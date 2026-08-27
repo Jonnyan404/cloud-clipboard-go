@@ -127,7 +127,8 @@ export default {
             if (this.$root.send.files.length) {
                 return this.$t('composerFilesSelected', { count: this.$root.send.files.length });
             }
-            return this.$t('dragDropPasteTip');
+            const pasteKey = this.isMac ? '⌘+V' : 'Ctrl+V';
+            return this.$t('dragDropPasteTip', { keys: pasteKey });
         },
         sendShortcutLabel() {
             return this.$t('sendShortcutTip', {
