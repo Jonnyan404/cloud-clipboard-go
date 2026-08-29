@@ -190,7 +190,9 @@ export default {
       return await router.handle(request, env, ctx);
     } catch (error) {
       console.error('Worker error:', error);
-      return new Response('Internal Server Error', { 
+      console.error('Worker stack:', error?.stack || '(no stack)');
+      const reason = String(error?.message || error || 'unknown');
+      return new Response(`Internal Server Error: ${reason}`, { 
         status: 500,
         headers: corsHeaders
       });

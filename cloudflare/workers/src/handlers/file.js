@@ -253,9 +253,11 @@ export class FileHandler {
     } catch (error) {
       console.error('File upload error:', error);
       console.error('File upload stack:', error?.stack || '(no stack)');
+      const reason = String(error?.message || error || 'unknown');
+      console.error('File upload reason:', reason);
       return new Response(JSON.stringify({
         error: 'Internal Server Error',
-        message: '上传文件时发生错误'
+        message: `上传文件时发生错误: ${reason}`
       }), {
         status: 500,
         headers: { 'Content-Type': 'application/json', ...corsHeaders }
