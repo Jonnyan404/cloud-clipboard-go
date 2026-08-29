@@ -20,15 +20,15 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version: '1.25'
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
 
@@ -42,7 +42,7 @@ jobs:
           ./openwrt/scripts/build.sh ${{ github.event.inputs.version }}
 
       - name: Upload binary artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: openwrt-binaries-${{ github.event.inputs.version }}
           path: openwrt/build/cloud-clipboard-${{ github.event.inputs.version }}-*
@@ -56,14 +56,14 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Create directory structure
         run: |
           mkdir -p openwrt/build
 
       - name: Download binary artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: openwrt-binaries-${{ github.event.inputs.version }}
           path: openwrt/build
@@ -74,7 +74,7 @@ jobs:
           ./openwrt/scripts/package-openwrt.sh ${{ github.event.inputs.version }} ${{ matrix.arch }}
 
       - name: Upload IPK artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: cloud-clipboard_${{ github.event.inputs.version }}_${{ matrix.arch }}.ipk
           path: openwrt/build/cloud-clipboard_${{ github.event.inputs.version }}_${{ matrix.arch }}.ipk
@@ -124,14 +124,14 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Create directory structure
         run: |
           mkdir -p openwrt/build
 
       - name: Download binary artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: openwrt-binaries-${{ github.event.inputs.version }}
           path: openwrt/build
@@ -149,7 +149,7 @@ jobs:
             '
 
       - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: cloud-clipboard-${{ github.event.inputs.version }}-${{ matrix.apk_arch }}.apk
           path: openwrt/build/cloud-clipboard-${{ github.event.inputs.version }}-${{ matrix.apk_arch }}.apk
@@ -158,7 +158,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Create directory structure
         run: |
@@ -184,13 +184,13 @@ jobs:
             '
       
       - name: Upload LuCI IPK artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: luci-app-cloud-clipboard_${{ github.event.inputs.version }}_all.ipk
           path: openwrt/build/luci-app-cloud-clipboard_${{ github.event.inputs.version }}_all.ipk
 
       - name: Upload LuCI APK artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: luci-app-cloud-clipboard-${{ github.event.inputs.version }}-noarch.apk
           path: openwrt/build/luci-app-cloud-clipboard-${{ github.event.inputs.version }}-noarch.apk
@@ -202,7 +202,7 @@ jobs:
     
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           path: artifacts
           merge-multiple: true
@@ -212,7 +212,7 @@ jobs:
 
       - name: Create Release
         id: create_release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             artifacts/**/*.ipk
