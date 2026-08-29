@@ -124,9 +124,12 @@ export class TextHandler {
 
     } catch (error) {
       console.error('Text handler error:', error);
+      console.error('Text handler stack:', error?.stack || '(no stack)');
+      const reason = String(error?.message || error || 'unknown');
+      console.error('Text handler reason:', reason);
       return new Response(JSON.stringify({
         error: 'Internal Server Error',
-        message: '处理文本时发生错误'
+        message: `处理文本时发生错误: ${reason}`
       }), {
         status: 500,
         headers: { 'Content-Type': 'application/json', ...corsHeaders }
