@@ -344,6 +344,8 @@ cd ..
 
 ### 🖥️ 客户端应用
 
+![Client Preview](https://github.com/Jonnyan404/cloud-clipboard-go/blob/main/client.png)
+
 - **Clipboard Sync**（仅提供给捐赠用户）
   - 桌面UI展示指定房间消息
   - 双向同步剪贴板
