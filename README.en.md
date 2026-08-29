@@ -343,6 +343,8 @@ Example:
 
 ### 🖥️ Client Application
 
+![Client Preview](https://github.com/Jonnyan404/cloud-clipboard-go/blob/main/client.png)
+
 - **Clipboard Sync** (available only to donors)
   - -The desktop UI shows the message of the specified room.
   - Two-way clipboard sync
