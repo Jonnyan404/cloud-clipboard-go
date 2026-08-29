@@ -311,12 +311,12 @@ func (s *ClipboardServer) setupRoutes() {
 		s.logger.Println("警告: 未使用嵌入式静态文件，也未配置外部静态目录。将不提供前端服务。")
 	}
 
-	// HTTP 路由
-	mux.HandleFunc(prefix+"/server", s.handle_server)
-	mux.HandleFunc(prefix+"/auth/token", s.handleAuthToken)
-	mux.HandleFunc(prefix+"/auth/token/refresh", s.handleAuthTokenRefresh)
+	// HTTP 路由（/server、/auth/*、/rooms、/revoke、/content 等无 authMiddleware 的路由补 CORS 头）
+	mux.HandleFunc(prefix+"/server", s.corsMiddleware(s.handle_server))
+	mux.HandleFunc(prefix+"/auth/token", s.corsMiddleware(s.handleAuthToken))
+	mux.HandleFunc(prefix+"/auth/token/refresh", s.corsMiddleware(s.handleAuthTokenRefresh))
 	mux.HandleFunc(prefix+"/push", s.handle_push)
-	mux.HandleFunc(prefix+"/rooms", s.handleRooms)
+	mux.HandleFunc(prefix+"/rooms", s.corsMiddleware(s.handleRooms))
 	// /share 在 handler 内按目标资源所在房间鉴权（支持 body 中的 file uuid）
 	mux.HandleFunc(prefix+"/share", s.handle_share)
 	mux.HandleFunc(prefix+"/file/", s.authMiddleware(s.handle_file))
@@ -325,9 +325,9 @@ func (s *ClipboardServer) setupRoutes() {
 	mux.HandleFunc(prefix+"/upload/chunk", s.authMiddleware(s.handle_upload))
 	mux.HandleFunc(prefix+"/upload/chunk/", s.authMiddleware(s.handle_chunk))
 	mux.HandleFunc(prefix+"/upload/finish/", s.authMiddleware(s.handle_finish))
-	mux.HandleFunc(prefix+"/revoke/", s.handle_revoke)
-	mux.HandleFunc(prefix+"/revoke/all", s.handleClearAll)
-	mux.HandleFunc(prefix+"/content/", s.handleContent)
+	mux.HandleFunc(prefix+"/revoke/", s.corsMiddleware(s.handle_revoke))
+	mux.HandleFunc(prefix+"/revoke/all", s.corsMiddleware(s.handleClearAll))
+	mux.HandleFunc(prefix+"/content/", s.corsMiddleware(s.handleContent))
 
 	s.httpServer = &http.Server{
 		Handler: mux,
@@ -708,6 +708,22 @@ func (s *ClipboardServer) authMiddleware(next http.HandlerFunc) http.HandlerFunc
 
 		s.logger.Printf("认证失败: 无效令牌。来自 IP: %s, 路径: %s, 房间: %s", clientIP, r.URL.Path, requirement.Room)
 		writeAuthJSONError(w, http.StatusUnauthorized, "无效的认证令牌")
+	}
+}
+
+// corsMiddleware 为未走 authMiddleware 的路由补充 CORS 头并处理 OPTIONS 预检，
+// 供跨源 Web 客户端（如 Tauri 房间视图，页面源为 http://tauri.localhost）调用。
+func (s *ClipboardServer) corsMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Room-Auth-Tokens")
+
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		next.ServeHTTP(w, r)
 	}
 }
 
