@@ -219,6 +219,8 @@ Then open it from another device: `http://your-android-device-ip:9501`
 
 ### 4️⃣ Homebrew (macOS)
 
+> default configuration file path:: /usr/local/etc/cloud-clipboard-go/config.json
+
 ```bash
 brew install Jonnyan404/tap/cloud-clipboard-go
 brew services start cloud-clipboard-go
@@ -339,9 +341,10 @@ Example:
    - `room`: room name, optional
    - `auth`: authentication password, optional
 
-### 🖥️ Desktop Application
+### 🖥️ Client Application
 
 - **Clipboard Sync** (available only to donors)
+  - -The desktop UI shows the message of the specified room.
   - Two-way clipboard sync
   - Supports Windows, macOS, and Linux
 

@@ -220,6 +220,8 @@ cloud-clipboard-go.exe -port 9501
 
 ### 4️⃣ 使用 Homebrew（macOS）
 
+> 默认配置文件路径: /usr/local/etc/cloud-clipboard-go/config.json
+
 ```bash
 brew install Jonnyan404/tap/cloud-clipboard-go
 brew services start cloud-clipboard-go
@@ -340,9 +342,10 @@ cd ..
    - `room`: 房间名称（可选）
    - `auth`: 认证密码（可选）
 
-### 🖥️ 桌面端应用
+### 🖥️ 客户端应用
 
 - **Clipboard Sync**（仅提供给捐赠用户）
+  - 桌面UI展示指定房间消息
   - 双向同步剪贴板
   - 支持 Windows/macOS/Linux
 

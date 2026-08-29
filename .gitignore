@@ -18,6 +18,13 @@ cloudflare/node_modules
 .kotlin/
 *.keystore
 .kilo
-clipboard-monitor
-clipboard-monitor/src-tauri/target/
+clip-sync
+clip-sync/dist/
+clip-sync/src-tauri/target/
 openwrt/build/
+
+# macOS
+.DS_Store
+**/.DS_Store
+.AppleDouble
+.LSOverride
