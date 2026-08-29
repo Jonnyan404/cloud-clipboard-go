@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       
       - name: Create directory structure and set permissions
         run: |
@@ -40,13 +40,13 @@ jobs:
             '
       
       - name: Upload LuCI IPK artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: luci-app-cloud-clipboard_${{ github.event.inputs.version }}_all.ipk
           path: openwrt/build/luci-app-cloud-clipboard_${{ github.event.inputs.version }}_all.ipk
 
       - name: Upload LuCI APK artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: luci-app-cloud-clipboard-${{ github.event.inputs.version }}-noarch.apk
           path: openwrt/build/luci-app-cloud-clipboard-${{ github.event.inputs.version }}-noarch.apk
