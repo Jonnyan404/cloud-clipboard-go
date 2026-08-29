@@ -24,7 +24,7 @@ RUN chmod +x /app/entrypoint.sh \
  && case "${TARGETARCH}-${TARGETVARIANT}" in \
       amd64-*) B="Linux_x86_64";; \
       arm64-*) B="Linux_aarch64";; \
-      arm-7)   B="Linux_armv7";; \
+      arm-v7)  B="Linux_armv7";; \
       *) echo "不支持的平台: ${TARGETARCH}-${TARGETVARIANT}"; exit 1;; \
     esac \
  && wget -q -O - "https://github.com/jonnyan404/cloud-clipboard-go/releases/download/${VERSION}/cloud-clipboard-go_${B}.tar.gz" \
