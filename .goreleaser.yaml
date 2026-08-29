@@ -6,7 +6,8 @@ before:
     - sh -c 'cd $GITHUB_WORKSPACE/cloud-clip && go mod tidy'
 
 builds:
-  - dir: cloud-clip
+  - id: std
+    dir: cloud-clip
     env:
       - CGO_ENABLED=0
       - GOOS=darwin
@@ -21,7 +22,6 @@ builds:
       - amd64
       - arm64
       - arm
-      - "386"
     goarm:
       - "7"
     ignore:
@@ -29,8 +29,6 @@ builds:
         goarch: arm
       - goos: windows
         goarch: arm
-      - goos: darwin
-        goarch: "386"
     mod_timestamp: '{{ .CommitTimestamp }}'
     hooks:
       post:
@@ -52,7 +50,6 @@ archives:
       {{ .ProjectName }}_
       {{- title .Os }}_
       {{- if eq .Arch "amd64" }}x86_64
-      {{- else if eq .Arch "386" }}i386
       {{- else if eq .Arch "arm64" }}aarch64
       {{- else if eq .Arch "arm" }}armv7
       {{- else }}{{ .Arch }}{{ end }}

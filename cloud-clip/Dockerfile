@@ -1,47 +1,36 @@
-# 前端构建阶段
-FROM node:22.12-alpine3.21 AS frontend
-ENV NODE_OPTIONS=--openssl-legacy-provider
-COPY client /app
-WORKDIR /app
-RUN npm install
-RUN npm run build
+# syntax=docker/dockerfile:1
 
-# 后端构建阶段
-FROM golang:1.25-alpine AS builder
+# 直接下载 GitHub Release 中已构建好的静态二进制（已内嵌前端静态资源），
+# 不再在镜像内编译前端/后端，大幅加快镜像生成。
+# 需要 build-arg: VERSION  (例如 v1.0.0)；
+# TARGETARCH / TARGETVARIANT 由 docker buildx 自动注入。
 
-# 设置工作目录
-WORKDIR /app
-# 复制 Go 模块文件（确保这些文件在 cloud-clip 目录下）
-COPY cloud-clip/go.mod cloud-clip/go.sum ./
-RUN go mod download
-
-# 复制源代码
-COPY cloud-clip/ ./
-
-# 创建静态文件目录
-RUN mkdir -p lib/static
-
-# 复制前端构建结果
-COPY --from=frontend /app/dist lib/static/
-
-# 编译应用，启用嵌入式静态文件
-RUN CGO_ENABLED=0 GOOS=linux go build -tags=embed -ldflags="-s -w" -o cloud-clipboard-go .
-
-# 最终镜像
 FROM alpine:latest
 
-# 安装运行时依赖
-RUN apk add --no-cache ca-certificates netcat-openbsd
+ARG VERSION
+ARG TARGETARCH
+ARG TARGETVARIANT
 
-# 创建应用目录
+# 运行时依赖
+RUN apk add --no-cache ca-certificates netcat-openbsd git tzdata \
+    && apk add --repository=https://dl-cdn.alpinelinux.org/alpine/edge/testing mkcert
+
 WORKDIR /app/server-node
 
-# 从构建阶段复制编译好的应用
-COPY --from=builder /app/cloud-clipboard-go .
-COPY cloud-clip/entrypoint.sh /app/
-RUN apk add --no-cache git tzdata \
-    && chmod +x /app/entrypoint.sh \
-    && apk add --repository=https://dl-cdn.alpinelinux.org/alpine/edge/testing mkcert
+COPY cloud-clip/entrypoint.sh /app/entrypoint.sh
+
+# 按平台映射 Release 归档名并解压出二进制
+RUN chmod +x /app/entrypoint.sh \
+ && case "${TARGETARCH}-${TARGETVARIANT}" in \
+      amd64-*) B="Linux_x86_64";; \
+      arm64-*) B="Linux_aarch64";; \
+      arm-7)   B="Linux_armv7";; \
+      *) echo "不支持的平台: ${TARGETARCH}-${TARGETVARIANT}"; exit 1;; \
+    esac \
+ && wget -q -O - "https://github.com/jonnyan404/cloud-clipboard-go/releases/download/${VERSION}/cloud-clipboard-go_${B}.tar.gz" \
+      | tar -xz -C /app/server-node/ cloud-clipboard-go \
+ && chmod +x /app/server-node/cloud-clipboard-go
+
 # 暴露端口
 EXPOSE 9501
 
