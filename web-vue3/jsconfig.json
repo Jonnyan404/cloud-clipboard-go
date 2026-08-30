@@ -1,0 +1,10 @@
+{
+    "compilerOptions": {
+        "baseUrl": ".",
+        "paths": {
+            "@/*": ["src/*"]
+        }
+    },
+    "include": ["src/**/*.vue", "src/**/*.js", "vite.config.js"],
+    "exclude": ["node_modules", "dist"]
+}
