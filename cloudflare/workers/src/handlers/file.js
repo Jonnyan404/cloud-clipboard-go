@@ -61,10 +61,6 @@ function createUploadMetaKey(uuid) {
   return `uploads/${uuid}/meta`;
 }
 
-function createUploadPartKey(uuid, index) {
-  return `uploads/${uuid}/part/${index}`;
-}
-
 function contentTypeFromName(filename = '') {
   if (!filename) return 'application/octet-stream';
   const ext = String(filename).split('.').pop()?.toLowerCase();
@@ -321,16 +317,26 @@ export class FileHandler {
       const currentTime = Math.floor(Date.now() / 1000);
       const uuid = generateUUID();
       const expireTime = resolveExpireTime(currentTime, env, authResult.requirement?.fileExpire);
+      const fileType = contentTypeFromName(fileName);
+
+      // 使用 R2 原生 multipart upload：各分块作为 multipart part 上传，
+      // 由 R2 在服务端合并为最终对象。避免用未知长度的自定义 ReadableStream put（R2 会拒绝）。
+      const upload = await env.R2_BUCKET.createMultipartUpload(
+        createFileKey(uuid),
+        buildMultipartOptions({ room, fileName, fileType, expireTime })
+      );
 
       await env.R2_BUCKET.put(createUploadMetaKey(uuid), JSON.stringify({
         name: fileName,
         room,
         expireTime,
-        partCount: 0,
+        uploadId: upload.uploadId,
+        parts: [],
+        totalSize: 0,
         created: currentTime,
       }));
 
-      console.log('[chunk] created', { room, uuid, fileName, expireTime });
+      console.log('[chunk] created', { room, uuid, fileName, expireTime, uploadId: upload.uploadId });
 
       return new Response(JSON.stringify({
         result: { uuid }
@@ -382,8 +388,7 @@ export class FileHandler {
         return authResult.response;
       }
 
-      const body = await request.arrayBuffer();
-      if (!body || body.byteLength === 0) {
+      if (!request.body) {
         return new Response(JSON.stringify({
           error: 'Empty chunk',
           message: '分块数据为空'
@@ -394,8 +399,8 @@ export class FileHandler {
       }
 
       const fileLimit = getFileLimit(env);
-      const accumulatedSize = meta.partCount * getMultipartPartSize(env);
-      if (fileLimit > 0 && (accumulatedSize + body.byteLength) > fileLimit) {
+      const chunkSize = Number(request.headers.get('Content-Length') || 0);
+      if (fileLimit > 0 && (Number(meta.totalSize || 0) + chunkSize) > fileLimit) {
         return new Response(JSON.stringify({
           error: 'File too large',
           message: `文件大小超出限制 (最大 ${Math.floor(fileLimit / 1024 / 1024)}MB)`
@@ -405,12 +410,15 @@ export class FileHandler {
         });
       }
 
-      const partIndex = meta.partCount;
-      await env.R2_BUCKET.put(createUploadPartKey(uuid, partIndex), body);
-      meta.partCount = partIndex + 1;
+      const upload = env.R2_BUCKET.resumeMultipartUpload(createFileKey(uuid), meta.uploadId);
+      const partNumber = (meta.parts.length || 0) + 1;
+      const part = await upload.uploadPart(partNumber, request.body);
+
+      meta.parts.push({ partNumber, etag: part.etag });
+      meta.totalSize = Number(meta.totalSize || 0) + chunkSize;
       await env.R2_BUCKET.put(createUploadMetaKey(uuid), JSON.stringify(meta));
 
-      console.log('[chunk] uploaded part', { uuid, partIndex, size: body.byteLength });
+      console.log('[chunk] uploaded part', { uuid, partNumber, etag: part.etag, size: chunkSize });
 
       return new Response(JSON.stringify({}), {
         headers: { 'Content-Type': 'application/json', ...corsHeaders }
@@ -461,21 +469,11 @@ export class FileHandler {
       }
       const meta = JSON.parse(await metaObject.text());
       const fileName = meta.name || 'file';
-      const partCount = Number(meta.partCount || 0);
       const expireTime = Number(meta.expireTime || 0);
       const fileRoom = normalizeRoomName(meta.room || room);
+      const parts = meta.parts || [];
 
-      let fileSize = 0;
-      const streams = [];
-      for (let i = 0; i < partCount; i++) {
-        const partObject = await env.R2_BUCKET.get(createUploadPartKey(uuid, i));
-        if (partObject) {
-          fileSize += partObject.size;
-          streams.push(partObject.body);
-        }
-      }
-
-      if (!streams.length) {
+      if (!meta.uploadId || !parts.length) {
         return new Response(JSON.stringify({
           error: 'No chunks',
           message: '未找到上传的分块'
@@ -485,43 +483,17 @@ export class FileHandler {
         });
       }
 
-      const concatenated = new ReadableStream({
-        async start(controller) {
-          for (const stream of streams) {
-            const reader = stream.getReader();
-            try {
-              for (;;) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                controller.enqueue(value);
-              }
-            } finally {
-              reader.releaseLock();
-            }
-          }
-          controller.close();
-        }
-      });
-
-      const fileType = contentTypeFromName(fileName);
-      await env.R2_BUCKET.put(createFileKey(uuid), concatenated, {
-        httpMetadata: {
-          contentType: fileType,
-          contentDisposition: buildContentDisposition(fileName, 'inline')
-        },
-        customMetadata: {
-          originalName: fileName,
-          uploadTime: Date.now().toString(),
-          expireTime: expireTime.toString(),
-          room: fileRoom,
-        }
-      });
+      const upload = env.R2_BUCKET.resumeMultipartUpload(createFileKey(uuid), meta.uploadId);
+      const completedObject = await upload.complete(
+        parts
+          .slice()
+          .sort((a, b) => a.partNumber - b.partNumber)
+          .map((p) => ({ partNumber: p.partNumber, etag: p.etag }))
+      );
+      const fileSize = Number(completedObject?.size || meta.totalSize || 0);
 
       console.log('[chunk] finalized', { room: fileRoom, uuid, fileName, fileSize, expireTime });
 
-      for (let i = 0; i < partCount; i++) {
-        await env.R2_BUCKET.delete(createUploadPartKey(uuid, i));
-      }
       await env.R2_BUCKET.delete(createUploadMetaKey(uuid));
 
       return await finalizeUploadedFile({
