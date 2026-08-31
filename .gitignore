@@ -28,3 +28,7 @@ openwrt/build/
 **/.DS_Store
 .AppleDouble
 .LSOverride
+
+# build caches / local artifacts
+/.vite/
+/cloud-clip/cloud-clipboard-go-embed

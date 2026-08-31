@@ -175,8 +175,8 @@ async function deleteItem() {
             <v-card-text>
                 <div class="d-flex flex-row align-start">
                     <div class="flex-grow-1 mr-2" style="min-width: 0">
-                        <div class="d-flex flex-wrap align-center mb-2 timeline-card__meta" v-if="meta.timestamp && (app.showTimestamp || app.showDeviceInfo || app.showSenderIP)">
-                            <v-chip size="x-small" label variant="flat" color="primary" class="mr-2 mb-1">{{ t('textMessage') }}</v-chip>
+                        <div class="text-caption d-flex flex-wrap align-center mb-2 timeline-card__meta" v-if="meta.timestamp && (app.showTimestamp || app.showDeviceInfo || app.showSenderIP)">
+                            <v-chip size="x-small" label variant="flat" color="primary" class="mr-2 mb-1 d-sm-inline">{{ t('textMessage') }}</v-chip>
                             <template v-if="app.showTimestamp">
                                 <span class="mr-3 mb-1"><v-icon size="x-small" class="mr-1">{{ mdiClockOutline }}</v-icon>{{ formatTimestamp(meta.timestamp) }}</span>
                             </template>
@@ -188,7 +188,7 @@ async function deleteItem() {
                             </template>
                         </div>
                         <div class="text-h6 text-truncate text-on-surface timeline-card__title" @click="expand = !expand">
-                            {{ t('textMessage') }}<v-icon>{{expand ? mdiChevronUp : mdiChevronDown}}</v-icon>
+                            {{ t('textMessage') }}<v-icon size="x-small">{{expand ? mdiChevronUp : mdiChevronDown}}</v-icon>
                         </div>
                         <div class="text-body-2 text-medium-emphasis timeline-card__preview text-truncate" @click="expand = !expand">{{ decodedContentPreview }}</div>
                     </div>
@@ -196,31 +196,31 @@ async function deleteItem() {
                         <div v-if="meta.id" class="text-caption text-grey-darken-1 mb-2">
                             <v-icon size="x-small" class="mr-1">{{ mdiPound }}</v-icon>{{ meta.id }}
                         </div>
-                        <div>
+                        <div class="d-flex flex-nowrap align-center timeline-card__icon-row">
                             <v-tooltip :text="t('copyText')" location="bottom">
                                 <template v-slot:activator="{ props }">
-                                    <v-btn v-bind="props" icon density="comfortable" variant="text" color="grey" class="timeline-card__icon-button" @click="copyText">
+                                    <v-btn v-bind="props" icon density="compact" variant="text" color="grey" class="timeline-card__icon-button" @click="copyText">
                                         <v-icon>{{mdiContentCopy}}</v-icon>
                                     </v-btn>
                                 </template>
                             </v-tooltip>
                             <v-tooltip :text="t('copyLink')" location="bottom">
                                 <template v-slot:activator="{ props }">
-                                    <v-btn v-bind="props" icon density="comfortable" variant="text" color="grey" class="timeline-card__icon-button" @click="openShareDialog('copy')">
-                                        <v-icon>{{ mdiLinkVariant }}</v-icon>
+                                    <v-btn v-bind="props" icon density="compact" variant="text" color="grey" class="timeline-card__icon-button" @click="openShareDialog('copy')">
+                                        <v-icon>{{mdiLinkVariant }}</v-icon>
                                     </v-btn>
                                 </template>
                             </v-tooltip>
                             <v-tooltip :text="t('showQrCode')" location="bottom">
                                 <template v-slot:activator="{ props }">
-                                    <v-btn v-bind="props" icon density="comfortable" variant="text" color="grey" class="timeline-card__icon-button" @click="openShareDialog('qr')">
-                                        <v-icon>{{ mdiQrcode }}</v-icon>
+                                    <v-btn v-bind="props" icon density="compact" variant="text" color="grey" class="timeline-card__icon-button" @click="openShareDialog('qr')">
+                                        <v-icon>{{mdiQrcode }}</v-icon>
                                     </v-btn>
                                 </template>
                             </v-tooltip>
                             <v-tooltip :text="t('delete')" location="bottom">
                                 <template v-slot:activator="{ props }">
-                                    <v-btn v-bind="props" icon density="comfortable" variant="text" color="grey" class="timeline-card__icon-button" @click="deleteItem">
+                                    <v-btn v-bind="props" icon density="compact" variant="text" color="grey" class="timeline-card__icon-button" @click="deleteItem">
                                         <v-icon>{{mdiClose}}</v-icon>
                                     </v-btn>
                                 </template>
@@ -370,9 +370,15 @@ async function deleteItem() {
     min-width: 8rem;
 }
 
+.timeline-card__icon-row {
+    flex-wrap: nowrap;
+    white-space: nowrap;
+}
+
 .timeline-card__icon-button {
     background: rgba(248, 250, 252, 0.92);
     margin-left: 0.125rem;
+    flex: 0 0 auto;
 }
 
 .timeline-card--dark .timeline-card__meta,

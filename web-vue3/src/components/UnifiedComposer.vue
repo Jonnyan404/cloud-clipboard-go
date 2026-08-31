@@ -8,7 +8,7 @@
         @dragleave.prevent="handleDragLeave"
         @drop.prevent="handleDrop"
     >
-        <div class="unified-composer__body pa-3 pa-md-4">
+        <div class="unified-composer__body pa-1 pa-md-3">
             <v-textarea
                 ref="textarea"
                 v-model="app.send.text"

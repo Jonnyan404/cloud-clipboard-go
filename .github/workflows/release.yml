@@ -24,17 +24,17 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: client/package.json
+          cache-dependency-path: web-vue3/package.json
       - name: Build frontend static assets
         run: |
-          cd client
+          cd web-vue3
           npm install
           npm run build
       - name: Upload frontend artifact
         uses: actions/upload-artifact@v7
         with:
           name: frontend-dist
-          path: client/dist
+          path: web-vue3/dist
 
   # ====================================================================
   # Job 2: Build Desktop Binaries using GoReleaser
@@ -58,16 +58,16 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: client/package.json
+          cache-dependency-path: web-vue3/package.json
       # - name: Download frontend artifact
       #   uses: actions/download-artifact@v8
       #   with:
       #     name: frontend-dist
-      #     path: client/dist
+      #     path: web-vue3/dist
       # - name: Prepare Go embed directory
       #   run: |
       #     mkdir -p cloud-clip/static
-      #     cp -r client/dist/* cloud-clip/static/
+      #     cp -r web-vue3/dist/* cloud-clip/static/
       - name: Run GoReleaser (build only)
         uses: goreleaser/goreleaser-action@v7
         with:
@@ -121,12 +121,12 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: frontend-dist
-          path: client/dist
+          path: web-vue3/dist
       - name: Prepare Go embed directory
         run: |
           rm -rf cloud-clip/lib/static
           mkdir -p cloud-clip/lib/static
-          cp -r client/dist/* cloud-clip/lib/static/
+          cp -r web-vue3/dist/* cloud-clip/lib/static/
       - name: Install gomobile and Build AAR
         run: |
           go install golang.org/x/mobile/cmd/gomobile@latest
@@ -195,12 +195,12 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: frontend-dist
-          path: client/dist
+          path: web-vue3/dist
       - name: Prepare Go embed directory
         run: |
           rm -rf cloud-clip/lib/static
           mkdir -p cloud-clip/lib/static
-          cp -r client/dist/* cloud-clip/lib/static/
+          cp -r web-vue3/dist/* cloud-clip/lib/static/
       - name: Install gomobile and Build Universal AAR
         run: |
           go install golang.org/x/mobile/cmd/gomobile@latest
