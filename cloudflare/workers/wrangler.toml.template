@@ -1,7 +1,15 @@
 name = "cloud-clipboard-worker"
 main = "src/index.js"
-compatibility_date = "2024-01-15"
+compatibility_date = "2025-08-01"
 compatibility_flags = ["nodejs_compat"]
+
+# 托管 Vue3 前端静态资源（web-vue3/dist 的拷贝）
+# 静态资源与 SPA 导航请求免费且不限量；
+# 非导航的 API 请求（/server、/text、/upload、/push 等，由前端 XHR/fetch 发起）才会调用 Worker。
+[assets]
+directory = "./assets"
+not_found_handling = "single-page-application"
+binding = "ASSETS"
 
 # 环境变量
 [vars]

@@ -57,6 +57,29 @@ function createFileKey(uuid) {
   return `files/${uuid}`;
 }
 
+function createUploadMetaKey(uuid) {
+  return `uploads/${uuid}/meta`;
+}
+
+function createUploadPartKey(uuid, index) {
+  return `uploads/${uuid}/part/${index}`;
+}
+
+function contentTypeFromName(filename = '') {
+  if (!filename) return 'application/octet-stream';
+  const ext = String(filename).split('.').pop()?.toLowerCase();
+  const map = {
+    jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif',
+    webp: 'image/webp', svg: 'image/svg+xml', bmp: 'image/bmp', ico: 'image/x-icon',
+    mp4: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime', mkv: 'video/x-matroska', m4v: 'video/mp4',
+    mp3: 'audio/mpeg', wav: 'audio/wav', ogg: 'audio/ogg', m4a: 'audio/mp4', aac: 'audio/aac', flac: 'audio/flac',
+    pdf: 'application/pdf',
+    txt: 'text/plain', md: 'text/markdown', json: 'application/json', html: 'text/html', csv: 'text/csv',
+    zip: 'application/zip', tar: 'application/x-tar', gz: 'application/gzip', '7z': 'application/x-7z-compressed',
+  };
+  return map[ext] || 'application/octet-stream';
+}
+
 function extractUuidFromKey(key = '') {
   return String(key || '').startsWith('files/') ? String(key).slice('files/'.length) : String(key || '');
 }
@@ -77,7 +100,7 @@ function buildMultipartOptions({ room, fileName, fileType, expireTime }) {
 }
 
 async function finalizeUploadedFile({ request, env, url, room, uuid, fileName, fileSize, expireTime }) {
-  const fileUrl = `${url.origin}/api/file/${uuid}/${encodeURIComponent(fileName)}`;
+  const fileUrl = `${url.origin}/file/${uuid}/${encodeURIComponent(fileName)}`;
   const messageData = {
     type: 'file',
     name: fileName,
@@ -126,7 +149,7 @@ async function finalizeUploadedFile({ request, env, url, room, uuid, fileName, f
     }
   });
 
-  const contentURL = `${url.origin}/api/content/${messageId}${room !== 'default' ? `?room=${room}` : ''}`;
+  const contentURL = `${url.origin}/content/${messageId}${room !== 'default' ? `?room=${room}` : ''}`;
 
   console.log('[upload] success', {
     room,
@@ -258,6 +281,265 @@ export class FileHandler {
       return new Response(JSON.stringify({
         error: 'Internal Server Error',
         message: `上传文件时发生错误: ${reason}`
+      }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      });
+    }
+  }
+
+  static async createChunk(request, env) {
+    try {
+      const url = new URL(request.url);
+      const room = normalizeRoomName(url.searchParams.get('room'));
+      const authResult = await ensureRoomAccess(request, env, room);
+      if (!authResult.ok) {
+        return authResult.response;
+      }
+
+      if (!env.R2_BUCKET) {
+        return new Response(JSON.stringify({
+          error: 'Storage not available',
+          message: '文件存储服务不可用'
+        }), {
+          status: 503,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders }
+        });
+      }
+
+      const fileName = String(await request.text() || '').trim();
+      if (!fileName) {
+        return new Response(JSON.stringify({
+          error: 'Invalid file name',
+          message: '未提供文件名'
+        }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders }
+        });
+      }
+
+      const currentTime = Math.floor(Date.now() / 1000);
+      const uuid = generateUUID();
+      const expireTime = resolveExpireTime(currentTime, env, authResult.requirement?.fileExpire);
+
+      await env.R2_BUCKET.put(createUploadMetaKey(uuid), JSON.stringify({
+        name: fileName,
+        room,
+        expireTime,
+        partCount: 0,
+        created: currentTime,
+      }));
+
+      console.log('[chunk] created', { room, uuid, fileName, expireTime });
+
+      return new Response(JSON.stringify({
+        result: { uuid }
+      }), {
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      });
+    } catch (error) {
+      console.error('Create chunk upload error:', error);
+      console.error('Create chunk upload stack:', error?.stack || '(no stack)');
+      return new Response(JSON.stringify({
+        error: 'Internal Server Error',
+        message: '初始化分块上传时发生错误'
+      }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      });
+    }
+  }
+
+  static async uploadChunkPart(request, env) {
+    try {
+      const url = new URL(request.url);
+      const uuid = String(request.params.uuid || '').trim();
+      if (!uuid || !env.R2_BUCKET) {
+        return new Response(JSON.stringify({
+          error: 'Invalid request',
+          message: '无效的 UUID'
+        }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders }
+        });
+      }
+
+      const metaObject = await env.R2_BUCKET.get(createUploadMetaKey(uuid));
+      if (!metaObject) {
+        return new Response(JSON.stringify({
+          error: 'Invalid UUID',
+          message: '无效的 UUID'
+        }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders }
+        });
+      }
+      const meta = JSON.parse(await metaObject.text());
+      const room = normalizeRoomName(meta.room);
+
+      const authResult = await ensureRoomAccess(request, env, room);
+      if (!authResult.ok) {
+        return authResult.response;
+      }
+
+      const body = await request.arrayBuffer();
+      if (!body || body.byteLength === 0) {
+        return new Response(JSON.stringify({
+          error: 'Empty chunk',
+          message: '分块数据为空'
+        }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders }
+        });
+      }
+
+      const fileLimit = getFileLimit(env);
+      const accumulatedSize = meta.partCount * getMultipartPartSize(env);
+      if (fileLimit > 0 && (accumulatedSize + body.byteLength) > fileLimit) {
+        return new Response(JSON.stringify({
+          error: 'File too large',
+          message: `文件大小超出限制 (最大 ${Math.floor(fileLimit / 1024 / 1024)}MB)`
+        }), {
+          status: 413,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders }
+        });
+      }
+
+      const partIndex = meta.partCount;
+      await env.R2_BUCKET.put(createUploadPartKey(uuid, partIndex), body);
+      meta.partCount = partIndex + 1;
+      await env.R2_BUCKET.put(createUploadMetaKey(uuid), JSON.stringify(meta));
+
+      console.log('[chunk] uploaded part', { uuid, partIndex, size: body.byteLength });
+
+      return new Response(JSON.stringify({}), {
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      });
+    } catch (error) {
+      console.error('Upload chunk part error:', error);
+      console.error('Upload chunk part stack:', error?.stack || '(no stack)');
+      return new Response(JSON.stringify({
+        error: 'Internal Server Error',
+        message: '上传分块数据时发生错误'
+      }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      });
+    }
+  }
+
+  static async finishChunk(request, env) {
+    try {
+      const url = new URL(request.url);
+      const uuid = String(request.params.uuid || '').trim();
+      const room = normalizeRoomName(url.searchParams.get('room'));
+
+      const authResult = await ensureRoomAccess(request, env, room);
+      if (!authResult.ok) {
+        return authResult.response;
+      }
+
+      if (!env.R2_BUCKET) {
+        return new Response(JSON.stringify({
+          error: 'Storage not available',
+          message: '文件存储服务不可用'
+        }), {
+          status: 503,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders }
+        });
+      }
+
+      const metaObject = await env.R2_BUCKET.get(createUploadMetaKey(uuid));
+      if (!metaObject) {
+        return new Response(JSON.stringify({
+          error: 'Invalid UUID',
+          message: '无效的 UUID'
+        }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders }
+        });
+      }
+      const meta = JSON.parse(await metaObject.text());
+      const fileName = meta.name || 'file';
+      const partCount = Number(meta.partCount || 0);
+      const expireTime = Number(meta.expireTime || 0);
+      const fileRoom = normalizeRoomName(meta.room || room);
+
+      let fileSize = 0;
+      const streams = [];
+      for (let i = 0; i < partCount; i++) {
+        const partObject = await env.R2_BUCKET.get(createUploadPartKey(uuid, i));
+        if (partObject) {
+          fileSize += partObject.size;
+          streams.push(partObject.body);
+        }
+      }
+
+      if (!streams.length) {
+        return new Response(JSON.stringify({
+          error: 'No chunks',
+          message: '未找到上传的分块'
+        }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders }
+        });
+      }
+
+      const concatenated = new ReadableStream({
+        async start(controller) {
+          for (const stream of streams) {
+            const reader = stream.getReader();
+            try {
+              for (;;) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                controller.enqueue(value);
+              }
+            } finally {
+              reader.releaseLock();
+            }
+          }
+          controller.close();
+        }
+      });
+
+      const fileType = contentTypeFromName(fileName);
+      await env.R2_BUCKET.put(createFileKey(uuid), concatenated, {
+        httpMetadata: {
+          contentType: fileType,
+          contentDisposition: buildContentDisposition(fileName, 'inline')
+        },
+        customMetadata: {
+          originalName: fileName,
+          uploadTime: Date.now().toString(),
+          expireTime: expireTime.toString(),
+          room: fileRoom,
+        }
+      });
+
+      console.log('[chunk] finalized', { room: fileRoom, uuid, fileName, fileSize, expireTime });
+
+      for (let i = 0; i < partCount; i++) {
+        await env.R2_BUCKET.delete(createUploadPartKey(uuid, i));
+      }
+      await env.R2_BUCKET.delete(createUploadMetaKey(uuid));
+
+      return await finalizeUploadedFile({
+        request,
+        env,
+        url,
+        room: fileRoom,
+        uuid,
+        fileName,
+        fileSize,
+        expireTime,
+      });
+    } catch (error) {
+      console.error('Finish chunk upload error:', error);
+      console.error('Finish chunk upload stack:', error?.stack || '(no stack)');
+      return new Response(JSON.stringify({
+        error: 'Internal Server Error',
+        message: '完成分块上传时发生错误'
       }), {
         status: 500,
         headers: { 'Content-Type': 'application/json', ...corsHeaders }

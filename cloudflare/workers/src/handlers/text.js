@@ -110,7 +110,7 @@ export class TextHandler {
         }
       });
 
-      const contentURL = `${url.origin}/api/content/${messageId}${room !== 'default' ? `?room=${room}` : ''}`;
+      const contentURL = `${url.origin}/content/${messageId}${room !== 'default' ? `?room=${room}` : ''}`;
 
       console.log(`文本消息处理完成, ID: ${messageId}, URL: ${contentURL}`);
 
@@ -173,7 +173,7 @@ export class TextHandler {
       });
     }
 
-    const contentURL = `${url.origin}/api/content/${numericId}${room !== 'default' ? `?room=${room}` : ''}`;
+    const contentURL = `${url.origin}/content/${numericId}${room !== 'default' ? `?room=${room}` : ''}`;
 
     if (existingMessage.content === content) {
       return new Response(JSON.stringify({
