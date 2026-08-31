@@ -440,7 +440,7 @@ export class ShareHandler {
         }
 
         const requirement = resolveRoomAuth(env, room);
-        const target = new URL(`${url.origin}/api/content/${id}`);
+        const target = new URL(`${url.origin}/content/${id}`);
         if (room !== 'default') {
           target.searchParams.set('room', room);
         }
@@ -501,7 +501,7 @@ export class ShareHandler {
 
         const requirement = resolveRoomAuth(env, room);
         const filename = encodeURIComponent(fileMeta.name || 'file');
-        const target = new URL(`${url.origin}/api/file/${uuid}/${filename}`);
+        const target = new URL(`${url.origin}/file/${uuid}/${filename}`);
         const response = {
           type: 'file',
           uuid,

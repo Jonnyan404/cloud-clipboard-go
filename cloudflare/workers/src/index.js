@@ -20,31 +20,34 @@ function isRoomListEnabled(env) {
 // CORS 预检请求
 router.options('*', handleCors);
 
-// API 路由
-router.get('/api/server', handleServer);
-router.post('/api/auth/token', handleAuthToken);
-router.post('/api/auth/token/refresh', handleAuthTokenRefresh);
-router.get('/api/rooms', RoomsHandler.list);
-router.post('/api/text', TextHandler.create);
-router.post('/api/share', ShareHandler.create);
-router.get('/api/content/latest', ContentHandler.getLatest);
-router.get('/api/content/latest.json', ContentHandler.getLatest);
-router.get('/api/content/:id', ContentHandler.getById);
-router.get('/api/content/:id.json', ContentHandler.getById);
-router.post('/api/upload/multipart/create', FileHandler.createMultipart);
-router.put('/api/upload/multipart/:partNumber', FileHandler.uploadMultipartPart);
-router.post('/api/upload/multipart/complete', FileHandler.completeMultipart);
-router.delete('/api/upload/multipart', FileHandler.abortMultipart);
-router.post('/api/upload', FileHandler.upload);
-router.get('/api/file/:uuid/:filename?', FileHandler.download);
-router.delete('/api/file/:uuid', FileHandler.delete);
+// API 路由（无 /api 前缀，与自托管 Go 后端路径对齐）
+router.get('/server', handleServer);
+router.post('/auth/token', handleAuthToken);
+router.post('/auth/token/refresh', handleAuthTokenRefresh);
+router.get('/rooms', RoomsHandler.list);
+router.post('/text', TextHandler.create);
+router.post('/share', ShareHandler.create);
+router.get('/content/latest', ContentHandler.getLatest);
+router.get('/content/latest.json', ContentHandler.getLatest);
+router.get('/content/:id', ContentHandler.getById);
+router.get('/content/:id.json', ContentHandler.getById);
+router.post('/upload/chunk', FileHandler.createChunk);
+router.post('/upload/chunk/:uuid', FileHandler.uploadChunkPart);
+router.post('/upload/finish/:uuid', FileHandler.finishChunk);
+router.post('/upload/multipart/create', FileHandler.createMultipart);
+router.put('/upload/multipart/:partNumber', FileHandler.uploadMultipartPart);
+router.post('/upload/multipart/complete', FileHandler.completeMultipart);
+router.delete('/upload/multipart', FileHandler.abortMultipart);
+router.post('/upload', FileHandler.upload);
+router.get('/file/:uuid/:filename?', FileHandler.download);
+router.delete('/file/:uuid', FileHandler.delete);
 
 // 添加删除消息路由
-router.delete('/api/revoke/all', ContentHandler.revokeAll);
-router.delete('/api/revoke/:id', ContentHandler.revoke);
+router.delete('/revoke/all', ContentHandler.revokeAll);
+router.delete('/revoke/:id', ContentHandler.revoke);
 
 // WebSocket 连接
-router.get('/api/push', WebSocketHandler.connect);
+router.get('/push', WebSocketHandler.connect);
 
 // 健康检查
 router.get('/health', () => new Response('OK'));
@@ -169,7 +172,7 @@ async function handleServer(request, env) {
   }
   
   return new Response(JSON.stringify({
-    server: `${wsProtocol}//${url.host}/api/push`,
+    server: `${wsProtocol}//${url.host}/push`,
     auth: authRequired,
     authorized,
     roomProtected,

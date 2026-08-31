@@ -13,8 +13,10 @@
 .vscode/
 cloudflare/workers/.wrangler
 cloudflare/workers/node_modules
-cloudflare/pages/server*
+cloudflare/workers/assets
 cloudflare/node_modules
+**/.wrangler/
+**/wrangler-account.json
 .kotlin/
 *.keystore
 .kilo
