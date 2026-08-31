@@ -14,12 +14,12 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Install Wrangler
         run: npm install -g wrangler@^4.59.3
@@ -71,7 +71,7 @@ jobs:
           FILE_EXPIRE: ${{ secrets.FILE_EXPIRE }}
         run: |
           python3 - <<'PY'
-          import os, subprocess, sys
+          import json, os, re, subprocess, sys
 
           keys = [
               "AUTH_PASSWORD",
@@ -82,14 +82,27 @@ jobs:
               "FILE_LIMIT",
               "FILE_EXPIRE",
           ]
-          args = ["wrangler", "deploy"]
+
+          toml_path = "wrangler.toml"
+          with open(toml_path, "r", encoding="utf-8") as f:
+              toml = f.read()
+
           for k in keys:
               v = os.environ.get(k, "")
-              if v:
-                  args.append("--var")
-                  args.append(f"{k}:{v}")
-              else:
-                  print(f"::warning::env {k} 未设置，部署时使用模板中的默认值")
-          print("执行:", " ".join(args))
-          sys.exit(subprocess.call(args))
+              if not v:
+                  print(f"::warning::env {k} 未设置，保留模板中的默认值")
+                  continue
+              # 匹配 "KEY = " 之后那个带引号的字符串值并整体替换（含正则转义）
+              pattern = re.compile(r'(?P<key>' + re.escape(k) + r'\s*=\s*)"(?:\\.|[^"\\])*"')
+              new_toml, n = pattern.subn(lambda m: m.group("key") + json.dumps(v), toml)
+              if n == 0:
+                  print(f"::warning::未能匹配到 {k}，该值未替换")
+                  continue
+              toml = new_toml
+              print(f"已替换 {k}")
+
+          with open(toml_path, "w", encoding="utf-8") as f:
+              f.write(toml)
+
+          sys.exit(subprocess.call(["wrangler", "deploy"]))
           PY
