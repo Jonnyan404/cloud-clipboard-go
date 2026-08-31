@@ -280,10 +280,9 @@ cd ..
 ```
 
 **Deployment includes**:
-- Cloudflare Workers (API backend)
+- Cloudflare Workers (frontend + backend)
 - Cloudflare D1 (database)
 - Cloudflare R2 (file storage)
-- Cloudflare Pages (frontend interface)
 
 **Advantages**:
 - 🌐 Global CDN acceleration
