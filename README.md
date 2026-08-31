@@ -281,10 +281,9 @@ cd ..
 ```
 
 **部署包含**：
-- Cloudflare Workers (API 后端)
+- Cloudflare Workers (前端+后端)
 - Cloudflare D1 (数据库)
 - Cloudflare R2 (文件存储)
-- Cloudflare Pages (前端界面)
 
 **优点**：
 - 🌐 全球 CDN 加速
