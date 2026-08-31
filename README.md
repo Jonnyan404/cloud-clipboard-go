@@ -73,9 +73,7 @@
 - [【阿里云】2核2G云服务器新老同享 99元/年，续费同价](https://www.aliyun.com/daily-act/ecs/activity_selection?userCode=79h2wrag)
 
 
-以仓库根目录现有的 `docker-compose.yml` 为准。镜像启动时会由入口脚本按这些环境变量生成配置文件，因此文档中的变量写法也应与它保持一致。
-
-按需修改根目录 `docker-compose.yml`：
+#### Docker Compose
 
 ```yaml
 services:
@@ -116,68 +114,9 @@ services:
 docker compose up -d
 ```
 
-`ROOM_AUTH_JSON` 需要是合法的 JSON 对象。每个房间的值支持两种形式：
-
-1. **字符串/数字**（旧格式）：仅作为该房间的额外密码；
-2. **对象** `{ "password": "xx", "fileExpire": N }`：同时配置密码与该房间文件的过期策略。
-
-`fileExpire` 字段说明：
-
-| 取值 | 含义 |
-| --- | --- |
-| 不填 | 使用全局 `FILE_EXPIRE`（默认行为） |
-| `0` | 该房间上传的文件**永不过期** |
-| `> 0` | 覆盖全局 `FILE_EXPIRE`，单位秒 |
-
-示例：
+#### Docker 命令行
 
 ```bash
-ROOM_AUTH_JSON='{
-  "finance": {"password": "finance-pass", "fileExpire": 0},
-  "archive": {"fileExpire": 604800},
-  "private": "",
-  "tmp": "quick-pass"
-}' docker compose up -d
-```
-
-含义：
-
-- `finance` 房间密码 `finance-pass`，文件永不过期；
-- `archive` 房间无独立密码（沿用全局），文件保留 7 天；
-- `private` 房间无独立密码；`tmp` 房间额外密码 `quick-pass`——两者文件均按全局 `FILE_EXPIRE` 过期。
-
-补充说明：
-
-- 当前 Docker Compose 文档变量名以 `ROOM_AUTH_JSON` 为准。
-- 入口脚本仍兼容旧变量名 `ROOM_AUTH`，但 Compose 示例和后续文档统一使用 `ROOM_AUTH_JSON`。
-- 如果你使用 `.env` 文件，建议保持与上面的 `${VAR:-}` 模板对应，只填写右侧的实际值。
-- 镜像内显式安装了 `nc`，Compose 健康检查只检查容器内监听端口，和 `PREFIX`、HTTP/HTTPS 配置无关。
-- **`fileExpire` 只影响修改配置之后上传的文件**，已上传文件的过期时间不会回溯变更；
-- 历史条数轮转删除不受 `fileExpire` 影响：房间消息数超过上限时，最旧的文件仍会被清理。
-
-示例：
-
-```yaml
-environment:
-  AUTH_PASSWORD: 'global-pass'
-  ROOM_AUTH_JSON: '{"finance":"finance-pass","private":""}'
-```
-
-如果你想通过变量动态修改 `roomAuth`，推荐配合 `.env` 文件：
-
-```env
-AUTH_PASSWORD=global-pass
-ROOM_AUTH_JSON={"finance":"finance-pass","private":""}
-```
-
-然后执行：
-
-```bash
-docker compose up -d
-```
-
-```bash
-# 方式二：Docker 命令行
 docker run -d \
   --name=cloud-clipboard-go \
   -p 9501:9501 \
@@ -402,19 +341,6 @@ docker pull jonnyan404/cloud-clipboard-go:latest
 - 📖 [配置文件说明](./cloud-clip/config.md)
 - 🔌 [HTTP API 文档](./cloud-clip/config.md)
 - 📱 [客户端部署指南](#-客户端使用)
-
----
-
-## 🔄 支持的平台
-
-| 平台 | 二进制 | Docker | 源代码 | 说明 |
-|------|---------|--------|--------|------|
-| Linux | ✅ | ✅ | ✅ | 主要支持 |
-| macOS | ✅ | ✅ | ✅ | Intel/Apple Silicon |
-| Windows | ✅ | ✅ | ✅ | 需要 Visual C++ Build Tools |
-| Android | ✅ | - | ✅ | 服务端APK/快捷指令 |
-| iOS | - | - | - | 快捷指令 |
-| OpenWrt | ✅ | ✅ | ✅ | 路由器系统 |
 
 ---
 
