@@ -1,0 +1,95 @@
+name: Deploy Cloudflare Worker
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Wrangler
+        run: npm install -g wrangler@^4.59.3
+
+      - name: Build Vue3 frontend (web-vue3)
+        working-directory: web-vue3
+        run: |
+          npm ci
+          npm run build
+
+      - name: Copy built assets to Worker static assets
+        run: |
+          rm -rf cloudflare/workers/assets
+          mkdir -p cloudflare/workers/assets
+          for item in web-vue3/dist/*; do
+            case "$(basename "$item")" in
+              *.gz|*.br) continue ;;
+            esac
+            cp -R "$item" cloudflare/workers/assets/
+          done
+          echo "assets 文件数: $(find cloudflare/workers/assets -type f | wc -l | tr -d ' ')"
+
+      - name: Generate wrangler.toml from template
+        working-directory: cloudflare/workers
+        run: |
+          cp wrangler.toml.template wrangler.toml
+          D1_ID=$(wrangler d1 list --json | jq -r '.[] | select(.name=="cloud-clipboard-db") | .uuid')
+          if [ -z "${D1_ID}" ] || [ "${D1_ID}" = "null" ]; then
+            echo "::error::未找到 D1 数据库 cloud-clipboard-db，请先手动创建或确认 CF_API_TOKEN 权限"
+            exit 1
+          fi
+          echo "D1 database id: ${D1_ID}"
+          sed -i "s/database_id = \"your-d1-database-id\"/database_id = \"${D1_ID}\"/" wrangler.toml
+          grep -n "database_id" wrangler.toml
+
+      - name: Run D1 migrations (remote)
+        working-directory: cloudflare/workers
+        run: wrangler d1 execute cloud-clipboard-db --file=../d1/schema.sql --remote
+
+      - name: Deploy Worker
+        working-directory: cloudflare/workers
+        env:
+          AUTH_PASSWORD: ${{ secrets.AUTH_PASSWORD }}
+          ROOM_AUTH: ${{ secrets.ROOM_AUTH }}
+          ROOM_LIST: ${{ secrets.ROOM_LIST }}
+          HISTORY_LIMIT: ${{ secrets.HISTORY_LIMIT }}
+          TEXT_LIMIT: ${{ secrets.TEXT_LIMIT }}
+          FILE_LIMIT: ${{ secrets.FILE_LIMIT }}
+          FILE_EXPIRE: ${{ secrets.FILE_EXPIRE }}
+        run: |
+          python3 - <<'PY'
+          import os, subprocess, sys
+
+          keys = [
+              "AUTH_PASSWORD",
+              "ROOM_AUTH",
+              "ROOM_LIST",
+              "HISTORY_LIMIT",
+              "TEXT_LIMIT",
+              "FILE_LIMIT",
+              "FILE_EXPIRE",
+          ]
+          args = ["wrangler", "deploy"]
+          for k in keys:
+              v = os.environ.get(k, "")
+              if v:
+                  args.append("--var")
+                  args.append(f"{k}:{v}")
+              else:
+                  print(f"::warning::env {k} 未设置，部署时使用模板中的默认值")
+          print("执行:", " ".join(args))
+          sys.exit(subprocess.call(args))
+          PY
