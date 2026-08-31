@@ -54,6 +54,37 @@ bash deploy.sh
 
 部署成功后，脚本会输出 Worker 地址，直接访问该地址即为前端页面。
 
+## GitHub Actions 自动部署
+
+仓库已提供手动触发的工作流 [.github/workflows/deploy-cloudflare.yml](../.github/workflows/deploy-cloudflare.yml)，可在 GitHub 仓库 **Actions → Deploy Cloudflare Worker → Run workflow** 一键部署，无需在本地登录 Wrangler。
+
+该工作流会：
+
+1. 构建 Vue3 前端并拷贝为 Worker 静态资源；
+2. 通过 `wrangler d1 list --json` 动态解析 D1 数据库 ID；
+3. 远程执行 D1 迁移（`cloudflare/d1/schema.sql`）；
+4. 部署一体化 Worker，并用 GitHub Secrets 覆盖 `[vars]` 中的敏感变量。
+
+### 配置 GitHub Secrets
+
+在仓库 **Settings → Secrets and variables → Actions** 中添加：
+
+| Secret 名称 | 必填 | 说明 |
+| --- | --- | --- |
+| `CF_API_TOKEN` | ✅ | Cloudflare API Token，权限需包含：Account → Workers Scripts: **Edit**、D1: **Edit**、R2: **Edit**、Durable Objects Namespace: **Edit**、Account Settings: **Read** |
+| `CF_ACCOUNT_ID` | ✅ | Cloudflare 账号 ID（Dashboard 首页右下角或 URL 中可查看） |
+| `AUTH_PASSWORD` | ✅ | 覆盖 `[vars].AUTH_PASSWORD`，即全局入口密码 |
+| `ROOM_AUTH_JSON` | ✅ | 覆盖 `[vars].ROOM_AUTH_JSON`，房间级密码映射（需为合法 JSON 字符串，见下方 `roomAuth 说明`） |
+| `ROOM_LIST` | ➖ | 可选，覆盖 `[vars].ROOM_LIST`；不设置则用模板默认值 |
+| `HISTORY_LIMIT` | ➖ | 可选，覆盖 `[vars].HISTORY_LIMIT` |
+| `TEXT_LIMIT` | ➖ | 可选，覆盖 `[vars].TEXT_LIMIT` |
+| `FILE_LIMIT` | ➖ | 可选，覆盖 `[vars].FILE_LIMIT` |
+| `FILE_EXPIRE` | ➖ | 可选，覆盖 `[vars].FILE_EXPIRE` |
+
+> 说明：
+> - 未设置的可选变量将使用 `wrangler.toml.template` 中的默认值，工作流会给出 warning 提示；
+> - 强烈建议至少配置 `CF_API_TOKEN`、`CF_ACCOUNT_ID`、`AUTH_PASSWORD`、`ROOM_AUTH_JSON` 四个必填项，避免在生产使用模板中的占位密码。
+
 ## 静态资源与配额
 
 Workers 通过 `assets` 配置托管前端静态资源：
@@ -80,7 +111,7 @@ Cloudflare Workers 默认变量定义在 [cloudflare/workers/wrangler.toml.templ
 ```toml
 [vars]
 AUTH_PASSWORD = "123"
-ROOM_AUTH = "{\"private\":\"\",\"finance\":\"finance-pass\"}"
+ROOM_AUTH_JSON = "{\"private\":\"\",\"finance\":\"finance-pass\"}"
 ROOM_LIST = "false"
 HISTORY_LIMIT = "50"
 TEXT_LIMIT = "40960"
@@ -91,7 +122,7 @@ FILE_EXPIRE = "3600"
 | 变量 | 默认值 | 类型 | 说明 |
 | --- | --- | --- | --- |
 | `AUTH_PASSWORD` | `"123"` | 字符串或布尔语义 | 全局入口密码。只要设置了就对所有房间生效，保证旧密码升级后仍可用 |
-| `ROOM_AUTH` | `{"private":"","finance":"finance-pass"}` | JSON 字符串 | 房间级密码映射。不会让 `AUTH_PASSWORD` 失效，而是为指定房间增加额外可用密码。值也支持对象形式 `{ "password": "xx", "fileExpire": N }`，可同时配置该房间文件的过期策略（见下方 roomAuth 说明） |
+| `ROOM_AUTH_JSON` | `{"private":"","finance":"finance-pass"}` | JSON 字符串 | 房间级密码映射。不会让 `AUTH_PASSWORD` 失效，而是为指定房间增加额外可用密码。值也支持对象形式 `{ "password": "xx", "fileExpire": N }`，可同时配置该房间文件的过期策略（见下方 roomAuth 说明） |
 | `ROOM_LIST` | `"false"` | 布尔语义字符串 | 是否启用房间列表功能，支持 `1`、`true`、`yes`、`on` |
 | `HISTORY_LIMIT` | `"50"` | 整数字符串 | 每个房间保留的历史消息条数 |
 | `TEXT_LIMIT` | `"40960"` | 整数字符串 | 单条文本消息最大长度 |
@@ -100,7 +131,7 @@ FILE_EXPIRE = "3600"
 
 ### roomAuth 说明
 
-`ROOM_AUTH` 需要是一个 JSON 字符串，对应后端的 `server.roomAuth`。
+`ROOM_AUTH_JSON` 需要是一个 JSON 字符串，对应后端的 `server.roomAuth`。
 
 每个房间的值支持两种形式：
 
@@ -110,7 +141,7 @@ FILE_EXPIRE = "3600"
 示例：
 
 ```toml
-ROOM_AUTH = "{\"finance\":{\"password\":\"finance-pass\",\"fileExpire\":0},\"archive\":{\"fileExpire\":604800},\"private\":\"\",\"ops\":\"ops-pass\"}"
+ROOM_AUTH_JSON = "{\"finance\":{\"password\":\"finance-pass\",\"fileExpire\":0},\"archive\":{\"fileExpire\":604800},\"private\":\"\",\"ops\":\"ops-pass\"}"
 ```
 
 含义：
@@ -131,7 +162,7 @@ ROOM_AUTH = "{\"finance\":{\"password\":\"finance-pass\",\"fileExpire\":0},\"arc
 
 注意事项：
 
-- **`fileExpire` 只影响修改配置之后上传的文件**：过期时间在上传瞬间写入 R2 元数据和 D1 记录，之后修改 ROOM_AUTH 不会回溯变更已有文件；
+- **`fileExpire` 只影响修改配置之后上传的文件**：过期时间在上传瞬间写入 R2 元数据和 D1 记录，之后修改 ROOM_AUTH_JSON 不会回溯变更已有文件；
 - 历史条数轮转删除不受 `fileExpire` 影响：房间消息数超过 `HISTORY_LIMIT` 时，最旧的文件仍会被清理。低频房间配合 `fileExpire: 0` 约等于永久保存；
 - 前端会把永久文件显示为“永久有效”。
 
@@ -216,7 +247,7 @@ SKIP_LOCAL_D1=1 bash deploy.sh
 
 如果你要改默认值，请修改模板文件 [cloudflare/workers/wrangler.toml.template](cloudflare/workers/wrangler.toml.template)，而不是临时生成文件。
 
-### 4. 修改了密码或 `ROOM_AUTH` 后未生效
+### 4. 修改了密码或 `ROOM_AUTH_JSON` 后未生效
 
 确认你修改的是模板文件 [cloudflare/workers/wrangler.toml.template](cloudflare/workers/wrangler.toml.template) 或 Cloudflare Dashboard 中的 Worker Variables，然后重新部署。
 
@@ -225,7 +256,7 @@ SKIP_LOCAL_D1=1 bash deploy.sh
 优先检查：
 
 1. Worker 是否部署成功
-2. Worker 变量中的 `AUTH_PASSWORD` / `ROOM_AUTH` / `ROOM_LIST` 是否符合预期
+2. Worker 变量中的 `AUTH_PASSWORD` / `ROOM_AUTH_JSON` / `ROOM_LIST` 是否符合预期
 3. D1 schema 是否已经迁移到远程数据库
 4. R2 存储桶与 Durable Object 绑定是否正确
 

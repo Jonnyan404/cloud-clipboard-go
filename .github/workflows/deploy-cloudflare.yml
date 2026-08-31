@@ -63,7 +63,7 @@ jobs:
         working-directory: cloudflare/workers
         env:
           AUTH_PASSWORD: ${{ secrets.AUTH_PASSWORD }}
-          ROOM_AUTH: ${{ secrets.ROOM_AUTH }}
+          ROOM_AUTH_JSON: ${{ secrets.ROOM_AUTH_JSON }}
           ROOM_LIST: ${{ secrets.ROOM_LIST }}
           HISTORY_LIMIT: ${{ secrets.HISTORY_LIMIT }}
           TEXT_LIMIT: ${{ secrets.TEXT_LIMIT }}
@@ -75,7 +75,7 @@ jobs:
 
           keys = [
               "AUTH_PASSWORD",
-              "ROOM_AUTH",
+              "ROOM_AUTH_JSON",
               "ROOM_LIST",
               "HISTORY_LIMIT",
               "TEXT_LIMIT",
