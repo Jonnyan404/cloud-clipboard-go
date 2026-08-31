@@ -72,9 +72,7 @@
 - [Tencent Cloud: 2 vCPU / 2 GB server from CNY 99/year](https://cloud.tencent.com/act/cps/redirect?redirect=6150&cps_key=0b1dfaf9bb573dac05abef76202dc8cc&from=console)
 - [Alibaba Cloud: 2 vCPU / 2 GB server from CNY 99/year](https://www.aliyun.com/daily-act/ecs/activity_selection?userCode=79h2wrag)
 
-Use the existing `docker-compose.yml` in the repository root as the source of truth. The image entrypoint generates the runtime configuration from these environment variables, so the documentation should follow the same naming.
-
-Adjust the root `docker-compose.yml` as needed:
+#### Docker Compose
 
 ```yaml
 services:
@@ -115,68 +113,9 @@ Run:
 docker compose up -d
 ```
 
-`ROOM_AUTH_JSON` must be a valid JSON object. Each room value supports two forms:
-
-1. **String/number** (legacy format): acts only as an extra password for that room;
-2. **Object** `{ "password": "xx", "fileExpire": N }`: configures both the password and the file expiration policy for that room.
-
-`fileExpire` values:
-
-| Value | Meaning |
-| --- | --- |
-| omitted | Use the global `FILE_EXPIRE` (default behavior) |
-| `0` | Files uploaded to this room **never expire** |
-| `> 0` | Override the global `FILE_EXPIRE`, in seconds |
-
-Example:
+#### Docker CLI
 
 ```bash
-ROOM_AUTH_JSON='{
-  "finance": {"password": "finance-pass", "fileExpire": 0},
-  "archive": {"fileExpire": 604800},
-  "private": "",
-  "tmp": "quick-pass"
-}' docker compose up -d
-```
-
-Meaning:
-
-- `finance` room password `finance-pass`, files never expire;
-- `archive` room has no extra password (falls back to the global one), files are kept for 7 days;
-- `private` room has no extra password; `tmp` room has extra password `quick-pass` — both use the global `FILE_EXPIRE`.
-
-Additional notes:
-
-- The Docker Compose variable name is now standardized as `ROOM_AUTH_JSON`.
-- The entrypoint still accepts the legacy variable name `ROOM_AUTH`, but the Compose example and later docs use `ROOM_AUTH_JSON` consistently.
-- If you use a `.env` file, keep the same `${VAR:-}` mapping and only fill in the actual values.
-- The image explicitly installs `nc`, and the Compose health check only verifies the listening port inside the container. It is unrelated to `PREFIX` or HTTP/HTTPS settings.
-- **`fileExpire` only affects files uploaded after the configuration change**: existing files keep their original expiration time.
-- History rotation is unaffected by `fileExpire`: once a room exceeds the message limit, the oldest files are still cleaned up.
-
-Example:
-
-```yaml
-environment:
-  AUTH_PASSWORD: 'global-pass'
-  ROOM_AUTH_JSON: '{"finance":"finance-pass","private":""}'
-```
-
-If you want to change `roomAuth` through variables dynamically, use a `.env` file:
-
-```env
-AUTH_PASSWORD=global-pass
-ROOM_AUTH_JSON={"finance":"finance-pass","private":""}
-```
-
-Then run:
-
-```bash
-docker compose up -d
-```
-
-```bash
-# Option 2: Docker CLI
 docker run -d \
   --name=cloud-clipboard-go \
   -p 9501:9501 \
@@ -404,18 +343,6 @@ docker pull jonnyan404/cloud-clipboard-go:latest
 
 ---
 
-## 🔄 Supported Platforms
-
-| Platform | Binary | Docker | Source | Notes |
-|----------|--------|--------|--------|-------|
-| Linux | ✅ | ✅ | ✅ | Primary support |
-| macOS | ✅ | ✅ | ✅ | Intel and Apple Silicon |
-| Windows | ✅ | ✅ | ✅ | Requires Visual C++ Build Tools |
-| Android | ✅ | - | ✅ | Server APK and shortcuts |
-| iOS | - | - | - | Shortcuts |
-| OpenWrt | ✅ | ✅ | ✅ | Router system |
-
----
 
 ## 📦 Related Projects
 
