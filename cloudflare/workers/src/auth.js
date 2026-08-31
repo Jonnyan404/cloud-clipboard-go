@@ -119,11 +119,11 @@ function parseFileExpireValue(room, value) {
   if (Number.isFinite(numeric) && numeric >= 0) {
     return Math.floor(numeric);
   }
-  console.warn(`ROOM_AUTH 配置警告: 房间 '${room}' 的 fileExpire 非法 (${JSON.stringify(value)})，已回退为全局 FILE_EXPIRE`);
+  console.warn(`ROOM_AUTH_JSON 配置警告: 房间 '${room}' 的 fileExpire 非法 (${JSON.stringify(value)})，已回退为全局 FILE_EXPIRE`);
   return undefined;
 }
 
-// 单个房间的 ROOM_AUTH 值支持两种形式：
+// 单个房间的 ROOM_AUTH_JSON 值支持两种形式：
 //   字符串/数字                 -> 仅密码（旧格式，完全兼容）
 //   对象 {password, fileExpire} -> 密码 + 文件过期覆盖策略
 function parseRoomAuthEntry(room, value) {
@@ -137,7 +137,7 @@ function parseRoomAuthEntry(room, value) {
 }
 
 export function parseRoomAuth(env) {
-  const roomAuth = env.ROOM_AUTH;
+  const roomAuth = env.ROOM_AUTH_JSON;
   if (!roomAuth) {
     return {};
   }
@@ -159,7 +159,7 @@ export function parseRoomAuth(env) {
 
     return reduce(Object.entries(parsed));
   } catch (error) {
-    console.error('ROOM_AUTH 解析失败:', error);
+    console.error('ROOM_AUTH_JSON 解析失败:', error);
     return {};
   }
 }

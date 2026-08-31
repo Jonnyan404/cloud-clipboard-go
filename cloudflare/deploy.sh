@@ -13,7 +13,7 @@ echo "=== 部署 Cloud Clipboard 到 Cloudflare ==="
 echo ""
 echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 echo "!!! 部署前请先检查并修改 workers/wrangler.toml.template !!!"
-echo "!!! 特别是 AUTH_PASSWORD、ROOM_AUTH、ROOM_LIST 等变量     !!!"
+echo "!!! 特别是 AUTH_PASSWORD、ROOM_AUTH_JSON、ROOM_LIST 等变量    !!!"
 echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 echo ""
 
