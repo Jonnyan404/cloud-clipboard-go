@@ -47,11 +47,11 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: client/package.json
+          cache-dependency-path: web-vue3/package.json
 
       - name: Build frontend static assets
         run: |
-          cd client
+          cd web-vue3
           npm install
           npm run build
 
@@ -59,7 +59,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: frontend-dist
-          path: client/dist
+          path: web-vue3/dist
 
   build-apk:
     name: Build APK for ${{ matrix.arch }}
@@ -90,13 +90,13 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: frontend-dist
-          path: client/dist
+          path: web-vue3/dist
 
       - name: Prepare Go embed directory
         run: |
           rm -rf cloud-clip/lib/static
           mkdir -p cloud-clip/lib/static
-          cp -r client/dist/* cloud-clip/lib/static/
+          cp -r web-vue3/dist/* cloud-clip/lib/static/
 
       - name: Install and initialize gomobile
         run: |
@@ -190,13 +190,13 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: frontend-dist
-          path: client/dist
+          path: web-vue3/dist
 
       - name: Prepare Go embed directory
         run: |
           rm -rf cloud-clip/lib/static
           mkdir -p cloud-clip/lib/static
-          cp -r client/dist/* cloud-clip/lib/static/
+          cp -r web-vue3/dist/* cloud-clip/lib/static/
 
       - name: Install and initialize gomobile
         run: |

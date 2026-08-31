@@ -63,7 +63,7 @@ const currentLanguageName = computed(() => {
     }
 });
 const isDesktopRoomDockEnabled = computed(() => {
-    return !display.mdAndDown && app.config && app.config.server && app.config.server.roomList;
+    return display.width.value > 1263 && app.config && app.config.server && app.config.server.roomList;
 });
 const isDesktopRoomDockVisible = computed(() => isDesktopRoomDockEnabled.value && roomDockVisible.value);
 const filteredRooms = computed(() => {
@@ -974,9 +974,9 @@ watch(() => route.fullPath, () => {
                                                     <v-icon size="x-small" start>{{ mdiLock }}</v-icon>
                                                     {{ t('protectedRoom') }}
                                                 </v-chip>
-                                                <div class="room-entry__state" :class="room.isActive ? 'room-entry__state--active' : 'room-entry__state--idle'">
+                                                <div class="room-entry__state" :class="currentRoomEntry.isActive ? 'room-entry__state--active' : 'room-entry__state--idle'">
                                                     <span class="room-entry__state-dot"></span>
-                                                    {{ room.isActive ? t('active') : t('inactive') }}
+                                                    {{ currentRoomEntry.isActive ? t('active') : t('inactive') }}
                                                 </div>
                                             </div>
                                         </div>
@@ -1174,6 +1174,23 @@ watch(() => route.fullPath, () => {
     padding: 16px 18px 20px;
 }
 
+.room-browser__sections {
+    display: grid;
+    gap: 18px;
+}
+
+.room-browser--dock {
+    position: sticky;
+    top: 80px;
+    flex: 0 0 332px;
+    width: 332px;
+    max-height: calc(100vh - 100px);
+    border-radius: 24px;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.14);
+    overflow: hidden;
+}
+
 .room-browser__toolbar {
     display: flex;
     align-items: center;
@@ -1197,102 +1214,176 @@ watch(() => route.fullPath, () => {
 }
 
 .room-group {
-    margin-bottom: 8px;
+    display: grid;
+    gap: 10px;
 }
 
 .room-group__label {
-    font-size: 0.75rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: rgba(0, 0, 0, 0.54);
-    padding: 8px 16px 4px;
-    font-weight: 600;
+    color: rgba(100, 116, 139, 0.95);
+}
+
+.app-shell--dark .room-group__label {
+    color: rgba(148, 163, 184, 0.9);
 }
 
 .room-list {
-    padding-bottom: 8px;
+    padding: 0;
+    background: transparent !important;
 }
 
 .room-entry {
-    cursor: pointer;
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    border-radius: 18px;
+    margin-bottom: 10px;
+    padding: 10px 8px;
+    background: rgba(248, 250, 252, 0.72);
+    transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+}
+
+.room-entry:hover {
+    transform: translateY(-1px);
+    border-color: rgba(59, 130, 246, 0.3);
+    box-shadow: 0 12px 24px rgba(15, 23, 42, 0.06);
+}
+
+.room-entry--current {
+    border-color: rgba(59, 130, 246, 0.38);
+    background: rgba(239, 246, 255, 0.92);
+}
+
+.app-shell--dark .room-entry {
+    border-color: rgba(71, 85, 105, 0.78);
+    background: rgba(15, 23, 42, 0.7);
+}
+
+.app-shell--dark .room-entry--current {
+    border-color: rgba(96, 165, 250, 0.52);
+    background: rgba(30, 41, 59, 0.92);
+}
+
+.room-entry__avatar {
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.7);
+}
+
+.app-shell--dark .room-entry__avatar {
+    background: rgba(30, 41, 59, 0.8);
 }
 
 .room-entry--current .room-entry__avatar--current {
-    border: 2px solid var(--v-primary-base);
+    background: rgba(219, 234, 254, 0.9);
 }
 
-.room-entry__name {
-    font-weight: 500;
+.app-shell--dark .room-entry--current .room-entry__avatar--current {
+    background: rgba(30, 64, 175, 0.24);
+}
+
+.room-entry__title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 4px;
 }
 
 .room-entry__badges {
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 4px;
+    justify-content: flex-end;
+    gap: 8px;
     flex-wrap: wrap;
 }
 
-.room-entry__security-chip {
-    display: flex;
-    align-items: center;
+.room-entry__name {
+    font-size: 0.98rem;
+    font-weight: 700;
+    color: rgba(15, 23, 42, 0.96);
+    word-break: break-word;
 }
 
-.room-entry__state {
-    display: flex;
-    align-items: center;
-    gap: 4px;
+.app-shell--dark .room-entry__name {
+    color: rgba(226, 232, 240, 0.96);
+}
+
+.room-entry__security-chip {
+    color: #b45309 !important;
+    border-color: rgba(217, 119, 6, 0.32) !important;
+    background: rgba(245, 158, 11, 0.08) !important;
+}
+
+.app-shell--dark .room-entry__security-chip {
+    color: #fbbf24 !important;
+    border-color: rgba(251, 191, 36, 0.35) !important;
+    background: rgba(245, 158, 11, 0.14) !important;
+}
+
+.room-entry__meta,
+.room-entry__activity {
+    color: rgba(100, 116, 139, 0.95) !important;
     font-size: 0.75rem;
 }
 
+.app-shell--dark .room-entry__meta,
+.app-shell--dark .room-entry__activity {
+    color: rgba(148, 163, 184, 0.9) !important;
+}
+
+.room-entry__state {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    font-size: 0.74rem;
+    font-weight: 600;
+}
+
 .room-entry__state--active {
-    color: success;
+    color: #15803d;
 }
 
 .room-entry__state--idle {
-    color: grey;
+    color: #64748b;
+}
+
+.app-shell--dark .room-entry__state--active {
+    color: #86efac;
+}
+
+.app-shell--dark .room-entry__state--idle {
+    color: #94a3b8;
 }
 
 .room-entry__state-dot {
     width: 8px;
     height: 8px;
-    border-radius: 50%;
+    border-radius: 999px;
     background: currentColor;
+    opacity: 0.9;
 }
 
-.room-entry__meta {
-    font-size: 0.75rem;
-}
-
-.room-entry__activity {
-    font-size: 0.75rem;
-}
-
-@media (min-width: 1264px) {
-    .room-browser--dock {
-        position: fixed;
-        bottom: 0;
-        inset-inline-end: 0;
-        width: 400px;
-        max-height: 70vh;
-        border-radius: 20px 0 0 0;
-        box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.12);
-        z-index: 100;
-    }
-
-    .room-browser--dock-left {
-        right: auto;
-        left: 0;
-        border-radius: 0 0 0 20px;
-        inset-inline-end: auto;
-        inset-inline-start: 0;
-    }
-
-    .room-browser--dock .room-browser__header--dock {
-        border-radius: 20px 20px 0 0;
-    }
-
-    .room-browser--dock .room-browser__body--dock {
-        max-height: calc(70vh - 64px);
+@media (max-width: 1263px) {
+    .app-shell__workspace {
+        display: block;
+        padding: 0;
     }
 }
+
+@media (max-width: 600px) {
+    .room-browser__toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .room-entry__title-row {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 4px;
+    }
+}
+
+
 </style>

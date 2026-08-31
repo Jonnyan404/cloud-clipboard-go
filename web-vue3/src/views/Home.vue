@@ -77,12 +77,12 @@ onBeforeRouteUpdate((to, from) => {
 <template>
     <v-container fluid class="home-minimal pa-3 pa-md-5" :class="{ 'home-minimal--dark': isDark }">
         <div class="home-minimal__shell mx-auto">
-            <v-card class="composer-dock composer-dock--top px-3 px-md-4 py-3 mb-4" :class="{ 'surface-card--dark': isDark }" variant="outlined">
+            <v-card class="composer-dock composer-dock--top px-3 px-md-4 py-2 mb-2" :class="{ 'surface-card--dark': isDark }" variant="outlined">
                 <unified-composer ref="composer" @show-qr="pageQrDialogVisible = true"></unified-composer>
             </v-card>
 
             <v-card class="timeline-panel" :class="{ 'surface-card--dark': isDark }" variant="outlined">
-                <div class="timeline-panel__body px-3 px-md-5 py-4">
+                <div class="timeline-panel__body px-3 px-md-4 py-2">
                     <div v-if="app.received.length" class="timeline-panel__stream">
                         <v-fade-transition group>
                             <div
@@ -93,7 +93,7 @@ onBeforeRouteUpdate((to, from) => {
                             >
                                 <v-chip
                                     v-if="item === app.received[0]"
-                                    x-small
+                                    size="x-small"
                                     :variant="'outlined'"
                                     color="primary"
                                     class="timeline-panel__count-chip timeline-panel__count-chip--overlay"

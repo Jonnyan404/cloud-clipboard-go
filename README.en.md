@@ -245,7 +245,7 @@ opkg install ./luci-app-cloud-clipboard_<version>_all.ipk
 # Requirements: Node.js >= 22.12, Go >= 1.25
 
 # 1. Build the frontend
-cd client
+cd web-vue3
 npm install
 npm run build
 

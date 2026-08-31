@@ -7,7 +7,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OPENWRT_DIR="$(dirname "$SCRIPT_DIR")"
 REPO_DIR="$(dirname "$OPENWRT_DIR")"
-CLIENT_DIR="$REPO_DIR/client"
+CLIENT_DIR="$REPO_DIR/web-vue3"
 CLOUD_CLIP_DIR="$REPO_DIR/cloud-clip"
 
 # 确定版本号
