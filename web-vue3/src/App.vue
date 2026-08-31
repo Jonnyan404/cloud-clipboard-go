@@ -716,11 +716,13 @@ watch(() => route.fullPath, () => {
                                         <template v-slot:append>
                                             <v-btn
                                                 icon
-                                                size="small"
+                                                density="compact"
+                                                variant="text"
+                                                :color="currentRoomEntry.isFavorite ? 'error' : 'grey'"
+                                                class="timeline-card__icon-button"
                                                 @click.stop="toggleFavoriteRoom(currentRoomEntry.name)"
-                                                :color="currentRoomEntry.isFavorite ? 'error' : ''"
                                             >
-                                                <v-icon size="small">
+                                                <v-icon>
                                                     {{ currentRoomEntry.isFavorite ? mdiHeart : mdiHeartOutline }}
                                                 </v-icon>
                                             </v-btn>
@@ -776,14 +778,16 @@ watch(() => route.fullPath, () => {
                                         <v-list-item-subtitle class="room-entry__activity">
                                             {{ t('lastActive') }} · {{ formatTime(room.lastActive) }}
                                         </v-list-item-subtitle>
-                                        <template v-slot:append>
+<template v-slot:append>
                                             <v-btn
                                                 icon
-                                                size="small"
+                                                density="compact"
+                                                variant="text"
+                                                :color="room.isFavorite ? 'error' : 'grey'"
+                                                class="timeline-card__icon-button"
                                                 @click.stop="toggleFavoriteRoom(room.name)"
-                                                :color="room.isFavorite ? 'error' : ''"
                                             >
-                                                <v-icon size="small">
+                                                <v-icon>
                                                     {{ room.isFavorite ? mdiHeart : mdiHeartOutline }}
                                                 </v-icon>
                                             </v-btn>
@@ -990,11 +994,13 @@ watch(() => route.fullPath, () => {
                                     <template v-slot:append>
                                         <v-btn
                                             icon
-                                            size="small"
+                                            density="compact"
+                                            variant="text"
+                                            :color="currentRoomEntry.isFavorite ? 'error' : 'grey'"
+                                            class="timeline-card__icon-button"
                                             @click.stop="toggleFavoriteRoom(currentRoomEntry.name)"
-                                            :color="currentRoomEntry.isFavorite ? 'error' : ''"
                                         >
-                                            <v-icon size="small">
+                                            <v-icon>
                                                 {{ currentRoomEntry.isFavorite ? mdiHeart : mdiHeartOutline }}
                                             </v-icon>
                                         </v-btn>
@@ -1053,11 +1059,13 @@ watch(() => route.fullPath, () => {
                                     <template v-slot:append>
                                         <v-btn
                                             icon
-                                            size="small"
+                                            density="compact"
+                                            variant="text"
+                                            :color="room.isFavorite ? 'error' : 'grey'"
+                                            class="timeline-card__icon-button"
                                             @click.stop="toggleFavoriteRoom(room.name)"
-                                            :color="room.isFavorite ? 'error' : ''"
                                         >
-                                            <v-icon size="small">
+                                            <v-icon>
                                                 {{ room.isFavorite ? mdiHeart : mdiHeartOutline }}
                                             </v-icon>
                                         </v-btn>
