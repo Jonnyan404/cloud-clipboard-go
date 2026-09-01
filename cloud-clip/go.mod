@@ -1,6 +1,6 @@
 module github.com/jonnyan404/cloud-clipboard-go/cloud-clip
 
-go 1.25.0
+go 1.26.0
 
 require (
 	github.com/andybalholm/brotli v1.1.1
