@@ -14,6 +14,8 @@ export const useAppStore = defineStore('app', {
             files: [],
         },
         received: [],
+        roomMessagesCache: {},
+        isRoomSyncing: false,
         device: [],
         showTimestamp: localStorage.getItem('showTimestamp') !== null
             ? localStorage.getItem('showTimestamp') === 'true'

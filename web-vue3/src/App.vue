@@ -415,6 +415,7 @@ watch(() => route.fullPath, () => {
     if (ws.normalizeRoomName(ws.room) !== routeRoom) {
         ws.room = routeRoom;
         ws.disconnect();
+        ws.syncRoomView(routeRoom);
         ws.connect();
     }
     if (app.config && app.config.server && app.config.server.roomList) {
@@ -717,11 +718,12 @@ watch(() => route.fullPath, () => {
                                                 icon
                                                 density="compact"
                                                 variant="text"
-                                                :color="currentRoomEntry.isFavorite ? 'error' : 'grey'"
-                                                class="timeline-card__icon-button"
+                                                class="room-entry__favorite-btn"
+                                                :class="{ 'room-entry__favorite-btn--active': currentRoomEntry.isFavorite }"
+                                                :color="currentRoomEntry.isFavorite ? 'error' : undefined"
                                                 @click.stop="toggleFavoriteRoom(currentRoomEntry.name)"
                                             >
-                                                <v-icon>
+                                                <v-icon size="small">
                                                     {{ currentRoomEntry.isFavorite ? mdiHeart : mdiHeartOutline }}
                                                 </v-icon>
                                             </v-btn>
@@ -777,16 +779,17 @@ watch(() => route.fullPath, () => {
                                         <v-list-item-subtitle class="room-entry__activity">
                                             {{ t('lastActive') }} · {{ formatTime(room.lastActive) }}
                                         </v-list-item-subtitle>
-<template v-slot:append>
+                                        <template v-slot:append>
                                             <v-btn
                                                 icon
                                                 density="compact"
                                                 variant="text"
-                                                :color="room.isFavorite ? 'error' : 'grey'"
-                                                class="timeline-card__icon-button"
+                                                class="room-entry__favorite-btn"
+                                                :class="{ 'room-entry__favorite-btn--active': room.isFavorite }"
+                                                :color="room.isFavorite ? 'error' : undefined"
                                                 @click.stop="toggleFavoriteRoom(room.name)"
                                             >
-                                                <v-icon>
+                                                <v-icon size="small">
                                                     {{ room.isFavorite ? mdiHeart : mdiHeartOutline }}
                                                 </v-icon>
                                             </v-btn>
@@ -995,11 +998,12 @@ watch(() => route.fullPath, () => {
                                             icon
                                             density="compact"
                                             variant="text"
-                                            :color="currentRoomEntry.isFavorite ? 'error' : 'grey'"
-                                            class="timeline-card__icon-button"
+                                            class="room-entry__favorite-btn"
+                                            :class="{ 'room-entry__favorite-btn--active': currentRoomEntry.isFavorite }"
+                                            :color="currentRoomEntry.isFavorite ? 'error' : undefined"
                                             @click.stop="toggleFavoriteRoom(currentRoomEntry.name)"
                                         >
-                                            <v-icon>
+                                            <v-icon size="small">
                                                 {{ currentRoomEntry.isFavorite ? mdiHeart : mdiHeartOutline }}
                                             </v-icon>
                                         </v-btn>
@@ -1060,11 +1064,12 @@ watch(() => route.fullPath, () => {
                                             icon
                                             density="compact"
                                             variant="text"
-                                            :color="room.isFavorite ? 'error' : 'grey'"
-                                            class="timeline-card__icon-button"
+                                            class="room-entry__favorite-btn"
+                                            :class="{ 'room-entry__favorite-btn--active': room.isFavorite }"
+                                            :color="room.isFavorite ? 'error' : undefined"
                                             @click.stop="toggleFavoriteRoom(room.name)"
                                         >
-                                            <v-icon>
+                                            <v-icon size="small">
                                                 {{ room.isFavorite ? mdiHeart : mdiHeartOutline }}
                                             </v-icon>
                                         </v-btn>
@@ -1370,6 +1375,20 @@ watch(() => route.fullPath, () => {
     border-radius: 999px;
     background: currentColor;
     opacity: 0.9;
+}
+
+.room-entry__favorite-btn {
+    opacity: 0.7;
+    transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.room-entry:hover .room-entry__favorite-btn {
+    opacity: 1;
+}
+
+.room-entry__favorite-btn--active {
+    opacity: 1 !important;
+    color: #ff5252 !important;
 }
 
 @media (max-width: 1263px) {
