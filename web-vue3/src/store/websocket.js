@@ -38,6 +38,8 @@ export const useWebSocketStore = defineStore('websocket', {
         roomDialog: false,
         retry: 0,
         heartbeatTimer: null,
+        pendingReceiveQueue: [],
+        receiveFlushTimer: null,
     }),
 
     getters: {
@@ -316,7 +318,6 @@ export const useWebSocketStore = defineStore('websocket', {
                 this.websocket = ws;
                 this.websocketConnecting = false;
                 this.retry = 0;
-                app.received = [];
                 this.authCode = resolvedToken || this.getAuthTokenForRoom(currentRoom);
                 if (this.heartbeatTimer) {
                     clearInterval(this.heartbeatTimer);
@@ -353,23 +354,94 @@ export const useWebSocketStore = defineStore('websocket', {
                 this.failure();
             }
         },
+        syncRoomView(targetRoom) {
+            const app = useAppStore();
+            const normalizedRoom = this.normalizeRoomName(targetRoom);
+            const cached = app.roomMessagesCache[normalizedRoom];
+            if (cached && Array.isArray(cached)) {
+                app.received = [...cached];
+            } else {
+                app.received = [];
+            }
+        },
+        saveRoomCache(room = this.room) {
+            const app = useAppStore();
+            const normalizedRoom = this.normalizeRoomName(room);
+            app.roomMessagesCache[normalizedRoom] = [...app.received];
+        },
+        flushPendingReceives() {
+            if (this.receiveFlushTimer) {
+                clearTimeout(this.receiveFlushTimer);
+                this.receiveFlushTimer = null;
+            }
+            if (!this.pendingReceiveQueue.length) {
+                return;
+            }
+            const app = useAppStore();
+            const newItems = this.pendingReceiveQueue.splice(0);
+            this.mergeMessages(newItems);
+        },
+        mergeMessages(incomingItems) {
+            const app = useAppStore();
+            if (!incomingItems || !incomingItems.length) {
+                return;
+            }
+            const currentList = [...app.received];
+            const existingIdMap = new Map();
+            currentList.forEach((item, index) => {
+                existingIdMap.set(item.id, index);
+            });
+
+            for (const item of incomingItems) {
+                if (existingIdMap.has(item.id)) {
+                    const idx = existingIdMap.get(item.id);
+                    currentList[idx] = { ...currentList[idx], ...item };
+                } else {
+                    currentList.push(item);
+                }
+            }
+
+            // 按时间倒序排列 (最新的排在最前)
+            currentList.sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0));
+
+            // 如果有配置历史条数限制，进行截断
+            const limit = Number(app.config?.server?.history || 0);
+            if (limit > 0 && currentList.length > limit) {
+                currentList.splice(limit);
+            }
+
+            app.received = currentList;
+            this.saveRoomCache();
+        },
+        queueReceive(data) {
+            this.pendingReceiveQueue.unshift(data);
+            if (!this.receiveFlushTimer) {
+                this.receiveFlushTimer = setTimeout(() => {
+                    this.flushPendingReceives();
+                }, 32);
+            }
+        },
         handleEvent(event, data) {
             const app = useAppStore();
             switch (event) {
                 case 'receive':
-                    app.received.unshift(data);
+                    this.queueReceive(data);
                     break;
                 case 'receiveMulti':
-                    app.received.unshift(...Array.from(data).reverse());
+                    this.flushPendingReceives();
+                    this.mergeMessages(Array.isArray(data) ? data : [data]);
                     break;
                 case 'revoke': {
+                    this.flushPendingReceives();
                     const index = app.received.findIndex(e => e.id === data.id);
                     if (index !== -1) {
                         app.received.splice(index, 1);
+                        this.saveRoomCache();
                     }
                     break;
                 }
                 case 'config': {
+                    this.flushPendingReceives();
                     app.config = data;
                     console.log(
                         `%c Cloud Clipboard ${data.version} by Jonnyan404 %c https://github.com/Jonnyan404/cloud-clipboard-go `,
@@ -389,13 +461,16 @@ export const useWebSocketStore = defineStore('websocket', {
                     break;
                 }
                 case 'update': {
+                    this.flushPendingReceives();
                     const index = app.received.findIndex(e => e.id === data.id);
                     if (index !== -1) {
                         app.received.splice(index, 1, { ...app.received[index], ...data });
+                        this.saveRoomCache();
                     }
                     break;
                 }
                 case 'forbidden': {
+                    this.flushPendingReceives();
                     this.clearAuthTokenForRoom(this.room);
                     this.openAuthDialog(this.room);
                     break;
@@ -415,7 +490,12 @@ export const useWebSocketStore = defineStore('websocket', {
                 clearInterval(this.heartbeatTimer);
                 this.heartbeatTimer = null;
             }
-            app.received = [];
+            if (this.receiveFlushTimer) {
+                clearTimeout(this.receiveFlushTimer);
+                this.receiveFlushTimer = null;
+            }
+            this.pendingReceiveQueue = [];
+            this.saveRoomCache();
             app.device = [];
         },
         failure() {

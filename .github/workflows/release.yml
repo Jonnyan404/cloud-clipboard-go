@@ -129,7 +129,7 @@ jobs:
           cp -r web-vue3/dist/* cloud-clip/lib/static/
       - name: Install gomobile and Build AAR
         run: |
-          go install golang.org/x/mobile/cmd/gomobile@latest
+          go install golang.org/x/mobile/cmd/gomobile@v0.0.0-20260211191516-dcd2a3258864
           export PATH=$PATH:$(go env GOPATH)/bin
           gomobile init
           # 2. 使用 case 语句支持多个架构
@@ -203,7 +203,7 @@ jobs:
           cp -r web-vue3/dist/* cloud-clip/lib/static/
       - name: Install gomobile and Build Universal AAR
         run: |
-          go install golang.org/x/mobile/cmd/gomobile@latest
+          go install golang.org/x/mobile/cmd/gomobile@v0.0.0-20260211191516-dcd2a3258864
           export PATH=$PATH:$(go env GOPATH)/bin
           gomobile init
           cd cloud-clip/mobile

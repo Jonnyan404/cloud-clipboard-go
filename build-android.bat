@@ -2,7 +2,7 @@ REM filepath: build-android.bat
 @echo off
 setlocal enabledelayedexpansion
 
-REM ½âÎöÃüÁîÐÐ²ÎÊý
+REM ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð²ï¿½ï¿½ï¿½
 set "SKIP_AAR=0"
 set "SKIP_APK=0"
 set "ONLY_AAR=0"
@@ -22,46 +22,46 @@ shift
 goto :parse_args
 
 :show_help
-echo ÓÃ·¨: build-android.bat [Ñ¡Ïî]
+echo ï¿½Ã·ï¿½: build-android.bat [Ñ¡ï¿½ï¿½]
 echo.
-echo Ñ¡Ïî:
-echo   -OnlyAAR      Ö»±àÒë AAR °ü,²»±àÒë APK
-echo   -OnlyAPK      Ö»±àÒë APK,Ìø¹ý AAR ±àÒë
-echo   -SkipAAR      Ìø¹ý AAR ±àÒë,Ö±½Ó±àÒë APK
-echo   -SkipAPK      Ö»±àÒë AAR,²»±àÒë APK
-echo   -Install      ±àÒëÍê³Éºó×Ô¶¯°²×°µ½Éè±¸
-echo   -Help         ÏÔÊ¾´Ë°ïÖúÐÅÏ¢
+echo Ñ¡ï¿½ï¿½:
+echo   -OnlyAAR      Ö»ï¿½ï¿½ï¿½ï¿½ AAR ï¿½ï¿½,ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ APK
+echo   -OnlyAPK      Ö»ï¿½ï¿½ï¿½ï¿½ APK,ï¿½ï¿½ï¿½ï¿½ AAR ï¿½ï¿½ï¿½ï¿½
+echo   -SkipAAR      ï¿½ï¿½ï¿½ï¿½ AAR ï¿½ï¿½ï¿½ï¿½,Ö±ï¿½Ó±ï¿½ï¿½ï¿½ APK
+echo   -SkipAPK      Ö»ï¿½ï¿½ï¿½ï¿½ AAR,ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ APK
+echo   -Install      ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Éºï¿½ï¿½Ô¶ï¿½ï¿½ï¿½×°ï¿½ï¿½ï¿½è±¸
+echo   -Help         ï¿½ï¿½Ê¾ï¿½Ë°ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 echo.
-echo Ê¾Àý:
-echo   build-android.bat                    # ÍêÕû¹¹½¨Á÷³Ì
-echo   build-android.bat -OnlyAAR           # Ö»±àÒë AAR
-echo   build-android.bat -OnlyAPK           # Ö»±àÒë APK
-echo   build-android.bat -SkipAAR           # Ìø¹ý AAR,Ö»±àÒë APK
-echo   build-android.bat -Install           # ÍêÕû¹¹½¨²¢×Ô¶¯°²×°
+echo Ê¾ï¿½ï¿½:
+echo   build-android.bat                    # ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+echo   build-android.bat -OnlyAAR           # Ö»ï¿½ï¿½ï¿½ï¿½ AAR
+echo   build-android.bat -OnlyAPK           # Ö»ï¿½ï¿½ï¿½ï¿½ APK
+echo   build-android.bat -SkipAAR           # ï¿½ï¿½ï¿½ï¿½ AAR,Ö»ï¿½ï¿½ï¿½ï¿½ APK
+echo   build-android.bat -Install           # ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô¶ï¿½ï¿½ï¿½×°
 echo.
 exit /b 0
 
 :end_parse_args
 
 echo ========================================
-echo   ¹¹½¨ Cloud Clipboard Android Ó¦ÓÃ
+echo   ï¿½ï¿½ï¿½ï¿½ Cloud Clipboard Android Ó¦ï¿½ï¿½
 echo ========================================
 echo.
 
-REM ²ÎÊýÑéÖ¤
+REM ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¤
 if "%ONLY_AAR%"=="1" if "%ONLY_APK%"=="1" (
-    echo [´íÎó] -OnlyAAR ºÍ -OnlyAPK ²»ÄÜÍ¬Ê±Ê¹ÓÃ
+    echo [ï¿½ï¿½ï¿½ï¿½] -OnlyAAR ï¿½ï¿½ -OnlyAPK ï¿½ï¿½ï¿½ï¿½Í¬Ê±Ê¹ï¿½ï¿½
     pause
     exit /b 1
 )
 
 if "%SKIP_AAR%"=="1" if "%ONLY_AAR%"=="1" (
-    echo [´íÎó] -SkipAAR ºÍ -OnlyAAR ²»ÄÜÍ¬Ê±Ê¹ÓÃ
+    echo [ï¿½ï¿½ï¿½ï¿½] -SkipAAR ï¿½ï¿½ -OnlyAAR ï¿½ï¿½ï¿½ï¿½Í¬Ê±Ê¹ï¿½ï¿½
     pause
     exit /b 1
 )
 
-REM È·¶¨Ö´ÐÐÄÄÐ©²½Öè
+REM È·ï¿½ï¿½Ö´ï¿½ï¿½ï¿½ï¿½Ð©ï¿½ï¿½ï¿½ï¿½
 set "BUILD_AAR=1"
 set "BUILD_APK=1"
 
@@ -70,130 +70,130 @@ if "%ONLY_APK%"=="1" set "BUILD_AAR=0"
 if "%SKIP_APK%"=="1" set "BUILD_APK=0"
 if "%ONLY_AAR%"=="1" set "BUILD_APK=0"
 
-REM ¼ì²é±ØÒª¹¤¾ß
-echo [¼ì²é] ÑéÖ¤±ØÒª¹¤¾ß...
+REM ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½
+echo [ï¿½ï¿½ï¿½] ï¿½ï¿½Ö¤ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½...
 
 java -version >nul 2>&1
 if errorlevel 1 (
-    echo [´íÎó] Î´¼ì²âµ½ Java,ÇëÏÈ°²×° JDK 17
-    echo ÏÂÔØµØÖ·: https://adoptium.net/
+    echo [ï¿½ï¿½ï¿½ï¿½] Î´ï¿½ï¿½âµ½ Java,ï¿½ï¿½ï¿½È°ï¿½×° JDK 17
+    echo ï¿½ï¿½ï¿½Øµï¿½Ö·: https://adoptium.net/
     pause
     exit /b 1
 )
-echo [?] Java ÒÑ°²×°
+echo [?] Java ï¿½Ñ°ï¿½×°
 
 if "%BUILD_AAR%"=="1" (
     go version >nul 2>&1
     if errorlevel 1 (
-        echo [´íÎó] Î´¼ì²âµ½ Go,ÇëÏÈ°²×° Go 1.22+
-        echo ÏÂÔØµØÖ·: https://go.dev/dl/
+        echo [ï¿½ï¿½ï¿½ï¿½] Î´ï¿½ï¿½âµ½ Go,ï¿½ï¿½ï¿½È°ï¿½×° Go 1.22+
+        echo ï¿½ï¿½ï¿½Øµï¿½Ö·: https://go.dev/dl/
         pause
         exit /b 1
     )
-    echo [?] Go ÒÑ°²×°
+    echo [?] Go ï¿½Ñ°ï¿½×°
 
     gomobile version >nul 2>&1
     if errorlevel 1 (
-        echo [¾¯¸æ] gomobile Î´°²×°,ÕýÔÚ°²×°...
-        go install golang.org/x/mobile/cmd/gomobile@latest
+        echo [ï¿½ï¿½ï¿½ï¿½] gomobile Î´ï¿½ï¿½×°,ï¿½ï¿½ï¿½Ú°ï¿½×°...
+        go install golang.org/x/mobile/cmd/gomobile@v0.0.0-20260211191516-dcd2a3258864
         if errorlevel 1 (
-            echo [´íÎó] gomobile °²×°Ê§°Ü
+            echo [ï¿½ï¿½ï¿½ï¿½] gomobile ï¿½ï¿½×°Ê§ï¿½ï¿½
             pause
             exit /b 1
         )
     )
-    echo [?] gomobile ÒÑ°²×°
+    echo [?] gomobile ï¿½Ñ°ï¿½×°
 )
 
 set "ROOT_DIR=%CD%"
 
-REM ==================== ²½Öè 1: ±àÒë AAR ====================
+REM ==================== ï¿½ï¿½ï¿½ï¿½ 1: ï¿½ï¿½ï¿½ï¿½ AAR ====================
 if "%BUILD_AAR%"=="1" (
     echo.
     echo ========================================
-    echo   ²½Öè 1: ±àÒë Go AAR °ü
+    echo   ï¿½ï¿½ï¿½ï¿½ 1: ï¿½ï¿½ï¿½ï¿½ Go AAR ï¿½ï¿½
     echo ========================================
 
     cd cloud-clip\mobile
     if errorlevel 1 (
-        echo [´íÎó] ÕÒ²»µ½ cloud-clip\mobile Ä¿Â¼
+        echo [ï¿½ï¿½ï¿½ï¿½] ï¿½Ò²ï¿½ï¿½ï¿½ cloud-clip\mobile Ä¿Â¼
         pause
         exit /b 1
     )
 
-    echo [ÐÅÏ¢] ÇåÀí¾ÉµÄ AAR ÎÄ¼þ...
+    echo [ï¿½ï¿½Ï¢] ï¿½ï¿½ï¿½ï¿½ï¿½Éµï¿½ AAR ï¿½Ä¼ï¿½...
     if exist cloudclipservice.aar del /f /q cloudclipservice.aar
     if exist cloudclipservice-sources.jar del /f /q cloudclipservice-sources.jar
 
-    echo [ÐÅÏ¢] ¿ªÊ¼±àÒë AAR...
-    echo [ÃüÁî] gomobile bind -tags embed -androidapi 24 -o cloudclipservice.aar -target=android -ldflags="-s -w"
+    echo [ï¿½ï¿½Ï¢] ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ AAR...
+    echo [ï¿½ï¿½ï¿½ï¿½] gomobile bind -tags embed -androidapi 24 -o cloudclipservice.aar -target=android -ldflags="-s -w"
 
     set "JAVA_TOOL_OPTIONS=-Dfile.encoding=UTF-8"
-    echo [ÐÅÏ¢] ÒÑÉèÖÃ Java ±àÂëÎª UTF-8
+    echo [ï¿½ï¿½Ï¢] ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ Java ï¿½ï¿½ï¿½ï¿½Îª UTF-8
 
     gomobile bind -tags embed -androidapi 24 -o cloudclipservice.aar -target=android -ldflags="-s -w" github.com/jonnyan404/cloud-clipboard-go/cloud-clip/mobile
 
     if errorlevel 1 (
-        echo [´íÎó] AAR ±àÒëÊ§°Ü!
+        echo [ï¿½ï¿½ï¿½ï¿½] AAR ï¿½ï¿½ï¿½ï¿½Ê§ï¿½ï¿½!
         cd "%ROOT_DIR%"
         pause
         exit /b 1
     )
 
-    echo [?] AAR ±àÒë³É¹¦: cloudclipservice.aar
+    echo [?] AAR ï¿½ï¿½ï¿½ï¿½É¹ï¿½: cloudclipservice.aar
 
-    echo [ÐÅÏ¢] ¸´ÖÆ AAR µ½ Android ÏîÄ¿...
+    echo [ï¿½ï¿½Ï¢] ï¿½ï¿½ï¿½ï¿½ AAR ï¿½ï¿½ Android ï¿½ï¿½Ä¿...
     if not exist "%ROOT_DIR%\android\app\libs" mkdir "%ROOT_DIR%\android\app\libs"
     copy /y cloudclipservice.aar "%ROOT_DIR%\android\app\libs\"
     if errorlevel 1 (
-        echo [´íÎó] AAR ¸´ÖÆÊ§°Ü
+        echo [ï¿½ï¿½ï¿½ï¿½] AAR ï¿½ï¿½ï¿½ï¿½Ê§ï¿½ï¿½
         cd "%ROOT_DIR%"
         pause
         exit /b 1
     )
-    echo [?] AAR ÒÑ¸´ÖÆµ½ android\app\libs\
+    echo [?] AAR ï¿½Ñ¸ï¿½ï¿½Æµï¿½ android\app\libs\
 
     cd "%ROOT_DIR%"
 ) else (
     echo.
-    echo [Ìø¹ý] Ìø¹ý AAR ±àÒë
+    echo [ï¿½ï¿½ï¿½ï¿½] ï¿½ï¿½ï¿½ï¿½ AAR ï¿½ï¿½ï¿½ï¿½
     
     if not exist "%ROOT_DIR%\android\app\libs\cloudclipservice.aar" (
-        echo [´íÎó] ÕÒ²»µ½ AAR ÎÄ¼þ: android\app\libs\cloudclipservice.aar
-        echo ÇëÏÈÔËÐÐÍêÕû¹¹½¨»òÊ¹ÓÃ -OnlyAAR ²ÎÊý±àÒë AAR
+        echo [ï¿½ï¿½ï¿½ï¿½] ï¿½Ò²ï¿½ï¿½ï¿½ AAR ï¿½Ä¼ï¿½: android\app\libs\cloudclipservice.aar
+        echo ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê¹ï¿½ï¿½ -OnlyAAR ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ AAR
         pause
         exit /b 1
     )
-    echo [?] ÕÒµ½ÏÖÓÐ AAR ÎÄ¼þ
+    echo [?] ï¿½Òµï¿½ï¿½ï¿½ï¿½ï¿½ AAR ï¿½Ä¼ï¿½
 )
 
-REM ==================== ²½Öè 2: ±àÒë APK ====================
+REM ==================== ï¿½ï¿½ï¿½ï¿½ 2: ï¿½ï¿½ï¿½ï¿½ APK ====================
 if "%BUILD_APK%"=="1" (
     echo.
     echo ========================================
-    echo   ²½Öè 2: ±àÒë Android APK
+    echo   ï¿½ï¿½ï¿½ï¿½ 2: ï¿½ï¿½ï¿½ï¿½ Android APK
     echo ========================================
 
     cd android
     if errorlevel 1 (
-        echo [´íÎó] ÕÒ²»µ½ android Ä¿Â¼
+        echo [ï¿½ï¿½ï¿½ï¿½] ï¿½Ò²ï¿½ï¿½ï¿½ android Ä¿Â¼
         pause
         exit /b 1
     )
 
-    echo [ÐÅÏ¢] ÇåÀíÏîÄ¿...
+    echo [ï¿½ï¿½Ï¢] ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä¿...
     call gradlew.bat clean
     if errorlevel 1 (
-        echo [´íÎó] Gradle clean Ê§°Ü
+        echo [ï¿½ï¿½ï¿½ï¿½] Gradle clean Ê§ï¿½ï¿½
         cd "%ROOT_DIR%"
         pause
         exit /b 1
     )
 
-    echo [ÐÅÏ¢] ±àÒë Debug APK...
+    echo [ï¿½ï¿½Ï¢] ï¿½ï¿½ï¿½ï¿½ Debug APK...
     call gradlew.bat assembleDebug
     if errorlevel 1 (
-        echo [´íÎó] APK ±àÒëÊ§°Ü!
+        echo [ï¿½ï¿½ï¿½ï¿½] APK ï¿½ï¿½ï¿½ï¿½Ê§ï¿½ï¿½!
         cd "%ROOT_DIR%"
         pause
         exit /b 1
@@ -201,29 +201,29 @@ if "%BUILD_APK%"=="1" (
 
     echo.
     echo ========================================
-    echo   ¹¹½¨³É¹¦!
+    echo   ï¿½ï¿½ï¿½ï¿½ï¿½É¹ï¿½!
     echo ========================================
     echo.
-    echo [?] APK Î»ÖÃ: android\app\build\outputs\apk\debug\app-debug.apk
+    echo [?] APK Î»ï¿½ï¿½: android\app\build\outputs\apk\debug\app-debug.apk
     echo.
 
     if "%AUTO_INSTALL%"=="1" (
-        echo [ÐÅÏ¢] ÕýÔÚ°²×° APK...
+        echo [ï¿½ï¿½Ï¢] ï¿½ï¿½ï¿½Ú°ï¿½×° APK...
         call gradlew.bat installDebug
         if errorlevel 1 (
-            echo [¾¯¸æ] APK °²×°Ê§°Ü,ÇëÊÖ¶¯°²×°
+            echo [ï¿½ï¿½ï¿½ï¿½] APK ï¿½ï¿½×°Ê§ï¿½ï¿½,ï¿½ï¿½ï¿½Ö¶ï¿½ï¿½ï¿½×°
         ) else (
-            echo [?] APK ÒÑ³É¹¦°²×°µ½Éè±¸
+            echo [?] APK ï¿½Ñ³É¹ï¿½ï¿½ï¿½×°ï¿½ï¿½ï¿½è±¸
         )
     ) else (
-        set /p INSTALL_CHOICE="ÊÇ·ñ°²×°µ½Éè±¸? (y/n): "
+        set /p INSTALL_CHOICE="ï¿½Ç·ï¿½×°ï¿½ï¿½ï¿½è±¸? (y/n): "
         if /i "!INSTALL_CHOICE!"=="y" (
-            echo [ÐÅÏ¢] ÕýÔÚ°²×° APK...
+            echo [ï¿½ï¿½Ï¢] ï¿½ï¿½ï¿½Ú°ï¿½×° APK...
             call gradlew.bat installDebug
             if errorlevel 1 (
-                echo [¾¯¸æ] APK °²×°Ê§°Ü,ÇëÊÖ¶¯°²×°
+                echo [ï¿½ï¿½ï¿½ï¿½] APK ï¿½ï¿½×°Ê§ï¿½ï¿½,ï¿½ï¿½ï¿½Ö¶ï¿½ï¿½ï¿½×°
             ) else (
-                echo [?] APK ÒÑ³É¹¦°²×°µ½Éè±¸
+                echo [?] APK ï¿½Ñ³É¹ï¿½ï¿½ï¿½×°ï¿½ï¿½ï¿½è±¸
             )
         )
     )
@@ -231,9 +231,9 @@ if "%BUILD_APK%"=="1" (
     cd "%ROOT_DIR%"
 ) else (
     echo.
-    echo [Ìø¹ý] Ìø¹ý APK ±àÒë
+    echo [ï¿½ï¿½ï¿½ï¿½] ï¿½ï¿½ï¿½ï¿½ APK ï¿½ï¿½ï¿½ï¿½
 )
 
 echo.
-echo [Íê³É] ¹¹½¨Á÷³Ì½áÊø
+echo [ï¿½ï¿½ï¿½] ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ì½ï¿½ï¿½ï¿½
 pause
