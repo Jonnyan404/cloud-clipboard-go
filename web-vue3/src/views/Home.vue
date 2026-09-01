@@ -1,4 +1,4 @@
-<script setup>import { computed, nextTick, ref } from 'vue';
+<script setup>import { computed, nextTick, ref, watch } from 'vue';
 import { onBeforeRouteUpdate, useRouter } from 'vue-router';
 import { useAppStore } from '@/store/app';
 import { useWebSocketStore } from '@/store/websocket';
@@ -13,6 +13,8 @@ import ReceivedText from '@/components/received-item/Text.vue';
 import ReceivedFile from '@/components/received-item/File.vue';
 
 const mdiTimeline = 'mdi-timeline';
+const tlLastRoom = ref('');
+let tlJustSwitched = false;
 
 
 const app = useAppStore();
@@ -64,6 +66,32 @@ function focusComposer(type) {
         }
     });
 }
+
+function tlNearTop() {
+    return window.scrollY < 120;
+}
+
+function tlScrollTop(smooth = true) {
+    window.scrollTo({ top: 0, behavior: smooth ? 'smooth' : 'auto' });
+}
+
+watch(() => app.received, () => {
+    if (tlJustSwitched) {
+        tlJustSwitched = false;
+        nextTick(() => tlScrollTop(false));
+        return;
+    }
+    if (!tlNearTop()) return;
+    nextTick(() => tlScrollTop(true));
+});
+
+watch(() => ws.room, (room) => {
+    if (tlLastRoom.value !== '' && tlLastRoom.value !== room) {
+        tlJustSwitched = true;
+    }
+    tlLastRoom.value = room;
+});
+
 </script>
 
 <template>
@@ -76,28 +104,26 @@ function focusComposer(type) {
             <v-card class="timeline-panel" :class="{ 'surface-card--dark': isDark }" variant="outlined">
                 <div class="timeline-panel__body px-3 px-md-4 py-2">
                     <div v-if="app.received.length" class="timeline-panel__stream">
-                        <v-fade-transition group>
-                            <div
-                                v-for="item in app.received"
-                                :key="item.id"
-                                class="timeline-panel__item"
-                                :class="{ 'timeline-panel__item--first': item === app.received[0] }"
+                        <div
+                            v-for="item in app.received"
+                            :key="item.id"
+                            class="timeline-panel__item"
+                            :class="{ 'timeline-panel__item--first': item === app.received[0] }"
+                        >
+                            <v-chip
+                                v-if="item === app.received[0]"
+                                size="x-small"
+                                :variant="'outlined'"
+                                color="primary"
+                                class="timeline-panel__count-chip timeline-panel__count-chip--overlay"
                             >
-                                <v-chip
-                                    v-if="item === app.received[0]"
-                                    size="x-small"
-                                    :variant="'outlined'"
-                                    color="primary"
-                                    class="timeline-panel__count-chip timeline-panel__count-chip--overlay"
-                                >
-                                    {{ historyUsageLabel }}
-                                </v-chip>
-                                <component
-                                    :is="item.type === 'text' ? ReceivedText : ReceivedFile"
-                                    :meta="item"
-                                />
-                            </div>
-                        </v-fade-transition>
+                                {{ historyUsageLabel }}
+                            </v-chip>
+                            <component
+                                :is="item.type === 'text' ? ReceivedText : ReceivedFile"
+                                :meta="item"
+                            />
+                        </div>
                     </div>
 
                     <v-sheet

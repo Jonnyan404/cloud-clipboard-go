@@ -413,10 +413,7 @@ watch(() => route.fullPath, () => {
     clipboardClearedMessageVisible.value = false;
     const routeRoom = ws.normalizeRoomName(route.query.room || '');
     if (ws.normalizeRoomName(ws.room) !== routeRoom) {
-        ws.room = routeRoom;
-        ws.disconnect();
-        ws.syncRoomView(routeRoom);
-        ws.connect();
+        ws.switchRoom(routeRoom);
     }
     if (app.config && app.config.server && app.config.server.roomList) {
         ensureRoomPresent(routeRoom);
