@@ -32,8 +32,8 @@ android {
         applicationId = "com.cloudclip"
         minSdk = 24
         targetSdk = 34
-        versionCode = 4
-        versionName = "4.8.6"
+        versionCode = 5
+        versionName = "5.0.1"
     }
 
     buildTypes {
