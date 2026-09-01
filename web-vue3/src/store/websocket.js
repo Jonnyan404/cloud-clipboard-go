@@ -481,7 +481,10 @@ export const useWebSocketStore = defineStore('websocket', {
             const app = useAppStore();
             this.websocketConnecting = false;
             if (this.websocket) {
-                this.websocket.onclose = () => {};
+                this.websocket.onopen = null;
+                this.websocket.onmessage = null;
+                this.websocket.onerror = null;
+                this.websocket.onclose = null;
                 this.websocket.close();
                 this.websocket = null;
             }
@@ -497,6 +500,43 @@ export const useWebSocketStore = defineStore('websocket', {
             this.pendingReceiveQueue = [];
             this.saveRoomCache();
             app.device = [];
+        },
+        switchRoom(targetRoom) {
+            const app = useAppStore();
+            const oldRoom = this.normalizeRoomName(this.room);
+            const newRoom = this.normalizeRoomName(targetRoom);
+            if (oldRoom === newRoom) {
+                return;
+            }
+            // 1. 先把当前视图（旧房间内容）保存回旧房间的 cache，避免混入新房间
+            app.roomMessagesCache[oldRoom] = [...app.received];
+            // 2. 断开旧连接并清空所有 handler，防止旧连接的残留消息写入新房间
+            this.websocketConnecting = false;
+            if (this.websocket) {
+                this.websocket.onopen = null;
+                this.websocket.onmessage = null;
+                this.websocket.onerror = null;
+                this.websocket.onclose = null;
+                this.websocket.close();
+                this.websocket = null;
+            }
+            this.clearAuthRefreshTimer();
+            if (this.heartbeatTimer) {
+                clearInterval(this.heartbeatTimer);
+                this.heartbeatTimer = null;
+            }
+            if (this.receiveFlushTimer) {
+                clearTimeout(this.receiveFlushTimer);
+                this.receiveFlushTimer = null;
+            }
+            this.pendingReceiveQueue = [];
+            app.device = [];
+            // 3. 切换当前房间
+            this.room = newRoom;
+            // 4. 载入新房间的 cache
+            this.syncRoomView(newRoom);
+            // 5. 连接新房间
+            this.connect();
         },
         failure() {
             const app = useAppStore();
