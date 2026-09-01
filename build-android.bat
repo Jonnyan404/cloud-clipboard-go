@@ -96,6 +96,7 @@ if "%BUILD_AAR%"=="1" (
     if errorlevel 1 (
         echo [����] gomobile δ��װ,���ڰ�װ...
         go install golang.org/x/mobile/cmd/gomobile@v0.0.0-20260211191516-dcd2a3258864
+        go install golang.org/x/mobile/cmd/gobind@v0.0.0-20260211191516-dcd2a3258864
         if errorlevel 1 (
             echo [����] gomobile ��װʧ��
             pause

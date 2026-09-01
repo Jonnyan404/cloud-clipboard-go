@@ -101,6 +101,7 @@ jobs:
       - name: Install and initialize gomobile
         run: |
           go install golang.org/x/mobile/cmd/gomobile@v0.0.0-20260211191516-dcd2a3258864
+          go install golang.org/x/mobile/cmd/gobind@v0.0.0-20260211191516-dcd2a3258864
           export PATH=$PATH:$(go env GOPATH)/bin
           gomobile init
 
@@ -201,6 +202,7 @@ jobs:
       - name: Install and initialize gomobile
         run: |
           go install golang.org/x/mobile/cmd/gomobile@v0.0.0-20260211191516-dcd2a3258864
+          go install golang.org/x/mobile/cmd/gobind@v0.0.0-20260211191516-dcd2a3258864
           export PATH=$PATH:$(go env GOPATH)/bin
           gomobile init
 
