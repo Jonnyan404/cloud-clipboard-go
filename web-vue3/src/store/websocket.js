@@ -295,10 +295,11 @@ export const useWebSocketStore = defineStore('websocket', {
                 const currentRoom = this.normalizeRoomName(this.room);
                 let resolvedToken = this.getAuthTokenForRoom(currentRoom);
 
-                // 如果未缓存 token 且已知当前房间或全局受保护，尝试提前交互弹窗
-                const isProtected = this.roomProtectionCache[currentRoom];
-                const globalAuth = Boolean(app.config?.auth);
-                if (!resolvedToken && (isProtected === true || (isProtected === undefined && globalAuth))) {
+                // 无论是否已缓存 token，都先探测 /server 以可靠获知房间是否需要认证。
+                // 若仅在 app.config?.auth 为真时才探测，首次加载（config 需在认证后才会收到）
+                // 受保护房间时会永远探测不到，导致既不连接也不弹认证窗口。
+                const serverInfo = await this.fetchServerInfo(currentRoom);
+                if (!resolvedToken && serverInfo.auth) {
                     resolvedToken = await this.resolveAuthTokenForRoom(currentRoom, { interactive: true });
                     if (resolvedToken === null) {
                         this.websocketConnecting = false;
@@ -328,7 +329,7 @@ export const useWebSocketStore = defineStore('websocket', {
                     }
                 };
                 this.heartbeatTimer = setInterval(heartbeat, 30000);
-                ws.onclose = () => {
+                ws.onclose = async () => {
                     if (this.heartbeatTimer) {
                         clearInterval(this.heartbeatTimer);
                         this.heartbeatTimer = null;
@@ -339,7 +340,17 @@ export const useWebSocketStore = defineStore('websocket', {
                     if (this.retry < 3) {
                         this.retry++;
                         setTimeout(() => this.connect(), 3000);
-                    } else if (this.getAuthTokenForRoom(this.room)) {
+                        return;
+                    }
+                    // 重试耗尽后，若服务器仍要求认证（可能因 token 失效/过期），
+                    // 清除本地 token 并弹出认证窗口，否则静默失败用户无法感知。
+                    try {
+                        const info = await this.fetchServerInfo(this.room);
+                        if (info.auth) {
+                            this.clearAuthTokenForRoom(this.room);
+                            this.openAuthDialog(this.room);
+                        }
+                    } catch {
                         this.openAuthDialog(this.room);
                     }
                 };
