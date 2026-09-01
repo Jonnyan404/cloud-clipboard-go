@@ -27,11 +27,13 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: 22
-          cache: 'npm'
-          cache-dependency-path: web-vue3/package-lock.json
 
       - name: Install Wrangler
         run: npm install -g wrangler@^4.59.3
+
+      - name: Install Worker dependencies
+        working-directory: cloudflare/workers
+        run: npm ci
 
       - name: Build Vue3 frontend (web-vue3)
         working-directory: web-vue3
@@ -55,7 +57,7 @@ jobs:
         working-directory: cloudflare/workers
         run: |
           # 1. 确保 R2 存储桶存在
-          wrangler r2 bucket create cloud-clipboard-files || echo "R2 bucket 已存在或已创建"
+          wrangler r2 bucket create cloud-clipboard-files 2>/dev/null || echo "R2 bucket 已存在或已创建"
 
           # 2. 获取或自动创建 D1 数据库
           cp wrangler.toml.template wrangler.toml
