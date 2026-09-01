@@ -411,15 +411,14 @@ watch(isDesktopRoomDockVisible, (newVal) => {
 }, { immediate: true });
 watch(() => route.fullPath, () => {
     clipboardClearedMessageVisible.value = false;
-    const routeRoom = route.query.room || '';
-    if (ws.room !== routeRoom) {
+    const routeRoom = ws.normalizeRoomName(route.query.room || '');
+    if (ws.normalizeRoomName(ws.room) !== routeRoom) {
         ws.room = routeRoom;
         ws.disconnect();
         ws.connect();
     }
     if (app.config && app.config.server && app.config.server.roomList) {
-        ensureRoomPresent();
-        fetchRoomList();
+        ensureRoomPresent(routeRoom);
     }
 });
 </script>

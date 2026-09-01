@@ -57,11 +57,6 @@ function buildAbsoluteRouteUrl(path) {
     const prefix = app.config?.server?.prefix || '';
     return new URL(`${prefix}/${normalizedPath}`, `${window.location.origin}/`).toString();
 }
-function syncRoomFromRoute(route) {
-    ws.room = route?.query?.room || '';
-    ws.disconnect();
-    ws.connect();
-}
 function focusComposer(type) {
     nextTick(() => {
         if (composer.value && typeof composer.value.focus === 'function') {
@@ -69,9 +64,6 @@ function focusComposer(type) {
         }
     });
 }
-onBeforeRouteUpdate((to, from) => {
-    syncRoomFromRoute(to);
-});
 </script>
 
 <template>

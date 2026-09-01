@@ -178,6 +178,10 @@ export const useWebSocketStore = defineStore('websocket', {
         },
         async resolveAuthTokenForRoom(room, { interactive = true } = {}) {
             const normalizedRoom = this.normalizeRoomName(room);
+            const cachedToken = this.getAuthTokenForRoom(normalizedRoom);
+            if (cachedToken) {
+                return cachedToken;
+            }
             const serverInfo = await this.fetchServerInfo(normalizedRoom);
             if (!serverInfo.auth) {
                 return '';
@@ -265,6 +269,19 @@ export const useWebSocketStore = defineStore('websocket', {
             }, delay);
         },
 
+        getWebSocketEndpoint(room = this.room) {
+            const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const app = useAppStore();
+            const prefix = app.config?.server?.prefix || '';
+            const normalizedPrefix = prefix ? `/${prefix.replace(/^\/+|\/+$/g, '')}` : '';
+            const wsUrl = new URL(`${protocol}//${location.host}${normalizedPrefix}/push`);
+            const normalizedRoom = this.normalizeRoomName(room);
+            if (normalizedRoom) {
+                wsUrl.searchParams.set('room', normalizedRoom);
+            }
+            return wsUrl.toString();
+        },
+
         /* ---------- 连接 ---------- */
         async connect() {
             const app = useAppStore();
@@ -274,21 +291,23 @@ export const useWebSocketStore = defineStore('websocket', {
             this.websocketConnecting = true;
             try {
                 const currentRoom = this.normalizeRoomName(this.room);
-                const serverInfo = await this.fetchServerInfo(currentRoom);
-                let resolvedToken = '';
-                if (serverInfo.auth) {
+                let resolvedToken = this.getAuthTokenForRoom(currentRoom);
+
+                // 如果未缓存 token 且已知当前房间或全局受保护，尝试提前交互弹窗
+                const isProtected = this.roomProtectionCache[currentRoom];
+                const globalAuth = Boolean(app.config?.auth);
+                if (!resolvedToken && (isProtected === true || (isProtected === undefined && globalAuth))) {
                     resolvedToken = await this.resolveAuthTokenForRoom(currentRoom, { interactive: true });
                     if (resolvedToken === null) {
                         this.websocketConnecting = false;
                         return;
                     }
                 }
+
+                const wsUrl = this.getWebSocketEndpoint(currentRoom);
+                const protocols = resolvedToken ? [resolvedToken] : [];
+
                 const ws = await new Promise((resolve, reject) => {
-                    const wsUrl = new URL(serverInfo.server);
-                    wsUrl.protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-                    wsUrl.port = location.port;
-                    wsUrl.searchParams.set('room', currentRoom);
-                    const protocols = resolvedToken ? [resolvedToken] : [];
                     const socket = new WebSocket(wsUrl, protocols);
                     socket.onopen = () => resolve(socket);
                     socket.onerror = reject;
@@ -298,7 +317,7 @@ export const useWebSocketStore = defineStore('websocket', {
                 this.websocketConnecting = false;
                 this.retry = 0;
                 app.received = [];
-                this.authCode = this.getAuthTokenForRoom(currentRoom);
+                this.authCode = resolvedToken || this.getAuthTokenForRoom(currentRoom);
                 if (this.heartbeatTimer) {
                     clearInterval(this.heartbeatTimer);
                 }
@@ -391,6 +410,12 @@ export const useWebSocketStore = defineStore('websocket', {
                 this.websocket.close();
                 this.websocket = null;
             }
+            this.clearAuthRefreshTimer();
+            if (this.heartbeatTimer) {
+                clearInterval(this.heartbeatTimer);
+                this.heartbeatTimer = null;
+            }
+            app.received = [];
             app.device = [];
         },
         failure() {
@@ -422,15 +447,24 @@ export const useWebSocketStore = defineStore('websocket', {
         },
         async navigateToRoom(room) {
             const normalizedRoom = this.normalizeRoomName(room);
-            const token = await this.resolveAuthTokenForRoom(normalizedRoom, { interactive: true });
-            if (token === null) {
-                return false;
-            }
             const targetQuery = normalizedRoom ? { room: normalizedRoom } : {};
             const currentQuery = router.currentRoute.value.query;
-            if (normalizedRoom === this.normalizeRoomName(currentQuery.room || 'default')) {
+            if (normalizedRoom === this.normalizeRoomName(currentQuery.room || '')) {
                 return true;
             }
+
+            const knownToken = this.getAuthTokenForRoom(normalizedRoom);
+            const isProtected = this.roomProtectionCache[normalizedRoom];
+            const app = useAppStore();
+            const globalAuth = Boolean(app.config?.auth);
+
+            if (!knownToken && (isProtected === true || (isProtected === undefined && globalAuth))) {
+                const token = await this.resolveAuthTokenForRoom(normalizedRoom, { interactive: true });
+                if (token === null) {
+                    return false;
+                }
+            }
+
             await router.push({ path: '/', query: targetQuery });
             return true;
         },
