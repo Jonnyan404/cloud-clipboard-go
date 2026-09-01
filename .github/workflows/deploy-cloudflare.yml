@@ -10,16 +10,25 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+
+      - name: Validate Cloudflare Credentials
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::缺少 CF_API_TOKEN / CLOUDFLARE_API_TOKEN Secret，请在仓库 Settings -> Secrets 中配置"
+            exit 1
+          fi
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
           node-version: 22
+          cache: 'npm'
+          cache-dependency-path: web-vue3/package-lock.json
 
       - name: Install Wrangler
         run: npm install -g wrangler@^4.59.3
@@ -42,22 +51,33 @@ jobs:
           done
           echo "assets 文件数: $(find cloudflare/workers/assets -type f | wc -l | tr -d ' ')"
 
-      - name: Generate wrangler.toml from template
+      - name: Setup Cloudflare Resources (D1 & R2)
         working-directory: cloudflare/workers
         run: |
+          # 1. 确保 R2 存储桶存在
+          wrangler r2 bucket create cloud-clipboard-files || echo "R2 bucket 已存在或已创建"
+
+          # 2. 获取或自动创建 D1 数据库
           cp wrangler.toml.template wrangler.toml
-          D1_ID=$(wrangler d1 list --json | jq -r '.[] | select(.name=="cloud-clipboard-db") | .uuid')
+          D1_ID=$(wrangler d1 list --json | jq -r '.[] | select(.name=="cloud-clipboard-db") | .uuid' 2>/dev/null || true)
           if [ -z "${D1_ID}" ] || [ "${D1_ID}" = "null" ]; then
-            echo "::error::未找到 D1 数据库 cloud-clipboard-db，请先手动创建或确认 CF_API_TOKEN 权限"
+            echo "未找到现有 D1 数据库，正在自动创建 cloud-clipboard-db..."
+            CREATE_OUTPUT=$(wrangler d1 create cloud-clipboard-db)
+            D1_ID=$(echo "$CREATE_OUTPUT" | grep -o 'database_id = "[^"]*"' | cut -d'"' -f2 || true)
+          fi
+
+          if [ -z "${D1_ID}" ] || [ "${D1_ID}" = "null" ]; then
+            echo "::error::未能获取到 D1 数据库 ID，请检查 Cloudflare Token 权限 (D1:Edit)"
             exit 1
           fi
+
           echo "D1 database id: ${D1_ID}"
           sed -i "s/database_id = \"your-d1-database-id\"/database_id = \"${D1_ID}\"/" wrangler.toml
           grep -n "database_id" wrangler.toml
 
       - name: Run D1 migrations (remote)
         working-directory: cloudflare/workers
-        run: wrangler d1 execute cloud-clipboard-db --file=../d1/schema.sql --remote
+        run: wrangler d1 execute cloud-clipboard-db --file=../d1/schema.sql --remote --yes
 
       - name: Deploy Worker
         working-directory: cloudflare/workers
@@ -92,7 +112,6 @@ jobs:
               if not v:
                   print(f"::warning::env {k} 未设置，保留模板中的默认值")
                   continue
-              # 匹配 "KEY = " 之后那个带引号的字符串值并整体替换（含正则转义）
               pattern = re.compile(r'(?P<key>' + re.escape(k) + r'\s*=\s*)"(?:\\.|[^"\\])*"')
               new_toml, n = pattern.subn(lambda m: m.group("key") + json.dumps(v), toml)
               if n == 0:
@@ -104,5 +123,21 @@ jobs:
           with open(toml_path, "w", encoding="utf-8") as f:
               f.write(toml)
 
-          sys.exit(subprocess.call(["wrangler", "deploy"]))
+          proc = subprocess.Popen(["wrangler", "deploy"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+          output_lines = []
+          for line in proc.stdout:
+              print(line, end="")
+              output_lines.append(line)
+          proc.wait()
+
+          full_output = "".join(output_lines)
+          url_match = re.search(r'https://[^\s]+\.workers\.dev', full_output)
+          if url_match:
+              worker_url = url_match.group(0)
+              summary_file = os.environ.get("GITHUB_STEP_SUMMARY")
+              if summary_file:
+                  with open(summary_file, "a", encoding="utf-8") as sf:
+                      sf.write(f"### 🚀 部署成功！\n\n**Worker URL**: [{worker_url}]({worker_url})\n")
+
+          sys.exit(proc.returncode)
           PY
