@@ -666,7 +666,7 @@ watch(() => route.fullPath, () => {
                             <v-chip size="small" :variant="'outlined'">{{ activeRooms.length }} {{ t('activeRoomsLabel') }}</v-chip>
                         </div>
 
-                        <div v-if="roomsLoading" class="text-center py-4">
+                        <div v-if="roomsLoading && availableRooms.length === 0" class="text-center py-4">
                             <v-progress-circular indeterminate color="primary"></v-progress-circular>
                             <div class="mt-2">{{ t('loadingRooms') }}</div>
                         </div>
@@ -941,7 +941,7 @@ watch(() => route.fullPath, () => {
                         <v-chip size="small" :variant="'outlined'">{{ activeRooms.length }} {{ t('activeRoomsLabel') }}</v-chip>
                     </div>
 
-                    <div v-if="roomsLoading" class="text-center py-4">
+                    <div v-if="roomsLoading && availableRooms.length === 0" class="text-center py-4">
                         <v-progress-circular indeterminate color="primary"></v-progress-circular>
                         <div class="mt-2">{{ t('loadingRooms') }}</div>
                     </div>
