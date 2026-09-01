@@ -8,7 +8,6 @@
 )
 
 $ErrorActionPreference = "Stop"
-$XMobileVersion = "v0.0.0-20250218173823-21e291c9c26e"
 
 # 显示帮助信息
 function Show-Help {
@@ -99,12 +98,16 @@ if ($BuildAAR) {
 
     $goBinDir = Add-GoBinToPath
 
-    if (-not (Test-Command "gomobile")) {
-        Write-Host "[警告] gomobile 未安装,正在安装..." -ForegroundColor Yellow
-        go install "golang.org/x/mobile/cmd/gomobile@$XMobileVersion"
-        go install "golang.org/x/mobile/cmd/gobind@$XMobileVersion"
-        if ($LASTEXITCODE -ne 0) {
-            Exit-WithError "gomobile 安装失败"
+    if (-not (Test-Command "gomobile") -or -not (Test-Command "gobind")) {
+        Write-Host "[警告] gomobile/gobind 未安装,正在从 cloud-clip/go.mod 依赖安装..." -ForegroundColor Yellow
+        Push-Location "cloud-clip"
+        try {
+            go install golang.org/x/mobile/cmd/gomobile golang.org/x/mobile/cmd/gobind
+            if ($LASTEXITCODE -ne 0) {
+                Exit-WithError "gomobile/gobind 安装失败"
+            }
+        } finally {
+            Pop-Location
         }
     }
 
@@ -125,7 +128,12 @@ if ($BuildAAR) {
         if ($LASTEXITCODE -ne 0) {
             Exit-WithError "gomobile 初始化失败"
         }
-        go install "golang.org/x/mobile/cmd/gobind@$XMobileVersion"
+        Push-Location "cloud-clip"
+        try {
+            go install golang.org/x/mobile/cmd/gobind
+        } finally {
+            Pop-Location
+        }
         Write-Host "[✓] gomobile 初始化成功" -ForegroundColor Green
     } else {
         Write-Host "[✓] gomobile 已初始化" -ForegroundColor Green

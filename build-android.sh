@@ -12,7 +12,6 @@ RED='\033[0;31m'
 CYAN='\033[0;36m'
 GRAY='\033[0;90m'
 NC='\033[0m' # 无颜色
-X_MOBILE_VERSION='v0.0.0-20250218173823-21e291c9c26e'
 
 # --- 默认标志 ---
 BUILD_AAR=true
@@ -121,10 +120,9 @@ if [ "$BUILD_AAR" = true ]; then
 
     ensure_go_bin_in_path
 
-    if ! command -v gomobile &> /dev/null; then
-        echo -e "${YELLOW}[警告] gomobile 未安装,正在安装...${NC}"
-        go install "golang.org/x/mobile/cmd/gomobile@${X_MOBILE_VERSION}"
-        go install "golang.org/x/mobile/cmd/gobind@${X_MOBILE_VERSION}"
+    if ! command -v gomobile &> /dev/null || ! command -v gobind &> /dev/null; then
+        echo -e "${YELLOW}[警告] gomobile/gobind 未安装,正在从 cloud-clip/go.mod 依赖安装...${NC}"
+        (cd cloud-clip && go install golang.org/x/mobile/cmd/gomobile golang.org/x/mobile/cmd/gobind)
     fi
 
     ensure_go_bin_in_path
@@ -140,7 +138,7 @@ if [ "$BUILD_AAR" = true ]; then
     if [ ! -d "$GOPATH/pkg/gomobile" ]; then
         echo -e "${YELLOW}[信息] gomobile 需要初始化,这可能需要几分钟...${NC}"
         gomobile init
-        go install "golang.org/x/mobile/cmd/gobind@${X_MOBILE_VERSION}"
+        (cd cloud-clip && go install golang.org/x/mobile/cmd/gobind)
     fi
     echo -e "${GREEN}[✓] gomobile 已初始化${NC}"
 fi

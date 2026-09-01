@@ -95,12 +95,15 @@ if "%BUILD_AAR%"=="1" (
     gomobile version >nul 2>&1
     if errorlevel 1 (
         echo [����] gomobile δ��װ,���ڰ�װ...
-        go install golang.org/x/mobile/cmd/gomobile@v0.0.0-20260211191516-dcd2a3258864
+        pushd cloud-clip
+        go install golang.org/x/mobile/cmd/gomobile golang.org/x/mobile/cmd/gobind
         if errorlevel 1 (
-            echo [����] gomobile ��װʧ��
+            popd
+            echo [] gomobile װʧ
             pause
             exit /b 1
         )
+        popd
     )
     echo [?] gomobile �Ѱ�װ
 )
