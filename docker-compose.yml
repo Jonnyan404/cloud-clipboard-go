@@ -28,4 +28,5 @@ services:
             ROOM_LIST: ${ROOM_LIST:-} #是否启用房间列表展示功能,默认false
         volumes:
             - /path/your/dir/data:/app/server-node/data #请注意修改为你自己的目录
-        image: jonnyan404/cloud-clipboard-go:latest
+        # image: jonnyan404/cloud-clipboard-go:latest
+        image: ghcr.io/jonnyan404/cloud-clipboard-go:latest
