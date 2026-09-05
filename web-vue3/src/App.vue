@@ -18,16 +18,17 @@ const mdiClose = 'mdi-close';
 const mdiContentPaste = 'mdi-content-paste';
 const mdiDevices = 'mdi-devices';
 const mdiDiceMultiple = 'mdi-dice-multiple';
+const mdiGithub = 'mdi-github';
 const mdiHeart = 'mdi-heart';
 const mdiHeartOutline = 'mdi-heart-outline';
 const mdiHome = 'mdi-home';
 const mdiHomeOutline = 'mdi-home-outline';
-const mdiInformation = 'mdi-information';
 const mdiIpNetworkOutline = 'mdi-ip-network-outline';
 const mdiLanConnect = 'mdi-lan-connect';
 const mdiLanDisconnect = 'mdi-lan-disconnect';
 const mdiLanPending = 'mdi-lan-pending';
 const mdiLock = 'mdi-lock';
+const mdiCog = 'mdi-cog';
 const mdiMagnify = 'mdi-magnify';
 const mdiNotificationClearAll = 'mdi-notification-clear-all';
 const mdiPalette = 'mdi-palette';
@@ -43,8 +44,8 @@ const { t, locale } = useI18n();
 const router = useRouter();
 const route = useRoute();
 
-const drawer = ref(false);
 const colorDialog = ref(false);
+const settingsDialog = ref(false);
 const clearAllDialog = ref(false);
 const clipboardClearedMessageVisible = ref(false);
 const roomSheet = ref(false);
@@ -54,14 +55,12 @@ const roomDockSide = ref('right');
 const availableRooms = ref([]);
 const roomsLoading = ref(false);
 
-const currentLanguageName = computed(() => {
-    switch (locale.value) {
-        case 'zh': return '简体中文';
-        case 'zh-TW': return '繁體中文';
-        case 'ja': return '日本語';
-        default: return 'English';
-    }
-});
+const languageOptions = [
+    { code: 'zh', name: '简体中文' },
+    { code: 'zh-TW', name: '繁體中文' },
+    { code: 'en', name: 'English' },
+    { code: 'ja', name: '日本語' },
+];
 const isDesktopRoomDockEnabled = computed(() => {
     return display.width.value > 1263 && app.config && app.config.server && app.config.server.roomList;
 });
@@ -423,99 +422,6 @@ watch(() => route.fullPath, () => {
 
 <template>
     <v-app class="app-shell" :class="{ 'app-shell--dark': isDark }">
-        <v-navigation-drawer
-            v-model="drawer"
-            temporary
-            app
-        >
-            <v-list>
-                <v-list-item link :href="`#/?room=${ws.room}`">
-                    <v-list-item-title>{{ t('clipboard') }}</v-list-item-title>
-                </v-list-item>
-                <v-list-item link href="#/device">
-                    <v-list-item-title>{{ t('deviceList') }}</v-list-item-title>
-                </v-list-item>
-
-                <v-menu
-                    offset-x
-                    transition="slide-x-transition"
-                    open-on-click
-                    open-on-hover
-                    :close-on-content-click="false"
-                >
-                    <template v-slot:activator="{ props }">
-                        <v-list-item link v-bind="props">
-                            <v-list-item-title>{{ t('darkMode') }}</v-list-item-title>
-                        </v-list-item>
-                    </template>
-                    <v-list>
-                        <v-list-item
-                            v-for="opt in darkModeOptions"
-                            :key="opt.value"
-                            :active="app.dark === opt.value"
-                            link
-                            @click="app.dark = opt.value"
-                        >
-                            <v-list-item-title>{{ opt.title }}</v-list-item-title>
-                            <v-list-item-subtitle v-if="opt.desc"><code>prefers-color-scheme</code> {{ opt.desc }}</v-list-item-subtitle>
-                        </v-list-item>
-                    </v-list>
-                </v-menu>
-
-                <v-list-item link @click="colorDialog = true; drawer = false">
-                    <v-list-item-title>{{ t('changeThemeColor') }}</v-list-item-title>
-                </v-list-item>
-
-                <v-menu offset-x transition="slide-x-transition">
-                    <template v-slot:activator="{ props }">
-                        <v-list-item link v-bind="props">
-                            <v-list-item-title>{{ t('language') }}</v-list-item-title>
-                            <v-list-item-subtitle>{{ currentLanguageName }}</v-list-item-subtitle>
-                        </v-list-item>
-                    </template>
-                    <v-list>
-                        <v-list-item @click="changeLocale('zh')"><v-list-item-title>简体中文</v-list-item-title></v-list-item>
-                        <v-list-item @click="changeLocale('zh-TW')"><v-list-item-title>繁體中文</v-list-item-title></v-list-item>
-                        <v-list-item @click="changeLocale('en')"><v-list-item-title>English</v-list-item-title></v-list-item>
-                        <v-list-item @click="changeLocale('ja')"><v-list-item-title>日本語</v-list-item-title></v-list-item>
-                    </v-list>
-                </v-menu>
-
-                <v-divider></v-divider>
-                <v-list-subheader>{{ t('displaySettings') }}</v-list-subheader>
-
-                <v-list-item>
-                    <template v-slot:prepend><v-icon>{{ mdiClockOutline }}</v-icon></template>
-                    <v-list-item-title @click="app.showTimestamp = !app.showTimestamp" style="cursor: pointer;">{{ t('showTimestamp') }}</v-list-item-title>
-                    <template v-slot:append>
-                        <v-switch v-model="app.showTimestamp" color="primary" class="ma-0 pa-0" hide-details></v-switch>
-                    </template>
-                </v-list-item>
-
-                <v-list-item>
-                    <template v-slot:prepend><v-icon>{{ mdiDevices }}</v-icon></template>
-                    <v-list-item-title @click="app.showDeviceInfo = !app.showDeviceInfo" style="cursor: pointer;">{{ t('showDeviceInfo') }}</v-list-item-title>
-                    <template v-slot:append>
-                        <v-switch v-model="app.showDeviceInfo" color="primary" class="ma-0 pa-0" hide-details></v-switch>
-                    </template>
-                </v-list-item>
-
-                <v-list-item>
-                    <template v-slot:prepend><v-icon>{{ mdiIpNetworkOutline }}</v-icon></template>
-                    <v-list-item-title @click="app.showSenderIP = !app.showSenderIP" style="cursor: pointer;">{{ t('showSenderIP') }}</v-list-item-title>
-                    <template v-slot:append>
-                        <v-switch v-model="app.showSenderIP" color="primary" class="ma-0 pa-0" hide-details></v-switch>
-                    </template>
-                </v-list-item>
-
-                <v-divider></v-divider>
-
-                <v-list-item link href="#/about">
-                    <v-list-item-title>{{ t('about') }}</v-list-item-title>
-                </v-list-item>
-            </v-list>
-        </v-navigation-drawer>
-
         <v-app-bar
             app
             color="primary"
@@ -523,7 +429,15 @@ watch(() => route.fullPath, () => {
             flat
             class="app-shell__bar"
         >
-            <v-app-bar-nav-icon @click.stop="drawer = !drawer" />
+            <v-tooltip right>
+                <template v-slot:activator="{ props }">
+                    <v-btn icon density="comfortable" variant="text" v-bind="props" @click="settingsDialog = true">
+                        <v-icon>{{ mdiCog }}</v-icon>
+                    </v-btn>
+                </template>
+                <span>{{ t('settings') }}</span>
+            </v-tooltip>
+
             <v-toolbar-title @click="goHome" style="cursor: pointer;">
                 {{ t('cloudClipboard') }}
                 <span class="d-none d-sm-inline" v-if="ws.room">
@@ -536,6 +450,7 @@ watch(() => route.fullPath, () => {
                     <abbr :title="t('copyRoomName')" style="cursor:pointer" @click.stop="copyRoomName(ws.room)">{{ws.room}}</abbr>）
                 </span>
             </v-toolbar-title>
+
             <v-spacer></v-spacer>
 
             <v-tooltip left v-if="app.config && app.config.server && app.config.server.roomList">
@@ -800,6 +715,103 @@ watch(() => route.fullPath, () => {
             </div>
         </v-main>
 
+        <v-dialog v-model="settingsDialog" max-width="480" scrollable>
+            <v-card>
+                <v-card-title class="d-flex align-center">
+                    <v-icon start>{{ mdiCog }}</v-icon>
+                    {{ t('settings') }}
+                    <v-spacer></v-spacer>
+                    <v-btn icon variant="text" @click="settingsDialog = false">
+                        <v-icon>{{ mdiClose }}</v-icon>
+                    </v-btn>
+                </v-card-title>
+                <v-divider></v-divider>
+                <v-card-text class="pa-4">
+                    <v-list-subheader class="ps-0">{{ t('appearance') }}</v-list-subheader>
+                    <v-list-item class="px-0">
+                        <template v-slot:prepend><v-icon>{{ mdiBrightness4 }}</v-icon></template>
+                        <v-list-item-title>{{ t('darkMode') }}</v-list-item-title>
+                        <template v-slot:append>
+                            <v-select
+                                :model-value="app.dark"
+                                :items="darkModeOptions"
+                                item-title="title"
+                                item-value="value"
+                                hide-details
+                                density="compact"
+                                class="cc-settings-select"
+                                @update:model-value="v => app.dark = v"
+                            ></v-select>
+                        </template>
+                    </v-list-item>
+                    <v-list-item class="px-0">
+                        <template v-slot:prepend><v-icon>{{ mdiPalette }}</v-icon></template>
+                        <v-list-item-title>{{ t('changeThemeColor') }}</v-list-item-title>
+                        <template v-slot:append>
+                            <v-btn variant="tonal" size="small" @click="colorDialog = true">{{ t('choose') }}</v-btn>
+                        </template>
+                    </v-list-item>
+
+                    <v-list-subheader class="ps-0 mt-2">{{ t('language') }}</v-list-subheader>
+                    <v-list-item class="px-0">
+                        <template v-slot:prepend><v-icon>{{ mdiTranslate }}</v-icon></template>
+                        <v-list-item-title>{{ t('language') }}</v-list-item-title>
+                        <template v-slot:append>
+                            <v-select
+                                :model-value="locale.value"
+                                :items="languageOptions"
+                                item-title="name"
+                                item-value="code"
+                                hide-details
+                                density="compact"
+                                class="cc-settings-select"
+                                @update:model-value="changeLocale"
+                            ></v-select>
+                        </template>
+                    </v-list-item>
+
+                    <v-list-subheader class="ps-0 mt-2">{{ t('displaySettings') }}</v-list-subheader>
+                    <v-list-item class="px-0">
+                        <template v-slot:prepend><v-icon>{{ mdiClockOutline }}</v-icon></template>
+                        <v-list-item-title @click="app.showTimestamp = !app.showTimestamp" style="cursor: pointer;">{{ t('showTimestamp') }}</v-list-item-title>
+                        <template v-slot:append>
+                            <v-switch v-model="app.showTimestamp" color="primary" hide-details></v-switch>
+                        </template>
+                    </v-list-item>
+                    <v-list-item class="px-0">
+                        <template v-slot:prepend><v-icon>{{ mdiDevices }}</v-icon></template>
+                        <v-list-item-title @click="app.showDeviceInfo = !app.showDeviceInfo" style="cursor: pointer;">{{ t('showDeviceInfo') }}</v-list-item-title>
+                        <template v-slot:append>
+                            <v-switch v-model="app.showDeviceInfo" color="primary" hide-details></v-switch>
+                        </template>
+                    </v-list-item>
+                    <v-list-item class="px-0">
+                        <template v-slot:prepend><v-icon>{{ mdiIpNetworkOutline }}</v-icon></template>
+                        <v-list-item-title @click="app.showSenderIP = !app.showSenderIP" style="cursor: pointer;">{{ t('showSenderIP') }}</v-list-item-title>
+                        <template v-slot:append>
+                            <v-switch v-model="app.showSenderIP" color="primary" hide-details></v-switch>
+                        </template>
+                    </v-list-item>
+
+                    <v-divider class="my-2"></v-divider>
+
+                    <v-list-item class="px-0">
+                        <template v-slot:prepend><v-icon>{{ mdiGithub }}</v-icon></template>
+                        <v-list-item-title>
+                            <a href="https://github.com/Jonnyan404/cloud-clipboard-go" target="_blank" rel="noopener">{{ t('github') }}</a>
+                        </v-list-item-title>
+                        <template v-slot:append>
+                            <span class="text-medium-emphasis text-caption">{{ app.config.version }}</span>
+                        </template>
+                    </v-list-item>
+                    <v-list-item class="px-0">
+                        <template v-slot:prepend><v-icon>{{ mdiHeartOutline }}</v-icon></template>
+                        <v-list-item-title class="text-caption text-medium-emphasis">{{ t('donatePrompt') }}</v-list-item-title>
+                    </v-list-item>
+                </v-card-text>
+            </v-card>
+        </v-dialog>
+
         <v-dialog v-model="colorDialog" max-width="300">
             <v-card>
                 <v-card-title>{{ t('selectThemeColor') }}</v-card-title>
@@ -825,6 +837,9 @@ watch(() => route.fullPath, () => {
                     <v-text-field
                         v-model="ws.inputPassword"
                         :label="t('password')"
+                        variant="outlined"
+                        bg-color="transparent"
+                        class="cc-dialog-field"
                         :loading="ws.authDialogLoading"
                         :disabled="ws.authDialogLoading"
                         :error-messages="ws.authCodeError ? [ws.authCodeError] : []"
@@ -855,6 +870,9 @@ watch(() => route.fullPath, () => {
                     <v-text-field
                         v-model="ws.roomInput"
                         :label="t('roomName')"
+                        variant="outlined"
+                        bg-color="transparent"
+                        class="cc-dialog-field"
                         :append-icon="mdiDiceMultiple"
                         @click:append="ws.roomInput = randomRoomName()"
                         @keyup.enter="submitRoomChange()"
@@ -1134,8 +1152,8 @@ watch(() => route.fullPath, () => {
     min-width: 0;
 }
 
-.v-navigation-drawer :deep(.v-navigation-drawer__border) {
-    pointer-events: none;
+.cc-settings-select {
+    max-width: 180px;
 }
 
 .v-alert {
@@ -1408,5 +1426,12 @@ watch(() => route.fullPath, () => {
     }
 }
 
+/* 认证密码与进入房间弹窗的输入框：去掉灰色填充底色 */
+:deep(.cc-dialog-field .v-field__field) {
+    background-color: transparent !important;
+}
+:deep(.cc-dialog-field.v-field--error) {
+    background-color: transparent !important;
+}
 
 </style>

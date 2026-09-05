@@ -60,6 +60,48 @@
                     <v-btn icon density="comfortable" variant="text" size="small" color="grey-darken-1" @click="emit('show-qr')">
                         <v-icon>{{ mdiQrcode }}</v-icon>
                     </v-btn>
+                    <v-tooltip location="top">
+                        <template v-slot:activator="{ props }">
+                            <v-btn
+                                variant="text"
+                                size="small"
+                                density="comfortable"
+                                color="grey-darken-1"
+                                v-bind="props"
+                                class="unified-composer__device"
+                                @click="goDeviceList"
+                            >
+                                <span v-if="display.mdAndUp.value" class="unified-composer__device-full">
+                                    <span class="unified-composer__devicestat"><v-icon size="small" class="mr-1">{{ mdiLaptop }}</v-icon>{{ deviceStats.desktop }}</span>
+                                    <span class="unified-composer__devicestat"><v-icon size="small" class="mr-1">{{ mdiCellphone }}</v-icon>{{ deviceStats.mobile }}</span>
+                                    <span class="unified-composer__devicestat"><v-icon size="small" class="mr-1">{{ mdiDevices }}</v-icon>{{ deviceStats.other }}</span>
+                                </span>
+                                <span v-else class="unified-composer__device-compact">
+                                    <v-icon>{{ mdiDevices }}</v-icon>
+                                    <span class="unified-composer__device-badge">{{ deviceTotal }}</span>
+                                </span>
+                            </v-btn>
+                        </template>
+                        <span>{{ t('connectedTotal', { count: deviceTotal }) }}</span>
+                    </v-tooltip>
+                    <v-tooltip location="top">
+                        <template v-slot:activator="{ props }">
+                            <v-btn
+                                icon
+                                density="comfortable"
+                                variant="text"
+                                size="small"
+                                color="grey-darken-1"
+                                v-bind="props"
+                                href="https://github.com/Jonnyan404/cloud-clipboard-go"
+                                target="_blank"
+                                rel="noopener"
+                            >
+                                <v-icon>{{ mdiGithub }}</v-icon>
+                            </v-btn>
+                        </template>
+                        <span>{{ t('github') }}</span>
+                    </v-tooltip>
                     <div class="text-caption text-medium-emphasis ml-2 unified-composer__hint">
                         {{ footerHint }}
                         <span class="unified-composer__shortcut">{{ sendShortcutLabel }}</span>
@@ -87,6 +129,53 @@
             @change="handleSelectFiles(Array.from($event.target.files))"
         >
     </v-card>
+
+    <v-dialog v-model="deviceDialog" max-width="480" scrollable>
+        <v-card>
+            <v-card-title class="d-flex align-center">
+                <v-icon start>{{ mdiDevices }}</v-icon>
+                {{ t('connectedDevices') }}
+                <v-spacer></v-spacer>
+                <v-btn icon variant="text" @click="deviceDialog = false">
+                    <v-icon>{{ mdiClose }}</v-icon>
+                </v-btn>
+            </v-card-title>
+            <v-divider></v-divider>
+            <v-card-text class="pa-2">
+                <template v-if="!ws.websocket">
+                    <p class="pa-2 text-medium-emphasis">{{ t('notConnectedToServer') }}</p>
+                </template>
+                <template v-else-if="app.device.length === 0">
+                    <p class="pa-2 text-medium-emphasis">{{ t('noDevicesConnected') }}</p>
+                </template>
+                <template v-else>
+                    <p class="pa-2 text-caption text-medium-emphasis">
+                        {{ t('devicesConnected', { count: app.device.length, desktop: desktopDeviceCount, mobile: mobileDeviceCount }) }}
+                    </p>
+                    <v-list rounded two-line density="compact">
+                        <v-list-item v-for="item in app.device" :key="item.id">
+                            <template v-slot:prepend>
+                                <v-icon v-if="item.type === 'desktop' && item.os.split(' ').shift() === 'Windows'">{{mdiMicrosoftWindows}}</v-icon>
+                                <v-icon v-else-if="item.type === 'desktop' && item.os.split(' ').shift() === 'GNU/Linux'">{{mdiLinux}}</v-icon>
+                                <v-icon v-else-if="item.type === 'desktop' && item.os.split(' ').shift() === 'Mac'">{{mdiApple}}</v-icon>
+                                <v-icon v-else-if="item.type === 'desktop'">{{mdiLaptop}}</v-icon>
+                                <v-icon v-else-if="(item.type === 'smartphone' || item.type === 'mobile' || item.type === 'tablet') && item.os.split(' ').shift() === 'Android'">{{mdiAndroid}}</v-icon>
+                                <v-icon v-else-if="(item.type === 'smartphone' || item.type === 'mobile' || item.type === 'tablet') && item.os.split(' ').shift() === 'iOS'">{{mdiAppleIos}}</v-icon>
+                                <v-icon v-else-if="item.type === 'smartphone' || item.type === 'mobile' || item.type === 'tablet'">{{mdiTabletCellphone}}</v-icon>
+                                <v-icon v-else>{{mdiDevices}}</v-icon>
+                            </template>
+                            <v-list-item-title>{{
+                                item.type === 'desktop' ? t('desktopDevice') : (
+                                    (item.type === 'smartphone' || item.type === 'mobile' || item.type === 'tablet') ? t('mobileDevice') : t('otherDevice')
+                                )
+                            }}</v-list-item-title>
+                            <v-list-item-subtitle>{{item.os}} ({{item.browser}})</v-list-item-subtitle>
+                        </v-list-item>
+                    </v-list>
+                </template>
+            </v-card-text>
+        </v-card>
+    </v-dialog>
 </template>
 
 <script setup>import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
@@ -102,6 +191,17 @@ import { prettyFileSize } from '@/util.js';
 const mdiPaperclip = 'mdi-paperclip';
 const mdiQrcode = 'mdi-qrcode';
 const mdiSend = 'mdi-send';
+const mdiLaptop = 'mdi-laptop';
+const mdiCellphone = 'mdi-cellphone';
+const mdiDevices = 'mdi-devices';
+const mdiGithub = 'mdi-github';
+const mdiClose = 'mdi-close';
+const mdiAndroid = 'mdi-android';
+const mdiApple = 'mdi-apple';
+const mdiAppleIos = 'mdi-apple-ios';
+const mdiLinux = 'mdi-linux';
+const mdiMicrosoftWindows = 'mdi-microsoft-windows';
+const mdiTabletCellphone = 'mdi-tablet-cellphone';
 
 
 const emit = defineEmits(['show-qr']);
@@ -111,6 +211,20 @@ const display = useDisplay();
 const theme = useTheme();
 const isDark = computed(() => theme.current.value?.dark ?? false);
 const { t } = useI18n();
+const deviceDialog = ref(false);
+const deviceStats = computed(() => {
+    const list = app.device || [];
+    const desktop = list.filter(d => d.type === 'desktop').length;
+    const mobile = list.filter(d => d.type === 'smartphone' || d.type === 'mobile' || d.type === 'tablet').length;
+    const other = list.length - desktop - mobile;
+    return { desktop, mobile, other };
+});
+const deviceTotal = computed(() => deviceStats.value.desktop + deviceStats.value.mobile + deviceStats.value.other);
+const desktopDeviceCount = computed(() => app.device.filter(e => e.type === 'desktop').length);
+const mobileDeviceCount = computed(() => app.device.filter(e => (e.type === 'smartphone' || e.type === 'tablet')).length);
+function goDeviceList() {
+    deviceDialog.value = true;
+}
 defineExpose({ focus, openFilePicker });
 const progress = ref(false);
 const dragover = ref(false);
@@ -360,6 +474,45 @@ onBeforeUnmount(() => {
 
 .unified-composer__footer-main {
     min-width: 0;
+}
+
+.unified-composer__device {
+    margin-inline-start: 2px;
+    height: 28px;
+    padding: 0 6px;
+}
+
+.unified-composer__device-full {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-variant-numeric: tabular-nums;
+}
+
+.unified-composer__devicestat {
+    display: inline-flex;
+    align-items: center;
+}
+
+.unified-composer__device-compact {
+    display: inline-flex;
+    align-items: center;
+    position: relative;
+}
+
+.unified-composer__device-badge {
+    position: absolute;
+    top: -4px;
+    right: -6px;
+    min-width: 14px;
+    height: 14px;
+    padding: 0 3px;
+    border-radius: 999px;
+    background: var(--v-theme-primary);
+    color: white;
+    font-size: 10px;
+    line-height: 14px;
+    text-align: center;
 }
 
 .unified-composer__hint {
