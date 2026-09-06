@@ -125,6 +125,22 @@
                     <v-btn icon density="comfortable" variant="text" size="small" color="grey-darken-1" @click="emit('show-qr')">
                         <v-icon>{{ mdiQrcode }}</v-icon>
                     </v-btn>
+                    <v-tooltip location="top">
+                        <template v-slot:activator="{ props }">
+                            <v-btn
+                                icon
+                                density="comfortable"
+                                variant="text"
+                                size="small"
+                                color="grey-darken-1"
+                                v-bind="props"
+                                @click="toggleDark"
+                            >
+                                <v-icon>{{ isDark ? mdiWhiteBalanceSunny : mdiWeatherNight }}</v-icon>
+                            </v-btn>
+                        </template>
+                        <span>{{ t('toggleDarkMode') }}</span>
+                    </v-tooltip>
                 </div>
                 <div class="unified-composer__footer-reward">
                     <v-tooltip location="top">
@@ -271,6 +287,20 @@
             <v-card-text class="text-center pa-4">
                 <img src="/reward.png" alt="Reward QR" class="unified-composer__reward-qr" />
                 <div class="text-body-2 text-medium-emphasis mt-3">{{ t('rewardHint') }}</div>
+                <v-divider class="my-4"></v-divider>
+                <div class="unified-composer__roadmap text-left">
+                    <div class="text-body-2 font-weight-medium unified-composer__roadmap-title">
+                        {{ t('nextVersionPreview') }}
+                    </div>
+                    <div class="d-flex align-center mt-2">
+                        <v-icon size="small" class="mr-2 unified-composer__roadmap-icon">{{ mdiTagMultiple }}</v-icon>
+                        <span class="text-body-2">{{ t('multiRoomMode') }}</span>
+                    </div>
+                    <div class="d-flex align-center mt-2">
+                        <v-icon size="small" class="mr-2 unified-composer__roadmap-icon">{{ mdiViewDashboardOutline }}</v-icon>
+                        <span class="text-body-2">{{ t('minimalMode') }}</span>
+                    </div>
+                </div>
             </v-card-text>
         </v-card>
     </v-dialog>
@@ -292,6 +322,10 @@ const mdiLaptop = 'mdi-laptop';
 const mdiCellphone = 'mdi-cellphone';
 const mdiDevices = 'mdi-devices';
 const mdiCurrencyCny = 'mdi-currency-cny';
+const mdiWhiteBalanceSunny = 'mdi-white-balance-sunny';
+const mdiWeatherNight = 'mdi-weather-night';
+const mdiTagMultiple = 'mdi-tag-multiple';
+const mdiViewDashboardOutline = 'mdi-view-dashboard-outline';
 const mdiClose = 'mdi-close';
 const mdiAndroid = 'mdi-android';
 const mdiApple = 'mdi-apple';
@@ -334,6 +368,9 @@ const desktopDeviceCount = computed(() => app.device.filter(e => e.type === 'des
 const mobileDeviceCount = computed(() => app.device.filter(e => (e.type === 'smartphone' || e.type === 'tablet')).length);
 function goDeviceList() {
     deviceDialog.value = true;
+}
+function toggleDark() {
+    app.dark = app.useDark ? 'disable' : 'enable';
 }
 defineExpose({ focus, openFilePicker });
 const progress = ref(false);
@@ -793,6 +830,30 @@ onBeforeUnmount(() => {
     width: 100%;
     height: auto;
     border-radius: 8px;
+}
+
+.unified-composer__roadmap {
+    background: rgba(99, 102, 241, 0.06);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+}
+
+.unified-composer--dark .unified-composer__roadmap {
+    background: rgba(99, 102, 241, 0.1);
+    border-color: rgba(71, 85, 105, 0.65);
+}
+
+.unified-composer__roadmap-title {
+    color: #f5b301;
+}
+
+.unified-composer__roadmap-icon {
+    color: rgba(100, 116, 139, 0.9);
+}
+
+.unified-composer--dark .unified-composer__roadmap-icon {
+    color: rgba(203, 213, 225, 0.8);
 }
 
 .unified-composer__send {
