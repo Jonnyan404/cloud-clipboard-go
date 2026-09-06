@@ -1,5 +1,6 @@
 {
     "settings": "設定",
+    "about": "關於",
     "github": "GitHub",
     "appearance": "外觀",
     "choose": "選擇",
@@ -52,7 +53,7 @@
     "minimalMode": "極簡模式",
     "toggleDarkMode": "切換深淺主題",
     "addFiles": "點擊選擇或拖入檔案（{keys}貼上）",
-    "dropFileHere": "把檔案拖到這裡、點擊選擇或{keys}貼上",
+    "addFilesShort": "點擊選擇或拖入檔案",
     "textIsPrimaryTip": "將文字作為主要輸入",
     "fileIsPrimaryTip": "將檔案作為主要輸入",
     "send": "傳送",

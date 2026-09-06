@@ -74,7 +74,7 @@
                         @click="openFilePicker"
                     >
                         <v-icon :size="isFilePrimary ? 40 : 20" class="mr-2">{{ mdiCloudUpload }}</v-icon>
-                        <span>{{ isFilePrimary ? t('dropFileHere', { keys: pasteKey }) : t('addFiles', { keys: pasteKey }) }}</span>
+                        <span>{{ t(mobile ? 'addFilesShort' : 'addFiles', { keys: pasteKey }) }}</span>
                     </div>
                     <div v-if="app.send.files.length" class="unified-composer__attachments px-1 pt-2">
                         <v-chip
@@ -101,7 +101,7 @@
         </div>
 
         <div class="unified-composer__footer pt-1">
-                <div class="unified-composer__footer-main d-flex align-center flex-wrap">
+                <div class="unified-composer__footer-icons">
                     <v-tooltip location="top">
                         <template v-slot:activator="{ props }">
                             <v-btn
@@ -122,9 +122,28 @@
                         </template>
                         <span>{{ t('connectedTotal', { count: deviceTotal }) }}</span>
                     </v-tooltip>
-                    <v-btn icon density="comfortable" variant="text" size="small" color="grey-darken-1" @click="emit('show-qr')">
-                        <v-icon>{{ mdiQrcode }}</v-icon>
-                    </v-btn>
+                    <div class="unified-composer__footer-reward">
+                        <v-tooltip location="top">
+                            <template v-slot:activator="{ props }">
+                                <v-btn
+                                    icon
+                                    density="comfortable"
+                                    variant="text"
+                                    size="small"
+                                    v-bind="props"
+                                    @click="rewardDialog = true"
+                                >
+                                    <v-icon class="unified-composer__reward-icon">{{ mdiCurrencyCny }}</v-icon>
+                                </v-btn>
+                            </template>
+                            <span>{{ t('reward') }}</span>
+                        </v-tooltip>
+                    </div>
+                    <div class="unified-composer__footer-main">
+                        <v-btn icon density="comfortable" variant="text" size="small" color="grey-darken-1" @click="emit('show-qr')">
+                            <v-icon>{{ mdiQrcode }}</v-icon>
+                        </v-btn>
+                    </div>
                     <v-tooltip location="top">
                         <template v-slot:activator="{ props }">
                             <v-btn
@@ -140,23 +159,6 @@
                             </v-btn>
                         </template>
                         <span>{{ t('toggleDarkMode') }}</span>
-                    </v-tooltip>
-                </div>
-                <div class="unified-composer__footer-reward">
-                    <v-tooltip location="top">
-                        <template v-slot:activator="{ props }">
-                            <v-btn
-                                icon
-                                density="comfortable"
-                                variant="text"
-                                size="small"
-                                v-bind="props"
-                                @click="rewardDialog = true"
-                            >
-                                <v-icon class="unified-composer__reward-icon">{{ mdiCurrencyCny }}</v-icon>
-                            </v-btn>
-                        </template>
-                        <span>{{ t('reward') }}</span>
                     </v-tooltip>
                 </div>
 
@@ -348,6 +350,7 @@ const ws = useWebSocketStore();
 const theme = useTheme();
 const isDark = computed(() => theme.current.value?.dark ?? false);
 const { t } = useI18n();
+const { mobile } = useDisplay();
 const isFilePrimary = computed(() => app.composerPrimary === 'files');
 const composerRows = computed(() => isFilePrimary.value ? 1 : 3);
 const deviceDialog = ref(false);
@@ -387,7 +390,12 @@ const pasteKey = isMac ? '⌘+V' : 'Ctrl+V';
 const sendShortcutLabel = computed(() => t('sendShortcutTip', {
     keys: isMac ? '⌘+Enter' : 'Ctrl+Enter',
 }));
-const textareaPlaceholder = computed(() => `${t('enterTextToSend')} ${sendShortcutLabel.value}`);
+const textareaPlaceholder = computed(() => {
+    if (mobile.value) {
+        return t('enterTextToSend');
+    }
+    return `${t('enterTextToSend')} ${sendShortcutLabel.value}`;
+});
 const textLimitLabel = computed(() => t('composerTextLimit', {
     current: app.send.text.length,
     limit: app.config.text.limit,
@@ -759,11 +767,20 @@ onBeforeUnmount(() => {
 .unified-composer__footer {
     flex-shrink: 0;
     display: grid;
-    align-items: end;
-    gap: 0.75rem;
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    gap: 0.75rem;
     border-top: 1px solid rgba(226, 232, 240, 0.9);
     padding: 0.25rem 0.25rem 0.25rem 0.25rem;
+}
+
+.unified-composer__footer-icons {
+    grid-column: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.15rem 0.5rem;
+    min-width: 0;
 }
 
 @media (min-width: 960px) {
@@ -870,12 +887,22 @@ onBeforeUnmount(() => {
         gap: 0.5rem 0.75rem;
     }
 
+    .unified-composer__footer-icons {
+        flex: 1 1 auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.15rem 0.5rem;
+        min-width: 0;
+    }
+
     .unified-composer__footer-reward {
         justify-content: flex-start;
     }
 
     .unified-composer__send {
         flex: 1 0 100%;
+        justify-content: center;
     }
 }
 </style>

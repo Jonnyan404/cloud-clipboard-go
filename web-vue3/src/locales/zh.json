@@ -1,5 +1,6 @@
 {
     "settings": "设置",
+    "about": "关于",
     "github": "GitHub",
     "appearance": "外观",
     "choose": "选择",
@@ -52,7 +53,7 @@
     "minimalMode": "极简模式",
     "toggleDarkMode": "切换深浅主题",
     "addFiles": "点击选择或拖入文件（{keys}粘贴）",
-    "dropFileHere": "把文件拖到这里、点击选择或{keys}粘贴",
+    "addFilesShort": "点击选择或拖入文件",
     "textIsPrimaryTip": "将文本作为主要输入",
     "fileIsPrimaryTip": "将文件作为主要输入",
     "send": "发送",

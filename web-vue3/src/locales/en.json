@@ -1,5 +1,6 @@
 {
     "settings": "Settings",
+    "about": "About",
     "github": "GitHub",
     "appearance": "Appearance",
     "choose": "Choose",
@@ -52,7 +53,7 @@
     "minimalMode": "Minimal mode",
     "toggleDarkMode": "Toggle dark mode",
     "addFiles": "Click, drop, or paste files here ({keys})",
-    "dropFileHere": "Drop files here, click to select, or paste ({keys})",
+    "addFilesShort": "Click or drop files here",
     "textIsPrimaryTip": "Make text the primary input",
     "fileIsPrimaryTip": "Make files the primary input",
     "send": "Send",

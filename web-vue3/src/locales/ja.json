@@ -1,5 +1,6 @@
 {
     "settings": "設定",
+    "about": "このアプリについて",
     "github": "GitHub",
     "appearance": "外観",
     "choose": "選択",
@@ -52,7 +53,7 @@
     "minimalMode": "ミニマルモード",
     "toggleDarkMode": "ダークモード切替",
     "addFiles": "クリック、ドロップまたは {keys} でペースト",
-    "dropFileHere": "ここにドロップ、クリック、または {keys} でペースト",
+    "addFilesShort": "クリックまたはドロップ",
     "textIsPrimaryTip": "テキストを主入力に設定",
     "fileIsPrimaryTip": "ファイルを主入力に設定",
     "send": "送信",
