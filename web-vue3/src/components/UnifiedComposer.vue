@@ -9,57 +9,99 @@
         @drop.prevent="handleDrop"
     >
         <div class="unified-composer__body pa-1 pa-md-3">
-            <v-textarea
-                ref="textarea"
-                v-model="app.send.text"
-                auto-grow
-                no-resize
-                variant="solo"
-                flat
-                density="compact"
-                rows="3"
-                :placeholder="t('enterTextToSend')"
-                hide-details
-                class="unified-composer__textarea"
-                :style="composerTextareaStyle"
-                @keydown.ctrl.enter.prevent="onSendShortcut"
-                @keydown.meta.enter.prevent="onSendShortcut"
-            ></v-textarea>
+            <div
+                class="unified-composer__inputs"
+                :class="{ 'unified-composer__inputs--files-first': isFilePrimary }"
+            >
+                <div class="unified-composer__textblock">
+                    <v-btn
+                        icon
+                        size="small"
+                        density="comfortable"
+                        variant="text"
+                        color="grey-darken-1"
+                        class="unified-composer__fullscreen-btn"
+                        @click="toggleTextFullscreen"
+                    >
+                        <v-icon>{{ textFullscreen ? mdiFullscreenExit : mdiFullscreen }}</v-icon>
+                    </v-btn>
+                    <v-textarea
+                        ref="textarea"
+                        :key="app.composerPrimary"
+                        v-model="app.send.text"
+                        variant="solo"
+                        flat
+                        density="compact"
+                        :rows="composerRows"
+                        :placeholder="textareaPlaceholder"
+                        hide-details
+                        class="unified-composer__textarea"
+                        :class="{ 'unified-composer__textarea--secondary': isFilePrimary }"
+                        @keydown.ctrl.enter.prevent="onSendShortcut"
+                        @keydown.meta.enter.prevent="onSendShortcut"
+                    ></v-textarea>
+                </div>
 
-            <div class="unified-composer__meta px-1 pb-2">
-                <span class="text-caption text-medium-emphasis mr-3">{{ textLimitLabel }}</span>
-                <span class="text-caption text-medium-emphasis">{{ fileLimitLabel }}</span>
+                <div class="unified-composer__divider">
+                    <div class="unified-composer__divider-line"></div>
+                    <span class="unified-composer__limit text-caption text-medium-emphasis">{{ textLimitLabel }}</span>
+                    <div class="unified-composer__divider-line unified-composer__divider-line--short"></div>
+                    <v-tooltip location="top">
+                        <template v-slot:activator="{ props }">
+                            <v-btn
+                                icon
+                                size="small"
+                                density="comfortable"
+                                variant="text"
+                                class="unified-composer__swapbtn"
+                                v-bind="props"
+                                @click="app.toggleComposerPrimary"
+                            >
+                                <v-icon>{{ mdiSwapVertical }}</v-icon>
+                            </v-btn>
+                        </template>
+                        <span>{{ isFilePrimary ? t('textIsPrimaryTip') : t('fileIsPrimaryTip') }}</span>
+                    </v-tooltip>
+                    <div class="unified-composer__divider-line unified-composer__divider-line--short"></div>
+                    <span class="unified-composer__limit text-caption text-medium-emphasis">{{ fileLimitLabel }}</span>
+                    <div class="unified-composer__divider-line"></div>
+                </div>
+
+                <div class="unified-composer__fileblock">
+                    <div
+                        class="unified-composer__dropzone"
+                        :class="{ 'unified-composer__dropzone--primary': isFilePrimary }"
+                        @click="openFilePicker"
+                    >
+                        <v-icon :size="isFilePrimary ? 40 : 20" class="mr-2">{{ mdiCloudUpload }}</v-icon>
+                        <span>{{ isFilePrimary ? t('dropFileHere', { keys: pasteKey }) : t('addFiles', { keys: pasteKey }) }}</span>
+                    </div>
+                    <div v-if="app.send.files.length" class="unified-composer__attachments px-1 pt-2">
+                        <v-chip
+                            v-for="(file, index) in app.send.files"
+                            :key="file.name + file.size + index"
+                            close
+                            :variant="'outlined'"
+                            size="small"
+                            class="mr-2 mb-2"
+                            @click:close="removeFile(index)"
+                        >
+                            {{ file.name }} · {{ prettyFileSize(file.size) }}
+                        </v-chip>
+                    </div>
+                </div>
             </div>
 
-            <div v-if="app.send.files.length" class="unified-composer__attachments px-1 pb-2">
-                <v-chip
-                    v-for="(file, index) in app.send.files"
-                    :key="file.name + file.size + index"
-                    close
-                    :variant="'outlined'"
-                    size="small"
-                    class="mr-2 mb-2"
-                    @click:close="removeFile(index)"
-                >
-                    {{ file.name }} · {{ prettyFileSize(file.size) }}
-                </v-chip>
-            </div>
-
-            <div v-if="progress" class="px-1 pb-2">
+            <div v-if="progress" class="px-1 px-md-3 pb-2">
                 <small class="d-block text-right text-medium-emphasis mb-1">
                     {{ prettyFileSize(Math.min(uploadedSize, fileSize)) }} / {{ prettyFileSize(fileSize) }}
                 </small>
                 <v-progress-linear :value="uploadProgress * 100"></v-progress-linear>
             </div>
+        </div>
 
-            <div class="unified-composer__footer pt-1">
+        <div class="unified-composer__footer pt-1">
                 <div class="unified-composer__footer-main d-flex align-center flex-wrap">
-                    <v-btn icon density="comfortable" variant="text" size="small" color="grey-darken-1" @click="openFilePicker">
-                        <v-icon>{{ mdiPaperclip }}</v-icon>
-                    </v-btn>
-                    <v-btn icon density="comfortable" variant="text" size="small" color="grey-darken-1" @click="emit('show-qr')">
-                        <v-icon>{{ mdiQrcode }}</v-icon>
-                    </v-btn>
                     <v-tooltip location="top">
                         <template v-slot:activator="{ props }">
                             <v-btn
@@ -71,19 +113,20 @@
                                 class="unified-composer__device"
                                 @click="goDeviceList"
                             >
-                                <span v-if="display.mdAndUp.value" class="unified-composer__device-full">
+                                <span class="unified-composer__device-full">
                                     <span class="unified-composer__devicestat"><v-icon size="small" class="mr-1">{{ mdiLaptop }}</v-icon>{{ deviceStats.desktop }}</span>
                                     <span class="unified-composer__devicestat"><v-icon size="small" class="mr-1">{{ mdiCellphone }}</v-icon>{{ deviceStats.mobile }}</span>
                                     <span class="unified-composer__devicestat"><v-icon size="small" class="mr-1">{{ mdiDevices }}</v-icon>{{ deviceStats.other }}</span>
-                                </span>
-                                <span v-else class="unified-composer__device-compact">
-                                    <v-icon>{{ mdiDevices }}</v-icon>
-                                    <span class="unified-composer__device-badge">{{ deviceTotal }}</span>
                                 </span>
                             </v-btn>
                         </template>
                         <span>{{ t('connectedTotal', { count: deviceTotal }) }}</span>
                     </v-tooltip>
+                    <v-btn icon density="comfortable" variant="text" size="small" color="grey-darken-1" @click="emit('show-qr')">
+                        <v-icon>{{ mdiQrcode }}</v-icon>
+                    </v-btn>
+                </div>
+                <div class="unified-composer__footer-reward">
                     <v-tooltip location="top">
                         <template v-slot:activator="{ props }">
                             <v-btn
@@ -91,21 +134,14 @@
                                 density="comfortable"
                                 variant="text"
                                 size="small"
-                                color="grey-darken-1"
                                 v-bind="props"
-                                href="https://github.com/Jonnyan404/cloud-clipboard-go"
-                                target="_blank"
-                                rel="noopener"
+                                @click="rewardDialog = true"
                             >
-                                <v-icon>{{ mdiGithub }}</v-icon>
+                                <v-icon class="unified-composer__reward-icon">{{ mdiCurrencyCny }}</v-icon>
                             </v-btn>
                         </template>
-                        <span>{{ t('github') }}</span>
+                        <span>{{ t('reward') }}</span>
                     </v-tooltip>
-                    <div class="text-caption text-medium-emphasis ml-2 unified-composer__hint">
-                        {{ footerHint }}
-                        <span class="unified-composer__shortcut">{{ sendShortcutLabel }}</span>
-                    </div>
                 </div>
 
                 <v-btn
@@ -119,7 +155,6 @@
                     {{ t('send') }}
                 </v-btn>
             </div>
-        </div>
 
         <input
             ref="selectFile"
@@ -176,6 +211,69 @@
             </v-card-text>
         </v-card>
     </v-dialog>
+
+    <v-dialog v-model="textFullscreen" fullscreen>
+        <v-card class="d-flex flex-column fill-height pts-fullscreen-card">
+            <v-toolbar elevation="1">
+                <v-btn icon variant="text" @click="textFullscreen = false">
+                    <v-icon>{{ mdiArrowLeft }}</v-icon>
+                </v-btn>
+                <v-toolbar-title>{{ t('enterTextToSend') }}</v-toolbar-title>
+                <v-spacer></v-spacer>
+                <v-tooltip location="bottom">
+                    <template v-slot:activator="{ props }">
+                        <v-btn
+                            icon
+                            variant="text"
+                            v-bind="props"
+                            :color="app.fullscreenSendClose ? 'primary' : 'grey-darken-1'"
+                            @click="app.toggleFullscreenSendClose"
+                        >
+                            <v-icon>{{ app.fullscreenSendClose ? mdiChevronDownCircle : mdiWindowRestore }}</v-icon>
+                        </v-btn>
+                    </template>
+                    <span>{{ app.fullscreenSendClose ? t('fullscreenCloseAfterSendOn') : t('fullscreenCloseAfterSendOff') }}</span>
+                </v-tooltip>
+                <v-btn
+                    variant="flat"
+                    color="primary"
+                    :disabled="sendDisabled"
+                    @click="sendAll"
+                >
+                    <v-icon start size="small">{{ mdiSend }}</v-icon>
+                    {{ t('send') }}
+                </v-btn>
+            </v-toolbar>
+            <div class="pts-fullscreen-body flex-grow-1">
+                <v-textarea
+                    v-model="app.send.text"
+                    variant="solo"
+                    flat
+                    hide-details
+                    no-resize
+                    class="pts-fullscreen-textarea"
+                    :placeholder="textareaPlaceholder"
+                    @keydown.ctrl.enter.prevent="onSendShortcut"
+                    @keydown.meta.enter.prevent="onSendShortcut"
+                ></v-textarea>
+                <small class="d-flex justify-center pa-2 text-medium-emphasis">{{ textLimitLabel }}</small>
+            </div>
+        </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="rewardDialog" max-width="420">
+        <v-card>
+            <v-card-title class="text-h6 d-flex align-center">
+                <v-icon class="mr-2 unified-composer__reward-icon">{{ mdiCurrencyCny }}</v-icon>
+                {{ t('rewardTitle') }}
+            </v-card-title>
+            <v-divider></v-divider>
+            <v-card-text class="text-center pa-4">
+                <img src="/reward.png" alt="Reward QR" class="unified-composer__reward-qr" />
+                <div class="text-body-2 text-medium-emphasis mt-3">{{ t('rewardHint') }}</div>
+            </v-card-text>
+        </v-card>
+    </v-dialog>
 </template>
 
 <script setup>import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
@@ -188,13 +286,12 @@ import axios from 'axios';
 import { toast } from '@/plugins/toast';
 import { prettyFileSize } from '@/util.js';
 
-const mdiPaperclip = 'mdi-paperclip';
 const mdiQrcode = 'mdi-qrcode';
 const mdiSend = 'mdi-send';
 const mdiLaptop = 'mdi-laptop';
 const mdiCellphone = 'mdi-cellphone';
 const mdiDevices = 'mdi-devices';
-const mdiGithub = 'mdi-github';
+const mdiCurrencyCny = 'mdi-currency-cny';
 const mdiClose = 'mdi-close';
 const mdiAndroid = 'mdi-android';
 const mdiApple = 'mdi-apple';
@@ -202,16 +299,29 @@ const mdiAppleIos = 'mdi-apple-ios';
 const mdiLinux = 'mdi-linux';
 const mdiMicrosoftWindows = 'mdi-microsoft-windows';
 const mdiTabletCellphone = 'mdi-tablet-cellphone';
+const mdiSwapVertical = 'mdi-swap-vertical';
+const mdiCloudUpload = 'mdi-cloud-upload-outline';
+const mdiFullscreen = 'mdi-fullscreen';
+const mdiFullscreenExit = 'mdi-fullscreen-exit';
+const mdiArrowLeft = 'mdi-arrow-left';
+const mdiChevronDownCircle = 'mdi-chevron-down-circle';
+const mdiWindowRestore = 'mdi-window-restore';
 
 
 const emit = defineEmits(['show-qr']);
 const app = useAppStore();
 const ws = useWebSocketStore();
-const display = useDisplay();
 const theme = useTheme();
 const isDark = computed(() => theme.current.value?.dark ?? false);
 const { t } = useI18n();
+const isFilePrimary = computed(() => app.composerPrimary === 'files');
+const composerRows = computed(() => isFilePrimary.value ? 1 : 3);
 const deviceDialog = ref(false);
+const rewardDialog = ref(false);
+const textFullscreen = ref(false);
+function toggleTextFullscreen() {
+    textFullscreen.value = !textFullscreen.value;
+}
 const deviceStats = computed(() => {
     const list = app.device || [];
     const desktop = list.filter(d => d.type === 'desktop').length;
@@ -236,25 +346,17 @@ const fileSize = computed(() => app.send.files.length ? app.send.files.reduce((a
 const uploadedSize = computed(() => uploadedSizes.value.length ? uploadedSizes.value.reduce((acc, cur) => acc += cur, 0) : 0);
 const uploadProgress = computed(() => Math.min(fileSize.value !== 0 ? (uploadedSize.value / fileSize.value) : 0, 1));
 const sendDisabled = computed(() => !ws.websocket || progress.value || (!app.send.text && !app.send.files.length) || app.send.text.length > app.config.text.limit);
-const footerHint = computed(() => {
-    if (app.send.files.length) {
-        return t('composerFilesSelected', { count: app.send.files.length });
-    }
-    const pasteKey = isMac ? '⌘+V' : 'Ctrl+V';
-    return t('dragDropPasteTip', { keys: pasteKey });
-});
+const pasteKey = isMac ? '⌘+V' : 'Ctrl+V';
 const sendShortcutLabel = computed(() => t('sendShortcutTip', {
     keys: isMac ? '⌘+Enter' : 'Ctrl+Enter',
 }));
+const textareaPlaceholder = computed(() => `${t('enterTextToSend')} ${sendShortcutLabel.value}`);
 const textLimitLabel = computed(() => t('composerTextLimit', {
     current: app.send.text.length,
     limit: app.config.text.limit,
 }));
 const fileLimitLabel = computed(() => t('fileSizeLimit', {
     limit: prettyFileSize(app.config.file.limit),
-}));
-const composerTextareaStyle = computed(() => ({
-    maxHeight: '12rem',
 }));
 function focus(type) {
     if (type === 'file') {
@@ -354,6 +456,9 @@ async function sendAll() {
             await sendFiles();
         }
         toast(t('sendSuccess'));
+        if (app.fullscreenSendClose) {
+            textFullscreen.value = false;
+        }
         focus();
     } catch (error) {
         if (error.response && error.response.data.msg) {
@@ -409,6 +514,16 @@ onBeforeUnmount(() => {
     box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
     background: rgba(255, 255, 255, 0.96);
     transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 6.5rem);
+    min-height: 0;
+}
+
+@media (max-width: 1263px) {
+    .unified-composer {
+        max-height: calc(100vh - 4.5rem);
+    }
 }
 
 .unified-composer--dark {
@@ -438,34 +553,187 @@ onBeforeUnmount(() => {
 }
 
 .unified-composer--dark .unified-composer__textarea :deep(textarea),
-.unified-composer--dark .unified-composer__meta,
-.unified-composer--dark .unified-composer__hint,
+.unified-composer--dark .unified-composer__limit,
 .unified-composer--dark .unified-composer__attachments {
     color: rgba(226, 232, 240, 0.92) !important;
 }
 
 .unified-composer__textarea :deep(textarea) {
-    max-height: 10.5rem !important;
-    overflow-y: auto !important;
+    resize: none;
+    height: 80px;
+    max-height: 40vh;
+    overflow-y: auto;
 }
 
-.unified-composer__meta {
+.unified-composer__textarea--secondary :deep(textarea) {
+    resize: none;
+    height: 42px;
+    max-height: 6rem;
+}
+
+.unified-composer__textblock {
+    position: relative;
+}
+
+.unified-composer__fullscreen-btn {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    z-index: 1;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 50%;
+}
+
+.unified-composer__fullscreen-btn :deep(.v-btn__overlay) {
+    background: transparent;
+}
+
+.unified-composer--dark .unified-composer__fullscreen-btn {
+    background: rgba(30, 41, 59, 0.9);
+}
+
+.unified-composer__fullscreen-btn :deep(.v-icon),
+.unified-composer__fullscreen-btn :deep(.v-btn__content) {
+    opacity: 0.55;
+}
+
+.unified-composer__textblock:hover .unified-composer__fullscreen-btn :deep(.v-icon) {
+    opacity: 1;
+}
+
+.pts-fullscreen-body {
     display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem 0;
+    flex-direction: column;
+    padding: 1rem;
+    min-height: 0;
+}
+
+.pts-fullscreen-textarea {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.pts-fullscreen-textarea :deep(.v-field--solo),
+.pts-fullscreen-textarea :deep(.v-field__input),
+.pts-fullscreen-textarea :deep(textarea) {
+    height: 100% !important;
+}
+
+.pts-fullscreen-textarea :deep(.v-field__input) {
+    overflow-y: auto;
+}
+
+.unified-composer__inputs {
+    display: flex;
+    flex-direction: column;
+}
+
+.unified-composer__inputs--files-first .unified-composer__textblock {
+    order: 3;
+}
+
+.unified-composer__inputs--files-first .unified-composer__divider {
+    order: 2;
+}
+
+.unified-composer__inputs--files-first .unified-composer__fileblock {
+    order: 1;
+}
+
+.unified-composer__textarea--secondary {
+    max-height: 3.5rem;
+}
+
+.unified-composer__divider {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0;
+}
+
+.unified-composer__limit {
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.unified-composer__divider-line {
+    flex: 1;
+    min-width: 0;
+    height: 1px;
+    background: rgba(148, 163, 184, 0.35);
+}
+
+.unified-composer__divider-line--short {
+    flex: 0 0 1.5rem;
+}
+
+.unified-composer--dark .unified-composer__divider-line {
+    background: rgba(71, 85, 105, 0.6);
+}
+
+.unified-composer__swapbtn {
+    flex-shrink: 0;
+}
+
+.unified-composer__fileblock {
+    min-width: 0;
+}
+
+.unified-composer__dropzone {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px dashed rgba(148, 163, 184, 0.55);
+    border-radius: 16px;
+    color: rgba(100, 116, 139, 0.95);
+    cursor: pointer;
+    min-height: 2.5rem;
+    padding: 0.25rem 0.5rem;
+    transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.unified-composer--dark .unified-composer__dropzone {
+    border-color: rgba(71, 85, 105, 0.65);
+    color: rgba(203, 213, 225, 0.85);
+}
+
+.unified-composer__dropzone:hover {
+    border-color: var(--v-theme-primary);
+    background: rgba(99, 102, 241, 0.06);
+}
+
+.unified-composer__dropzone--primary {
+    min-height: 7rem;
+    flex-direction: column;
+    gap: 0.25rem;
 }
 
 .unified-composer__attachments {
     min-height: 1.5rem;
 }
 
+.unified-composer__body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+}
+
 .unified-composer__footer {
+    flex-shrink: 0;
     display: grid;
     align-items: end;
     gap: 0.75rem;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     border-top: 1px solid rgba(226, 232, 240, 0.9);
-    padding-top: 0.5rem;
+    padding: 0.25rem 0.25rem 0.25rem 0.25rem;
+}
+
+@media (min-width: 960px) {
+    .unified-composer__footer {
+        padding: 0.75rem;
+        padding-top: 0.5rem;
+    }
 }
 
 .unified-composer--dark .unified-composer__footer {
@@ -473,6 +741,12 @@ onBeforeUnmount(() => {
 }
 
 .unified-composer__footer-main {
+    min-width: 0;
+}
+
+.unified-composer__footer-reward {
+    display: flex;
+    justify-content: center;
     min-width: 0;
 }
 
@@ -494,35 +768,31 @@ onBeforeUnmount(() => {
     align-items: center;
 }
 
-.unified-composer__device-compact {
-    display: inline-flex;
-    align-items: center;
-    position: relative;
-}
-
-.unified-composer__device-badge {
-    position: absolute;
-    top: -4px;
-    right: -6px;
-    min-width: 14px;
-    height: 14px;
-    padding: 0 3px;
-    border-radius: 999px;
-    background: var(--v-theme-primary);
-    color: white;
-    font-size: 10px;
-    line-height: 14px;
-    text-align: center;
-}
-
-.unified-composer__hint {
-    line-height: 1.4;
-    min-width: 0;
-    word-break: break-word;
-}
-
 .unified-composer__shortcut {
     white-space: nowrap;
+}
+
+.unified-composer__reward-icon {
+    color: #f5b301;
+    animation: unified-composer-reward-shine 2s ease-in-out infinite;
+}
+
+@keyframes unified-composer-reward-shine {
+    0%, 100% {
+        filter: brightness(1);
+        text-shadow: 0 0 0 rgba(245, 179, 1, 0);
+    }
+    50% {
+        filter: brightness(1.45);
+        text-shadow: 0 0 6px rgba(245, 179, 1, 0.85);
+    }
+}
+
+.unified-composer__reward-qr {
+    max-width: 280px;
+    width: 100%;
+    height: auto;
+    border-radius: 8px;
 }
 
 .unified-composer__send {
@@ -533,12 +803,18 @@ onBeforeUnmount(() => {
 
 @media (max-width: 960px) {
     .unified-composer__footer {
+        display: flex;
+        flex-wrap: wrap;
         align-items: flex-start;
-        grid-template-columns: 1fr;
+        gap: 0.5rem 0.75rem;
+    }
+
+    .unified-composer__footer-reward {
+        justify-content: flex-start;
     }
 
     .unified-composer__send {
-        justify-self: stretch;
+        flex: 1 0 100%;
     }
 }
 </style>

@@ -26,10 +26,22 @@ export const useAppStore = defineStore('app', {
         showSenderIP: localStorage.getItem('showSenderIP') !== null
             ? localStorage.getItem('showSenderIP') === 'true'
             : false,
+        composerPrimary: localStorage.getItem('composerPrimary') || 'text',
+        fullscreenSendClose: localStorage.getItem('fullscreenSendClose') !== null
+            ? localStorage.getItem('fullscreenSendClose') === 'true'
+            : true,
     }),
     actions: {
         setConfig(config) {
             this.config = config;
+        },
+        toggleComposerPrimary() {
+            this.composerPrimary = this.composerPrimary === 'files' ? 'text' : 'files';
+            localStorage.setItem('composerPrimary', this.composerPrimary);
+        },
+        toggleFullscreenSendClose() {
+            this.fullscreenSendClose = !this.fullscreenSendClose;
+            localStorage.setItem('fullscreenSendClose', String(this.fullscreenSendClose));
         },
     },
     getters: {
