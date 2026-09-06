@@ -103,10 +103,11 @@ jobs:
         with:
           distribution: goreleaser
           version: '~> v2'
-          args: release --clean --skip=publish
+          args: release --clean --skip=publish,validate
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+          GORELEASER_CURRENT_TAG: ${{ needs.determine-tag.outputs.tag }}
       - name: Upload GoReleaser artifacts
         uses: actions/upload-artifact@v7
         with:
