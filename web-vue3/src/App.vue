@@ -427,13 +427,14 @@ watch(() => route.fullPath, () => {
             color="primary"
             dark
             flat
+            density="compact"
             class="app-shell__bar"
         >
             <v-tooltip right>
                 <template v-slot:activator="{ props }">
-                    <v-btn icon density="comfortable" variant="text" v-bind="props" @click="settingsDialog = true">
+                    <v-app-bar-nav-icon v-bind="props" @click="settingsDialog = true">
                         <v-icon>{{ mdiCog }}</v-icon>
-                    </v-btn>
+                    </v-app-bar-nav-icon>
                 </template>
                 <span>{{ t('settings') }}</span>
             </v-tooltip>
@@ -455,7 +456,7 @@ watch(() => route.fullPath, () => {
 
             <v-tooltip left v-if="app.config && app.config.server && app.config.server.roomList">
                 <template v-slot:activator="{ props }">
-                    <v-btn icon density="comfortable" variant="text" v-bind="props" @click="openRoomBrowser()">
+                    <v-btn icon density="compact" variant="text" v-bind="props" @click="openRoomBrowser()">
                         <v-badge
                             :content="availableRooms.length"
                             :model-value="availableRooms.length > 0"
@@ -471,7 +472,7 @@ watch(() => route.fullPath, () => {
 
             <v-tooltip left>
                 <template v-slot:activator="{ props }">
-                    <v-btn icon density="comfortable" variant="text" v-bind="props" @click="clearAllDialog = true">
+                    <v-btn icon density="compact" variant="text" v-bind="props" @click="clearAllDialog = true">
                         <v-icon>{{mdiNotificationClearAll}}</v-icon>
                     </v-btn>
                 </template>
@@ -479,7 +480,7 @@ watch(() => route.fullPath, () => {
             </v-tooltip>
             <v-tooltip left>
                 <template v-slot:activator="{ props }">
-                    <v-btn icon density="comfortable" variant="text" v-bind="props" @click="ws.roomInput = ws.room; ws.roomDialog = true">
+                    <v-btn icon density="compact" variant="text" v-bind="props" @click="ws.roomInput = ws.room; ws.roomDialog = true">
                         <v-icon>{{mdiBulletinBoard}}</v-icon>
                     </v-btn>
                 </template>
@@ -487,7 +488,7 @@ watch(() => route.fullPath, () => {
             </v-tooltip>
             <v-tooltip left>
                 <template v-slot:activator="{ props }">
-                    <v-btn icon density="comfortable" variant="text" v-bind="props" @click="if (!ws.websocket && !ws.websocketConnecting) {ws.retry = 0; ws.connect();}">
+                    <v-btn icon density="compact" variant="text" v-bind="props" @click="if (!ws.websocket && !ws.websocketConnecting) {ws.retry = 0; ws.connect();}">
                         <v-icon v-if="ws.websocket">{{mdiLanConnect}}</v-icon>
                         <v-icon v-else-if="ws.websocketConnecting">{{mdiLanPending}}</v-icon>
                         <v-icon v-else>{{mdiLanDisconnect}}</v-icon>
@@ -505,7 +506,7 @@ watch(() => route.fullPath, () => {
             dismissible
             dense
             class="ma-0 text-center"
-            style="position: sticky; top: 64px; z-index: 5;"
+            style="position: sticky; top: 48px; z-index: 5;"
         >
             {{ t('clipboardClearedRefresh') }}
         </v-alert>
@@ -1123,6 +1124,10 @@ watch(() => route.fullPath, () => {
     box-shadow: 0 14px 34px rgba(15, 23, 42, 0.18) !important;
 }
 
+.app-shell__bar .v-toolbar-title {
+    margin-inline-start: 8px;
+}
+
 .app-shell--dark .app-shell__bar {
     box-shadow: 0 14px 34px rgba(2, 6, 23, 0.42) !important;
 }
@@ -1135,7 +1140,7 @@ watch(() => route.fullPath, () => {
     display: flex;
     align-items: flex-start;
     gap: 20px;
-    min-height: calc(100vh - 64px);
+    min-height: calc(100vh - 48px);
     padding: 16px 20px 24px;
 }
 
@@ -1157,7 +1162,7 @@ watch(() => route.fullPath, () => {
 }
 
 .v-alert {
-    top: 64px;
+    top: 48px;
     z-index: 5;
 }
 
@@ -1196,7 +1201,7 @@ watch(() => route.fullPath, () => {
 }
 
 .room-browser__body--dock {
-    max-height: calc(100vh - 164px);
+    max-height: calc(100vh - 148px);
     overflow: auto;
     padding: 16px 18px 20px;
 }
@@ -1208,10 +1213,10 @@ watch(() => route.fullPath, () => {
 
 .room-browser--dock {
     position: sticky;
-    top: 80px;
+    top: 64px;
     flex: 0 0 332px;
     width: 332px;
-    max-height: calc(100vh - 100px);
+    max-height: calc(100vh - 84px);
     border-radius: 24px;
     border: 1px solid rgba(148, 163, 184, 0.18);
     box-shadow: 0 24px 60px rgba(15, 23, 42, 0.14);
