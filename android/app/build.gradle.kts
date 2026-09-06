@@ -32,8 +32,8 @@ android {
         applicationId = "com.cloudclip"
         minSdk = 24
         targetSdk = 34
-        versionCode = 5
-        versionName = "5.0.1"
+        versionCode = (project.findProperty("versionCode") as String?)?.toIntOrNull() ?: 500003
+        versionName = project.findProperty("versionName") as String? ?: "5.0.3"
     }
 
     buildTypes {
