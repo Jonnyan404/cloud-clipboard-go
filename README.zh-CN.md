@@ -30,14 +30,14 @@
 <details>
 <summary><b>💻 桌面端</b></summary>
 
-![Desktop Preview](https://github.com/Jonnyan404/cloud-clipboard-go/blob/main/desktop.png)
+![Desktop Preview](https://github.com/Jonnyan404/cloud-clipboard-go/blob/main/desktop1.png)
 
 </details>
 
 <details>
 <summary><b>📱 移动端</b></summary>
 
-![Mobile Preview](https://github.com/Jonnyan404/cloud-clipboard-go/blob/main/mobile.png)
+![Mobile Preview](https://github.com/Jonnyan404/cloud-clipboard-go/blob/main/mobile1.png)
 
 </details>
 

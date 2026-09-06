@@ -52,7 +52,7 @@ jobs:
     needs: build-binaries
     strategy:
       matrix:
-        arch: [x86_64, i386, arm_cortex-a5, arm_cortex-a7, arm_cortex-a8, arm_cortex-a9, arm_cortex-a15_neon-vfpv4, aarch64, mips_24kc, mipsel_24kc]
+        arch: [x86_64, arm_cortex-a5, arm_cortex-a7, arm_cortex-a8, arm_cortex-a9, arm_cortex-a15_neon-vfpv4, aarch64, mips_24kc, mipsel_24kc]
 
     steps:
       - name: Checkout code
@@ -87,10 +87,6 @@ jobs:
         include:
           - binary_arch: x86_64
             apk_arch: x86_64
-          - binary_arch: i386
-            apk_arch: i386_pentium4
-          - binary_arch: i386
-            apk_arch: i386_pentium-mmx
           - binary_arch: arm_cortex-a5
             apk_arch: arm_cortex-a5_vfpv4
           - binary_arch: arm_cortex-a7

@@ -2,11 +2,66 @@ import { fileURLToPath, URL } from 'node:url';
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import vuetify from 'vite-plugin-vuetify';
+import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
     plugins: [
         vue(),
         vuetify({ autoImport: true }),
+        VitePWA({
+            registerType: 'autoUpdate',
+            injectRegister: null,
+            includeAssets: ['favicon.svg', 'favicon.ico', 'pwa-192x192.png', 'pwa-512x512.png', 'reward.png'],
+            manifest: {
+                name: 'Cloud Clipboard',
+                short_name: 'Clipboard',
+                description: 'Browser-based cloud clipboard for text and files',
+                lang: 'zh',
+                start_url: './',
+                scope: './',
+                display: 'standalone',
+                orientation: 'any',
+                background_color: '#35495e',
+                theme_color: '#35495e',
+                icons: [
+                    {
+                        src: 'pwa-192x192.png',
+                        sizes: '192x192',
+                        type: 'image/png',
+                    },
+                    {
+                        src: 'pwa-512x512.png',
+                        sizes: '512x512',
+                        type: 'image/png',
+                    },
+                ],
+            },
+            workbox: {
+                globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2,woff,ttf,eot}'],
+                cleanupOutdatedCaches: true,
+                navigateFallback: 'index.html',
+                navigateFallbackDenylist: [
+                    /^\/server/,
+                    /^\/text/,
+                    /^\/auth/,
+                    /^\/upload/,
+                    /^\/push/,
+                    /^\/rooms/,
+                    /^\/share/,
+                    /^\/file\//,
+                    /^\/revoke/,
+                    /^\/content\//,
+                    /^\/push/,
+                ],
+                runtimeCaching: [
+                    {
+                        urlPattern: /^\/(server|text|auth|upload|push|rooms|share|file|revoke|content)/,
+                        handler: 'NetworkOnly',
+                        method: 'GET',
+                    },
+                ],
+            },
+        }),
     ],
     define: {
         '__VUE_PROD_HYDRATION_MISMATCH_DETAILS__': false,
