@@ -80,7 +80,7 @@
                         <v-chip
                             v-for="(file, index) in app.send.files"
                             :key="file.name + file.size + index"
-                            close
+                            closable
                             :variant="'outlined'"
                             size="small"
                             class="mr-2 mb-2"
