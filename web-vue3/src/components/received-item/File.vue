@@ -322,39 +322,42 @@ function deviceIcon(type) {
 
 <template>
     <v-hover v-slot="{ isHovering, props }">
-        <v-card :elevation="isHovering ? 10 : 2" v-bind="props" class="timeline-card timeline-card--file mb-3 transition-swing" :class="{ 'timeline-card--dark': isDark }">
+        <v-card :elevation="isHovering ? 10 : 2" v-bind="props" class="timeline-card timeline-card--file timeline-card--id-float mb-3 transition-swing" :class="{ 'timeline-card--dark': isDark }">
+            <div v-if="meta.id" class="text-caption text-grey-darken-1 timeline-card__id-float">
+                <v-icon size="x-small" class="mr-1">{{ mdiPound }}</v-icon>{{ meta.id }}
+            </div>
             <v-card-text>
-                <div class="text-caption d-flex flex-wrap align-center mb-2 timeline-card__meta" v-if="meta.timestamp && (app.showTimestamp || app.showDeviceInfo || app.showSenderIP)">
-                    <v-chip size="x-small" label variant="flat" color="secondary" class="mr-2 mb-1 d-sm-inline">{{ t('fileMessage') }}</v-chip>
+                <div class="text-caption d-flex flex-nowrap align-center mb-2 timeline-card__meta" v-if="meta.timestamp && (app.showTimestamp || app.showDeviceInfo || app.showSenderIP)">
+                    <v-chip size="x-small" label variant="flat" color="secondary" class="mr-2 flex-shrink-0">{{ t('fileMessage') }}</v-chip>
                     <template v-if="app.showTimestamp">
-                        <span class="mr-3 mb-1"><v-icon size="x-small" class="mr-1">{{ mdiClockOutline }}</v-icon>{{ formatTimestamp(meta.timestamp) }}</span>
+                        <span class="mr-3 text-no-wrap flex-shrink-0"><v-icon size="x-small" class="mr-1">{{ mdiClockOutline }}</v-icon>{{ formatTimestamp(meta.timestamp) }}</span>
                     </template>
                     <template v-if="app.showDeviceInfo && meta.senderDevice && meta.senderDevice.type">
-                        <span class="mr-3 mb-1"><v-icon size="x-small" class="mr-1">{{ deviceIcon(meta.senderDevice.type) }}</v-icon>{{ meta.senderDevice.os || meta.senderDevice.type }}</span>
+                        <span class="mr-3 text-no-wrap flex-shrink-0"><v-icon size="x-small" class="mr-1">{{ deviceIcon(meta.senderDevice.type) }}</v-icon>{{ meta.senderDevice.os || meta.senderDevice.type }}</span>
                     </template>
                     <template v-if="app.showSenderIP && meta.senderIP">
-                        <span class="mb-1"><v-icon size="x-small" class="mr-1">{{ mdiIpNetworkOutline }}</v-icon>{{ meta.senderIP }}</span>
+                        <span class="text-no-wrap flex-shrink-0"><v-icon size="x-small" class="mr-1">{{ mdiIpNetworkOutline }}</v-icon>{{ meta.senderIP }}</span>
                     </template>
                 </div>
 
-                <div class="d-flex flex-row align-center">
+                <div class="d-flex flex-row align-center flex-nowrap">
                     <v-img
                         v-if="meta.thumbnail && (!isPreviewableVideo && !isPreviewableAudio)"
                         :src="meta.thumbnail"
-                        class="mr-3 flex-grow-0"
+                        class="mr-3 flex-grow-0 flex-shrink-0"
                         width="2.5rem"
                         height="2.5rem"
                         style="border-radius: 3px"
                     ></v-img>
                     <v-icon
                         v-else-if="isPreviewableAudio"
-                        class="mr-3 flex-grow-0"
+                        class="mr-3 flex-grow-0 flex-shrink-0"
                         size="2.5rem"
                         color="grey"
                     >{{mdiMusicNote }}</v-icon>
                     <v-icon
                         v-else-if="isPreviewableVideo"
-                        class="mr-3 flex-grow-0"
+                        class="mr-3 flex-grow-0 flex-shrink-0"
                         size="2.5rem"
                         color="grey"
                     >{{mdiMovie }}</v-icon>
@@ -372,68 +375,63 @@ function deviceIcon(type) {
                         </div>
                     </div>
 
-                    <div class="align-self-start text-nowrap d-flex flex-column align-end timeline-card__actions">
-                        <div v-if="meta.id" class="text-caption text-grey-darken-1 mb-2">
-                            <v-icon size="x-small" class="mr-1">{{ mdiPound }}</v-icon>{{ meta.id }}
-                        </div>
-                        <div class="align-self-center text-nowrap d-flex flex-nowrap align-center timeline-card__icon-row">
-                            <v-tooltip :text="expired ? t('expired') : t('download')" location="bottom">
-                                <template v-slot:activator="{ props }">
-                                    <v-btn
-                                        v-bind="props"
-                                        icon
-                                        density="compact"
-                                        variant="text"
-                                        color="grey"
-                                        class="timeline-card__icon-button"
-                                        :loading="downloading"
-                                        :disabled="expired || downloading"
-                                        @click="downloadFile"
-                                    >
-                                        <v-icon>{{expired ? mdiDownloadOff : mdiDownload }}</v-icon>
-                                    </v-btn>
-                                </template>
-                            </v-tooltip>
-
-                            <template v-if="meta.thumbnail || isPreviewableVideo || isPreviewableAudio || isPreviewableText">
-                                <v-progress-circular
-                                    v-if="loadingPreview"
-                                    indeterminate
+                    <div class="d-flex flex-nowrap align-center timeline-card__icon-row timeline-card__preview-actions">
+                        <v-tooltip :text="expired ? t('expired') : t('download')" location="top">
+                            <template v-slot:activator="{ props }">
+                                <v-btn
+                                    v-bind="props"
+                                    icon
+                                    density="compact"
+                                    variant="text"
                                     color="grey"
-                                >{{ percentage(loadedPreview / meta.size, 0) }}</v-progress-circular>
-                                <v-tooltip :text="t('preview')" location="bottom">
-                                    <template v-slot:activator="{ props }">
-                                        <v-btn v-bind="props" icon density="compact" variant="text" color="grey" class="timeline-card__icon-button" @click="!expired && previewFile()">
-                                            <v-icon>{{previewIcon }}</v-icon>
-                                        </v-btn>
-                                    </template>
-                                </v-tooltip>
+                                    class="timeline-card__icon-button"
+                                    :loading="downloading"
+                                    :disabled="expired || downloading"
+                                    @click="downloadFile"
+                                >
+                                    <v-icon>{{expired ? mdiDownloadOff : mdiDownload }}</v-icon>
+                                </v-btn>
                             </template>
+                        </v-tooltip>
 
-                            <v-tooltip :text="t('copyLink')" location="bottom">
+                        <template v-if="meta.thumbnail || isPreviewableVideo || isPreviewableAudio || isPreviewableText">
+                            <v-progress-circular
+                                v-if="loadingPreview"
+                                indeterminate
+                                color="grey"
+                            >{{ percentage(loadedPreview / meta.size, 0) }}</v-progress-circular>
+                            <v-tooltip :text="t('preview')" location="top">
                                 <template v-slot:activator="{ props }">
-                                    <v-btn v-bind="props" icon density="compact" variant="text" color="grey" class="timeline-card__icon-button" @click="openShareDialog('copy')">
-                                        <v-icon>{{mdiLinkVariant }}</v-icon>
+                                    <v-btn v-bind="props" icon density="compact" variant="text" color="grey" class="timeline-card__icon-button" @click="!expired && previewFile()">
+                                        <v-icon>{{previewIcon }}</v-icon>
                                     </v-btn>
                                 </template>
                             </v-tooltip>
+                        </template>
 
-                            <v-tooltip :text="t('showQrCode')" location="bottom">
-                                <template v-slot:activator="{ props }">
-                                    <v-btn v-bind="props" icon density="compact" variant="text" color="grey" class="timeline-card__icon-button" @click="openShareDialog('qr')">
-                                        <v-icon>{{mdiQrcode }}</v-icon>
-                                    </v-btn>
-                                </template>
-                            </v-tooltip>
+                        <v-tooltip :text="t('copyLink')" location="top">
+                            <template v-slot:activator="{ props }">
+                                <v-btn v-bind="props" icon density="compact" variant="text" color="grey" class="timeline-card__icon-button" @click="openShareDialog('copy')">
+                                    <v-icon>{{mdiLinkVariant }}</v-icon>
+                                </v-btn>
+                            </template>
+                        </v-tooltip>
 
-                            <v-tooltip :text="t('delete')" location="bottom">
-                                <template v-slot:activator="{ props }">
-                                    <v-btn v-bind="props" icon density="compact" variant="text" color="grey" class="timeline-card__icon-button" @click="deleteItem" :disabled="loadingPreview">
-                                        <v-icon>{{mdiClose}}</v-icon>
-                                    </v-btn>
-                                </template>
-                            </v-tooltip>
-                        </div>
+                        <v-tooltip :text="t('showQrCode')" location="top">
+                            <template v-slot:activator="{ props }">
+                                <v-btn v-bind="props" icon density="compact" variant="text" color="grey" class="timeline-card__icon-button" @click="openShareDialog('qr')">
+                                    <v-icon>{{mdiQrcode }}</v-icon>
+                                </v-btn>
+                            </template>
+                        </v-tooltip>
+
+                        <v-tooltip :text="t('delete')" location="top">
+                            <template v-slot:activator="{ props }">
+                                <v-btn v-bind="props" icon density="compact" variant="text" color="grey" class="timeline-card__icon-button" @click="deleteItem" :disabled="loadingPreview">
+                                    <v-icon>{{mdiClose}}</v-icon>
+                                </v-btn>
+                            </template>
+                        </v-tooltip>
                     </div>
                 </div>
                 <v-expand-transition v-if="meta.thumbnail || isPreviewableVideo || isPreviewableAudio || isPreviewableText">
@@ -595,6 +593,7 @@ function deviceIcon(type) {
 
 .timeline-card__meta {
     color: rgba(71, 85, 105, 0.9);
+    overflow: visible;
 }
 
 .timeline-card__title {
@@ -605,8 +604,22 @@ function deviceIcon(type) {
     color: rgba(71, 85, 105, 0.88);
 }
 
-.timeline-card__actions {
-    min-width: 9rem;
+/* G: ID 固定右上角,操作按钮与标题行同行 */
+.timeline-card--id-float {
+    position: relative;
+}
+
+.timeline-card__id-float {
+    position: absolute;
+    top: 0.85rem;
+    right: 1.5rem;
+    z-index: 1;
+    pointer-events: none;
+}
+
+.timeline-card__preview-actions {
+    margin-left: 0.5rem;
+    flex-shrink: 0;
 }
 
 .timeline-card__icon-row {
@@ -634,7 +647,6 @@ function deviceIcon(type) {
 
 .timeline-card--dark .timeline-card__meta,
 .timeline-card--dark .timeline-card__file-meta,
-.timeline-card--dark .timeline-card__actions,
 .timeline-card--dark .text-grey {
     color: rgba(226, 232, 240, 0.72) !important;
 }
