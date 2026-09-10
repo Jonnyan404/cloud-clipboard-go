@@ -34,6 +34,7 @@ const mdiOpenInNew = 'mdi-open-in-new';
 const mdiBroom = 'mdi-broom';
 const mdiPalette = 'mdi-palette';
 const mdiCurrencyCny = 'mdi-currency-cny';
+const mdiCoffee = 'mdi-coffee';
 const mdiTranslate = 'mdi-translate';
 const mdiViewList = 'mdi-view-list';
 
@@ -898,6 +899,13 @@ watch(() => route.fullPath, () => {
                         </v-col>
                     </v-row>
                     <div class="text-body-2 text-medium-emphasis mt-3 cc-settings__warm-text">{{ t('rewardHint') }}</div>
+                    <v-btn class="mt-3" color="#ff5f5f" variant="tonal" block
+                           href="https://ko-fi.com/jonnyan404"
+                           target="_blank" rel="noopener">
+                        <v-icon start>{{ mdiCoffee }}</v-icon>
+                        <span>Buy Me a Coffee</span>
+                        <v-icon end size="16">{{ mdiOpenInNew }}</v-icon>
+                    </v-btn>
                     <v-divider class="my-4"></v-divider>
                     <div class="cc-settings__warm-box">
                         <div class="text-body-2 text-medium-emphasis cc-settings__warm-text">{{ t('cloudPromoHint') }}</div>

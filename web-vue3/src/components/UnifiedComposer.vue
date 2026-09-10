@@ -299,6 +299,13 @@
                     </v-col>
                 </v-row>
                 <div class="text-body-2 text-medium-emphasis mt-3 unified-composer__warm-text">{{ t('rewardHint') }}</div>
+                <v-btn class="mt-3" color="#ff5f5f" variant="tonal" block
+                       href="https://ko-fi.com/jonnyan404"
+                       target="_blank" rel="noopener">
+                    <v-icon start>{{ mdiCoffee }}</v-icon>
+                    <span>Buy Me a Coffee</span>
+                    <v-icon end size="16">{{ mdiOpenInNew }}</v-icon>
+                </v-btn>
                 <v-divider class="my-4"></v-divider>
                 <div class="unified-composer__warm-box">
                     <div class="text-body-2 text-medium-emphasis unified-composer__warm-text">{{ t('cloudPromoHint') }}</div>
@@ -354,6 +361,7 @@ const mdiLaptop = 'mdi-laptop';
 const mdiCellphone = 'mdi-cellphone';
 const mdiDevices = 'mdi-devices';
 const mdiCurrencyCny = 'mdi-currency-cny';
+const mdiCoffee = 'mdi-coffee';
 const mdiOpenInNew = 'mdi-open-in-new';
 const mdiWhiteBalanceSunny = 'mdi-white-balance-sunny';
 const mdiWeatherNight = 'mdi-weather-night';
