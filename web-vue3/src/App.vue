@@ -453,15 +453,6 @@ watch(() => route.fullPath, () => {
             density="compact"
             class="app-shell__bar"
         >
-            <v-tooltip right>
-                <template v-slot:activator="{ props }">
-                    <v-btn icon density="compact" variant="text" v-bind="props" @click="settingsDialog = true">
-                        <v-icon>{{ mdiCog }}</v-icon>
-                    </v-btn>
-                </template>
-                <span>{{ t('settings') }}</span>
-            </v-tooltip>
-
             <v-toolbar-title @click="goHome" style="cursor: pointer;" class="d-flex align-center ga-2">
                 <v-btn icon density="compact" variant="text" class="room-title__logo-btn" @click.stop="goHome">
                     <v-icon>{{ mdiHome }}</v-icon>
@@ -484,6 +475,15 @@ watch(() => route.fullPath, () => {
             </v-toolbar-title>
 
             <v-spacer></v-spacer>
+
+            <v-tooltip left>
+                <template v-slot:activator="{ props }">
+                    <v-btn icon density="compact" variant="text" v-bind="props" @click="settingsDialog = true">
+                        <v-icon>{{ mdiCog }}</v-icon>
+                    </v-btn>
+                </template>
+                <span>{{ t('settings') }}</span>
+            </v-tooltip>
 
             <v-tooltip left v-if="app.config && app.config.server && app.config.server.roomList">
                 <template v-slot:activator="{ props }">
@@ -1265,7 +1265,12 @@ watch(() => route.fullPath, () => {
 }
 
 .app-shell__bar .v-toolbar-title {
-    margin-inline-start: 2px;
+    margin-inline-start: 0;
+}
+
+.room-title__logo-btn {
+    margin-inline-start: 4px;
+    margin-right: 0;
 }
 
 .app-shell--dark .app-shell__bar {
@@ -1454,13 +1459,14 @@ watch(() => route.fullPath, () => {
 }
 
 .room-title__logo-btn {
-    margin-inline-start: 10px;
-    margin-right: 4px;
+    margin-inline-start: 4px;
+    margin-right: 0;
 }
 
 .room-title__chip {
     max-width: 220px;
-    flex-shrink: 0;
+    flex-shrink: 1;
+    min-width: 0;
     cursor: pointer;
 }
 
@@ -1472,7 +1478,9 @@ watch(() => route.fullPath, () => {
 
 @media (max-width: 600px) {
     .room-title__chip {
-        max-width: 140px;
+        flex-shrink: 1;
+        flex-grow: 1;
+        max-width: 100%;
     }
 }
 
