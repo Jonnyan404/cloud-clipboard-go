@@ -1454,8 +1454,8 @@ watch(() => route.fullPath, () => {
 }
 
 .room-title__logo-btn {
-    margin-inline-start: 4px;
-    margin-right: -6px;
+    margin-inline-start: 10px;
+    margin-right: 4px;
 }
 
 .room-title__chip {
