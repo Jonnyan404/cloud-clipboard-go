@@ -28,6 +28,7 @@ const mdiIpNetworkOutline = 'mdi-ip-network-outline';
 const mdiLanConnect = 'mdi-lan-connect';
 const mdiLanDisconnect = 'mdi-lan-disconnect';
 const mdiLanPending = 'mdi-lan-pending';
+const mdiEarth = 'mdi-earth';
 const mdiLock = 'mdi-lock';
 const mdiCog = 'mdi-cog';
 const mdiMagnify = 'mdi-magnify';
@@ -244,9 +245,10 @@ async function clearAll() {
     }
 }
 function copyRoomName(roomName) {
+    const displayName = roomName || t('publicRoom');
     if (navigator.clipboard && window.isSecureContext) {
         navigator.clipboard.writeText(roomName)
-            .then(() => toast(t('copiedRoomName', { room: roomName })))
+            .then(() => toast(t('copiedRoomName', { room: displayName })))
             .catch(err => toast(t('copyFailed', { err })));
     } else {
         try {
@@ -453,24 +455,32 @@ watch(() => route.fullPath, () => {
         >
             <v-tooltip right>
                 <template v-slot:activator="{ props }">
-                    <v-app-bar-nav-icon v-bind="props" @click="settingsDialog = true">
+                    <v-btn icon density="compact" variant="text" v-bind="props" @click="settingsDialog = true">
                         <v-icon>{{ mdiCog }}</v-icon>
-                    </v-app-bar-nav-icon>
+                    </v-btn>
                 </template>
                 <span>{{ t('settings') }}</span>
             </v-tooltip>
 
-            <v-toolbar-title @click="goHome" style="cursor: pointer;">
-                {{ t('cloudClipboard') }}
-                <span class="d-none d-sm-inline" v-if="ws.room">
-                    （<v-icon
-                        v-if="currentRoomEntry && currentRoomEntry.isProtected"
-                        x-small
-                        class="room-title__lock-icon"
-                    >{{ mdiLock }}</v-icon>
-                    {{ t('room') }}：
-                    <abbr :title="t('copyRoomName')" style="cursor:pointer" @click.stop="copyRoomName(ws.room)">{{ws.room}}</abbr>）
-                </span>
+            <v-toolbar-title @click="goHome" style="cursor: pointer;" class="d-flex align-center ga-2">
+                <v-btn icon density="compact" variant="text" class="room-title__logo-btn" @click.stop="goHome">
+                    <v-icon>{{ mdiHome }}</v-icon>
+                </v-btn>
+                <span class="d-none d-sm-inline">{{ t('cloudClipboard') }}</span>
+                <v-chip
+                    size="small"
+                    variant="tonal"
+                    color="white"
+                    class="room-title__chip"
+                    :title="t('copyRoomName')"
+                    @click.stop="copyRoomName(ws.room || '')"
+                >
+                    <v-icon start size="x-small">
+                        {{ ws.room ? (currentRoomEntry && currentRoomEntry.isProtected ? mdiLock : mdiEarth) : mdiEarth }}
+                    </v-icon>
+                    <span v-if="ws.room">{{ ws.room }}</span>
+                    <span v-else>{{ t('publicRoom') }}</span>
+                </v-chip>
             </v-toolbar-title>
 
             <v-spacer></v-spacer>
@@ -1255,7 +1265,7 @@ watch(() => route.fullPath, () => {
 }
 
 .app-shell__bar .v-toolbar-title {
-    margin-inline-start: 8px;
+    margin-inline-start: 2px;
 }
 
 .app-shell--dark .app-shell__bar {
@@ -1443,10 +1453,27 @@ watch(() => route.fullPath, () => {
     border-bottom: 1px solid rgba(148, 163, 184, 0.18);
 }
 
-.room-title__lock-icon {
-    margin: 0 4px 2px 0;
-    vertical-align: middle;
-    opacity: 0.92;
+.room-title__logo-btn {
+    margin-inline-start: 4px;
+    margin-right: -6px;
+}
+
+.room-title__chip {
+    max-width: 220px;
+    flex-shrink: 0;
+    cursor: pointer;
+}
+
+.room-title__chip .v-chip__content {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+    .room-title__chip {
+        max-width: 140px;
+    }
 }
 
 .room-browser__title-wrap {
