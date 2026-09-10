@@ -140,26 +140,55 @@
                         </v-tooltip>
                     </div>
                     <div class="unified-composer__footer-main">
-                        <v-btn icon density="comfortable" variant="text" size="small" color="grey-darken-1" @click="emit('show-qr')">
-                            <v-icon>{{ mdiQrcode }}</v-icon>
-                        </v-btn>
+                        <v-tooltip location="top">
+                            <template v-slot:activator="{ props }">
+                                <v-btn
+                                    icon
+                                    density="comfortable"
+                                    variant="text"
+                                    size="small"
+                                    color="grey-darken-1"
+                                    v-bind="props"
+                                    @click="emit('show-qr')"
+                                >
+                                    <v-icon>{{ mdiQrcode }}</v-icon>
+                                </v-btn>
+                            </template>
+                            <span>{{ t('showQrCode') }}</span>
+                        </v-tooltip>
+                        <v-tooltip location="top">
+                            <template v-slot:activator="{ props }">
+                                <v-btn
+                                    icon
+                                    density="comfortable"
+                                    variant="text"
+                                    size="small"
+                                    color="grey-darken-1"
+                                    v-bind="props"
+                                    @click="colorDialog = true"
+                                >
+                                    <v-icon>{{ mdiPaletteSwatch }}</v-icon>
+                                </v-btn>
+                            </template>
+                            <span>{{ t('traditionalColors') }}</span>
+                        </v-tooltip>
+                        <v-tooltip location="top">
+                            <template v-slot:activator="{ props }">
+                                <v-btn
+                                    icon
+                                    density="comfortable"
+                                    variant="text"
+                                    size="small"
+                                    color="grey-darken-1"
+                                    v-bind="props"
+                                    @click="toggleDark"
+                                >
+                                    <v-icon>{{ isDark ? mdiWhiteBalanceSunny : mdiWeatherNight }}</v-icon>
+                                </v-btn>
+                            </template>
+                            <span>{{ t('toggleDarkMode') }}</span>
+                        </v-tooltip>
                     </div>
-                    <v-tooltip location="top">
-                        <template v-slot:activator="{ props }">
-                            <v-btn
-                                icon
-                                density="comfortable"
-                                variant="text"
-                                size="small"
-                                color="grey-darken-1"
-                                v-bind="props"
-                                @click="toggleDark"
-                            >
-                                <v-icon>{{ isDark ? mdiWhiteBalanceSunny : mdiWeatherNight }}</v-icon>
-                            </v-btn>
-                        </template>
-                        <span>{{ t('toggleDarkMode') }}</span>
-                    </v-tooltip>
                 </div>
 
                 <v-btn
@@ -343,6 +372,8 @@
             </v-card-text>
         </v-card>
     </v-dialog>
+
+    <traditional-color-dialog v-model="colorDialog"></traditional-color-dialog>
 </template>
 
 <script setup>import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
@@ -354,8 +385,11 @@ import { useI18n } from 'vue-i18n';
 import axios from 'axios';
 import { toast } from '@/plugins/toast';
 import { prettyFileSize } from '@/util.js';
+import TraditionalColorDialog from '@/components/TraditionalColorDialog.vue';
 
 const mdiQrcode = 'mdi-qrcode';
+const mdiPalette = 'mdi-palette';
+const mdiPaletteSwatch = 'mdi-palette-swatch';
 const mdiSend = 'mdi-send';
 const mdiLaptop = 'mdi-laptop';
 const mdiCellphone = 'mdi-cellphone';
@@ -394,6 +428,7 @@ const isFilePrimary = computed(() => app.composerPrimary === 'files');
 const composerRows = computed(() => isFilePrimary.value ? 1 : 3);
 const deviceDialog = ref(false);
 const rewardDialog = ref(false);
+const colorDialog = ref(false);
 const textFullscreen = ref(false);
 function toggleTextFullscreen() {
     textFullscreen.value = !textFullscreen.value;
