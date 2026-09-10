@@ -11,7 +11,7 @@ export default defineConfig({
         VitePWA({
             registerType: 'autoUpdate',
             injectRegister: null,
-            includeAssets: ['favicon.svg', 'favicon.ico', 'pwa-192x192.png', 'pwa-512x512.png', 'reward.png'],
+            includeAssets: ['favicon.svg', 'favicon.ico', 'apple-touch-icon.png', 'pwa-192x192.png', 'pwa-512x512.png', 'reward-wechat.png', 'reward-alipay.png'],
             manifest: {
                 name: 'Cloud Clipboard',
                 short_name: 'Clipboard',
@@ -21,8 +21,8 @@ export default defineConfig({
                 scope: './',
                 display: 'standalone',
                 orientation: 'any',
-                background_color: '#35495e',
-                theme_color: '#35495e',
+                background_color: '#1e88e5',
+                theme_color: '#1e88e5',
                 icons: [
                     {
                         src: 'pwa-192x192.png',
@@ -33,6 +33,12 @@ export default defineConfig({
                         src: 'pwa-512x512.png',
                         sizes: '512x512',
                         type: 'image/png',
+                    },
+                    {
+                        src: 'pwa-512x512.png',
+                        sizes: '512x512',
+                        type: 'image/png',
+                        purpose: 'maskable',
                     },
                 ],
             },
