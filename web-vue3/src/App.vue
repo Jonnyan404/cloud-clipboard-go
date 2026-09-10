@@ -31,10 +31,11 @@ const mdiLock = 'mdi-lock';
 const mdiCog = 'mdi-cog';
 const mdiMagnify = 'mdi-magnify';
 const mdiOpenInNew = 'mdi-open-in-new';
-const mdiNotificationClearAll = 'mdi-notification-clear-all';
+const mdiBroom = 'mdi-broom';
 const mdiPalette = 'mdi-palette';
+const mdiCurrencyCny = 'mdi-currency-cny';
 const mdiTranslate = 'mdi-translate';
-const mdiViewGrid = 'mdi-view-grid';
+const mdiViewList = 'mdi-view-list';
 
 const app = useAppStore();
 const ws = useWebSocketStore();
@@ -51,6 +52,7 @@ const currentPrimary = computed(() => isDark.value ? theme.themes.value.dark.col
 const clearAllDialog = ref(false);
 const clipboardClearedMessageVisible = ref(false);
 const roomSheet = ref(false);
+const donateDialog = ref(false);
 const roomSearch = ref('');
 const roomDockVisible = ref(true);
 const roomDockSide = ref('right');
@@ -469,7 +471,7 @@ watch(() => route.fullPath, () => {
                             color="accent"
                             overlap
                         >
-                            <v-icon>{{mdiViewGrid}}</v-icon>
+                            <v-icon>{{mdiViewList}}</v-icon>
                         </v-badge>
                     </v-btn>
                 </template>
@@ -479,7 +481,7 @@ watch(() => route.fullPath, () => {
             <v-tooltip left>
                 <template v-slot:activator="{ props }">
                     <v-btn icon density="compact" variant="text" v-bind="props" @click="clearAllDialog = true">
-                        <v-icon>{{mdiNotificationClearAll}}</v-icon>
+                        <v-icon>{{mdiBroom}}</v-icon>
                     </v-btn>
                 </template>
                 <span>{{ t('clearClipboard') }}</span>
@@ -542,7 +544,7 @@ watch(() => route.fullPath, () => {
                 >
                     <div class="room-browser__header room-browser__header--dock d-flex align-center">
                         <div class="d-flex align-center room-browser__title-wrap">
-                            <v-icon start>{{ mdiViewGrid }}</v-icon>
+                            <v-icon start>{{ mdiViewList }}</v-icon>
                             <span>{{ t('roomList') }}</span>
                             <v-chip class="ml-2" size="small" :variant="'outlined'">{{ availableRooms.length }} {{ t('rooms') }}</v-chip>
                         </div>
@@ -857,15 +859,70 @@ watch(() => route.fullPath, () => {
                                 </v-list-item-title>
                             </v-list-item>
                             <v-divider class="cc-settings__divider"></v-divider>
-                            <v-list-item class="pa-2">
-                                <template v-slot:prepend>
-                                    <v-icon color="error">{{ mdiHeartOutline }}</v-icon>
-                                </template>
-                                <v-list-item-title class="text-caption text-medium-emphasis">{{ t('donatePrompt') }}</v-list-item-title>
+                            <v-list-item class="pa-1">
+                                <v-btn block color="error" variant="outlined" size="small"
+                                       class="cc-settings__donate-btn"
+                                       @click="donateDialog = true">
+                                    <template v-slot:prepend>
+                                        <v-icon>{{ mdiHeartOutline }}</v-icon>
+                                    </template>
+                                    {{ t('donatePrompt') }}
+                                    <template v-slot:append>
+                                        <v-icon size="16">{{ mdiChevronRight }}</v-icon>
+                                    </template>
+                                </v-btn>
                             </v-list-item>
                         </v-list>
                     </div>
                 </v-card-text>
+            </v-card>
+        </v-dialog>
+
+        <v-dialog v-model="donateDialog" max-width="420">
+            <v-card>
+                <v-card-title class="text-h6 d-flex align-center">
+                    <v-icon color="error" class="mr-2">{{ mdiHeartOutline }}</v-icon>
+                    {{ t('donatePrompt') }}
+                </v-card-title>
+                <v-divider></v-divider>
+                <v-card-text class="text-center pa-4">
+                    <div class="text-body-2 font-weight-medium cc-settings__link-title mb-2">{{ t('supportSectionTitle') }}</div>
+                    <v-row class="cc-settings__reward-row" dense>
+                        <v-col class="text-center">
+                            <div class="cc-settings__reward-label">微信</div>
+                            <img src="/reward-wechat.png" alt="WeChat Reward QR" class="cc-settings__reward-qr" />
+                        </v-col>
+                        <v-col class="text-center">
+                            <div class="cc-settings__reward-label">支付宝</div>
+                            <img src="/reward-alipay.png" alt="Alipay Reward QR" class="cc-settings__reward-qr" />
+                        </v-col>
+                    </v-row>
+                    <div class="text-body-2 text-medium-emphasis mt-3 cc-settings__warm-text">{{ t('rewardHint') }}</div>
+                    <v-divider class="my-4"></v-divider>
+                    <div class="cc-settings__warm-box">
+                        <div class="text-body-2 text-medium-emphasis cc-settings__warm-text">{{ t('cloudPromoHint') }}</div>
+                        <div class="d-flex flex-column ga-2 mt-3">
+                        <v-btn variant="outlined" color="primary"
+                               href="https://cloud.tencent.com/act/cps/redirect?redirect=6150&cps_key=0b1dfaf9bb573dac05abef76202dc8cc&from=console"
+                               target="_blank" rel="noopener" block>
+                            <v-icon start>{{ mdiCurrencyCny }}</v-icon>
+                            腾讯云 2C2G ¥99/年
+                            <v-icon end size="16">{{ mdiOpenInNew }}</v-icon>
+                        </v-btn>
+                        <v-btn variant="outlined" color="primary"
+                               href="https://www.aliyun.com/daily-act/ecs/activity_selection?userCode=79h2wrag"
+                               target="_blank" rel="noopener" block>
+                            <v-icon start>{{ mdiCurrencyCny }}</v-icon>
+                            阿里云 2C2G ¥99/年
+                            <v-icon end size="16">{{ mdiOpenInNew }}</v-icon>
+                        </v-btn>
+                        </div>
+                    </div>
+                </v-card-text>
+                <v-card-actions>
+                    <v-spacer></v-spacer>
+                    <v-btn color="primary" variant="text" @click="donateDialog = false">{{ t('close') }}</v-btn>
+                </v-card-actions>
             </v-card>
         </v-dialog>
 
@@ -977,7 +1034,7 @@ watch(() => route.fullPath, () => {
         <v-bottom-sheet v-model="roomSheet" scrollable max-width="820">
             <v-card class="room-browser" :class="{ 'room-browser--dark': isDark }">
                 <v-card-title class="d-flex align-center room-browser__header">
-                    <v-icon start>{{ mdiViewGrid }}</v-icon>
+                    <v-icon start>{{ mdiViewList }}</v-icon>
                     {{ t('roomList') }}
                     <v-chip class="ml-2" size="small" :variant="'outlined'">{{ availableRooms.length }} {{ t('rooms') }}</v-chip>
                     <v-spacer></v-spacer>
@@ -1258,6 +1315,39 @@ watch(() => route.fullPath, () => {
 .cc-settings__divider {
     margin: 0 12px;
     opacity: 0.6;
+}
+
+.cc-settings__reward-row {
+    justify-content: center;
+}
+
+.cc-settings__reward-label {
+    font-size: 12px;
+    color: rgba(0, 0, 0, 0.6);
+    margin-bottom: 4px;
+}
+
+.cc-settings__reward-qr {
+    width: 150px;
+    height: 150px;
+    object-fit: contain;
+    border-radius: 8px;
+}
+
+.cc-settings__warm-text {
+    white-space: pre-line;
+    line-height: 1.7;
+}
+
+.cc-settings__warm-box {
+    background: rgba(99, 102, 241, 0.06);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+}
+
+.cc-settings__link-title {
+    color: inherit;
 }
 
 .cc-settings__theme-btn {
