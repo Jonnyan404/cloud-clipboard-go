@@ -725,13 +725,10 @@ watch(() => route.fullPath, () => {
             </div>
         </v-main>
 
-        <v-dialog v-model="settingsDialog" max-width="480" scrollable>
+        <v-dialog v-model="settingsDialog" max-width="480">
             <v-card class="cc-settings">
                 <v-card-title class="cc-settings__header">
-                    <v-avatar color="primary" variant="tonal" size="42" rounded="lg" class="mr-3">
-                        <v-icon>{{ mdiCog }}</v-icon>
-                    </v-avatar>
-                    <div class="flex-grow-1">
+                    <div class="flex-grow-1 cc-settings__header-wrap">
                         <div class="cc-settings__title">{{ t('settings') }}</div>
                         <div class="cc-settings__version">
                             <span class="mr-1">{{ t('cloudClipboard') }}</span>
@@ -743,11 +740,11 @@ watch(() => route.fullPath, () => {
                     </v-btn>
                 </v-card-title>
                 <v-divider></v-divider>
-                <v-card-text class="pa-4">
+                <v-card-text class="pa-4 pt-0">
                     <div class="cc-settings__group">
                         <v-list-subheader class="cc-settings__subheader">{{ t('appearance') }}</v-list-subheader>
-                        <v-list class="cc-settings__list" density="comfortable" rounded="lg">
-                            <v-list-item class="pa-2">
+                        <v-list class="cc-settings__list" density="comfortable">
+                            <v-list-item class="cc-settings__item">
                                 <template v-slot:prepend>
                                     <v-icon color="primary">{{ mdiBrightness4 }}</v-icon>
                                 </template>
@@ -765,8 +762,7 @@ watch(() => route.fullPath, () => {
                                     ></v-select>
                                 </template>
                             </v-list-item>
-                            <v-divider class="cc-settings__divider"></v-divider>
-                            <v-list-item class="pa-2">
+                            <v-list-item class="cc-settings__item">
                                 <template v-slot:prepend>
                                     <v-icon color="primary">{{ mdiPalette }}</v-icon>
                                 </template>
@@ -788,8 +784,8 @@ watch(() => route.fullPath, () => {
 
                     <div class="cc-settings__group">
                         <v-list-subheader class="cc-settings__subheader">{{ t('language') }}</v-list-subheader>
-                        <v-list class="cc-settings__list" density="comfortable" rounded="lg">
-                            <v-list-item class="pa-2">
+                        <v-list class="cc-settings__list" density="comfortable">
+                            <v-list-item class="cc-settings__item">
                                 <template v-slot:prepend>
                                     <v-icon color="primary">{{ mdiTranslate }}</v-icon>
                                 </template>
@@ -812,32 +808,30 @@ watch(() => route.fullPath, () => {
 
                     <div class="cc-settings__group">
                         <v-list-subheader class="cc-settings__subheader">{{ t('displaySettings') }}</v-list-subheader>
-                        <v-list class="cc-settings__list" density="comfortable" rounded="lg">
-                            <v-list-item class="pa-2">
+                        <v-list class="cc-settings__list" density="comfortable">
+                            <v-list-item class="cc-settings__item">
                                 <template v-slot:prepend>
                                     <v-icon color="primary">{{ mdiClockOutline }}</v-icon>
                                 </template>
-                                <v-list-item-title @click="app.showTimestamp = !app.showTimestamp" style="cursor: pointer;">{{ t('showTimestamp') }}</v-list-item-title>
+                                <v-list-item-title>{{ t('showTimestamp') }}</v-list-item-title>
                                 <template v-slot:append>
                                     <v-switch v-model="app.showTimestamp" color="primary" hide-details inset></v-switch>
                                 </template>
                             </v-list-item>
-                            <v-divider class="cc-settings__divider"></v-divider>
-                            <v-list-item class="pa-2">
+                            <v-list-item class="cc-settings__item">
                                 <template v-slot:prepend>
                                     <v-icon color="primary">{{ mdiDevices }}</v-icon>
                                 </template>
-                                <v-list-item-title @click="app.showDeviceInfo = !app.showDeviceInfo" style="cursor: pointer;">{{ t('showDeviceInfo') }}</v-list-item-title>
+                                <v-list-item-title>{{ t('showDeviceInfo') }}</v-list-item-title>
                                 <template v-slot:append>
                                     <v-switch v-model="app.showDeviceInfo" color="primary" hide-details inset></v-switch>
                                 </template>
                             </v-list-item>
-                            <v-divider class="cc-settings__divider"></v-divider>
-                            <v-list-item class="pa-2">
+                            <v-list-item class="cc-settings__item">
                                 <template v-slot:prepend>
                                     <v-icon color="primary">{{ mdiIpNetworkOutline }}</v-icon>
                                 </template>
-                                <v-list-item-title @click="app.showSenderIP = !app.showSenderIP" style="cursor: pointer;">{{ t('showSenderIP') }}</v-list-item-title>
+                                <v-list-item-title>{{ t('showSenderIP') }}</v-list-item-title>
                                 <template v-slot:append>
                                     <v-switch v-model="app.showSenderIP" color="primary" hide-details inset></v-switch>
                                 </template>
@@ -847,8 +841,8 @@ watch(() => route.fullPath, () => {
 
                     <div class="cc-settings__group">
                         <v-list-subheader class="cc-settings__subheader">{{ t('about') }}</v-list-subheader>
-                        <v-list class="cc-settings__list" density="comfortable" rounded="lg">
-                            <v-list-item class="pa-2">
+                        <v-list class="cc-settings__list" density="comfortable">
+                            <v-list-item class="cc-settings__item">
                                 <template v-slot:prepend>
                                     <v-icon color="primary">{{ mdiGithub }}</v-icon>
                                 </template>
@@ -859,21 +853,19 @@ watch(() => route.fullPath, () => {
                                     </a>
                                 </v-list-item-title>
                             </v-list-item>
-                            <v-divider class="cc-settings__divider"></v-divider>
-                            <v-list-item class="pa-1">
-                                <v-btn block color="error" variant="outlined" size="small"
-                                       class="cc-settings__donate-btn"
-                                       @click="donateDialog = true">
-                                    <template v-slot:prepend>
-                                        <v-icon>{{ mdiHeartOutline }}</v-icon>
-                                    </template>
-                                    {{ t('donatePrompt') }}
-                                    <template v-slot:append>
-                                        <v-icon size="16">{{ mdiChevronRight }}</v-icon>
-                                    </template>
-                                </v-btn>
-                            </v-list-item>
                         </v-list>
+                        <v-divider class="my-2"></v-divider>
+                        <v-btn block color="error" variant="outlined" size="small"
+                               class="cc-settings__donate-btn"
+                               @click="donateDialog = true">
+                            <template v-slot:prepend>
+                                <v-icon>{{ mdiHeartOutline }}</v-icon>
+                            </template>
+                            {{ t('donatePrompt') }}
+                            <template v-slot:append>
+                                <v-icon size="16">{{ mdiChevronRight }}</v-icon>
+                            </template>
+                        </v-btn>
                     </div>
                 </v-card-text>
             </v-card>
@@ -1286,7 +1278,11 @@ watch(() => route.fullPath, () => {
 .cc-settings__header {
     display: flex;
     align-items: center;
-    padding: 16px;
+    padding: 10px 16px;
+}
+
+.cc-settings__header-wrap {
+    line-height: 1.3;
 }
 
 .cc-settings__title {
@@ -1301,28 +1297,26 @@ watch(() => route.fullPath, () => {
     opacity: 0.7;
 }
 
+.cc-settings__item {
+    padding: 2px 4px !important;
+    min-height: 40px;
+}
+
 .cc-settings__group {
-    margin-bottom: 18px;
+    margin-bottom: 10px;
 }
 
 .cc-settings__subheader {
-    padding-left: 4px;
-    padding-bottom: 6px;
-    font-size: 13px;
+    padding: 0 4px 2px;
+    font-size: 12px;
     font-weight: 500;
     color: rgb(var(--v-theme-on-background));
     opacity: 0.75;
 }
 
 .cc-settings__list {
-    background: rgba(var(--v-theme-on-background), 0.05);
-    border: 1px solid rgba(var(--v-theme-on-background), 0.1);
-    padding: 2px 0;
-}
-
-.cc-settings__divider {
-    margin: 0 12px;
-    opacity: 0.6;
+    background: transparent;
+    padding: 0;
 }
 
 .cc-settings__reward-row {
@@ -1362,6 +1356,10 @@ watch(() => route.fullPath, () => {
     display: inline-flex;
     align-items: center;
     gap: 8px;
+}
+
+.cc-settings__donate-btn {
+    margin-top: 2px;
 }
 
 .cc-settings__swatch {
