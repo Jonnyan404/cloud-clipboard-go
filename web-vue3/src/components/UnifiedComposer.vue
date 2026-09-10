@@ -287,8 +287,38 @@
             </v-card-title>
             <v-divider></v-divider>
             <v-card-text class="text-center pa-4">
-                <img src="/reward.png" alt="Reward QR" class="unified-composer__reward-qr" />
-                <div class="text-body-2 text-medium-emphasis mt-3">{{ t('rewardHint') }}</div>
+                <div class="text-body-2 font-weight-medium unified-composer__roadmap-title mb-2">{{ t('supportSectionTitle') }}</div>
+                <v-row class="unified-composer__reward-row" dense>
+                    <v-col class="text-center">
+                        <div class="unified-composer__reward-label">微信</div>
+                        <img src="/reward-wechat.png" alt="WeChat Reward QR" class="unified-composer__reward-qr" />
+                    </v-col>
+                    <v-col class="text-center">
+                        <div class="unified-composer__reward-label">支付宝</div>
+                        <img src="/reward-alipay.png" alt="Alipay Reward QR" class="unified-composer__reward-qr" />
+                    </v-col>
+                </v-row>
+                <div class="text-body-2 text-medium-emphasis mt-3 unified-composer__warm-text">{{ t('rewardHint') }}</div>
+                <v-divider class="my-4"></v-divider>
+                <div class="unified-composer__warm-box">
+                    <div class="text-body-2 text-medium-emphasis unified-composer__warm-text">{{ t('cloudPromoHint') }}</div>
+                    <div class="d-flex flex-column ga-2 mt-3">
+                    <v-btn variant="outlined" color="primary"
+                           href="https://cloud.tencent.com/act/cps/redirect?redirect=6150&cps_key=0b1dfaf9bb573dac05abef76202dc8cc&from=console"
+                           target="_blank" rel="noopener" block>
+                        <v-icon start>{{ mdiCurrencyCny }}</v-icon>
+                        腾讯云 2C2G ¥99/年
+                        <v-icon end size="16">{{ mdiOpenInNew }}</v-icon>
+                    </v-btn>
+                    <v-btn variant="outlined" color="primary"
+                           href="https://www.aliyun.com/daily-act/ecs/activity_selection?userCode=79h2wrag"
+                           target="_blank" rel="noopener" block>
+                        <v-icon start>{{ mdiCurrencyCny }}</v-icon>
+                        阿里云 2C2G ¥99/年
+                        <v-icon end size="16">{{ mdiOpenInNew }}</v-icon>
+                    </v-btn>
+                    </div>
+                </div>
                 <v-divider class="my-4"></v-divider>
                 <div class="unified-composer__roadmap text-left">
                     <div class="text-body-2 font-weight-medium unified-composer__roadmap-title">
@@ -324,6 +354,7 @@ const mdiLaptop = 'mdi-laptop';
 const mdiCellphone = 'mdi-cellphone';
 const mdiDevices = 'mdi-devices';
 const mdiCurrencyCny = 'mdi-currency-cny';
+const mdiOpenInNew = 'mdi-open-in-new';
 const mdiWhiteBalanceSunny = 'mdi-white-balance-sunny';
 const mdiWeatherNight = 'mdi-weather-night';
 const mdiTagMultiple = 'mdi-tag-multiple';
@@ -842,11 +873,34 @@ onBeforeUnmount(() => {
     }
 }
 
+.unified-composer__reward-row {
+    justify-content: center;
+}
+
+.unified-composer__reward-label {
+    font-size: 12px;
+    color: rgba(0, 0, 0, 0.6);
+    margin-bottom: 4px;
+}
+
 .unified-composer__reward-qr {
-    max-width: 280px;
+    max-width: 150px;
     width: 100%;
-    height: auto;
+    height: 150px;
+    object-fit: contain;
     border-radius: 8px;
+}
+
+.unified-composer__warm-text {
+    white-space: pre-line;
+    line-height: 1.7;
+}
+
+.unified-composer__warm-box {
+    background: rgba(99, 102, 241, 0.06);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
 }
 
 .unified-composer__roadmap {
