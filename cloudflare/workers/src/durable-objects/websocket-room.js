@@ -5,12 +5,21 @@ function isRoomListEnabled(env) {
   return ['1', 'true', 'yes', 'on'].includes(String(env.ROOM_LIST || '').toLowerCase());
 }
 
+// 在线会话视为活跃的最大间隔（超过则视为离开），与前端 30s 心跳配合
+const PRESENCE_TTL_MS = 120 * 1000;
+// 清理任务的调度间隔
+const PRESENCE_CLEAN_INTERVAL_MS = 60 * 1000;
+// 同一会话写 D1 的最小间隔（节流心跳 30s 带来的频繁写入）
+const PRESENCE_WRITE_INTERVAL_MS = 120 * 1000;
+
 export class WebSocketRoom {
   constructor(state, env) {
     this.state = state;
     this.env = env;
     this.sessions = new Map();
     console.log('WebSocketRoom 实例创建');
+    // 安排周期性的残留在线状态清理
+    this.state.blockConcurrencyWhile(() => this.schedulePresenceCleanup());
   }
 
   async fetch(request) {
@@ -56,6 +65,7 @@ export class WebSocketRoom {
       const userAgent = request.headers.get('User-Agent') || '';
       const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
       const room = normalizeRoomName(url.searchParams.get('room'));
+      this.roomName = this.roomName || room;
       
       console.log(`创建 WebSocket 会话: ${sessionId}, room: ${room}, ip: ${ip}`);
       
@@ -65,7 +75,8 @@ export class WebSocketRoom {
         userAgent,
         ip,
         room: room,
-        connectedAt: Date.now()
+        connectedAt: Date.now(),
+        lastPresenceTouchedAt: 0
       };
 
       this.sessions.set(sessionId, session);
@@ -286,6 +297,17 @@ export class WebSocketRoom {
 
   handleMessage(sessionId, event) {
     try {
+      const session = this.sessions.get(sessionId);
+      if (session) {
+        // 前端每 30s 会发送空文本帧作为心跳；任何消息都视为该会话仍活跃。
+        const now = Date.now();
+        session.connectedAt = now;
+        // 节流：仅当距上次写 D1 超过间隔才落库，避免心跳带来的频繁写入
+        if (now - session.lastPresenceTouchedAt >= PRESENCE_WRITE_INTERVAL_MS) {
+          session.lastPresenceTouchedAt = now;
+          void this.touchSessionPresence(sessionId, now);
+        }
+      }
       if (event.data && event.data.trim()) {
         console.log(`WebSocket 消息 from ${sessionId}:`, event.data);
       }
@@ -415,6 +437,57 @@ export class WebSocketRoom {
       await this.env.DB.prepare('DELETE FROM room_presence WHERE sessionId = ?').bind(sessionId).run();
     } catch (error) {
       console.error(`删除房间在线状态失败 (${sessionId}):`, error);
+    }
+  }
+
+  async touchSessionPresence(sessionId, updatedAt) {
+    if (!this.env.DB) {
+      return;
+    }
+    try {
+      await this.env.DB.prepare('UPDATE room_presence SET updatedAt = ? WHERE sessionId = ?')
+        .bind(Math.floor(updatedAt / 1000), sessionId)
+        .run();
+    } catch (error) {
+      console.error(`更新会话活跃时间失败 (${sessionId}):`, error);
+    }
+  }
+
+  async schedulePresenceCleanup() {
+    const now = Date.now();
+    let existingAlarm = now;
+    try {
+      existingAlarm = (await this.state.storage.getAlarm()) ?? now;
+    } catch (error) {
+      console.error('读取已有清理任务失败，将按当前时间重新安排:', error);
+    }
+    await this.state.storage.setAlarm(Math.max(now, existingAlarm) + PRESENCE_CLEAN_INTERVAL_MS);
+  }
+
+  async alarm() {
+    try {
+      await this.cleanupStalePresence(this.roomName || '');
+    } catch (error) {
+      console.error('清理残留在线状态失败:', error);
+    } finally {
+      await this.schedulePresenceCleanup();
+    }
+  }
+
+  async cleanupStalePresence(room = '') {
+    if (!this.env.DB) {
+      return;
+    }
+    const cutoff = Math.floor((Date.now() - PRESENCE_TTL_MS) / 1000);
+    const statement = room
+      ? this.env.DB.prepare('DELETE FROM room_presence WHERE room = ? AND updatedAt < ?')
+          .bind(room, cutoff)
+      : this.env.DB.prepare('DELETE FROM room_presence WHERE updatedAt < ?')
+          .bind(cutoff);
+    const result = await statement.run();
+    const removed = result?.meta?.changes ?? 0;
+    if (removed > 0) {
+      console.log(`清理了 ${removed} 条过期在线状态${room ? ` (房间: ${room})` : ''}`);
     }
   }
 
