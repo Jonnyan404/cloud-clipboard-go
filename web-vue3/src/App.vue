@@ -8,6 +8,7 @@ import { useDisplay } from 'vuetify';
 import { useI18n } from 'vue-i18n';
 import axios from 'axios';
 import { toast, toastState } from '@/plugins/toast';
+import TraditionalColorDialog from '@/components/TraditionalColorDialog.vue';
 
 const mdiBrightness4 = 'mdi-brightness-4';
 const mdiBulletinBoard = 'mdi-bulletin-board';
@@ -33,6 +34,7 @@ const mdiMagnify = 'mdi-magnify';
 const mdiOpenInNew = 'mdi-open-in-new';
 const mdiBroom = 'mdi-broom';
 const mdiPalette = 'mdi-palette';
+const mdiPaletteSwatch = 'mdi-palette-swatch';
 const mdiCurrencyCny = 'mdi-currency-cny';
 const mdiCoffee = 'mdi-coffee';
 const mdiTranslate = 'mdi-translate';
@@ -48,6 +50,7 @@ const router = useRouter();
 const route = useRoute();
 
 const colorDialog = ref(false);
+const pickColorDialog = ref(false);
 const settingsDialog = ref(false);
 const currentPrimary = computed(() => isDark.value ? theme.themes.value.dark.colors.primary : theme.themes.value.light.colors.primary);
 const clearAllDialog = ref(false);
@@ -768,15 +771,26 @@ watch(() => route.fullPath, () => {
                                 </template>
                                 <v-list-item-title>{{ t('changeThemeColor') }}</v-list-item-title>
                                 <template v-slot:append>
-                                    <v-btn
-                                        variant="tonal"
-                                        size="small"
-                                        class="cc-settings__theme-btn"
-                                        @click="colorDialog = true"
-                                    >
-                                        <span class="cc-settings__swatch" :style="{ background: currentPrimary }"></span>
-                                        {{ t('choose') }}
-                                    </v-btn>
+                                    <div class="cc-settings__theme-actions">
+                                        <v-btn
+                                            variant="tonal"
+                                            size="small"
+                                            class="cc-settings__theme-btn"
+                                            @click="pickColorDialog = true"
+                                        >
+                                            <span class="cc-settings__swatch" :style="{ background: currentPrimary }"></span>
+                                            {{ t('colorPicker') }}
+                                        </v-btn>
+                                        <v-btn
+                                            variant="tonal"
+                                            size="small"
+                                            class="cc-settings__theme-btn"
+                                            @click="colorDialog = true"
+                                        >
+                                            <v-icon start size="16">{{ mdiPaletteSwatch }}</v-icon>
+                                            {{ t('traditionalColors') }}
+                                        </v-btn>
+                                    </div>
                                 </template>
                             </v-list-item>
                         </v-list>
@@ -926,16 +940,18 @@ watch(() => route.fullPath, () => {
             </v-card>
         </v-dialog>
 
-        <v-dialog v-model="colorDialog" max-width="300">
+        <traditional-color-dialog v-model="colorDialog"></traditional-color-dialog>
+
+        <v-dialog v-model="pickColorDialog" max-width="340">
             <v-card>
                 <v-card-title>{{ t('selectThemeColor') }}</v-card-title>
-                <v-card-text>
+                <v-card-text class="cc-picker-dialog__body">
                     <v-color-picker v-if="isDark" v-model="theme.themes.value.dark.colors.primary" show-swatches hide-inputs></v-color-picker>
                     <v-color-picker v-else v-model="theme.themes.value.light.colors.primary" show-swatches hide-inputs></v-color-picker>
                 </v-card-text>
                 <v-card-actions>
                     <v-spacer></v-spacer>
-                    <v-btn color="primary" variant="text" @click="colorDialog = false">{{ t('ok') }}</v-btn>
+                    <v-btn color="primary" variant="text" @click="pickColorDialog = false">{{ t('ok') }}</v-btn>
                 </v-card-actions>
             </v-card>
         </v-dialog>
@@ -1352,10 +1368,26 @@ watch(() => route.fullPath, () => {
     color: inherit;
 }
 
+.cc-picker-dialog__body {
+    padding-top: 0;
+}
+
+.cc-picker-dialog__body .v-color-picker {
+    width: 100%;
+    max-width: 340px;
+}
+
+.cc-settings__theme-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
 .cc-settings__theme-btn {
     display: inline-flex;
     align-items: center;
     gap: 8px;
+    white-space: nowrap;
 }
 
 .cc-settings__donate-btn {
