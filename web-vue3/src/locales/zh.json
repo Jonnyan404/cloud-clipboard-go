@@ -47,7 +47,7 @@
   "fullscreenCloseAfterSendOff": "发送后保持全屏打开",
   "reward": "赞赏支持",
   "rewardTitle": "给作者一点支持",
-  "rewardHint": "喜欢就用，方便就行。\n如果这个免费工具帮到了你，\n一杯奶茶就是最大的鼓励 🍵",
+  "rewardHint": "喜欢就用，方便就行。\n如果这个免费工具帮到了你，一杯奶茶就是最大的鼓励 🍵",
   "nextVersionPreview": "下一版本预告",
   "multiRoomMode": "多房间模式",
   "minimalMode": "极简模式",
@@ -179,7 +179,7 @@
   "shareDurationHours": "{hours} 小时",
   "shareDurationHoursMinutes": "{hours} 小时 {minutes} 分",
   "open": "打开",
-  "cloudPromoHint": "你有云服务器需求的话，\n可以看看这些活动价，\n顺带也支持到了项目开发 👇",
+  "cloudPromoHint": "你有云服务器需求的话，\n可以看看这些活动价，顺带也支持到了项目开发 👇",
   "supportSectionTitle": "给作者一点支持",
   "cloudSectionTitle": "云服务器活动（可支持开发）"
 }

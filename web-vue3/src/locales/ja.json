@@ -47,7 +47,7 @@
   "fullscreenCloseAfterSendOff": "送信後も全画面を開いたままにする",
   "reward": "サポート",
   "rewardTitle": "作者への応援",
-  "rewardHint": "気楽に使ってください。\nこの無料ツールが役に立ったら、\n一杯の緑茶が最大の励みです 🍵",
+  "rewardHint": "気楽に使ってください。\nこの無料ツールが役に立ったら、一杯の緑茶が最大の励みです 🍵",
   "nextVersionPreview": "次回バージョン予告",
   "multiRoomMode": "マルチルームモード",
   "minimalMode": "ミニマルモード",
@@ -161,7 +161,7 @@
   "shareDurationHours": "{hours} 時間",
   "shareDurationHoursMinutes": "{hours} 時間 {minutes} 分",
   "open": "開く",
-  "cloudPromoHint": "クラウドサーバーをお探しなら、\n活動価格のこちらもぜひ。\n開発支援にもつながります 👇",
+  "cloudPromoHint": "クラウドサーバーをお探しなら、\n活動価格のこちらもぜひ。開発支援にもつながります 👇",
   "supportSectionTitle": "作者への応援",
   "cloudSectionTitle": "クラウドサーバー特典（開発支援）"
 }

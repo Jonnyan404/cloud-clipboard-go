@@ -47,7 +47,7 @@
   "fullscreenCloseAfterSendOff": "傳送後保持全螢幕開啟",
   "reward": "贊賞支持",
   "rewardTitle": "給作者一點支持",
-  "rewardHint": "喜歡就用，方便就行。\n如果這個免費工具幫到了你，\n一杯奶茶就是最大的鼓勵 🍵",
+  "rewardHint": "喜歡就用，方便就行。\n如果這個免費工具幫到了你，一杯奶茶就是最大的鼓勵 🍵",
   "nextVersionPreview": "下一版本預告",
   "multiRoomMode": "多房間模式",
   "minimalMode": "極簡模式",
@@ -161,7 +161,7 @@
   "shareDurationHours": "{hours} 小時",
   "shareDurationHoursMinutes": "{hours} 小時 {minutes} 分",
   "open": "開啟",
-  "cloudPromoHint": "你有雲端伺服器需求的話，\n可以看看這些活動價，\n順帶也支持到了專案開發 👇",
+  "cloudPromoHint": "你有雲端伺服器需求的話，\n可以看看這些活動價，順帶也支持到了專案開發 👇",
   "supportSectionTitle": "給作者一點支持",
   "cloudSectionTitle": "雲端伺服器活動（可支持開發）"
 }
