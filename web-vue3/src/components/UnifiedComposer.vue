@@ -313,6 +313,10 @@
             <v-card-title class="text-h6 d-flex align-center">
                 <v-icon class="mr-2 unified-composer__reward-icon">{{ mdiCurrencyCny }}</v-icon>
                 {{ t('rewardTitle') }}
+                <v-spacer></v-spacer>
+                <v-btn icon density="comfortable" variant="text" size="small" @click="rewardDialog = false">
+                    <v-icon>{{ mdiClose }}</v-icon>
+                </v-btn>
             </v-card-title>
             <v-divider></v-divider>
             <v-card-text class="text-center pa-4">

@@ -11,7 +11,7 @@ import { toast, toastState } from '@/plugins/toast';
 import TraditionalColorDialog from '@/components/TraditionalColorDialog.vue';
 
 const mdiBrightness4 = 'mdi-brightness-4';
-const mdiBulletinBoard = 'mdi-bulletin-board';
+const mdiDoorOpen = 'mdi-door-open';
 const mdiChevronLeft = 'mdi-chevron-left';
 const mdiChevronRight = 'mdi-chevron-right';
 const mdiClockOutline = 'mdi-clock-outline';
@@ -93,7 +93,14 @@ const filteredRooms = computed(() => {
 });
 const currentRoomEntry = computed(() => {
     const currentRoomName = ws.room || '';
-    return filteredRooms.value.find(room => room.name === currentRoomName) || createOptimisticRoom(currentRoomName);
+    const matching = filteredRooms.value.find(room => room.name === currentRoomName);
+    if (matching) {
+        return matching;
+    }
+    if (roomSearch.value) {
+        return null;
+    }
+    return createOptimisticRoom(currentRoomName);
 });
 const favoriteRooms = computed(() => {
     const currentRoomName = ws.room || '';
@@ -107,6 +114,8 @@ const otherRooms = computed(() => {
     const currentRoomName = ws.room || '';
     return filteredRooms.value.filter(room => !room.isFavorite && !room.isActive && room.name !== currentRoomName);
 });
+const favoriteRoomCount = computed(() => availableRooms.value.filter(room => room.isFavorite).length);
+const activeRoomCount = computed(() => availableRooms.value.filter(room => room.isActive).length);
 const roomGroups = computed(() => [
     {
         key: 'favorites',
@@ -493,7 +502,7 @@ watch(() => route.fullPath, () => {
             <v-tooltip left>
                 <template v-slot:activator="{ props }">
                     <v-btn icon density="compact" variant="text" v-bind="props" @click="ws.roomInput = ws.room; ws.roomDialog = true">
-                        <v-icon>{{mdiBulletinBoard}}</v-icon>
+                        <v-icon>{{mdiDoorOpen}}</v-icon>
                     </v-btn>
                 </template>
                 <span>{{ t('enterRoom') }}</span>
@@ -588,8 +597,8 @@ watch(() => route.fullPath, () => {
 
                         <div class="room-browser__summary">
                             <v-chip size="small" :variant="'outlined'" color="primary">{{ getRoomDisplayName({ name: ws.room }) }}</v-chip>
-                            <v-chip size="small" :variant="'outlined'">{{ favoriteRooms.length }} {{ t('favoriteRoomsLabel') }}</v-chip>
-                            <v-chip size="small" :variant="'outlined'">{{ activeRooms.length }} {{ t('activeRoomsLabel') }}</v-chip>
+                            <v-chip size="small" :variant="'outlined'">{{ favoriteRoomCount }} {{ t('favoriteRoomsLabel') }}</v-chip>
+                            <v-chip size="small" :variant="'outlined'">{{ activeRoomCount }} {{ t('activeRoomsLabel') }}</v-chip>
                         </div>
 
                         <div v-if="roomsLoading && availableRooms.length === 0" class="text-center py-4">
@@ -1073,20 +1082,12 @@ watch(() => route.fullPath, () => {
                             hide-details
                             class="room-browser__search"
                         ></v-text-field>
-                        <v-btn
-                            :variant="'outlined'"
-                            color="primary"
-                            class="room-browser__manual-action"
-                            @click="roomSheet = false; ws.roomInput = ws.room; ws.roomDialog = true"
-                        >
-                            {{ t('enterRoom') }}
-                        </v-btn>
                     </div>
 
                     <div class="room-browser__summary">
                         <v-chip size="small" :variant="'outlined'" color="primary">{{ getRoomDisplayName({ name: ws.room }) }}</v-chip>
-                        <v-chip size="small" :variant="'outlined'">{{ favoriteRooms.length }} {{ t('favoriteRoomsLabel') }}</v-chip>
-                        <v-chip size="small" :variant="'outlined'">{{ activeRooms.length }} {{ t('activeRoomsLabel') }}</v-chip>
+                        <v-chip size="small" :variant="'outlined'">{{ favoriteRoomCount }} {{ t('favoriteRoomsLabel') }}</v-chip>
+                        <v-chip size="small" :variant="'outlined'">{{ activeRoomCount }} {{ t('activeRoomsLabel') }}</v-chip>
                     </div>
 
                     <div v-if="roomsLoading && availableRooms.length === 0" class="text-center py-4">
@@ -1489,10 +1490,6 @@ watch(() => route.fullPath, () => {
 
 .room-browser__search {
     flex: 1;
-}
-
-.room-browser__manual-action {
-    flex: 0 0 auto;
 }
 
 .room-browser__summary {

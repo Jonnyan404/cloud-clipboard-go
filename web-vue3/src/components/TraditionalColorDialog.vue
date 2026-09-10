@@ -1,7 +1,13 @@
 <template>
     <v-dialog v-model="visible" max-width="380" scrollable>
 <v-card class="cc-color-dialog">
-                <v-card-title>{{ t('traditionalColors') }}</v-card-title>
+                <v-card-title class="d-flex align-center">
+                    {{ t('traditionalColors') }}
+                    <v-spacer></v-spacer>
+                    <v-btn icon density="comfortable" variant="text" size="small" @click="visible = false">
+                        <v-icon>{{ mdiClose }}</v-icon>
+                    </v-btn>
+                </v-card-title>
                 <v-card-text class="pt-0">
                     <div class="cc-color-dialog__divider-text">
                         742
@@ -55,6 +61,7 @@ import { useI18n } from 'vue-i18n';
 import { traditionalColorGroups } from '@/data/traditionalColors';
 
 const visible = defineModel({ type: Boolean, default: false });
+const mdiClose = 'mdi-close';
 
 const theme = useTheme();
 const { t } = useI18n();
