@@ -14,7 +14,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BASE_DIR="$(dirname "$SCRIPT_DIR")"  # 这是 openwrt 目录
 LUCI_DIR="$BASE_DIR/luci-app-cloud-clipboard"  # 直接在 openwrt 目录下
 PKG_DIR="$BASE_DIR/build/luci-app"
-IPK_NAME="luci-app-cloud-clipboard_${VERSION}_all.ipk"
+IPK_NAME="CCG_server-luci-ipk-all-v${VERSION}.ipk"
 
 echo "=== 打包 LuCI 应用 $VERSION 为 OpenWrt IPK ==="
 echo "SCRIPT_DIR: $SCRIPT_DIR"
