@@ -382,6 +382,17 @@ func (s *ClipboardServer) handle_push(w http.ResponseWriter, r *http.Request) {
 				break
 			}
 			if len(p) > 0 {
+				// Web 端延迟测量: 客户端发送 {"event":"ping","data":<clientMs>},
+				// 这里原样回显 data, 客户端用 (Date.now()-data) 计算 RTT。
+				var pingMsg WebSocketMessage
+				if json.Unmarshal(p, &pingMsg) == nil && pingMsg.Event == "ping" {
+					if t, ok := pingMsg.Data.(float64); ok {
+						if err := conn.WriteJSON(WebSocketMessage{Event: "pong", Data: t}); err != nil {
+							return
+						}
+						continue
+					}
+				}
 				s.logger.Printf("收到来自 %s (ID: %s) 的 WebSocket 心跳消息: 类型 %d, 内容: %s",
 					conn.RemoteAddr(), deviceID, messageType, string(p))
 			}

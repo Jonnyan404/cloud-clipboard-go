@@ -122,6 +122,7 @@
   "showDeviceInfo": "Show Device Info",
   "showSenderIP": "Show Sender IP",
   "clipboardClearedRefresh": "Clipboard cleared, refresh the page to take effect",
+  "latency": "Latency",
   "showQrCode": "Show QR Code",
   "scanToAccess": "Scan to Access",
   "currentShare": "Current",

@@ -28,6 +28,7 @@ const mdiIpNetworkOutline = 'mdi-ip-network-outline';
 const mdiLanConnect = 'mdi-lan-connect';
 const mdiLanDisconnect = 'mdi-lan-disconnect';
 const mdiLanPending = 'mdi-lan-pending';
+const mdiTimerOutline = 'mdi-timer-outline';
 const mdiEarth = 'mdi-earth';
 const mdiLock = 'mdi-lock';
 const mdiCog = 'mdi-cog';
@@ -76,6 +77,24 @@ const currentLocaleCode = computed(() => {
 });
 const isDesktopRoomDockEnabled = computed(() => {
     return display.width.value > 1263 && app.config && app.config.server && app.config.server.roomList;
+});
+const latencyValue = computed(() => {
+    if (ws.latency === null) {
+        return '';
+    }
+    return `${Math.round(ws.latency)} ms`;
+});
+const latencyColor = computed(() => {
+    if (ws.latency === null) {
+        return 'grey';
+    }
+    if (ws.latency < 60) {
+        return 'success';
+    }
+    if (ws.latency < 120) {
+        return 'warning';
+    }
+    return 'error';
 });
 const isDesktopRoomDockVisible = computed(() => isDesktopRoomDockEnabled.value && roomDockVisible.value);
 const filteredRooms = computed(() => {
@@ -516,6 +535,21 @@ watch(() => route.fullPath, () => {
                     </v-btn>
                 </template>
                 <span>{{ t('enterRoom') }}</span>
+            </v-tooltip>
+            <v-tooltip left v-if="ws.websocket && ws.latency !== null">
+                <template v-slot:activator="{ props }">
+                    <v-chip
+                        size="small"
+                        variant="tonal"
+                        :color="latencyColor"
+                        class="mx-1"
+                        v-bind="props"
+                    >
+                        <v-icon start size="x-small">{{ mdiTimerOutline }}</v-icon>
+                        {{ latencyValue }}
+                    </v-chip>
+                </template>
+                <span>{{ t('latency') }}</span>
             </v-tooltip>
             <v-tooltip left>
                 <template v-slot:activator="{ props }">
