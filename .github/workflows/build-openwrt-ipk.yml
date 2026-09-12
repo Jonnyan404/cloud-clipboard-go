@@ -15,7 +15,7 @@ on:
         default: '5.0.4'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-binaries:
@@ -193,3 +193,31 @@ jobs:
         with:
           name: CCG_server-luci-apk-noarch-v${{ inputs.version }}.apk
           path: openwrt/build/CCG_server-luci-apk-noarch-v${{ inputs.version }}.apk
+
+  # 仅手动触发(workflow_dispatch)时执行：将产物覆盖上传到指定版本的 release，免去频繁发布
+  release:
+    needs: [build-binaries, build-ipk, build-apk, build-luci]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Display structure of downloaded files
+        run: ls -R artifacts
+
+      - name: Upload assets to release (overwrite)
+        uses: softprops/action-gh-release@v3
+        with:
+          files: |
+            artifacts/**/*.ipk
+            artifacts/**/*.apk
+          overwrite_files: true
+          tag_name: v${{ inputs.version }}
+          name: v${{ inputs.version }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
