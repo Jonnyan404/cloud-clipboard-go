@@ -22,12 +22,12 @@ COPY cloud-clip/entrypoint.sh /app/entrypoint.sh
 # 按平台映射 Release 归档名并解压出二进制
 RUN chmod +x /app/entrypoint.sh \
  && case "${TARGETARCH}-${TARGETVARIANT}" in \
-      amd64-*) B="Linux_x86_64";; \
-      arm64-*) B="Linux_aarch64";; \
-      arm-v7)  B="Linux_armv7";; \
+      amd64-*) B="linux-x86_64";; \
+      arm64-*) B="linux-aarch64";; \
+      arm-v7)  B="linux-armv7";; \
       *) echo "不支持的平台: ${TARGETARCH}-${TARGETVARIANT}"; exit 1;; \
     esac \
- && wget -q -O - "https://github.com/jonnyan404/cloud-clipboard-go/releases/download/${VERSION}/cloud-clipboard-go_${B}.tar.gz" \
+ && wget -q -O - "https://github.com/jonnyan404/cloud-clipboard-go/releases/download/${VERSION}/CCG_server-${B}-${VERSION}.tar.gz" \
       | tar -xz -C /app/server-node/ cloud-clipboard-go \
  && chmod +x /app/server-node/cloud-clipboard-go
 
