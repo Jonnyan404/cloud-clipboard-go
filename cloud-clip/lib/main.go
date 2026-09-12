@@ -136,6 +136,9 @@ func NewClipboardServer(cfg *Config) (*ClipboardServer, error) {
 		// 初始化房间管理相关字段
 		roomStats:      make(map[string]*RoomStat),
 		roomStatsMutex: sync.RWMutex{},
+
+		// 局域网延迟统计
+		latency: newLatencyTracker(30),
 	}
 
 	if err := s.loadHistoryData(); err != nil {

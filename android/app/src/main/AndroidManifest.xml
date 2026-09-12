@@ -28,10 +28,6 @@
             </intent-filter>
         </activity>
 
-        <activity
-            android:name=".AdvancedSettingsActivity"
-            android:label="高级设置" />
-
         <service
             android:name=".ClipboardService"
             android:enabled="true"

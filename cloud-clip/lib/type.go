@@ -81,6 +81,44 @@ type ClipboardServer struct {
 	roomStats         map[string]*RoomStat `json:"-"` // 房间统计信息，不序列化
 	roomStatsMutex    sync.RWMutex         `json:"-"` // 房间统计读写锁
 	roomCleanupTicker *time.Ticker         `json:"-"` // 房间清理定时器
+
+	// 局域网延迟统计（WebSocket ping/pong RTT）
+	latency *latencyTracker `json:"-"`
+}
+
+// latencyTracker 维护最近若干次 WS ping/pong 往返时间样本，用于计算平均延迟
+type latencyTracker struct {
+	mu      sync.Mutex
+	samples []float64 // 毫秒
+	max     int
+}
+
+func newLatencyTracker(max int) *latencyTracker {
+	return &latencyTracker{samples: make([]float64, 0, max), max: max}
+}
+
+func (l *latencyTracker) add(ms float64) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if len(l.samples) >= l.max {
+		l.samples = append(l.samples[1:], ms)
+	} else {
+		l.samples = append(l.samples, ms)
+	}
+}
+
+// average 返回平均往返延迟（毫秒）；无样本时返回 -1
+func (l *latencyTracker) average() float64 {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if len(l.samples) == 0 {
+		return -1
+	}
+	sum := 0.0
+	for _, s := range l.samples {
+		sum += s
+	}
+	return sum / float64(len(l.samples))
 }
 
 // file item in File[]
