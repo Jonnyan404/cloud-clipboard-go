@@ -41,10 +41,18 @@
     <string name="settings_title">主要设置</string>
     <string name="more_settings">更多设置</string>
     <string name="more_settings_desc">文本限制、文件过期等高级配置</string>
+    <string name="language_label">语言 / Language</string>
+    <string name="language_system">跟随系统</string>
+    <string name="language_zh">简体中文</string>
+    <string name="language_en">English</string>
+    <string name="language_choose">选择语言</string>
     <string name="setting_text_limit">文本长度限制(字符)</string>
     <string name="setting_file_expire">文件过期时间(秒)</string>
     <string name="setting_file_limit">文件大小限制(MB)</string>
     <string name="setting_history_count">历史记录条数</string>
+    <string name="setting_room_list">房间列表</string>
+    <string name="setting_room_auth">房间密码(格式: 房间名=密码)</string>
+    <string name="room_auth_hint">每行一个,例如\nprivate=123\nfinance=456</string>
     <string name="preview_config">预览配置</string>
     <string name="save_config">保存配置</string>
     <string name="config_saved">配置已保存,重启服务后生效</string>

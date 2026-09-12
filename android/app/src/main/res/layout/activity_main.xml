@@ -763,6 +763,59 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:orientation="horizontal"
+                            android:gravity="center_vertical"
+                            android:paddingTop="4dp"
+                            android:paddingBottom="4dp">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="@string/setting_room_list"
+                                android:textColor="#232D3D"
+                                android:textSize="14sp" />
+
+                            <Switch
+                                android:id="@+id/roomListSwitch"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:showText="false" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical"
+                            android:gravity="top"
+                            android:paddingTop="4dp"
+                            android:paddingBottom="4dp">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/setting_room_auth"
+                                android:textColor="#232D3D"
+                                android:textSize="14sp" />
+
+                            <EditText
+                                android:id="@+id/roomAuthInput"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:inputType="textMultiLine"
+                                android:hint="@string/room_auth_hint"
+                                android:gravity="start"
+                                android:background="#F4F6FA"
+                                android:padding="10dp"
+                                android:singleLine="false"
+                                android:minLines="2"
+                                android:textSize="13sp"
+                                android:fontFamily="monospace" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
                             android:layout_marginTop="10dp">
 
                             <TextView
@@ -798,6 +851,41 @@
                                 android:focusable="true" />
                         </LinearLayout>
                     </LinearLayout>
+
+                    <!-- 语言切换 -->
+                    <LinearLayout
+                        android:id="@+id/languageRow"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:background="#FFFFFF"
+                        android:elevation="1dp"
+                        android:padding="16dp"
+                        android:gravity="center_vertical"
+                        android:clickable="true"
+                        android:focusable="true">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/language_label"
+                            android:textColor="#232D3D"
+                            android:textSize="14sp" />
+
+                        <TextView
+                            android:id="@+id/languageValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/language_system"
+                            android:textColor="#8B93A1"
+                            android:textSize="13sp" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="#F0F2F6" />
 
                     <LinearLayout
                         android:layout_width="wrap_content"

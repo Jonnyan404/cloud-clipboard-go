@@ -41,10 +41,18 @@
     <string name="settings_title">Main settings</string>
     <string name="more_settings">More settings</string>
     <string name="more_settings_desc">Text limit, file expiry and other advanced options</string>
+    <string name="language_label">语言 / Language</string>
+    <string name="language_system">Follow system</string>
+    <string name="language_zh">简体中文</string>
+    <string name="language_en">English</string>
+    <string name="language_choose">Choose language</string>
     <string name="setting_text_limit">Text length limit (chars)</string>
     <string name="setting_file_expire">File expiry (seconds)</string>
     <string name="setting_file_limit">File size limit (MB)</string>
     <string name="setting_history_count">History retention count</string>
+    <string name="setting_room_list">Room list</string>
+    <string name="setting_room_auth">Room passwords (format: room=password)</string>
+    <string name="room_auth_hint">One per line, e.g.\nprivate=123\nfinance=456</string>
     <string name="preview_config">Preview config</string>
     <string name="save_config">Save config</string>
     <string name="config_saved">Config saved. Restart service to apply.</string>

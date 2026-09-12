@@ -20,6 +20,8 @@ import android.view.ViewGroup
 import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.os.LocaleListCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.floatingactionbutton.FloatingActionButton
@@ -70,8 +72,12 @@ class MainActivity : AppCompatActivity() {
     private lateinit var fileExpireInput: EditText
     private lateinit var fileLimitInput: EditText
     private lateinit var historyCountInput: EditText
+    private lateinit var roomListSwitch: Switch
+    private lateinit var roomAuthInput: EditText
     private lateinit var previewConfigButton: TextView
     private lateinit var saveConfigButton: TextView
+    private lateinit var languageRow: View
+    private lateinit var languageValue: TextView
 
     private val handler = Handler(Looper.getMainLooper())
     private val updateRunnable = object : Runnable {
@@ -143,11 +149,16 @@ class MainActivity : AppCompatActivity() {
         fileExpireInput = findViewById(R.id.fileExpireInput)
         fileLimitInput = findViewById(R.id.fileLimitInput)
         historyCountInput = findViewById(R.id.historyCountInput)
+        roomListSwitch = findViewById(R.id.roomListSwitch)
+        roomAuthInput = findViewById(R.id.roomAuthInput)
         previewConfigButton = findViewById(R.id.previewConfigButton)
         saveConfigButton = findViewById(R.id.saveConfigButton)
+        languageRow = findViewById(R.id.languageRow)
+        languageValue = findViewById(R.id.languageValue)
 
         loadConfig()
         loadMoreSettings()
+        loadLanguage()
 
         // 底部导航切换
         bottomNav.setOnItemSelectedListener { item ->
@@ -203,6 +214,8 @@ class MainActivity : AppCompatActivity() {
                 Toast.makeText(this, R.string.config_saved, Toast.LENGTH_SHORT).show()
             }
         }
+
+        languageRow.setOnClickListener { showLanguageDialog() }
 
         openBrowserButton.setOnClickListener {
             val url = addressText.text.toString()
@@ -304,12 +317,48 @@ class MainActivity : AppCompatActivity() {
             fileExpireInput.setText((file?.optInt("expire") ?: 3600).toString())
             fileLimitInput.setText((file?.optLong("limit")?.div(1024 * 1024) ?: 256).toString())
             historyCountInput.setText((server?.optInt("history") ?: 100).toString())
+            roomListSwitch.isChecked = server?.optBoolean("roomList") ?: false
+            roomAuthInput.setText(renderRoomAuth(server?.optJSONObject("roomAuth")))
         } catch (e: Exception) {
             textLimitInput.setText("4096")
             fileExpireInput.setText("3600")
             fileLimitInput.setText("256")
             historyCountInput.setText("100")
+            roomListSwitch.isChecked = false
+            roomAuthInput.setText("")
         }
+    }
+
+    // roomAuth(形如 {"private":{"password":"123"}}) -> 每行 "房间名=密码"
+    private fun renderRoomAuth(roomAuth: JSONObject?): String {
+        if (roomAuth == null) return ""
+        val lines = mutableListOf<String>()
+        for (key in roomAuth.keys()) {
+            if (key == "__default__") continue
+            val entry = roomAuth.optJSONObject(key)
+            val pass = entry?.optString("password")
+            if (key.isNotEmpty() && !pass.isNullOrEmpty()) {
+                lines.add("$key=$pass")
+            }
+        }
+        return lines.joinToString("\n")
+    }
+
+    // 每行 "房间名=密码" -> roomAuth JSON
+    private fun parseRoomAuth(text: String): JSONObject {
+        val result = JSONObject()
+        for (line in text.lines()) {
+            val trimmed = line.trim()
+            if (trimmed.isEmpty()) continue
+            val eq = trimmed.indexOf('=')
+            val room = if (eq > 0) trimmed.substring(0, eq).trim() else trimmed.trim()
+            val pass = if (eq > 0) trimmed.substring(eq + 1).trim() else ""
+            if (room.isEmpty() || pass.isEmpty()) continue
+            val entry = JSONObject()
+            entry.put("password", pass)
+            result.put(room, entry)
+        }
+        return result
     }
 
     private fun buildConfigJson(): JSONObject {
@@ -322,14 +371,20 @@ class MainActivity : AppCompatActivity() {
         file.put("expire", fileExpireInput.text.toString().toIntOrNull() ?: 3600)
         file.put("limit", (fileLimitInput.text.toString().toLongOrNull() ?: 256) * 1024 * 1024)
         server.put("history", historyCountInput.text.toString().toIntOrNull() ?: 100)
+        server.put("roomList", roomListSwitch.isChecked)
+        server.put("roomAuth", parseRoomAuth(roomAuthInput.text.toString()))
         return json
     }
 
     private fun saveMoreSettings(): Boolean {
         return try {
-            CloudClipboardPaths.resolveConfigFile(this).writeText(buildConfigJson().toString(2))
+            val f = CloudClipboardPaths.resolveConfigFile(this)
+            android.util.Log.i("CloudClipboard", "saveMoreSettings: writing ${f.absolutePath}")
+            f.writeText(buildConfigJson().toString(2))
+            android.util.Log.i("CloudClipboard", "saveMoreSettings: OK")
             true
         } catch (e: Exception) {
+            android.util.Log.e("CloudClipboard", "saveMoreSettings failed", e)
             false
         }
     }
@@ -350,6 +405,45 @@ class MainActivity : AppCompatActivity() {
             .setView(scroll)
             .setPositiveButton(android.R.string.ok, null)
             .show()
+    }
+
+    private fun loadLanguage() {
+        updateLanguageValue()
+    }
+
+    private fun updateLanguageValue() {
+        languageValue.text = when (getSharedPreferences("config", MODE_PRIVATE).getString("language", "system")) {
+            "zh" -> getString(R.string.language_zh)
+            "en" -> getString(R.string.language_en)
+            else -> getString(R.string.language_system)
+        }
+    }
+
+    private fun showLanguageDialog() {
+        val options = arrayOf(getString(R.string.language_system), getString(R.string.language_zh), getString(R.string.language_en))
+        val values = arrayOf("system", "zh", "en")
+        val current = getSharedPreferences("config", MODE_PRIVATE).getString("language", "system")
+        val checked = values.indexOf(current).coerceAtLeast(0)
+        AlertDialog.Builder(this)
+            .setTitle(R.string.language_choose)
+            .setSingleChoiceItems(options, checked) { dialog, which ->
+                setLanguage(values[which])
+                dialog.dismiss()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun setLanguage(code: String) {
+        val prefs = getSharedPreferences("config", MODE_PRIVATE).edit()
+        val target = when (code) {
+            "zh" -> LocaleListCompat.forLanguageTags("zh-CN")
+            "en" -> LocaleListCompat.forLanguageTags("en-US")
+            else -> LocaleListCompat.getEmptyLocaleList()
+        }
+        prefs.putString("language", code)
+        prefs.apply()
+        AppCompatDelegate.setApplicationLocales(target)
     }
 
     private fun loadHistory() {
