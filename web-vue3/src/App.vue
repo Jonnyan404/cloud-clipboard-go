@@ -1559,14 +1559,13 @@ watch(() => route.fullPath, () => {
 }
 
 .room-title__chip {
-    flex-grow: 1;
     flex-shrink: 1;
     min-width: 0;
     max-width: 100%;
     cursor: pointer;
 }
 
-.room-title__chip .v-chip__content {
+.room-title__chip :deep(.v-chip__content) {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1580,7 +1579,6 @@ watch(() => route.fullPath, () => {
 @media (max-width: 600px) {
     .room-title__chip {
         flex-shrink: 1;
-        flex-grow: 1;
         max-width: 100%;
     }
 }
