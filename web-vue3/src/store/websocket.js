@@ -38,6 +38,8 @@ export const useWebSocketStore = defineStore('websocket', {
         roomDialog: false,
         retry: 0,
         heartbeatTimer: null,
+        pingTimer: null,
+        latency: null,
         pendingReceiveQueue: [],
         receiveFlushTimer: null,
     }),
@@ -329,11 +331,25 @@ export const useWebSocketStore = defineStore('websocket', {
                     }
                 };
                 this.heartbeatTimer = setInterval(heartbeat, 30000);
+                const ping = () => {
+                    if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
+                        try {
+                            this.websocket.send(JSON.stringify({ event: 'ping', data: Date.now() }));
+                        } catch {}
+                    }
+                };
+                ping();
+                this.pingTimer = setInterval(ping, 3000);
                 ws.onclose = async () => {
                     if (this.heartbeatTimer) {
                         clearInterval(this.heartbeatTimer);
                         this.heartbeatTimer = null;
                     }
+                    if (this.pingTimer) {
+                        clearInterval(this.pingTimer);
+                        this.pingTimer = null;
+                    }
+                    this.latency = null;
                     this.websocket = null;
                     this.websocketConnecting = false;
                     app.device = [];
@@ -486,6 +502,15 @@ export const useWebSocketStore = defineStore('websocket', {
                     this.openAuthDialog(this.room);
                     break;
                 }
+                case 'pong': {
+                    if (typeof data === 'number' && data > 0) {
+                        const rtt = Date.now() - data;
+                        if (rtt >= 0) {
+                            this.latency = rtt;
+                        }
+                    }
+                    break;
+                }
             }
         },
         disconnect() {
@@ -503,6 +528,10 @@ export const useWebSocketStore = defineStore('websocket', {
             if (this.heartbeatTimer) {
                 clearInterval(this.heartbeatTimer);
                 this.heartbeatTimer = null;
+            }
+            if (this.pingTimer) {
+                clearInterval(this.pingTimer);
+                this.pingTimer = null;
             }
             if (this.receiveFlushTimer) {
                 clearTimeout(this.receiveFlushTimer);
@@ -536,6 +565,11 @@ export const useWebSocketStore = defineStore('websocket', {
                 clearInterval(this.heartbeatTimer);
                 this.heartbeatTimer = null;
             }
+            if (this.pingTimer) {
+                clearInterval(this.pingTimer);
+                this.pingTimer = null;
+            }
+            this.latency = null;
             if (this.receiveFlushTimer) {
                 clearTimeout(this.receiveFlushTimer);
                 this.receiveFlushTimer = null;
@@ -552,6 +586,11 @@ export const useWebSocketStore = defineStore('websocket', {
         failure() {
             const app = useAppStore();
             this.websocket = null;
+            this.latency = null;
+            if (this.pingTimer) {
+                clearInterval(this.pingTimer);
+                this.pingTimer = null;
+            }
             app.device = [];
             if (this.retry++ < 3) {
                 this.connect();

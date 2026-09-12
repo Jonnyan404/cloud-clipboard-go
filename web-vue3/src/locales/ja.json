@@ -122,6 +122,7 @@
   "showDeviceInfo": "デバイス情報を表示",
   "showSenderIP": "送信者IPを表示",
   "clipboardClearedRefresh": "クリップボードがクリアされました、ページを更新して有効にしてください",
+  "latency": "ネットワーク遅延",
   "showQrCode": "QRコードを表示",
   "scanToAccess": "スキャンしてアクセス",
   "currentShare": "現在",

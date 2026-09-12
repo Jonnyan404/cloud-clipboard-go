@@ -113,6 +113,8 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        supportActionBar?.setDisplayShowTitleEnabled(false)
+        supportActionBar?.setBackgroundDrawable(getDrawable(R.drawable.gradient_cover))
 
         pageServices = findViewById(R.id.pageServices)
         pageSync = findViewById(R.id.pageSync)
@@ -329,7 +331,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // roomAuth(形如 {"private":{"password":"123"}}) -> 每行 "房间名=密码"
+    // roomAuth(形如 {"private":{"password":"123","fileExpire":3600}}) -> 每行 "房间名=密码,过期秒数"(过期秒数可选)
     private fun renderRoomAuth(roomAuth: JSONObject?): String {
         if (roomAuth == null) return ""
         val lines = mutableListOf<String>()
@@ -338,13 +340,14 @@ class MainActivity : AppCompatActivity() {
             val entry = roomAuth.optJSONObject(key)
             val pass = entry?.optString("password")
             if (key.isNotEmpty() && !pass.isNullOrEmpty()) {
-                lines.add("$key=$pass")
+                val expire = entry?.optInt("fileExpire", Int.MIN_VALUE)
+                lines.add(if (expire != null && expire != Int.MIN_VALUE) "$key=$pass,$expire" else "$key=$pass")
             }
         }
         return lines.joinToString("\n")
     }
 
-    // 每行 "房间名=密码" -> roomAuth JSON
+    // 每行 "房间名=密码[,过期秒数]" -> roomAuth JSON
     private fun parseRoomAuth(text: String): JSONObject {
         val result = JSONObject()
         for (line in text.lines()) {
@@ -352,10 +355,18 @@ class MainActivity : AppCompatActivity() {
             if (trimmed.isEmpty()) continue
             val eq = trimmed.indexOf('=')
             val room = if (eq > 0) trimmed.substring(0, eq).trim() else trimmed.trim()
-            val pass = if (eq > 0) trimmed.substring(eq + 1).trim() else ""
-            if (room.isEmpty() || pass.isEmpty()) continue
+            val rest = if (eq > 0) trimmed.substring(eq + 1).trim() else ""
+            if (room.isEmpty()) continue
+            val comma = rest.lastIndexOf(',')
+            val pass = if (comma > 0) rest.substring(0, comma).trim() else rest.trim()
+            val expireText = if (comma > 0) rest.substring(comma + 1).trim() else ""
+            val expire = expireText.toIntOrNull()
+            if (pass.isEmpty()) continue
             val entry = JSONObject()
             entry.put("password", pass)
+            if (expire != null) {
+                entry.put("fileExpire", expire)
+            }
             result.put(room, entry)
         }
         return result
@@ -367,12 +378,19 @@ class MainActivity : AppCompatActivity() {
         val text = json.getJSONObject("text")
         val file = json.getJSONObject("file")
 
+        val baseDir = CloudClipboardPaths.resolveBaseDir(this)
+
+        server.put("host", "0.0.0.0")
+        server.put("port", portInput.text.toString().toIntOrNull() ?: 9501)
+        server.put("history", historyCountInput.text.toString().toIntOrNull() ?: 100)
+        server.put("historyFile", File(baseDir, "history.json").absolutePath)
+        server.put("storageDir", File(baseDir, "uploads").absolutePath)
+        server.put("auth", authInput.text.toString())
+        server.put("roomList", roomListSwitch.isChecked)
+        server.put("roomAuth", parseRoomAuth(roomAuthInput.text.toString()))
         text.put("limit", textLimitInput.text.toString().toIntOrNull() ?: 4096)
         file.put("expire", fileExpireInput.text.toString().toIntOrNull() ?: 3600)
         file.put("limit", (fileLimitInput.text.toString().toLongOrNull() ?: 256) * 1024 * 1024)
-        server.put("history", historyCountInput.text.toString().toIntOrNull() ?: 100)
-        server.put("roomList", roomListSwitch.isChecked)
-        server.put("roomAuth", parseRoomAuth(roomAuthInput.text.toString()))
         return json
     }
 
