@@ -42,11 +42,11 @@ jobs:
       - name: Upload LuCI IPK artifact
         uses: actions/upload-artifact@v7
         with:
-          name: luci-app-cloud-clipboard_${{ github.event.inputs.version }}_all.ipk
-          path: openwrt/build/luci-app-cloud-clipboard_${{ github.event.inputs.version }}_all.ipk
+          name: CCG_server-luci-ipk-all-v${{ github.event.inputs.version }}.ipk
+          path: openwrt/build/CCG_server-luci-ipk-all-v${{ github.event.inputs.version }}.ipk
 
       - name: Upload LuCI APK artifact
         uses: actions/upload-artifact@v7
         with:
-          name: luci-app-cloud-clipboard-${{ github.event.inputs.version }}-noarch.apk
-          path: openwrt/build/luci-app-cloud-clipboard-${{ github.event.inputs.version }}-noarch.apk
+          name: CCG_server-luci-apk-noarch-v${{ github.event.inputs.version }}.apk
+          path: openwrt/build/CCG_server-luci-apk-noarch-v${{ github.event.inputs.version }}.apk

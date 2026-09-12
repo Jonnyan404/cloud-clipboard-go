@@ -16,7 +16,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BASE_DIR="$(dirname "$SCRIPT_DIR")"
 LUCI_DIR="$BASE_DIR/luci-app-cloud-clipboard"
 PKG_DIR="$BASE_DIR/build/luci-app-apk"
-APK_NAME="luci-app-cloud-clipboard-${VERSION}-noarch.apk"
+APK_NAME="CCG_server-luci-apk-noarch-v${VERSION}.apk"
 TEMP_DIR="$BASE_DIR/build/.tmp-luci-app-apk-$$"
 
 to_container_path() {

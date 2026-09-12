@@ -1,9 +1,12 @@
 name: Build OpenWrt Packages
 
 on:
-#   push:
-#     # tags:
-#     #   - 'v*' # 当创建版本标签时触发
+  workflow_call:
+    inputs:
+      version:
+        description: '版本号 (不含v前缀)'
+        required: true
+        type: string
   workflow_dispatch: # 允许手动触发
     inputs:
       version:
@@ -12,7 +15,7 @@ on:
         default: '5.0.4'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build-binaries:
@@ -39,13 +42,13 @@ jobs:
       - name: Build binary
         run: |
           chmod +x openwrt/scripts/build.sh
-          ./openwrt/scripts/build.sh ${{ github.event.inputs.version }}
+          ./openwrt/scripts/build.sh ${{ inputs.version }}
 
       - name: Upload binary artifact
         uses: actions/upload-artifact@v7
         with:
-          name: openwrt-binaries-${{ github.event.inputs.version }}
-          path: openwrt/build/cloud-clipboard-${{ github.event.inputs.version }}-*
+          name: openwrt-binaries-${{ inputs.version }}
+          path: openwrt/build/cloud-clipboard-${{ inputs.version }}-*
 
   build-ipk:
     runs-on: ubuntu-latest
@@ -65,19 +68,19 @@ jobs:
       - name: Download binary artifacts
         uses: actions/download-artifact@v8
         with:
-          name: openwrt-binaries-${{ github.event.inputs.version }}
+          name: openwrt-binaries-${{ inputs.version }}
           path: openwrt/build
 
       - name: Package IPK
         run: |
           chmod +x openwrt/scripts/package-openwrt.sh
-          ./openwrt/scripts/package-openwrt.sh ${{ github.event.inputs.version }} ${{ matrix.arch }}
+          ./openwrt/scripts/package-openwrt.sh ${{ inputs.version }} ${{ matrix.arch }}
 
       - name: Upload IPK artifact
         uses: actions/upload-artifact@v7
         with:
-          name: cloud-clipboard_${{ github.event.inputs.version }}_${{ matrix.arch }}.ipk
-          path: openwrt/build/cloud-clipboard_${{ github.event.inputs.version }}_${{ matrix.arch }}.ipk
+          name: CCG_server-openwrt-ipk-${{ matrix.arch }}-v${{ inputs.version }}.ipk
+          path: openwrt/build/CCG_server-openwrt-ipk-${{ matrix.arch }}-v${{ inputs.version }}.ipk
 
   build-apk:
     runs-on: ubuntu-latest
@@ -129,7 +132,7 @@ jobs:
       - name: Download binary artifacts
         uses: actions/download-artifact@v8
         with:
-          name: openwrt-binaries-${{ github.event.inputs.version }}
+          name: openwrt-binaries-${{ inputs.version }}
           path: openwrt/build
 
       - name: Package APK
@@ -141,14 +144,14 @@ jobs:
             sh -lc '
               apk add --no-cache bash >/dev/null
               chmod +x openwrt/scripts/package-openwrt-apk.sh
-              bash ./openwrt/scripts/package-openwrt-apk.sh ${{ github.event.inputs.version }} ${{ matrix.binary_arch }} ${{ matrix.apk_arch }}
+              bash ./openwrt/scripts/package-openwrt-apk.sh ${{ inputs.version }} ${{ matrix.binary_arch }} ${{ matrix.apk_arch }}
             '
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v7
         with:
-          name: cloud-clipboard-${{ github.event.inputs.version }}-${{ matrix.apk_arch }}.apk
-          path: openwrt/build/cloud-clipboard-${{ github.event.inputs.version }}-${{ matrix.apk_arch }}.apk
+          name: CCG_server-openwrt-apk-${{ matrix.apk_arch }}-v${{ inputs.version }}.apk
+          path: openwrt/build/CCG_server-openwrt-apk-${{ matrix.apk_arch }}-v${{ inputs.version }}.apk
 
   build-luci:
     runs-on: ubuntu-latest
@@ -165,7 +168,7 @@ jobs:
       - name: Package LuCI IPK
         run: |
           chmod +x openwrt/scripts/package-luci-app.sh
-          ./openwrt/scripts/package-luci-app.sh ${{ github.event.inputs.version }}
+          ./openwrt/scripts/package-luci-app.sh ${{ inputs.version }}
 
       - name: Package LuCI APK
         run: |
@@ -176,47 +179,17 @@ jobs:
             sh -lc '
               apk add --no-cache bash >/dev/null
               chmod +x openwrt/scripts/package-luci-app-apk.sh
-              bash ./openwrt/scripts/package-luci-app-apk.sh ${{ github.event.inputs.version }}
+              bash ./openwrt/scripts/package-luci-app-apk.sh ${{ inputs.version }}
             '
       
       - name: Upload LuCI IPK artifact
         uses: actions/upload-artifact@v7
         with:
-          name: luci-app-cloud-clipboard_${{ github.event.inputs.version }}_all.ipk
-          path: openwrt/build/luci-app-cloud-clipboard_${{ github.event.inputs.version }}_all.ipk
+          name: CCG_server-luci-ipk-all-v${{ inputs.version }}.ipk
+          path: openwrt/build/CCG_server-luci-ipk-all-v${{ inputs.version }}.ipk
 
       - name: Upload LuCI APK artifact
         uses: actions/upload-artifact@v7
         with:
-          name: luci-app-cloud-clipboard-${{ github.event.inputs.version }}-noarch.apk
-          path: openwrt/build/luci-app-cloud-clipboard-${{ github.event.inputs.version }}-noarch.apk
-
-  release:
-    needs: [build-binaries, build-ipk, build-apk, build-luci]
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
-    
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v8
-        with:
-          path: artifacts
-          merge-multiple: true
-
-      - name: Display structure of downloaded files
-        run: ls -R artifacts
-
-      - name: Create Release
-        id: create_release
-        uses: softprops/action-gh-release@v3
-        with:
-          files: |
-            artifacts/**/*.ipk
-            artifacts/**/*.apk
-          draft: false
-          prerelease: ${{ !startsWith(github.ref, 'refs/tags/v') }}
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v{0}', github.event.inputs.version) }}
-          name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v{0}', github.event.inputs.version) }}
-          generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: CCG_server-luci-apk-noarch-v${{ inputs.version }}.apk
+          path: openwrt/build/CCG_server-luci-apk-noarch-v${{ inputs.version }}.apk

@@ -47,12 +47,13 @@ builds:
 archives:
   - formats: [ 'tar.gz' ]
     name_template: >-
-      {{ .ProjectName }}_
-      {{- title .Os }}_
+      CCG_server-
+      {{- .Os }}-
       {{- if eq .Arch "amd64" }}x86_64
       {{- else if eq .Arch "arm64" }}aarch64
       {{- else if eq .Arch "arm" }}armv7
-      {{- else }}{{ .Arch }}{{ end }}
+      {{- else }}{{ .Arch }}{{ end }}-
+      {{- .Tag }}
     format_overrides:
       - goos: windows
         formats: [ 'zip' ]

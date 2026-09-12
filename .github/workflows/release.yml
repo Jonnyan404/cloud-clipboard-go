@@ -199,15 +199,15 @@ jobs:
           APK_PATH=$(find android/app/build/outputs/apk -type f -name "app-${{ matrix.arch }}-release.apk")
           if [ -z "$APK_PATH" ]; then echo "::error::Per-arch APK file not found!" && exit 1; fi
           echo "Found APK at: $APK_PATH"
-          # 重命名 APK 到根目录，避免嵌套目录
-          mv "$APK_PATH" "cloud-clipboard-go-${{ needs.determine-tag.outputs.tag }}-${{ matrix.arch }}.apk"
+          # 重命名 APK，避免嵌套目录
+          mv "$APK_PATH" "CCG_server-android-${{ matrix.arch }}-v${{ needs.determine-tag.outputs.tag }}.apk"
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v7
         with:
           # 使用矩阵变量使 artifact 名称唯一，避免冲突
           name: apk-per-arch-artifacts-${{ matrix.arch }}
           # 直接上传重命名后的 APK 文件
-          path: cloud-clipboard-go-${{ needs.determine-tag.outputs.tag }}-${{ matrix.arch }}.apk
+          path: CCG_server-android-${{ matrix.arch }}-v${{ needs.determine-tag.outputs.tag }}.apk
 
   # ====================================================================
   # Job 4: Build Universal Android APK (新添加的 Job)
@@ -264,20 +264,29 @@ jobs:
           APK_PATH=$(find android/app/build/outputs/apk -type f -name "app-universal-release.apk")
           if [ -z "$APK_PATH" ]; then echo "::error::Universal APK file not found!" && exit 1; fi
           echo "Found Universal APK at: $APK_PATH"
-          mv "$APK_PATH" "cloud-clipboard-go-${{ needs.determine-tag.outputs.tag }}-universal.apk"
+          mv "$APK_PATH" "CCG_server-android-universal-v${{ needs.determine-tag.outputs.tag }}.apk"
       - name: Upload Universal APK Artifact
         uses: actions/upload-artifact@v7
         with:
           name: apk-universal-artifact
-          path: cloud-clipboard-go-${{ needs.determine-tag.outputs.tag }}-universal.apk
+          path: CCG_server-android-universal-v${{ needs.determine-tag.outputs.tag }}.apk
 
   # ====================================================================
-  # Job 5: Create Release and Upload All Assets
+  # Job 5: Build OpenWrt + LuCI Packages (可复用 workflow)
+  # ====================================================================
+  build-openwrt:
+    name: Build OpenWrt + LuCI Packages
+    uses: ./.github/workflows/build-openwrt-ipk.yml
+    with:
+      version: ${{ needs.determine-tag.outputs.version_name }}
+
+  # ====================================================================
+  # Job 6: Create Release and Upload All Assets
   # ====================================================================
   release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: [determine-tag, build-desktop, build-apk, build-universal-apk]
+    needs: [determine-tag, build-desktop, build-apk, build-universal-apk, build-openwrt]
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v8
@@ -295,12 +304,16 @@ jobs:
             artifacts/goreleaser-dist/*
             artifacts/apk-per-arch-artifacts-*/*.apk
             artifacts/apk-universal-artifact/*.apk
+            artifacts/CCG_server-openwrt-ipk-*/*.ipk
+            artifacts/CCG_server-openwrt-apk-*/*.apk
+            artifacts/CCG_server-luci-ipk-*/*.ipk
+            artifacts/CCG_server-luci-apk-*/*.apk
           # 注意：GoReleaser 在 --skip-publish 模式下可能不生成 release-notes.md
           # 我们暂时使用 CHANGELOG.md 作为 body
           body_path: "artifacts/goreleaser-dist/CHANGELOG.md"
 
   # ====================================================================
-  # Job 6: Sync Homebrew Tap
+  # Job 7: Sync Homebrew Tap
   # GoReleaser 以 --skip=publish 运行（Release 由 softprops 创建），
   # brews 推送被一并跳过，这里在 Release 资产就绪后手动补推 formula，
   # 必须放在 release 之后，否则用户安装时下载链接会 404
@@ -341,7 +354,7 @@ jobs:
           git push
 
   # ====================================================================
-  # Job 7: Build and Push Docker Images
+  # Job 8: Build and Push Docker Images
   # ====================================================================
   docker:
     name: Build and Push Docker

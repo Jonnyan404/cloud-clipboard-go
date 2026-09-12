@@ -46,7 +46,7 @@ resolve_package_arch() {
 
 resolve_package_arch
 
-APK_NAME="cloud-clipboard-${VERSION}-${PACKAGE_ARCH}.apk"
+APK_NAME="CCG_server-openwrt-apk-${PACKAGE_ARCH}-v${VERSION}.apk"
 
 to_container_path() {
     local host_path=$1

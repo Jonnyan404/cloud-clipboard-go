@@ -22,7 +22,7 @@ BINARY="$EXPECTED_BINARY"
 PKG_DIR="$BASE_DIR/build/pkg-$ARCH"
 CONTROL_DIR="$BASE_DIR/ipk/control"
 ROOTFS_DIR="$BASE_DIR/ipk/rootfs"
-IPK_NAME="cloud-clipboard_${VERSION}_${ARCH}.ipk"
+IPK_NAME="CCG_server-openwrt-ipk-${ARCH}-v${VERSION}.ipk"
 
 # 调试输出
 echo "脚本目录: $SCRIPT_DIR"
