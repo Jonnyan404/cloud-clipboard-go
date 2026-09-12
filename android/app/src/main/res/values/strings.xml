@@ -52,7 +52,7 @@
     <string name="setting_history_count">历史记录条数</string>
     <string name="setting_room_list">房间列表</string>
     <string name="setting_room_auth">房间密码(格式: 房间名=密码[,过期秒数])</string>
-    <string name="room_auth_hint">每行一个,例如\nprivate=123\nfinance=456,3600\n(过期秒数可选,缺省跟随全局;填 0 表示永不过期)</string>
+    <string name="room_auth_hint">房间名=密码,过期秒数(缺省跟随全局,0=永不过期)</string>
     <string name="preview_config">预览配置</string>
     <string name="save_config">保存配置</string>
     <string name="config_saved">配置已保存,重启服务后生效</string>

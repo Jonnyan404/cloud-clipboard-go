@@ -113,8 +113,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        supportActionBar?.setDisplayShowTitleEnabled(false)
-        supportActionBar?.setBackgroundDrawable(getDrawable(R.drawable.gradient_cover))
+        window.statusBarColor = android.graphics.Color.parseColor("#1F6FEB")
 
         pageServices = findViewById(R.id.pageServices)
         pageSync = findViewById(R.id.pageSync)
@@ -373,24 +372,34 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun buildConfigJson(): JSONObject {
-        val json = configJson()
-        val server = json.getJSONObject("server")
-        val text = json.getJSONObject("text")
-        val file = json.getJSONObject("file")
-
         val baseDir = CloudClipboardPaths.resolveBaseDir(this)
 
+        val server = JSONObject()
         server.put("host", "0.0.0.0")
         server.put("port", portInput.text.toString().toIntOrNull() ?: 9501)
+        server.put("prefix", "")
         server.put("history", historyCountInput.text.toString().toIntOrNull() ?: 100)
         server.put("historyFile", File(baseDir, "history.json").absolutePath)
         server.put("storageDir", File(baseDir, "uploads").absolutePath)
         server.put("auth", authInput.text.toString())
-        server.put("roomList", roomListSwitch.isChecked)
         server.put("roomAuth", parseRoomAuth(roomAuthInput.text.toString()))
+        server.put("cert", "")
+        server.put("key", "")
+        server.put("roomList", roomListSwitch.isChecked)
+        server.put("roomCleanup", 3600)
+
+        val text = JSONObject()
         text.put("limit", textLimitInput.text.toString().toIntOrNull() ?: 4096)
+
+        val file = JSONObject()
         file.put("expire", fileExpireInput.text.toString().toIntOrNull() ?: 3600)
+        file.put("chunk", 1024 * 1024)
         file.put("limit", (fileLimitInput.text.toString().toLongOrNull() ?: 256) * 1024 * 1024)
+
+        val json = JSONObject()
+        json.put("server", server)
+        json.put("text", text)
+        json.put("file", file)
         return json
     }
 
