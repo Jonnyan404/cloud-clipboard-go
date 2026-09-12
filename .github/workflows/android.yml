@@ -166,13 +166,13 @@ jobs:
           APK_PATH=$(find android/app/build/outputs/apk -type f -name "app-${{ matrix.arch }}-release.apk")
           if [ -z "$APK_PATH" ]; then echo "::error::Per-arch APK file not found!" && exit 1; fi
           echo "Found APK at: $APK_PATH"
-          mv "$APK_PATH" "cloud-clipboard-go-${{ needs.determine-tag.outputs.tag }}-${{ matrix.arch }}.apk"
+          mv "$APK_PATH" "CCG_server-android-${{ matrix.arch }}-v${{ needs.determine-tag.outputs.version_name }}.apk"
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v7
         with:
           name: apk-per-arch-artifacts-${{ matrix.arch }}
-          path: cloud-clipboard-go-${{ needs.determine-tag.outputs.tag }}-${{ matrix.arch }}.apk
+          path: CCG_server-android-${{ matrix.arch }}-v${{ needs.determine-tag.outputs.version_name }}.apk
 
   build-universal-apk:
     name: Build Universal Android APK
@@ -251,13 +251,13 @@ jobs:
           APK_PATH=$(find android/app/build/outputs/apk -type f -name "app-universal-release.apk")
           if [ -z "$APK_PATH" ]; then echo "::error::Universal APK file not found!" && exit 1; fi
           echo "Found Universal APK at: $APK_PATH"
-          mv "$APK_PATH" "cloud-clipboard-go-${{ needs.determine-tag.outputs.tag }}-universal.apk"
+          mv "$APK_PATH" "CCG_server-android-universal-v${{ needs.determine-tag.outputs.version_name }}.apk"
 
       - name: Upload Universal APK Artifact
         uses: actions/upload-artifact@v7
         with:
           name: apk-universal-artifact
-          path: cloud-clipboard-go-${{ needs.determine-tag.outputs.tag }}-universal.apk
+          path: CCG_server-android-universal-v${{ needs.determine-tag.outputs.version_name }}.apk
 
   # 单独的 job 用于更新 Release
   update-release:
