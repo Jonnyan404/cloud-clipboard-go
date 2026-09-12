@@ -310,6 +310,16 @@ export class WebSocketRoom {
       }
       if (event.data && event.data.trim()) {
         console.log(`WebSocket 消息 from ${sessionId}:`, event.data);
+
+        // Web 端延迟测量: 客户端发送 {"event":"ping","data":<clientMs>},
+        // 与 Go 后端行为一致，原样回显 data，客户端用 (Date.now()-data) 计算 RTT。
+        let parsed;
+        try {
+          parsed = JSON.parse(event.data);
+        } catch {}
+        if (parsed && parsed.event === 'ping' && typeof parsed.data === 'number') {
+          session.webSocket.send(JSON.stringify({ event: 'pong', data: parsed.data }));
+        }
       }
     } catch (error) {
       console.error(`处理消息错误 (${sessionId}):`, error);
