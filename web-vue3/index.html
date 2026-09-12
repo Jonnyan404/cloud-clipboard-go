@@ -15,7 +15,8 @@
     <div id="app"></div>
     <script type="module" src="/src/main.js"></script>
     <script>
-        if ('serviceWorker' in navigator) {
+        // dev 模式下 vite-plugin-pwa 不生成 sw.js，仅在生产环境注册
+        if ('serviceWorker' in navigator && '%MODE%' === 'production') {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./sw.js', { scope: './', updateViaCache: 'none' }).catch((error) => {
                     console.error('Service worker registration failed:', error);
