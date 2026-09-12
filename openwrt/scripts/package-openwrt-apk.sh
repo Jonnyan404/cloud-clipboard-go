@@ -17,6 +17,9 @@ if [ -z "$VERSION" ] || [ -z "$ARCH" ]; then
     exit 1
 fi
 
+# apk-tools 版本号不允许 '-'（仅 -r<rev> 分隔可用），替换为 '_'
+PKG_VERSION="${VERSION//-/_}"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BASE_DIR="$(dirname "$SCRIPT_DIR")"
 EXPECTED_BINARY="$BASE_DIR/build/cloud-clipboard-$VERSION-$ARCH"
@@ -159,7 +162,7 @@ run_apk_mkpkg \
     --files "$APK_FILES_DIR" \
     --output "$APK_OUTPUT_PATH" \
     --info "name:cloud-clipboard" \
-    --info "version:$VERSION-r1" \
+    --info "version:$PKG_VERSION-r1" \
     --info "description:Cloud clipboard application for transferring text and files between devices" \
     --info "arch:$PACKAGE_ARCH" \
     --info "license:MIT" \
