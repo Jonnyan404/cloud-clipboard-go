@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -337,6 +338,38 @@ func (s *ClipboardServer) handle_push(w http.ResponseWriter, r *http.Request) {
 	// 启动 WebSocket 消息读取 goroutine
 	go func() {
 		defer s.cleanupWebSocketConnection(conn, deviceID, room)
+
+		done := make(chan struct{})
+		defer close(done)
+
+		var lastPingNano int64 // 原子访问；0 表示当前无待确认的 ping
+
+		// 设置 pong 处理，测量局域网 RTT
+		conn.SetPongHandler(func(appData string) error {
+			nanos := atomic.SwapInt64(&lastPingNano, 0)
+			if nanos != 0 {
+				rtt := float64(time.Now().UnixNano()-nanos) / float64(time.Millisecond)
+				s.latency.add(rtt)
+			}
+			return nil
+		})
+
+		// 定期发送 ping 以计算延迟
+		go func() {
+			ticker := time.NewTicker(5 * time.Second)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-done:
+					return
+				case <-ticker.C:
+					atomic.StoreInt64(&lastPingNano, time.Now().UnixNano())
+					if err := conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(2*time.Second)); err != nil {
+						return
+					}
+				}
+			}
+		}()
 
 		for {
 			messageType, p, err := conn.ReadMessage()

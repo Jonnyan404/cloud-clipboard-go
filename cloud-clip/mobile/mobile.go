@@ -34,6 +34,26 @@ func (s *Service) IsRunning() bool {
 	return s.service.IsRunning()
 }
 
+// GetOnlineDeviceCount 获取当前在线的设备数量
+func (s *Service) GetOnlineDeviceCount() int64 {
+	return int64(s.service.GetOnlineDeviceCount())
+}
+
+// GetTodaySyncCount 获取今天的同步消息条数
+func (s *Service) GetTodaySyncCount() int64 {
+	return int64(s.service.GetTodaySyncCount())
+}
+
+// GetTotalSyncCount 获取历史同步消息总条数
+func (s *Service) GetTotalSyncCount() int64 {
+	return int64(s.service.GetTotalSyncCount())
+}
+
+// GetAverageLatency 获取局域网平均延迟（毫秒）；无样本时返回 -1
+func (s *Service) GetAverageLatency() float64 {
+	return s.service.GetAverageLatency()
+}
+
 // GetServerAddress 获取服务器地址
 func (s *Service) GetServerAddress() string {
 	return s.service.GetServerAddress()

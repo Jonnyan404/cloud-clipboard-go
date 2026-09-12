@@ -42,9 +42,13 @@ class MainActivity : AppCompatActivity() {
     private lateinit var statusChip: TextView
     private lateinit var coverTitle: TextView
     private lateinit var coverSubtitle: TextView
-    private lateinit var statPort: TextView
-    private lateinit var statIp: TextView
-    private lateinit var statAuth: TextView
+    private lateinit var statDevices: TextView
+    private lateinit var statTodaySyncs: TextView
+    private lateinit var statLatency: TextView
+    private lateinit var infoLan: TextView
+    private lateinit var infoPort: TextView
+    private lateinit var infoAuth: TextView
+    private lateinit var infoDir: TextView
     private lateinit var qrImage: ImageView
     private lateinit var addressText: TextView
     private lateinit var addressActions: View
@@ -54,7 +58,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var historyFileText: TextView
     private lateinit var copyAddressButton: TextView
     private lateinit var openBrowserButton: TextView
-    private lateinit var advancedSettingsButton: Button
     private lateinit var githubButton: TextView
     private lateinit var helpButton: TextView
     private lateinit var syncEmpty: TextView
@@ -85,8 +88,8 @@ class MainActivity : AppCompatActivity() {
                 val prefs = getSharedPreferences("config", MODE_PRIVATE).edit()
                 prefs.putString("storageDirUri", uri.toString())
                 prefs.apply()
-                storageDirText.text = CloudClipboardPaths.getPathFromUri(this, uri)
-                historyFileText.text = CloudClipboardPaths.getPathFromUri(this, uri) + File.separator + "history.json"
+                storageDirText.text = CloudClipboardPaths.shortDirName(CloudClipboardPaths.getPathFromUri(this, uri))
+                historyFileText.text = CloudClipboardPaths.shortDirName(CloudClipboardPaths.getPathFromUri(this, uri)) + File.separator + "history.json"
             }
         }
     }
@@ -103,9 +106,13 @@ class MainActivity : AppCompatActivity() {
         statusChip = findViewById(R.id.statusChip)
         coverTitle = findViewById(R.id.coverTitle)
         coverSubtitle = findViewById(R.id.coverSubtitle)
-        statPort = findViewById(R.id.statPort)
-        statIp = findViewById(R.id.statIp)
-        statAuth = findViewById(R.id.statAuth)
+        statDevices = findViewById(R.id.statDevices)
+        statTodaySyncs = findViewById(R.id.statTodaySyncs)
+        statLatency = findViewById(R.id.statLatency)
+        infoLan = findViewById(R.id.infoLan)
+        infoPort = findViewById(R.id.infoPort)
+        infoAuth = findViewById(R.id.infoAuth)
+        infoDir = findViewById(R.id.infoDir)
         qrImage = findViewById(R.id.qrImage)
         addressText = findViewById(R.id.addressText)
         addressActions = findViewById(R.id.addressActions)
@@ -115,7 +122,6 @@ class MainActivity : AppCompatActivity() {
         historyFileText = findViewById(R.id.historyFileText)
         copyAddressButton = findViewById(R.id.copyAddressButton)
         openBrowserButton = findViewById(R.id.openBrowserButton)
-        advancedSettingsButton = findViewById(R.id.advancedSettingsButton)
         githubButton = findViewById(R.id.githubButton)
         helpButton = findViewById(R.id.helpButton)
         syncEmpty = findViewById(R.id.syncEmpty)
@@ -151,11 +157,6 @@ class MainActivity : AppCompatActivity() {
             openDirectoryLauncher.launch(intent)
         }
         historyFileText.setOnClickListener { storageDirText.performClick() }
-
-        advancedSettingsButton.setOnClickListener {
-            val intent = Intent(this, AdvancedSettingsActivity::class.java)
-            startActivity(intent)
-        }
 
         githubButton.setOnClickListener {
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/Jonnyan404/cloud-clipboard-go"))
@@ -223,12 +224,12 @@ class MainActivity : AppCompatActivity() {
         if (storageDirUriString != null) {
             val uri = Uri.parse(storageDirUriString)
             val resolvedPath = CloudClipboardPaths.getPathFromUri(this, uri)
-            storageDirText.text = resolvedPath
-            historyFileText.text = resolvedPath + File.separator + "history.json"
+            storageDirText.text = CloudClipboardPaths.shortDirName(resolvedPath)
+            historyFileText.text = CloudClipboardPaths.shortDirName(resolvedPath) + File.separator + "history.json"
         } else {
             val defaultBaseDir = CloudClipboardPaths.resolveBaseDir(this)
-            storageDirText.text = defaultBaseDir.absolutePath
-            historyFileText.text = File(defaultBaseDir, "history.json").absolutePath
+            storageDirText.text = CloudClipboardPaths.shortDirName(defaultBaseDir.absolutePath)
+            historyFileText.text = CloudClipboardPaths.shortDirName(defaultBaseDir.absolutePath) + File.separator + "history.json"
         }
     }
 
@@ -270,9 +271,20 @@ class MainActivity : AppCompatActivity() {
                     .removePrefix("https://")
                     .substringBefore(":")
                     .ifEmpty { "--" }
-                statPort.text = portInput.text.toString().takeIf { it.isNotEmpty() } ?: "9501"
-                statIp.text = ip
-                statAuth.text = getString(if (hasAuth) R.string.stat_auth_on else R.string.stat_auth_off)
+                val deviceCount = ClipboardService.onlineDeviceCount.toString()
+                val todaySyncs = ClipboardService.todaySyncCount.toString()
+                val latency = ClipboardService.averageLatency
+                statDevices.text = deviceCount
+                statTodaySyncs.text = todaySyncs
+                statLatency.text = if (latency >= 0) {
+                    String.format("%.1f ms", latency)
+                } else {
+                    "--"
+                }
+                infoLan.text = ip
+                infoPort.text = portInput.text.toString().takeIf { it.isNotEmpty() } ?: "9501"
+                infoAuth.text = getString(if (hasAuth) R.string.stat_auth_on else R.string.stat_auth_off)
+                infoDir.text = storageDirText.text.toString()
                 generateQr(ClipboardService.address)
             }
         } else {
@@ -284,9 +296,9 @@ class MainActivity : AppCompatActivity() {
             powerFab.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.parseColor("#1677D0")))
             powerFab.setImageResource(R.drawable.ic_power)
             addressActions.visibility = View.GONE
-            statPort.text = "--"
-            statIp.text = "--"
-            statAuth.text = "--"
+            statDevices.text = "--"
+            statTodaySyncs.text = "--"
+            statLatency.text = "--"
             qrImage.setImageDrawable(null)
         }
     }

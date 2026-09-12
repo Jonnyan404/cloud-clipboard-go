@@ -12,6 +12,17 @@ object CloudClipboardPaths {
     private const val STORAGE_DIR_URI_KEY = "storageDirUri"
     private const val DEFAULT_FOLDER_NAME = "CloudClipboard"
 
+    // 从完整路径提取最后一级目录名，供 UI 短名显示
+    fun shortDirName(path: String): String {
+        val normalized = path.trimEnd('/')
+        val idx = normalized.lastIndexOf('/')
+        return if (idx >= 0 && idx < normalized.length - 1) {
+            normalized.substring(idx + 1)
+        } else {
+            path
+        }
+    }
+
     fun resolveBaseDir(context: Context): File {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val storageDirUriString = prefs.getString(STORAGE_DIR_URI_KEY, null)

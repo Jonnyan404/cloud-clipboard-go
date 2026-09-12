@@ -18,16 +18,31 @@ import java.net.NetworkInterface
 class ClipboardService : Service() {
     private var service: mobile.Service? = null
     private val handler = Handler(Looper.getMainLooper())
+    private val statsRunnable = object : Runnable {
+        override fun run() {
+            refreshStats()
+            handler.postDelayed(this, 3000)
+        }
+    }
     
     companion object {
         @Volatile
         var isRunning = false
-        
+
         @Volatile
         var address = ""
 
+        @Volatile
+        var onlineDeviceCount = 0L
+
+        @Volatile
+        var todaySyncCount = 0L
+
+        @Volatile
+        var averageLatency = -1.0
+
         const val ACTION_SERVICE_STOPPED = "com.cloudclip.ACTION_SERVICE_STOPPED"
-        
+
         private const val CHANNEL_ID = "CloudClipboardService"
         private const val NOTIFICATION_ID = 1
     }
@@ -83,9 +98,10 @@ class ClipboardService : Service() {
                             if (address.isEmpty() || address.contains("0.0.0.0")) {
                                 address = getLocalAddress(port)
                             }
-                            
+
                             updateNotification("运行中: $address")
                             android.util.Log.d("ClipboardService", "服务启动成功: $address")
+                            startStatsRefresh()
                         }, 500) // 延迟 500 毫秒
 
                     } else {
@@ -111,6 +127,10 @@ class ClipboardService : Service() {
         service?.stopServer()
         isRunning = false
         address = ""
+        handler.removeCallbacks(statsRunnable)
+        onlineDeviceCount = 0L
+        todaySyncCount = 0L
+        averageLatency = -1.0
 
         // 发送服务已停止的广播
         val intent = Intent(ACTION_SERVICE_STOPPED)
@@ -120,6 +140,21 @@ class ClipboardService : Service() {
     }
     
     override fun onBind(intent: Intent?): IBinder? = null
+
+    private fun startStatsRefresh() {
+        handler.removeCallbacks(statsRunnable)
+        handler.postDelayed(statsRunnable, 3000)
+    }
+
+    private fun refreshStats() {
+        try {
+            onlineDeviceCount = service?.onlineDeviceCount ?: 0L
+            todaySyncCount = service?.todaySyncCount ?: 0L
+            averageLatency = service?.averageLatency ?: -1.0
+        } catch (e: Exception) {
+            android.util.Log.e("ClipboardService", "刷新统计失败", e)
+        }
+    }
     
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

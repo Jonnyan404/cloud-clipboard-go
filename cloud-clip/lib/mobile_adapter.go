@@ -1,9 +1,12 @@
 package lib
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net"
+	"os"
+	"time"
 	// 引入 os 包
 )
 
@@ -122,6 +125,70 @@ func (s *CloudClipboardService) GetServerAddress() string {
 // IsRunning 检查服务器是否在运行
 func (s *CloudClipboardService) IsRunning() bool {
 	return s.isRunning
+}
+
+// GetOnlineDeviceCount 获取当前在线的设备数量
+func (s *CloudClipboardService) GetOnlineDeviceCount() int {
+	if !s.isRunning || s.server == nil {
+		return 0
+	}
+	s.server.runMutex.Lock()
+	defer s.server.runMutex.Unlock()
+	return len(s.server.deviceConnected)
+}
+
+// GetTodaySyncCount 获取今天的同步消息条数
+func (s *CloudClipboardService) GetTodaySyncCount() int {
+	if !s.isRunning || s.server == nil {
+		return 0
+	}
+	now := time.Now()
+	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()).Unix()
+
+	data, err := os.ReadFile(s.server.historyFilePath)
+	if err != nil {
+		return 0
+	}
+
+	var hist History
+	if err := json.Unmarshal(data, &hist); err != nil {
+		return 0
+	}
+
+	count := 0
+	for _, rh := range hist.Receive {
+		ts := rh.Timestamp()
+		if ts >= startOfDay {
+			count++
+		}
+	}
+	return count
+}
+
+// GetTotalSyncCount 获取历史同步消息总条数
+func (s *CloudClipboardService) GetTotalSyncCount() int {
+	if !s.isRunning || s.server == nil {
+		return 0
+	}
+
+	data, err := os.ReadFile(s.server.historyFilePath)
+	if err != nil {
+		return 0
+	}
+
+	var hist History
+	if err := json.Unmarshal(data, &hist); err != nil {
+		return 0
+	}
+	return len(hist.Receive)
+}
+
+// GetAverageLatency 获取局域网平均延迟（毫秒）；无样本时返回 -1
+func (s *CloudClipboardService) GetAverageLatency() float64 {
+	if !s.isRunning || s.server == nil || s.server.latency == nil {
+		return -1
+	}
+	return s.server.latency.average()
 }
 
 // getLocalIPv4 获取本地 IPv4 地址

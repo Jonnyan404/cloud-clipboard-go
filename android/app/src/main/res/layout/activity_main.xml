@@ -103,7 +103,7 @@
                                 android:padding="12dp">
 
                                 <TextView
-                                    android:id="@+id/statPort"
+                                    android:id="@+id/statDevices"
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:text="--"
@@ -115,7 +115,7 @@
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:layout_marginTop="2dp"
-                                    android:text="@string/stat_port"
+                                    android:text="@string/stat_devices"
                                     android:textColor="#CFFFFFFF"
                                     android:textSize="11sp" />
                             </LinearLayout>
@@ -130,7 +130,7 @@
                                 android:padding="12dp">
 
                                 <TextView
-                                    android:id="@+id/statIp"
+                                    android:id="@+id/statTodaySyncs"
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:text="--"
@@ -142,7 +142,7 @@
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:layout_marginTop="2dp"
-                                    android:text="@string/stat_ip"
+                                    android:text="@string/stat_today_syncs"
                                     android:textColor="#CFFFFFFF"
                                     android:textSize="11sp" />
                             </LinearLayout>
@@ -157,7 +157,7 @@
                                 android:padding="12dp">
 
                                 <TextView
-                                    android:id="@+id/statAuth"
+                                    android:id="@+id/statLatency"
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:text="--"
@@ -169,7 +169,7 @@
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:layout_marginTop="2dp"
-                                    android:text="@string/stat_auth"
+                                    android:text="@string/stat_avg_latency"
                                     android:textColor="#CFFFFFFF"
                                     android:textSize="11sp" />
                             </LinearLayout>
@@ -260,6 +260,132 @@
                             </LinearLayout>
                         </LinearLayout>
                     </LinearLayout>
+                <!-- ===== 服务项信息卡 ===== -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:layout_marginTop="12dp"
+                    android:layout_marginStart="16dp"
+                    android:layout_marginEnd="16dp"
+                    android:background="#FFFFFF"
+                    android:elevation="2dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:padding="14dp">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/service_info_lan"
+                            android:textColor="#8B93A1"
+                            android:textSize="13sp" />
+
+                        <TextView
+                            android:id="@+id/infoLan"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="--"
+                            android:textColor="#22304A"
+                            android:textSize="13sp"
+                            android:fontFamily="monospace" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="#F0F2F6" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:padding="14dp">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/service_info_port"
+                            android:textColor="#8B93A1"
+                            android:textSize="13sp" />
+
+                        <TextView
+                            android:id="@+id/infoPort"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="--"
+                            android:textColor="#22304A"
+                            android:textSize="13sp"
+                            android:fontFamily="monospace" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="#F0F2F6" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:padding="14dp">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/service_info_auth"
+                            android:textColor="#8B93A1"
+                            android:textSize="13sp" />
+
+                        <TextView
+                            android:id="@+id/infoAuth"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="--"
+                            android:textColor="#22304A"
+                            android:textSize="13sp" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="#F0F2F6" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:padding="14dp">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/service_info_dir"
+                            android:textColor="#8B93A1"
+                            android:textSize="13sp" />
+
+                        <TextView
+                            android:id="@+id/infoDir"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="--"
+                            android:textColor="#22304A"
+                            android:textSize="13sp"
+                            android:maxLines="1"
+                            android:ellipsize="middle" />
+                    </LinearLayout>
+                </LinearLayout>
                 </LinearLayout>
             </ScrollView>
 
@@ -460,18 +586,6 @@
                             android:maxLines="1"
                             android:ellipsize="middle" />
                     </LinearLayout>
-
-                    <Button
-                        android:id="@+id/advancedSettingsButton"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="16dp"
-                        android:layout_marginEnd="16dp"
-                        android:layout_marginTop="16dp"
-                        android:text="@string/advanced_settings"
-                        style="?android:attr/borderlessButtonStyle"
-                        android:textColor="#8B93A1"
-                        android:textSize="13sp" />
 
                     <LinearLayout
                         android:layout_width="wrap_content"
