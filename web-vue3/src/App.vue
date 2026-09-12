@@ -1566,9 +1566,14 @@ watch(() => route.fullPath, () => {
 }
 
 .room-title__chip :deep(.v-chip__content) {
+    min-width: 0;
+}
+
+.room-title__chip :deep(.v-chip__content > span) {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    min-width: 0;
 }
 
 .room-title__latency {
