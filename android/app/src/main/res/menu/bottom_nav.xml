@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/nav_services"
+        android:icon="@android:drawable/ic_menu_camera"
+        android:title="@string/nav_services" />
+    <item
+        android:id="@+id/nav_sync"
+        android:icon="@android:drawable/ic_menu_recent_history"
+        android:title="@string/nav_sync" />
+    <item
+        android:id="@+id/nav_settings"
+        android:icon="@android:drawable/ic_menu_manage"
+        android:title="@string/nav_settings" />
+</menu>
