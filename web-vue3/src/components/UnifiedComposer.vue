@@ -149,22 +149,6 @@
                                     size="small"
                                     color="grey-darken-1"
                                     v-bind="props"
-                                    @click="emit('show-qr')"
-                                >
-                                    <v-icon>{{ mdiQrcode }}</v-icon>
-                                </v-btn>
-                            </template>
-                            <span>{{ t('showQrCode') }}</span>
-                        </v-tooltip>
-                        <v-tooltip location="top">
-                            <template v-slot:activator="{ props }">
-                                <v-btn
-                                    icon
-                                    density="comfortable"
-                                    variant="text"
-                                    size="small"
-                                    color="grey-darken-1"
-                                    v-bind="props"
                                     @click="colorDialog = true"
                                 >
                                     <v-icon>{{ mdiPaletteSwatch }}</v-icon>
@@ -391,7 +375,6 @@ import { toast } from '@/plugins/toast';
 import { prettyFileSize } from '@/util.js';
 import TraditionalColorDialog from '@/components/TraditionalColorDialog.vue';
 
-const mdiQrcode = 'mdi-qrcode';
 const mdiPalette = 'mdi-palette';
 const mdiPaletteSwatch = 'mdi-palette-swatch';
 const mdiSend = 'mdi-send';
@@ -421,7 +404,6 @@ const mdiChevronDownCircle = 'mdi-chevron-down-circle';
 const mdiWindowRestore = 'mdi-window-restore';
 
 
-const emit = defineEmits(['show-qr']);
 const app = useAppStore();
 const ws = useWebSocketStore();
 const theme = useTheme();

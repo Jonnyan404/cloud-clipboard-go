@@ -1,13 +1,9 @@
 <script setup>import { computed, nextTick, ref, watch } from 'vue';
-import { onBeforeRouteUpdate, useRouter } from 'vue-router';
 import { useAppStore } from '@/store/app';
 import { useWebSocketStore } from '@/store/websocket';
 import { useTheme } from 'vuetify';
 import { useDisplay } from 'vuetify';
 import { useI18n } from 'vue-i18n';
-import axios from 'axios';
-import { toast } from '@/plugins/toast';
-import QrcodeVue from 'qrcode.vue';
 import UnifiedComposer from '@/components/UnifiedComposer.vue';
 import ReceivedText from '@/components/received-item/Text.vue';
 import ReceivedFile from '@/components/received-item/File.vue';
@@ -23,9 +19,6 @@ const theme = useTheme();
 const isDark = computed(() => theme.current.value?.dark ?? false);
 const display = useDisplay();
 const { t } = useI18n();
-const router = useRouter();
-const pageQrDialogVisible = ref(false);
-const pageQrMode = ref('page');
 const composer = ref(null);
 const activeRoomName = computed(() => ws.room || t('publicRoom'));
 const historyUsageLabel = computed(() => {
@@ -33,32 +26,6 @@ const historyUsageLabel = computed(() => {
     const limit = Number(app.config?.server?.history || 0);
     return `${current}/${limit}`;
 });
-const currentPageUrl = computed(() => {
-    const currentRoom = ws.room || '';
-    const query = {};
-    if (currentRoom) {
-        query.room = currentRoom;
-    }
-    const resolved = router.resolve({ path: '/', query });
-    const url = new URL(window.location.pathname, window.location.origin);
-    url.hash = resolved.href.startsWith('#') ? resolved.href : `#${resolved.href}`;
-    return url.toString();
-});
-const latestContentUrl = computed(() => {
-    const currentRoom = ws.room || '';
-    const roomQuery = currentRoom ? `?room=${encodeURIComponent(currentRoom)}` : '';
-    return buildAbsoluteRouteUrl(`content/latest${roomQuery}`);
-});
-const pageQrUrl = computed(() => pageQrMode.value === 'latest' ? latestContentUrl.value : currentPageUrl.value);
-function buildAbsoluteRouteUrl(path) {
-    const normalizedPath = String(path || '').replace(/^\/+/, '');
-    const baseURL = axios.defaults.baseURL || '';
-    if (baseURL) {
-        return new URL(normalizedPath, `${baseURL.replace(/\/+$/, '')}/`).toString();
-    }
-    const prefix = app.config?.server?.prefix || '';
-    return new URL(`${prefix}/${normalizedPath}`, `${window.location.origin}/`).toString();
-}
 function focusComposer(type) {
     nextTick(() => {
         if (composer.value && typeof composer.value.focus === 'function') {
@@ -98,7 +65,7 @@ watch(() => ws.room, (room) => {
     <v-container fluid class="home-minimal pa-3 pa-md-5" :class="{ 'home-minimal--dark': isDark }">
         <div class="home-minimal__shell mx-auto">
             <v-card class="composer-dock composer-dock--top px-3 px-md-4 py-2 mb-2" :class="{ 'surface-card--dark': isDark }" variant="outlined">
-                <unified-composer ref="composer" @show-qr="pageQrDialogVisible = true"></unified-composer>
+                <unified-composer ref="composer"></unified-composer>
             </v-card>
 
             <v-card class="timeline-panel" :class="{ 'surface-card--dark': isDark }" variant="outlined">
@@ -146,23 +113,6 @@ watch(() => ws.room, (room) => {
             </v-card>
         </div>
 
-        <v-dialog v-model="pageQrDialogVisible" max-width="250">
-            <v-card>
-                <v-card-title class="text-h5 justify-center">{{ t('scanToAccess') }}</v-card-title>
-                <v-card-text class="text-center pa-4">
-                    <v-btn-toggle v-model="pageQrMode" mandatory density="compact" class="mb-3">
-                        <v-btn size="small" value="page">{{ t('currentShare') }}</v-btn>
-                        <v-btn size="small" value="latest">{{ t('latestShare') }}</v-btn>
-                    </v-btn-toggle>
-                    <qrcode-vue :value="pageQrUrl" :size="200" level="H" />
-                    <div class="text-caption mt-2" style="word-break: break-all;">{{ pageQrUrl }}</div>
-                </v-card-text>
-                <v-card-actions>
-                    <v-spacer></v-spacer>
-                    <v-btn color="primary" variant="text" @click="pageQrDialogVisible = false">{{ t('close') }}</v-btn>
-                </v-card-actions>
-            </v-card>
-        </v-dialog>
     </v-container>
 </template>
 

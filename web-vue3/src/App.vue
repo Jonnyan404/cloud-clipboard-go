@@ -9,6 +9,7 @@ import { useI18n } from 'vue-i18n';
 import axios from 'axios';
 import { toast, toastState } from '@/plugins/toast';
 import TraditionalColorDialog from '@/components/TraditionalColorDialog.vue';
+import QrcodeVue from 'qrcode.vue';
 
 const mdiBrightness4 = 'mdi-brightness-4';
 const mdiDoorOpen = 'mdi-door-open';
@@ -28,7 +29,6 @@ const mdiIpNetworkOutline = 'mdi-ip-network-outline';
 const mdiLanConnect = 'mdi-lan-connect';
 const mdiLanDisconnect = 'mdi-lan-disconnect';
 const mdiLanPending = 'mdi-lan-pending';
-const mdiTimerOutline = 'mdi-timer-outline';
 const mdiEarth = 'mdi-earth';
 const mdiLock = 'mdi-lock';
 const mdiCog = 'mdi-cog';
@@ -54,6 +54,8 @@ const route = useRoute();
 const colorDialog = ref(false);
 const pickColorDialog = ref(false);
 const settingsDialog = ref(false);
+const pageQrDialogVisible = ref(false);
+const pageQrMode = ref('page');
 const currentPrimary = computed(() => isDark.value ? theme.themes.value.dark.colors.primary : theme.themes.value.light.colors.primary);
 const clearAllDialog = ref(false);
 const clipboardClearedMessageVisible = ref(false);
@@ -95,6 +97,14 @@ const latencyColor = computed(() => {
         return 'warning';
     }
     return 'error';
+});
+const latencyHexColor = computed(() => {
+    if (ws.latency === null) {
+        return '';
+    }
+    const colorName = latencyColor.value;
+    const themeColors = theme.themes.value[isDark.value ? 'dark' : 'light'].colors;
+    return themeColors[colorName] || colorName;
 });
 const isDesktopRoomDockVisible = computed(() => isDesktopRoomDockEnabled.value && roomDockVisible.value);
 const filteredRooms = computed(() => {
@@ -263,28 +273,6 @@ async function clearAll() {
         }
     }
 }
-function copyRoomName(roomName) {
-    const displayName = roomName || t('publicRoom');
-    if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(roomName)
-            .then(() => toast(t('copiedRoomName', { room: displayName })))
-            .catch(err => toast(t('copyFailed', { err })));
-    } else {
-        try {
-            const textArea = document.createElement("textarea");
-            textArea.value = roomName;
-            textArea.style.position = "absolute";
-            textArea.style.left = "-9999px";
-            document.body.appendChild(textArea);
-            textArea.select();
-            document.execCommand('copy');
-            document.body.removeChild(textArea);
-            toast(t('copiedRoomName', { room: roomName }));
-        } catch (err) {
-            toast(t('copyFailed', { err }));
-        }
-    }
-}
 function changeLocale(localeValue) {
     if (locale.value !== localeValue) {
         locale.value = localeValue;
@@ -294,6 +282,54 @@ function changeLocale(localeValue) {
 function goHome() {
     if (route.path !== '/' || Object.keys(route.query).length > 0) {
         router.push('/');
+    }
+}
+const currentPageUrl = computed(() => {
+    const currentRoom = ws.room || '';
+    const query = {};
+    if (currentRoom) {
+        query.room = currentRoom;
+    }
+    const resolved = router.resolve({ path: '/', query });
+    const url = new URL(window.location.pathname, window.location.origin);
+    url.hash = resolved.href.startsWith('#') ? resolved.href : `#${resolved.href}`;
+    return url.toString();
+});
+const latestContentUrl = computed(() => {
+    const currentRoom = ws.room || '';
+    const roomQuery = currentRoom ? `?room=${encodeURIComponent(currentRoom)}` : '';
+    return buildAbsoluteRouteUrl(`content/latest${roomQuery}`);
+});
+const pageQrUrl = computed(() => pageQrMode.value === 'latest' ? latestContentUrl.value : currentPageUrl.value);
+function buildAbsoluteRouteUrl(path) {
+    const normalizedPath = String(path || '').replace(/^\/+/, '');
+    const baseURL = axios.defaults.baseURL || '';
+    if (baseURL) {
+        return new URL(normalizedPath, `${baseURL.replace(/\/+$/, '')}/`).toString();
+    }
+    const prefix = app.config?.server?.prefix || '';
+    return new URL(`${prefix}/${normalizedPath}`, `${window.location.origin}/`).toString();
+}
+function copyQrUrl() {
+    const url = pageQrUrl.value;
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(url)
+            .then(() => toast(t('copySuccess')))
+            .catch(() => toast(t('copyFailedGeneral')));
+    } else {
+        try {
+            const textArea = document.createElement("textarea");
+            textArea.value = url;
+            textArea.style.position = "absolute";
+            textArea.style.left = "-9999px";
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+            toast(t('copySuccess'));
+        } catch {
+            toast(t('copyFailedGeneral'));
+        }
     }
 }
 async function fetchRooms() {
@@ -482,14 +518,17 @@ watch(() => route.fullPath, () => {
                     variant="tonal"
                     color="white"
                     class="room-title__chip"
-                    :title="t('copyRoomName')"
-                    @click.stop="copyRoomName(ws.room || '')"
+                    :title="t('showQrCode')"
+                    @click.stop="pageQrDialogVisible = true"
                 >
                     <v-icon start size="x-small">
                         {{ ws.room ? (currentRoomEntry && currentRoomEntry.isProtected ? mdiLock : mdiEarth) : mdiEarth }}
                     </v-icon>
-                    <span v-if="ws.room">{{ ws.room }}</span>
+                    <span v-if="ws.room" class="room-title__roomname">{{ ws.room }}</span>
                     <span v-else>{{ t('publicRoom') }}</span>
+                    <span v-if="ws.websocket && ws.latency !== null" class="room-title__latency" :style="{ color: latencyHexColor }">
+                        {{ latencyValue }}
+                    </span>
                 </v-chip>
             </v-toolbar-title>
 
@@ -535,21 +574,6 @@ watch(() => route.fullPath, () => {
                     </v-btn>
                 </template>
                 <span>{{ t('enterRoom') }}</span>
-            </v-tooltip>
-            <v-tooltip left v-if="ws.websocket && ws.latency !== null">
-                <template v-slot:activator="{ props }">
-                    <v-chip
-                        size="small"
-                        variant="tonal"
-                        :color="latencyColor"
-                        class="mx-1"
-                        v-bind="props"
-                    >
-                        <v-icon start size="x-small">{{ mdiTimerOutline }}</v-icon>
-                        {{ latencyValue }}
-                    </v-chip>
-                </template>
-                <span>{{ t('latency') }}</span>
             </v-tooltip>
             <v-tooltip left>
                 <template v-slot:activator="{ props }">
@@ -1100,6 +1124,40 @@ watch(() => route.fullPath, () => {
             </v-card>
         </v-dialog>
 
+        <v-dialog v-model="pageQrDialogVisible" max-width="250">
+            <v-card>
+                <v-card-title class="text-h5 d-flex align-center">
+                    {{ t('scanToAccess') }}
+                    <v-spacer></v-spacer>
+                    <v-btn icon variant="text" @click="pageQrDialogVisible = false">
+                        <v-icon>{{ mdiClose }}</v-icon>
+                    </v-btn>
+                </v-card-title>
+                <v-card-text class="text-center pa-4 pt-0">
+                    <v-btn-toggle v-model="pageQrMode" mandatory density="compact" class="mb-3">
+                        <v-btn size="small" value="page">{{ t('currentShare') }}</v-btn>
+                        <v-btn size="small" value="latest">{{ t('latestShare') }}</v-btn>
+                    </v-btn-toggle>
+                    <div>
+                        <qrcode-vue :value="pageQrUrl" :size="200" level="H" />
+                    </div>
+                    <div
+                        class="text-caption mt-2 d-flex align-center justify-center"
+                        style="word-break: break-all; cursor: pointer;"
+                        :title="t('copyLink')"
+                        @click="copyQrUrl"
+                    >
+                        <span class="flex-grow-1">{{ pageQrUrl }}</span>
+                        <v-icon size="small" class="ml-1">{{ mdiContentPaste }}</v-icon>
+                    </div>
+                    <v-btn size="small" variant="tonal" color="primary" class="mt-2" @click="copyQrUrl">
+                        <v-icon start size="x-small">{{ mdiContentPaste }}</v-icon>
+                        {{ pageQrMode === 'latest' ? t('copyLatestLink') : t('copyLink') }}
+                    </v-btn>
+                </v-card-text>
+            </v-card>
+        </v-dialog>
+
         <v-bottom-sheet v-model="roomSheet" scrollable max-width="820">
             <v-card class="room-browser" :class="{ 'room-browser--dark': isDark }">
                 <v-card-title class="d-flex align-center room-browser__header">
@@ -1498,9 +1556,10 @@ watch(() => route.fullPath, () => {
 }
 
 .room-title__chip {
-    max-width: 220px;
+    flex-grow: 1;
     flex-shrink: 1;
     min-width: 0;
+    max-width: 100%;
     cursor: pointer;
 }
 
@@ -1508,6 +1567,11 @@ watch(() => route.fullPath, () => {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.room-title__latency {
+    font-size: 13px;
+    font-weight: 500;
 }
 
 @media (max-width: 600px) {
