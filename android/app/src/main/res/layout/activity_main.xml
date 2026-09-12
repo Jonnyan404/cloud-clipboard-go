@@ -587,6 +587,218 @@
                             android:ellipsize="middle" />
                     </LinearLayout>
 
+                    <!-- 更多设置(折叠) -->
+                    <LinearLayout
+                        android:id="@+id/moreSettingsHeader"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:background="#FFFFFF"
+                        android:elevation="1dp"
+                        android:padding="16dp"
+                        android:clickable="true"
+                        android:focusable="true">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="@string/more_settings"
+                                android:textColor="#232D3D"
+                                android:textSize="14sp" />
+
+                            <TextView
+                                android:id="@+id/moreSettingsArrow"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="▾"
+                                android:textColor="#8B93A1"
+                                android:textSize="14sp" />
+                        </LinearLayout>
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="@string/more_settings_desc"
+                            android:textSize="12sp"
+                            android:textColor="#8B93A1" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="#F0F2F6" />
+
+                    <!-- 更多设置: 配置项表单 -->
+                    <LinearLayout
+                        android:id="@+id/moreSettingsPanel"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:background="#FFFFFF"
+                        android:elevation="1dp"
+                        android:padding="16dp"
+                        android:visibility="gone">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical"
+                            android:paddingTop="4dp"
+                            android:paddingBottom="4dp">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="@string/setting_text_limit"
+                                android:textColor="#232D3D"
+                                android:textSize="14sp" />
+
+                            <EditText
+                                android:id="@+id/textLimitInput"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:inputType="number"
+                                android:hint="4096"
+                                android:background="@null"
+                                android:textAlignment="viewEnd"
+                                android:textSize="14sp"
+                                android:minWidth="100dp" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical"
+                            android:paddingTop="4dp"
+                            android:paddingBottom="4dp">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="@string/setting_file_expire"
+                                android:textColor="#232D3D"
+                                android:textSize="14sp" />
+
+                            <EditText
+                                android:id="@+id/fileExpireInput"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:inputType="number"
+                                android:hint="3600"
+                                android:background="@null"
+                                android:textAlignment="viewEnd"
+                                android:textSize="14sp"
+                                android:minWidth="100dp" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical"
+                            android:paddingTop="4dp"
+                            android:paddingBottom="4dp">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="@string/setting_file_limit"
+                                android:textColor="#232D3D"
+                                android:textSize="14sp" />
+
+                            <EditText
+                                android:id="@+id/fileLimitInput"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:inputType="number"
+                                android:hint="256"
+                                android:background="@null"
+                                android:textAlignment="viewEnd"
+                                android:textSize="14sp"
+                                android:minWidth="100dp" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical"
+                            android:paddingTop="4dp"
+                            android:paddingBottom="4dp">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="@string/setting_history_count"
+                                android:textColor="#232D3D"
+                                android:textSize="14sp" />
+
+                            <EditText
+                                android:id="@+id/historyCountInput"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:inputType="number"
+                                android:hint="100"
+                                android:background="@null"
+                                android:textAlignment="viewEnd"
+                                android:textSize="14sp"
+                                android:minWidth="100dp" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:layout_marginTop="10dp">
+
+                            <TextView
+                                android:id="@+id/previewConfigButton"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="@string/preview_config"
+                                android:textColor="#1677D0"
+                                android:textSize="13sp"
+                                android:background="#F2F7FD"
+                                android:gravity="center"
+                                android:padding="12dp"
+                                android:clickable="true"
+                                android:focusable="true" />
+
+                            <View
+                                android:layout_width="8dp"
+                                android:layout_height="1dp" />
+
+                            <TextView
+                                android:id="@+id/saveConfigButton"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="@string/save_config"
+                                android:textColor="#FFFFFF"
+                                android:textSize="13sp"
+                                android:background="#19A560"
+                                android:gravity="center"
+                                android:padding="12dp"
+                                android:clickable="true"
+                                android:focusable="true" />
+                        </LinearLayout>
+                    </LinearLayout>
+
                     <LinearLayout
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"

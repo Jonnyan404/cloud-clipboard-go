@@ -1,6 +1,7 @@
 package com.cloudclip
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.BroadcastReceiver
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -62,6 +63,15 @@ class MainActivity : AppCompatActivity() {
     private lateinit var helpButton: TextView
     private lateinit var syncEmpty: TextView
     private lateinit var syncList: ListView
+    private lateinit var moreSettingsHeader: View
+    private lateinit var moreSettingsArrow: TextView
+    private lateinit var moreSettingsPanel: View
+    private lateinit var textLimitInput: EditText
+    private lateinit var fileExpireInput: EditText
+    private lateinit var fileLimitInput: EditText
+    private lateinit var historyCountInput: EditText
+    private lateinit var previewConfigButton: TextView
+    private lateinit var saveConfigButton: TextView
 
     private val handler = Handler(Looper.getMainLooper())
     private val updateRunnable = object : Runnable {
@@ -126,8 +136,18 @@ class MainActivity : AppCompatActivity() {
         helpButton = findViewById(R.id.helpButton)
         syncEmpty = findViewById(R.id.syncEmpty)
         syncList = findViewById(R.id.syncList)
+        moreSettingsHeader = findViewById(R.id.moreSettingsHeader)
+        moreSettingsArrow = findViewById(R.id.moreSettingsArrow)
+        moreSettingsPanel = findViewById(R.id.moreSettingsPanel)
+        textLimitInput = findViewById(R.id.textLimitInput)
+        fileExpireInput = findViewById(R.id.fileExpireInput)
+        fileLimitInput = findViewById(R.id.fileLimitInput)
+        historyCountInput = findViewById(R.id.historyCountInput)
+        previewConfigButton = findViewById(R.id.previewConfigButton)
+        saveConfigButton = findViewById(R.id.saveConfigButton)
 
         loadConfig()
+        loadMoreSettings()
 
         // 底部导航切换
         bottomNav.setOnItemSelectedListener { item ->
@@ -166,6 +186,22 @@ class MainActivity : AppCompatActivity() {
         helpButton.setOnClickListener {
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/Jonnyan404/cloud-clipboard-go#readme"))
             startActivity(intent)
+        }
+
+        moreSettingsHeader.setOnClickListener {
+            val visible = moreSettingsPanel.visibility == View.GONE
+            moreSettingsPanel.visibility = if (visible) View.VISIBLE else View.GONE
+            moreSettingsArrow.text = if (visible) "▴" else "▾"
+        }
+
+        previewConfigButton.setOnClickListener {
+            showConfigPreview()
+        }
+
+        saveConfigButton.setOnClickListener {
+            if (saveMoreSettings()) {
+                Toast.makeText(this, R.string.config_saved, Toast.LENGTH_SHORT).show()
+            }
         }
 
         openBrowserButton.setOnClickListener {
@@ -238,6 +274,82 @@ class MainActivity : AppCompatActivity() {
         prefs.putInt("port", portInput.text.toString().toIntOrNull() ?: 9501)
         prefs.putString("auth", authInput.text.toString())
         prefs.apply()
+    }
+
+    private fun configJson(): JSONObject {
+        val configFile = CloudClipboardPaths.resolveConfigFile(this)
+        val json = if (configFile.exists()) {
+            try {
+                JSONObject(configFile.readText())
+            } catch (e: Exception) {
+                JSONObject()
+            }
+        } else {
+            JSONObject()
+        }
+
+        if (!json.has("server")) json.put("server", JSONObject())
+        if (!json.has("text")) json.put("text", JSONObject())
+        if (!json.has("file")) json.put("file", JSONObject())
+        return json
+    }
+
+    private fun loadMoreSettings() {
+        try {
+            val json = configJson()
+            val text = json.optJSONObject("text")
+            val file = json.optJSONObject("file")
+            val server = json.optJSONObject("server")
+            textLimitInput.setText((text?.optInt("limit") ?: 4096).toString())
+            fileExpireInput.setText((file?.optInt("expire") ?: 3600).toString())
+            fileLimitInput.setText((file?.optLong("limit")?.div(1024 * 1024) ?: 256).toString())
+            historyCountInput.setText((server?.optInt("history") ?: 100).toString())
+        } catch (e: Exception) {
+            textLimitInput.setText("4096")
+            fileExpireInput.setText("3600")
+            fileLimitInput.setText("256")
+            historyCountInput.setText("100")
+        }
+    }
+
+    private fun buildConfigJson(): JSONObject {
+        val json = configJson()
+        val server = json.getJSONObject("server")
+        val text = json.getJSONObject("text")
+        val file = json.getJSONObject("file")
+
+        text.put("limit", textLimitInput.text.toString().toIntOrNull() ?: 4096)
+        file.put("expire", fileExpireInput.text.toString().toIntOrNull() ?: 3600)
+        file.put("limit", (fileLimitInput.text.toString().toLongOrNull() ?: 256) * 1024 * 1024)
+        server.put("history", historyCountInput.text.toString().toIntOrNull() ?: 100)
+        return json
+    }
+
+    private fun saveMoreSettings(): Boolean {
+        return try {
+            CloudClipboardPaths.resolveConfigFile(this).writeText(buildConfigJson().toString(2))
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    private fun showConfigPreview() {
+        val jsonText = buildConfigJson().toString(2)
+        val scroll = ScrollView(this)
+        val tv = TextView(this).apply {
+            text = jsonText
+            typeface = android.graphics.Typeface.MONOSPACE
+            textSize = 12f
+            setTextColor(0xFF232D3D.toInt())
+            setPadding(24, 24, 24, 24)
+        }
+        scroll.addView(tv)
+        AlertDialog.Builder(this)
+            .setTitle(R.string.config_preview_title)
+            .setView(scroll)
+            .setPositiveButton(android.R.string.ok, null)
+            .show()
     }
 
     private fun loadHistory() {
