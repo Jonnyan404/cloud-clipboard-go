@@ -1,157 +1,548 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="16dp">
+    android:background="#F4F6FA">
 
-    <TextView
-        android:id="@+id/statusText"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/service_stopped"
-        android:textSize="20sp"
-        android:gravity="center"
-        android:padding="16dp"/>
-
-    <!-- 地址栏，包含地址、打开和复制按钮 -->
     <LinearLayout
-        android:id="@+id/addressLayout"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:visibility="gone"
-        android:padding="8dp">
+        android:layout_height="match_parent"
+        android:orientation="vertical">
 
-        <TextView
-            android:id="@+id/addressText"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:textSize="14sp"
-            android:autoLink="web"
-            android:textColorLink="?android:attr/textColorPrimary"
-            android:textIsSelectable="true"/>
+        <!-- ======== 内容区域(按 tab 切换) ======== -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1">
 
-        <ImageButton
-            android:id="@+id/openBrowserButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:src="@android:drawable/ic_menu_view"
-            android:background="?android:attr/selectableItemBackgroundBorderless"
-            android:contentDescription="Open in browser"
-            android:layout_marginStart="8dp"/>
+            <!-- ===== 服务 tab ===== -->
+            <ScrollView
+                android:id="@+id/pageServices"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:fillViewport="true">
 
-        <ImageButton
-            android:id="@+id/copyAddressButton"
-            android:layout_width="wrap_content"
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <!-- 渐变封面 -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:background="@drawable/gradient_cover"
+                        android:paddingStart="20dp"
+                        android:paddingEnd="20dp"
+                        android:paddingTop="24dp"
+                        android:paddingBottom="26dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="@string/app_name"
+                                android:textColor="#FFFFFF"
+                                android:textSize="18sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/statusChip"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:background="@drawable/chip_stopped"
+                                android:paddingStart="12dp"
+                                android:paddingEnd="12dp"
+                                android:paddingTop="5dp"
+                                android:paddingBottom="5dp"
+                                android:text="@string/service_stopped"
+                                android:textColor="#FFFFFF"
+                                android:textSize="12sp" />
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/coverTitle"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="20dp"
+                            android:text="@string/cover_title_stopped"
+                            android:textColor="#FFFFFF"
+                            android:textSize="22sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/coverSubtitle"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="@string/cover_subtitle_stopped"
+                            android:textColor="#CFFFFFFF"
+                            android:textSize="13sp" />
+
+                        <!-- 统计卡 -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="18dp"
+                            android:orientation="horizontal">
+
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:orientation="vertical"
+                                android:background="@drawable/chip_running"
+                                android:padding="12dp">
+
+                                <TextView
+                                    android:id="@+id/statPort"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="--"
+                                    android:textColor="#FFFFFF"
+                                    android:textSize="18sp"
+                                    android:textStyle="bold" />
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="2dp"
+                                    android:text="@string/stat_port"
+                                    android:textColor="#CFFFFFFF"
+                                    android:textSize="11sp" />
+                            </LinearLayout>
+
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:orientation="vertical"
+                                android:layout_marginStart="10dp"
+                                android:background="@drawable/chip_running"
+                                android:padding="12dp">
+
+                                <TextView
+                                    android:id="@+id/statIp"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="--"
+                                    android:textColor="#FFFFFF"
+                                    android:textSize="18sp"
+                                    android:textStyle="bold" />
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="2dp"
+                                    android:text="@string/stat_ip"
+                                    android:textColor="#CFFFFFFF"
+                                    android:textSize="11sp" />
+                            </LinearLayout>
+
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:orientation="vertical"
+                                android:layout_marginStart="10dp"
+                                android:background="@drawable/chip_running"
+                                android:padding="12dp">
+
+                                <TextView
+                                    android:id="@+id/statAuth"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="--"
+                                    android:textColor="#FFFFFF"
+                                    android:textSize="18sp"
+                                    android:textStyle="bold" />
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="2dp"
+                                    android:text="@string/stat_auth"
+                                    android:textColor="#CFFFFFFF"
+                                    android:textSize="11sp" />
+                            </LinearLayout>
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <!-- 地址/QR 卡 -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:layout_marginTop="16dp"
+                        android:layout_marginStart="16dp"
+                        android:layout_marginEnd="16dp"
+                        android:background="#FFFFFF"
+                        android:elevation="2dp"
+                        android:padding="14dp"
+                        android:gravity="center_vertical">
+
+                        <ImageView
+                            android:id="@+id/qrImage"
+                            android:layout_width="88dp"
+                            android:layout_height="88dp"
+                            android:layout_marginEnd="14dp"
+                            android:background="@drawable/qr_placeholder"
+                            android:contentDescription="@string/qr_placeholder"
+                            android:scaleType="fitCenter" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/scan_hint"
+                                android:textColor="#8B93A1"
+                                android:textSize="12sp" />
+
+                            <TextView
+                                android:id="@+id/addressText"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="4dp"
+                                android:text="--"
+                                android:textColor="#22304A"
+                                android:textSize="13sp"
+                                android:textStyle="bold"
+                                android:fontFamily="monospace"
+                                android:textIsSelectable="true" />
+
+                            <LinearLayout
+                                android:id="@+id/addressActions"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="8dp"
+                                android:orientation="horizontal"
+                                android:visibility="gone">
+
+                                <TextView
+                                    android:id="@+id/copyAddressButton"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:background="@drawable/chip_accent"
+                                    android:paddingStart="10dp"
+                                    android:paddingEnd="10dp"
+                                    android:paddingTop="5dp"
+                                    android:paddingBottom="5dp"
+                                    android:text="@string/copy_address"
+                                    android:textColor="#FFFFFF"
+                                    android:textSize="11sp" />
+
+                                <TextView
+                                    android:id="@+id/openBrowserButton"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginStart="8dp"
+                                    android:background="@drawable/chip_accent"
+                                    android:paddingStart="10dp"
+                                    android:paddingEnd="10dp"
+                                    android:paddingTop="5dp"
+                                    android:paddingBottom="5dp"
+                                    android:text="@string/open_browser"
+                                    android:textColor="#FFFFFF"
+                                    android:textSize="11sp" />
+                            </LinearLayout>
+                        </LinearLayout>
+                    </LinearLayout>
+                </LinearLayout>
+            </ScrollView>
+
+            <!-- ===== 同步记录 tab ===== -->
+            <LinearLayout
+                android:id="@+id/pageSync"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="18dp"
+                    android:text="@string/sync_history"
+                    android:textColor="#1A2433"
+                    android:textSize="17sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/syncEmpty"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="30dp"
+                    android:gravity="center"
+                    android:text="@string/sync_empty"
+                    android:textColor="#B0B8C4"
+                    android:textSize="13sp" />
+
+                <ListView
+                    android:id="@+id/syncList"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:divider="@color/bg_screen"
+                    android:dividerHeight="2dp" />
+            </LinearLayout>
+
+            <!-- ===== 设置 tab ===== -->
+            <ScrollView
+                android:id="@+id/pageSettings"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:fillViewport="true"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:paddingStart="18dp"
+                        android:paddingEnd="18dp"
+                        android:paddingTop="18dp"
+                        android:paddingBottom="6dp"
+                        android:text="@string/settings_title"
+                        android:textColor="#1A2433"
+                        android:textSize="17sp"
+                        android:textStyle="bold" />
+
+                    <!-- 端口 -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:background="#FFFFFF"
+                        android:elevation="1dp"
+                        android:padding="16dp"
+                        android:gravity="center_vertical">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/port_label"
+                            android:textColor="#232D3D"
+                            android:textSize="14sp" />
+
+                        <EditText
+                            android:id="@+id/portInput"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:inputType="number"
+                            android:hint="9501"
+                            android:background="@null"
+                            android:textAlignment="viewEnd"
+                            android:textSize="14sp"
+                            android:minWidth="80dp" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="#F0F2F6" />
+
+                    <!-- 密码 -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:background="#FFFFFF"
+                        android:elevation="1dp"
+                        android:padding="16dp"
+                        android:gravity="center_vertical">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/password_label"
+                            android:textColor="#232D3D"
+                            android:textSize="14sp" />
+
+                        <EditText
+                            android:id="@+id/authInput"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:inputType="textPassword"
+                            android:hint="@string/password_hint"
+                            android:background="@null"
+                            android:textAlignment="viewEnd"
+                            android:textSize="14sp"
+                            android:minWidth="120dp" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="#F0F2F6" />
+
+                    <!-- 存储目录 -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:background="#FFFFFF"
+                        android:elevation="1dp"
+                        android:padding="16dp"
+                        android:gravity="center_vertical">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/storage_label"
+                            android:textColor="#232D3D"
+                            android:textSize="14sp" />
+
+                        <TextView
+                            android:id="@+id/storageDirText"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/choose_dir"
+                            android:textColor="#1677D0"
+                            android:textSize="13sp"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:maxLines="1"
+                            android:ellipsize="middle" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="#F0F2F6" />
+
+                    <!-- 历史文件路径 -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:background="#FFFFFF"
+                        android:elevation="1dp"
+                        android:padding="16dp"
+                        android:gravity="center_vertical">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/history_label"
+                            android:textColor="#232D3D"
+                            android:textSize="14sp" />
+
+                        <TextView
+                            android:id="@+id/historyFileText"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/choose_dir"
+                            android:textColor="#1677D0"
+                            android:textSize="13sp"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:maxLines="1"
+                            android:ellipsize="middle" />
+                    </LinearLayout>
+
+                    <Button
+                        android:id="@+id/advancedSettingsButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="16dp"
+                        android:layout_marginEnd="16dp"
+                        android:layout_marginTop="16dp"
+                        android:text="@string/advanced_settings"
+                        style="?android:attr/borderlessButtonStyle"
+                        android:textColor="#8B93A1"
+                        android:textSize="13sp" />
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center_horizontal"
+                        android:layout_marginTop="8dp"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/githubButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/github"
+                            android:textColor="#8B93A1"
+                            android:textSize="12sp"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:padding="8dp" />
+
+                        <TextView
+                            android:layout_width="1dp"
+                            android:layout_height="16dp"
+                            android:layout_gravity="center_vertical"
+                            android:background="#E0E4EA" />
+
+                        <TextView
+                            android:id="@+id/helpButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/help"
+                            android:textColor="#8B93A1"
+                            android:textSize="12sp"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:padding="8dp" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:padding="16dp"
+                        android:gravity="center"
+                        android:text="@string/hint_always_on"
+                        android:textSize="12sp"
+                        android:textColor="#8B93A1" />
+                </LinearLayout>
+            </ScrollView>
+        </FrameLayout>
+
+        <!-- ======== 底部导航 ======== -->
+        <com.google.android.material.bottomnavigation.BottomNavigationView
+            android:id="@+id/bottomNav"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:src="@android:drawable/ic_menu_save"
-            android:background="?android:attr/selectableItemBackgroundBorderless"
-            android:contentDescription="Copy address"
-            android:layout_marginStart="8dp"/>
+            android:background="#FFFFFF"
+            app:itemIconTint="@color/nav_tint"
+            app:itemTextColor="@color/nav_tint"
+            app:labelVisibilityMode="labeled"
+            app:menu="@menu/bottom_nav" />
     </LinearLayout>
 
-    <TextView
-        android:text="@string/port_label"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"/>
-
-    <EditText
-        android:id="@+id/portInput"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:inputType="number"
-        android:hint="9501"/>
-
-    <TextView
-        android:text="访问密码(可选)"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"/>
-
-    <EditText
-        android:id="@+id/authInput"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:inputType="textPassword"
-        android:hint="留空表示不需要密码"/>
-
-    <TextView
-        android:text="存储目录"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"/>
-
-    <TextView
-        android:id="@+id/storageDirText"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="@android:drawable/edit_text"
-        android:padding="12dp"
-        android:text="点击选择目录"
-        android:textColor="?android:attr/textColorSecondary"
-        android:clickable="true"
-        android:focusable="true" />
-
-    <TextView
-        android:text="历史文件路径"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"/>
-
-    <TextView
-        android:id="@+id/historyFileText"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="@android:drawable/edit_text"
-        android:padding="12dp"
-        android:text="点击选择目录"
-        android:textColor="?android:attr/textColorSecondary"
-        android:clickable="true"
-        android:focusable="true" />
-
-    <Button
-        android:id="@+id/startStopButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/start_service"
-        android:layout_marginTop="24dp"/>
-
-    <Button
-        android:id="@+id/advancedSettingsButton"
+    <!-- ======== 悬浮电源按钮 ======== -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/powerFab"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="高级设置"
-        android:layout_gravity="center_horizontal"
-        android:layout_marginTop="8dp"
-        style="?android:attr/borderlessButtonStyle"
-        android:textColor="?android:attr/textColorSecondary" />
-
-    <!-- 占位符，将 GitHub 图标推到底部 -->
-    <View
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:layout_weight="1" />
-
-    <ImageButton
-        android:id="@+id/githubButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:src="@android:drawable/ic_menu_info_details"
-        android:background="?android:attr/selectableItemBackgroundBorderless"
-        android:contentDescription="GitHub Repository"
-        android:layout_gravity="center_horizontal"
-        android:layout_marginTop="8dp"/>
-
-    <TextView
-        android:text="提示:服务启动后会在后台运行,可以关闭此界面"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:textSize="12sp"
-        android:layout_marginTop="16dp"
-        android:gravity="center"/>
-
-</LinearLayout>
+        android:layout_gravity="bottom|end"
+        android:layout_marginEnd="20dp"
+        android:layout_marginBottom="84dp"
+        android:contentDescription="@string/start_service"
+        app:srcCompat="@drawable/ic_power"
+        app:backgroundTint="#19A560"
+        app:tint="#FFFFFF" />
+</FrameLayout>

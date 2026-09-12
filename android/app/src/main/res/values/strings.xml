@@ -1,10 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">云剪贴板</string>
-    <string name="service_running">服务运行中</string>
-    <string name="service_stopped">服务未运行</string>
+    <string name="service_running">运行中</string>
+    <string name="service_stopped">未运行</string>
     <string name="start_service">启动服务</string>
     <string name="stop_service">停止服务</string>
     <string name="port_label">端口号</string>
     <string name="password_label">访问密码(可选)</string>
+    <string name="password_hint">留空不需要密码</string>
+    <string name="storage_label">存储目录</string>
+    <string name="history_label">历史文件路径</string>
+    <string name="choose_dir">点击选择目录</string>
     <string name="service_notification">云剪贴板服务正在运行</string>
+    <string name="cover_title_running">局域网服务运行中</string>
+    <string name="cover_title_stopped">服务未运行</string>
+    <string name="cover_subtitle_running">设备可扫码或通过地址访问</string>
+    <string name="cover_subtitle_stopped">点击下方按钮开始同步剪贴板</string>
+    <string name="stat_port">端口</string>
+    <string name="stat_ip">局域网 IP</string>
+    <string name="stat_auth">访问密码</string>
+    <string name="stat_auth_on">已设</string>
+    <string name="stat_auth_off">未设</string>
+    <string name="scan_hint">扫码连接(即将支持) / 复制地址</string>
+    <string name="copy_address">复制</string>
+    <string name="open_browser">打开</string>
+    <string name="advanced_settings">高级设置</string>
+    <string name="github">开源仓库</string>
+    <string name="help">帮助</string>
+    <string name="qr_placeholder">QR</string>
+    <string name="hint_always_on">服务启动后在后台运行,可关闭此界面</string>
+    <string name="address_copied">地址已复制</string>
+    <string name="nav_services">服务</string>
+    <string name="nav_sync">同步记录</string>
+    <string name="nav_settings">设置</string>
+    <string name="sync_history">同步记录</string>
+    <string name="sync_empty">暂无同步记录</string>
+    <string name="settings_title">主要设置</string>
 </resources>
