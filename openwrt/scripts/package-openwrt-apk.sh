@@ -17,8 +17,8 @@ if [ -z "$VERSION" ] || [ -z "$ARCH" ]; then
     exit 1
 fi
 
-# apk-tools 版本号不允许 '-'（仅 -r<rev> 分隔可用），替换为 '_'
-PKG_VERSION="${VERSION//-/_}"
+# apk-tools 版本号不允许 '-' 也不允许后缀带 '.'（如 _beta.1），统一转为 _<后缀><数字>
+PKG_VERSION="$(printf '%s' "$VERSION" | sed -E 's/-([a-zA-Z]+)\.([0-9]+)/_\1\2/g; s/-([a-zA-Z]+)/_\1/g; s/-/_/g')"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BASE_DIR="$(dirname "$SCRIPT_DIR")"
