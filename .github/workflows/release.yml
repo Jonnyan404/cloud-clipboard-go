@@ -276,6 +276,7 @@ jobs:
   # ====================================================================
   build-openwrt:
     name: Build OpenWrt + LuCI Packages
+    needs: [determine-tag]
     uses: ./.github/workflows/build-openwrt-ipk.yml
     with:
       version: ${{ needs.determine-tag.outputs.version_name }}
