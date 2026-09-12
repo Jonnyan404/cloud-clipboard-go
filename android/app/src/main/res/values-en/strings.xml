@@ -52,7 +52,7 @@
     <string name="setting_history_count">History retention count</string>
     <string name="setting_room_list">Room list</string>
     <string name="setting_room_auth">Room passwords (format: room=password[,expirySecs])</string>
-    <string name="room_auth_hint">One per line, e.g.\nprivate=123\nfinance=456,3600\n(expiry seconds optional, falls back to global; 0 = never expire)</string>
+    <string name="room_auth_hint">room=password,expirySecs(omit = follow global; 0 = never expire)</string>
     <string name="preview_config">Preview config</string>
     <string name="save_config">Save config</string>
     <string name="config_saved">Config saved. Restart service to apply.</string>
