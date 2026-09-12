@@ -532,8 +532,6 @@ watch(() => route.fullPath, () => {
                 </v-chip>
             </v-toolbar-title>
 
-            <v-spacer></v-spacer>
-
             <v-tooltip left>
                 <template v-slot:activator="{ props }">
                     <v-btn icon density="compact" variant="text" v-bind="props" @click="settingsDialog = true">
@@ -1150,10 +1148,6 @@ watch(() => route.fullPath, () => {
                         <span class="flex-grow-1">{{ pageQrUrl }}</span>
                         <v-icon size="small" class="ml-1">{{ mdiContentPaste }}</v-icon>
                     </div>
-                    <v-btn size="small" variant="tonal" color="primary" class="mt-2" @click="copyQrUrl">
-                        <v-icon start size="x-small">{{ mdiContentPaste }}</v-icon>
-                        {{ pageQrMode === 'latest' ? t('copyLatestLink') : t('copyLink') }}
-                    </v-btn>
                 </v-card-text>
             </v-card>
         </v-dialog>
@@ -1358,6 +1352,15 @@ watch(() => route.fullPath, () => {
 
 .app-shell__bar .v-toolbar-title {
     margin-inline-start: 0;
+    min-width: 0;
+}
+
+.app-shell__bar :deep(.v-toolbar-title__placeholder) {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1 1 auto;
+    min-width: 0;
 }
 
 .room-title__logo-btn {
