@@ -38,9 +38,24 @@ function handlePaste(event) {
     if (!(event && event.clipboardData)) {
         return;
     }
-    const items = Array.from(event.clipboardData.items || []);
-    const files = items.filter(item => item.kind === 'file').map(item => item.getAsFile()).filter(Boolean);
+    const files = [];
+    for (const item of Array.from(event.clipboardData.items || [])) {
+        if (item.kind === 'file') {
+            const file = item.getAsFile();
+            if (file) {
+                files.push(file);
+            }
+        }
+    }
+    if (!files.length) {
+        for (const file of Array.from(event.clipboardData.files || [])) {
+            if (file) {
+                files.push(file);
+            }
+        }
+    }
     if (files.length) {
+        event.preventDefault();
         handleSelectFiles(files);
     }
 }

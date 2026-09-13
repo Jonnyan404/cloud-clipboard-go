@@ -383,8 +383,8 @@ async function deleteItem() {
                     <v-btn v-if="!isFile" variant="text" size="small" @click="copyLink">
                         <v-icon start size="small">mdi-link-variant</v-icon>{{ t('copyLink') }}
                     </v-btn>
-                    <v-btn variant="text" size="small" color="error" @click="deleteItem">
-                        <v-icon start size="small">mdi-close</v-icon>{{ t('delete') }}
+                    <v-btn variant="text" size="small" color="error" class="sticky-note__reader-delete" @click="deleteItem">
+                        <v-icon start size="small">mdi-delete-outline</v-icon>{{ t('delete') }}
                     </v-btn>
                 </div>
             </div>
@@ -488,6 +488,7 @@ async function deleteItem() {
     line-height: 1.5;
     font-weight: 500;
     word-break: break-word;
+    overflow-wrap: anywhere;
     white-space: pre-wrap;
     display: -webkit-box;
     -webkit-line-clamp: 4;
@@ -527,6 +528,12 @@ async function deleteItem() {
 
 .sticky-note:hover .sticky-note__ops {
     display: flex;
+}
+
+@media (hover: none) {
+    .sticky-note__ops {
+        display: flex;
+    }
 }
 
 .sticky-note__op {
@@ -612,8 +619,16 @@ async function deleteItem() {
 .sticky-note__reader-actions {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     gap: 8px;
     margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px dashed rgba(68, 64, 42, 0.16);
+}
+
+.sticky-note__reader-delete {
+    margin-left: auto;
+    opacity: 0.72;
 }
 
 .sticky-note__reader-actions .v-btn {

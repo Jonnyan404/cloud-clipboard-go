@@ -203,6 +203,7 @@ function handlePageDrop(event) {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
+    overflow-x: hidden;
     display: flex;
     flex-wrap: wrap;
     gap: 14px;
@@ -213,6 +214,7 @@ function handlePageDrop(event) {
 .sticky-wall__item {
     flex: 1 1 220px;
     max-width: 100%;
+    min-width: 0;
     display: flex;
 }
 

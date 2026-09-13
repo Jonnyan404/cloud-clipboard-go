@@ -17,6 +17,9 @@ const { t } = useI18n();
 
 const actions = inject('pageToolbarActions', {});
 
+const roomCount = computed(() => Number(actions.roomCount?.value ?? actions.roomCount ?? 0));
+const roomListEnabled = computed(() => Boolean(actions.roomListEnabled?.value ?? actions.roomListEnabled));
+
 const roomName = computed(() => ws.room || t('publicRoom'));
 const isProtected = computed(() => Boolean(ws.roomProtectionCache?.[ws.normalizeRoomName(ws.room)]));
 const latencyValue = computed(() => {
@@ -100,10 +103,10 @@ function setMode(mode) {
                     </button>
                 </div>
 
-                <v-tooltip v-if="actions.roomListEnabled" :text="t('roomList')" location="bottom">
+                <v-tooltip v-if="roomListEnabled" :text="t('roomList')" location="bottom">
                     <template v-slot:activator="{ props }">
                         <v-btn icon density="compact" size="small" variant="text" v-bind="props" @click="actions.openRoomBrowser && actions.openRoomBrowser()">
-                            <v-badge :content="actions.roomCount" :model-value="actions.roomCount > 0" color="accent" overlap>
+                            <v-badge :content="roomCount" :model-value="roomCount > 0" color="accent" overlap>
                                 <v-icon size="small">mdi-view-list</v-icon>
                             </v-badge>
                         </v-btn>
