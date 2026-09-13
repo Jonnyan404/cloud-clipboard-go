@@ -209,5 +209,10 @@
   "workbenchNoFiles": "暫無檔案",
   "workbenchNoTexts": "暫無文字",
   "workbenchNoRecords": "暫無記錄",
-  "workbenchInputHint": "剪貼簿內容自動出現…"
+  "workbenchInputHint": "剪貼簿內容自動出現…",
+  "workbenchNewRoom": "新增房間",
+  "workbenchCreate": "建立",
+  "workbenchRoomPlaceholder": "輸入房間名稱…",
+  "workbenchRoomNameInvalid": "房間名稱不能為空",
+  "workbenchRoomCreated": "已進入房間「{room}」"
 }

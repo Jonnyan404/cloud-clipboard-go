@@ -224,5 +224,10 @@
   "workbenchNoFiles": "No files",
   "workbenchNoTexts": "No text",
   "workbenchNoRecords": "No records",
-  "workbenchInputHint": "Clipboard content appears here…"
+  "workbenchInputHint": "Clipboard content appears here…",
+  "workbenchNewRoom": "New room",
+  "workbenchCreate": "Create",
+  "workbenchRoomPlaceholder": "Enter room name…",
+  "workbenchRoomNameInvalid": "Room name cannot be empty",
+  "workbenchRoomCreated": "Entered room \"{room}\""
 }

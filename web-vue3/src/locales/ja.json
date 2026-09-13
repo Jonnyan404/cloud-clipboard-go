@@ -209,5 +209,10 @@
   "workbenchNoFiles": "ファイルなし",
   "workbenchNoTexts": "テキストなし",
   "workbenchNoRecords": "記録なし",
-  "workbenchInputHint": "クリップボードの内容がここに表示…"
+  "workbenchInputHint": "クリップボードの内容がここに表示…",
+  "workbenchNewRoom": "新規ルーム",
+  "workbenchCreate": "作成",
+  "workbenchRoomPlaceholder": "ルーム名を入力…",
+  "workbenchRoomNameInvalid": "ルーム名を入力してください",
+  "workbenchRoomCreated": "ルーム「{room}」に入りました"
 }

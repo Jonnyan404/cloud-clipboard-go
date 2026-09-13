@@ -23,6 +23,60 @@ const isDark = computed(() => theme.current.value?.dark ?? false);
 const { t } = useI18n();
 const actions = inject('pageToolbarActions', {});
 
+const WORKBENCH_ROOMS_KEY = 'workbenchRooms';
+const localRooms = ref(loadLocalRooms());
+const newRoomDialog = ref(false);
+const newRoomName = ref('');
+const newRoomNameInput = ref(null);
+
+function loadLocalRooms() {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(WORKBENCH_ROOMS_KEY) || '[]');
+        if (Array.isArray(parsed)) {
+            const rooms = parsed.map(ws.normalizeRoomName).filter(Boolean);
+            return [...new Set(rooms)];
+        }
+    } catch (error) {
+        console.error('解析本地房间列表失败:', error);
+    }
+    return [];
+}
+
+function saveLocalRooms() {
+    localStorage.setItem(WORKBENCH_ROOMS_KEY, JSON.stringify(localRooms.value));
+}
+
+const activeRoom = computed(() => ws.room);
+
+function openNewRoomDialog() {
+    newRoomName.value = '';
+    newRoomDialog.value = true;
+    setTimeout(() => {
+        if (newRoomNameInput.value && typeof newRoomNameInput.value.focus === 'function') {
+            newRoomNameInput.value.focus();
+        }
+    }, 50);
+}
+
+function createRoom() {
+    const name = ws.normalizeRoomName(newRoomName.value);
+    if (!name) {
+        toast(t('workbenchRoomNameInvalid'));
+        return;
+    }
+    if (!localRooms.value.includes(name)) {
+        localRooms.value.unshift(name);
+        saveLocalRooms();
+    }
+    newRoomDialog.value = false;
+    ws.switchRoom(name);
+    toast(t('workbenchRoomCreated', { room: name }));
+}
+
+function switchToRoom(room) {
+    ws.switchRoom(room);
+}
+
 const items = computed(() => app.received);
 const filesPane = computed(() => items.value.filter(item => item.type === 'file'));
 const textsPane = computed(() => items.value.filter(item => item.type === 'text'));
@@ -266,12 +320,20 @@ watch(detailItem, (item) => {
         <div class="workbench-wall__body">
             <div class="workbench-wall__tabs">
                 <button
+                    v-for="room in localRooms"
+                    :key="room"
+                    type="button"
+                    class="workbench-wall__tab"
+                    :class="{ 'workbench-wall__tab--active': activeRoom === room }"
+                    @click="switchToRoom(room)"
+                ><i></i>{{ room }}</button>
+                <button
+                    v-if="!activeRoom && !localRooms.length"
                     type="button"
                     class="workbench-wall__tab workbench-wall__tab--active"
-                    @click="actions.openRoomBrowser"
-                ><i></i>{{ ws.room || t('publicRoom') }}</button>
+                ><i></i>{{ t('publicRoom') }}</button>
                 <div class="workbench-wall__tabs-spacer"></div>
-                <button type="button" class="workbench-wall__plus" :title="t('roomList')" @click="actions.openRoomBrowser">＋</button>
+                <button type="button" class="workbench-wall__plus" :title="t('workbenchNewRoom')" @click="openNewRoomDialog">＋</button>
             </div>
 
             <div class="workbench-wall__panes">
@@ -367,6 +429,27 @@ watch(detailItem, (item) => {
         <div class="workbench-wall__composer">
             <sticky-composer variant="workbench"></sticky-composer>
         </div>
+
+        <v-dialog v-model="newRoomDialog" max-width="360">
+            <div class="workbench-wall__dialog" :class="{ 'workbench-wall__dialog--dark': isDark }">
+                <div class="workbench-wall__dialog-title">{{ t('workbenchNewRoom') }}</div>
+                <v-text-field
+                    ref="newRoomNameInput"
+                    v-model="newRoomName"
+                    :placeholder="t('workbenchRoomPlaceholder')"
+                    density="compact"
+                    variant="outlined"
+                    hide-details
+                    autofocus
+                    @keydown.enter.prevent="createRoom"
+                ></v-text-field>
+                <div class="workbench-wall__dialog-actions">
+                    <v-spacer></v-spacer>
+                    <v-btn variant="text" size="small" @click="newRoomDialog = false">{{ t('cancel') }}</v-btn>
+                    <v-btn color="primary" variant="flat" size="small" @click="createRoom">{{ t('workbenchCreate') }}</v-btn>
+                </div>
+            </div>
+        </v-dialog>
 
         <v-dialog v-model="detailItem" max-width="560">
             <div v-if="detailItem" class="workbench-wall__reader" :class="{ 'workbench-wall__reader--dark': isDark }">
@@ -789,6 +872,34 @@ watch(detailItem, (item) => {
 
 .workbench-wall--dark .workbench-wall__composer :deep(.sticky-composer--workbench .sticky-composer__progress) {
     color: #e7eaf0;
+}
+
+.workbench-wall__dialog {
+    background: #fff;
+    border-radius: 12px;
+    border: 1px solid #e2e7ee;
+    padding: 18px;
+    color: #1a2332;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
+}
+
+.workbench-wall__dialog--dark {
+    background: #1d2128;
+    border-color: #2b3138;
+    color: #e7eaf0;
+}
+
+.workbench-wall__dialog-title {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 14px;
+}
+
+.workbench-wall__dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+    margin-top: 16px;
 }
 
 .workbench-wall__reader {
