@@ -130,6 +130,13 @@ func (s *ClipboardServer) handleAuthTokenRefresh(w http.ResponseWriter, r *http.
 	})
 }
 
+func (s *ClipboardServer) handle_myip(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"ip": get_remote_ip(r),
+	})
+}
+
 func (s *ClipboardServer) handle_server(w http.ResponseWriter, r *http.Request) {
 	s.logger.Printf("处理 /server 请求，来自: %s", get_remote_ip(r))
 	authNeeded := false

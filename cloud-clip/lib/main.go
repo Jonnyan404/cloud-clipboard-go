@@ -316,6 +316,7 @@ func (s *ClipboardServer) setupRoutes() {
 
 	// HTTP 路由（/server、/auth/*、/rooms、/revoke、/content 等无 authMiddleware 的路由补 CORS 头）
 	mux.HandleFunc(prefix+"/server", s.corsMiddleware(s.handle_server))
+	mux.HandleFunc(prefix+"/myip", s.corsMiddleware(s.handle_myip))
 	mux.HandleFunc(prefix+"/auth/token", s.corsMiddleware(s.handleAuthToken))
 	mux.HandleFunc(prefix+"/auth/token/refresh", s.corsMiddleware(s.handleAuthTokenRefresh))
 	mux.HandleFunc(prefix+"/push", s.handle_push)
