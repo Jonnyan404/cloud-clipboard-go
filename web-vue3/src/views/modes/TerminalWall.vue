@@ -259,10 +259,10 @@ watch(detailItem, (item) => {
                         <span class="terminal-wall__val">{{ decodedContent(item) }}</span>
                         <span class="terminal-wall__ops">
                             <button type="button" class="terminal-wall__op" :title="t('copyText')" @click="copyContent(item)">
-                                <v-icon size="medium">mdi-content-copy</v-icon>
+                                <v-icon size="large">mdi-content-copy</v-icon>
                             </button>
                             <button type="button" class="terminal-wall__op terminal-wall__op--danger" :title="t('delete')" @click="deleteItem(item)">
-                                <v-icon size="medium">mdi-close</v-icon>
+                                <v-icon size="large">mdi-close</v-icon>
                             </button>
                         </span>
                     </template>
@@ -275,10 +275,10 @@ watch(detailItem, (item) => {
                         </span>
                         <span class="terminal-wall__ops">
                             <button type="button" class="terminal-wall__op" :title="isItemExpired(item) ? t('expired') : t('download')" @click="downloadFromItem(item)">
-                                <v-icon size="medium">mdi-download</v-icon>
+                                <v-icon size="large">mdi-download</v-icon>
                             </button>
                             <button type="button" class="terminal-wall__op terminal-wall__op--danger" :title="t('delete')" @click="deleteItem(item)">
-                                <v-icon size="medium">mdi-close</v-icon>
+                                <v-icon size="large">mdi-close</v-icon>
                             </button>
                         </span>
                     </template>

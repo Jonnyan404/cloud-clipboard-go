@@ -163,6 +163,26 @@ function fileIcon(item) {
 
 const timeLabel = (item) => formatTimestamp(item.timestamp);
 
+// 移动端紧凑时间：1分钟内"刚刚"，再依次"分钟前/小时前/天前"，超过一周回退为"MM-DD"
+function relativeTimeLabel(item) {
+    if (!item?.timestamp) return '';
+    const now = Math.floor(Date.now() / 1000);
+    const diff = now - item.timestamp;
+    if (diff < 0) {
+        return t('justNow');
+    }
+    if (diff < 60) {
+        return t('justNow');
+    } else if (diff < 3600) {
+        return t('minutesAgo', { minutes: Math.floor(diff / 60) });
+    } else if (diff < 86400) {
+        return t('hoursAgo', { hours: Math.floor(diff / 3600) });
+    } else if (diff < 7 * 86400) {
+        return t('daysAgo', { days: Math.floor(diff / 86400) });
+    }
+    return new Date(item.timestamp * 1000).toLocaleDateString(undefined, { month: '2-digit', day: '2-digit' });
+}
+
 const needsShareProtection = computed(() => Boolean(app.config?.auth));
 
 async function ensureFileShareUrl(item) {
@@ -385,7 +405,8 @@ watch(detailItem, (item) => {
                             <span class="workbench-wall__row-icon">{{ fileIcon(item) }}</span>
                             <span class="workbench-wall__row-title">{{ item.name || 'file' }}</span>
                             <span class="workbench-wall__row-meta">{{ prettyFileSize(item.size || 0) }}</span>
-                            <span class="workbench-wall__row-time">{{ timeLabel(item) }}</span>
+                            <span class="workbench-wall__row-time workbench-wall__row-time--full">{{ timeLabel(item) }}</span>
+                            <span class="workbench-wall__row-time workbench-wall__row-time--compact">{{ relativeTimeLabel(item) }}</span>
                         </div>
                     </div>
                     <div v-else class="workbench-wall__pane-empty">{{ t('workbenchNoFiles') }}</div>
@@ -404,13 +425,14 @@ watch(detailItem, (item) => {
                         >
                             <span class="workbench-wall__row-icon">📝</span>
                             <span class="workbench-wall__row-title">{{ decodedContent(item) }}</span>
-                            <span class="workbench-wall__row-time">{{ timeLabel(item) }}</span>
+                            <span class="workbench-wall__row-time workbench-wall__row-time--full">{{ timeLabel(item) }}</span>
+                            <span class="workbench-wall__row-time workbench-wall__row-time--compact">{{ relativeTimeLabel(item) }}</span>
                             <span class="workbench-wall__row-ops">
                                 <button type="button" class="workbench-wall__op" :title="t('copyText')" @click="copyContent(item)">
-                                    <v-icon size="medium">mdi-content-copy</v-icon>
+                                    <v-icon size="large">mdi-content-copy</v-icon>
                                 </button>
                                 <button type="button" class="workbench-wall__op workbench-wall__op--danger" :title="t('delete')" @click="deleteItem(item)">
-                                    <v-icon size="medium">mdi-delete-outline</v-icon>
+                                    <v-icon size="large">mdi-delete-outline</v-icon>
                                 </button>
                             </span>
                         </div>
@@ -437,16 +459,17 @@ watch(detailItem, (item) => {
                             <span class="workbench-wall__row-icon">{{ item.type === 'file' ? fileIcon(item) : '📝' }}</span>
                             <span class="workbench-wall__row-title">{{ item.type === 'file' ? (item.name || 'file') : decodedContent(item) }}</span>
                             <span v-if="item.type === 'file'" class="workbench-wall__row-meta">{{ prettyFileSize(item.size || 0) }}</span>
-                            <span class="workbench-wall__row-time">{{ timeLabel(item) }}</span>
+                            <span class="workbench-wall__row-time workbench-wall__row-time--full">{{ timeLabel(item) }}</span>
+                            <span class="workbench-wall__row-time workbench-wall__row-time--compact">{{ relativeTimeLabel(item) }}</span>
                             <span class="workbench-wall__row-ops">
                                 <button v-if="item.type === 'file'" type="button" class="workbench-wall__op" :title="isItemExpired(item) ? t('expired') : t('download')" @click.stop="item.cache && downloadItem(item)">
-                                    <v-icon size="medium">mdi-download</v-icon>
+                                    <v-icon size="large">mdi-download</v-icon>
                                 </button>
                                 <button type="button" class="workbench-wall__op" :title="t('copyText')" @click.stop="item.type === 'text' ? copyContent(item) : copyFileLink(item)">
-                                    <v-icon size="medium">mdi-content-copy</v-icon>
+                                    <v-icon size="large">mdi-content-copy</v-icon>
                                 </button>
                                 <button type="button" class="workbench-wall__op workbench-wall__op--danger" :title="t('delete')" @click.stop="deleteItem(item)">
-                                    <v-icon size="medium">mdi-delete-outline</v-icon>
+                                    <v-icon size="large">mdi-delete-outline</v-icon>
                                 </button>
                             </span>
                         </div>
@@ -834,13 +857,21 @@ watch(detailItem, (item) => {
     color: #6d7681;
 }
 
-.workbench-wall__row-time {
+.workbench-wall__row-time--full {
     display: none;
 }
 
-@media (min-width: 480px) {
-    .workbench-wall__row-time {
+.workbench-wall__row-time--compact {
+    display: inline;
+}
+
+@media (min-width: 768px) {
+    .workbench-wall__row-time--full {
         display: inline;
+    }
+
+    .workbench-wall__row-time--compact {
+        display: none;
     }
 }
 
