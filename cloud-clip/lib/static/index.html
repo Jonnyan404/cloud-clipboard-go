@@ -10,18 +10,19 @@
     <style>
         html, body { height: 100%; margin: 0; }
     </style>
-  <script type="module" crossorigin src="./assets/index-DgQTe1Mm.js"></script>
-  <link rel="modulepreload" crossorigin href="./assets/vue-core-D4-orajI.js">
-  <link rel="modulepreload" crossorigin href="./assets/vendor-C1RBHXCn.js">
-  <link rel="modulepreload" crossorigin href="./assets/i18n-D4rQ6gPh.js">
-  <link rel="modulepreload" crossorigin href="./assets/vuetify-CpeP3vjY.js">
-  <link rel="stylesheet" crossorigin href="./assets/vuetify-BV95-D1e.css">
-  <link rel="stylesheet" crossorigin href="./assets/index-BGuCaBRa.css">
+  <script type="module" crossorigin src="./assets/index-OGuFov9d.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/vue-core-C1ikxJp4.js">
+  <link rel="modulepreload" crossorigin href="./assets/vendor-OZScGHRH.js">
+  <link rel="modulepreload" crossorigin href="./assets/i18n-C-uw6g1j.js">
+  <link rel="modulepreload" crossorigin href="./assets/vuetify-Bk-_HQq6.js">
+  <link rel="stylesheet" crossorigin href="./assets/vuetify-CrugSvbH.css">
+  <link rel="stylesheet" crossorigin href="./assets/index-B0uzaKnY.css">
 <link rel="manifest" href="./manifest.webmanifest"></head>
 <body>
     <div id="app"></div>
     <script>
-        if ('serviceWorker' in navigator) {
+        // dev 模式下 vite-plugin-pwa 不生成 sw.js，仅在生产环境注册
+        if ('serviceWorker' in navigator && 'production' === 'production') {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./sw.js', { scope: './', updateViaCache: 'none' }).catch((error) => {
                     console.error('Service worker registration failed:', error);
