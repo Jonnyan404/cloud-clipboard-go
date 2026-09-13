@@ -279,6 +279,16 @@ const currentMode = computed(() => MODES.find(mode => mode.key === app.uiMode) |
     border-bottom-color: rgba(255, 255, 255, 0.08);
 }
 
+.page-toolbar--chat {
+    background: #f6f7fa;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.page-toolbar--dark.page-toolbar--chat {
+    background: #15171c;
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
 .page-toolbar__inner {
     display: flex;
     align-items: center;

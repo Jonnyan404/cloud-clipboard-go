@@ -229,5 +229,16 @@
   "workbenchCreate": "创建",
   "workbenchRoomPlaceholder": "输入房间名称…",
   "workbenchRoomNameInvalid": "房间名称不能为空",
-  "workbenchRoomCreated": "已进入房间「{room}」"
+  "workbenchRoomCreated": "已进入房间「{room}」",
+  "uiModeChat": "聊天气泡",
+  "chatQuickBuffer": "👍 收到",
+  "chatQuickCopy": "❓ 复制",
+  "chatQuickForward": "🔗 转发",
+  "chatForwardSuccess": "已复制转发链接",
+  "chatBufferOk": "收到，已记录",
+  "chatToday": "今天",
+  "chatTypeText": "文本",
+  "chatTypeFile": "文件",
+  "uiModeChatCount": "{count} 条",
+  "chatPlaceholder": "发送文字或文件…"
 }

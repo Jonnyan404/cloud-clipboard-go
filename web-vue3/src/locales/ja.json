@@ -214,5 +214,16 @@
   "workbenchCreate": "作成",
   "workbenchRoomPlaceholder": "ルーム名を入力…",
   "workbenchRoomNameInvalid": "ルーム名を入力してください",
-  "workbenchRoomCreated": "ルーム「{room}」に入りました"
+  "workbenchRoomCreated": "ルーム「{room}」に入りました",
+  "uiModeChat": "チャット",
+  "chatQuickBuffer": "👍 受け取り",
+  "chatQuickCopy": "❓ コピー",
+  "chatQuickForward": "🔗 転送",
+  "chatForwardSuccess": "転送リンクをコピーしました",
+  "chatBufferOk": "受け取りました",
+  "chatToday": "今日",
+  "chatTypeText": "テキスト",
+  "chatTypeFile": "ファイル",
+  "uiModeChatCount": "{count} 件",
+  "chatPlaceholder": "テキストまたはファイルを送る…"
 }

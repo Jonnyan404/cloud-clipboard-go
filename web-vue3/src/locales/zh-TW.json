@@ -214,5 +214,16 @@
   "workbenchCreate": "建立",
   "workbenchRoomPlaceholder": "輸入房間名稱…",
   "workbenchRoomNameInvalid": "房間名稱不能為空",
-  "workbenchRoomCreated": "已進入房間「{room}」"
+  "workbenchRoomCreated": "已進入房間「{room}」",
+  "uiModeChat": "聊天氣泡",
+  "chatQuickBuffer": "👍 收到",
+  "chatQuickCopy": "❓ 複製",
+  "chatQuickForward": "🔗 轉發",
+  "chatForwardSuccess": "已複製轉發連結",
+  "chatBufferOk": "收到，已記錄",
+  "chatToday": "今天",
+  "chatTypeText": "文字",
+  "chatTypeFile": "檔案",
+  "uiModeChatCount": "{count} 筆",
+  "chatPlaceholder": "傳送文字或檔案…"
 }

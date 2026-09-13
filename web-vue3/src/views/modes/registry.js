@@ -3,6 +3,7 @@ import StickyWall from './StickyWall.vue';
 import MegaWall from './MegaWall.vue';
 import TerminalWall from './TerminalWall.vue';
 import WorkbenchWall from './WorkbenchWall.vue';
+import ChatWall from './ChatWall.vue';
 
 export const MODES = [
     {
@@ -10,6 +11,12 @@ export const MODES = [
         labelKey: 'uiModeDefault',
         icon: 'mdi-view-dashboard-outline',
         component: DefaultMode,
+    },
+    {
+        key: 'chat',
+        labelKey: 'uiModeChat',
+        icon: 'mdi-chat-outline',
+        component: ChatWall,
     },
     {
         key: 'sticky',

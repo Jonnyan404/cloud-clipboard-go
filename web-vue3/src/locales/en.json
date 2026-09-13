@@ -229,5 +229,16 @@
   "workbenchCreate": "Create",
   "workbenchRoomPlaceholder": "Enter room name…",
   "workbenchRoomNameInvalid": "Room name cannot be empty",
-  "workbenchRoomCreated": "Entered room \"{room}\""
+  "workbenchRoomCreated": "Entered room \"{room}\"",
+  "uiModeChat": "Chat",
+  "chatQuickBuffer": "👍 Got it",
+  "chatQuickCopy": "❓ Copy",
+  "chatQuickForward": "🔗 Forward",
+  "chatForwardSuccess": "Forward link copied",
+  "chatBufferOk": "Got it",
+  "chatToday": "Today",
+  "chatTypeText": "text",
+  "chatTypeFile": "file",
+  "uiModeChatCount": "{count} items",
+  "chatPlaceholder": "Send a text or file…"
 }

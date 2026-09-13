@@ -27,6 +27,9 @@ const placeholder = computed(() => {
     if (props.variant === 'workbench') {
         return t('workbenchInputHint');
     }
+    if (props.variant === 'chat') {
+        return t('chatPlaceholder');
+    }
     return t('stickyNewNote');
 });
 const fileSize = computed(() => app.send.files.length ? app.send.files.reduce((acc, cur) => acc += cur.size, 0) : 0);
@@ -226,6 +229,13 @@ async function sendAll() {
                 v-else-if="props.variant === 'workbench'"
                 type="button"
                 class="sticky-composer__go sticky-composer__go--workbench"
+                :disabled="sendDisabled"
+                @click="sendAll"
+            >{{ t('send') }}</button>
+            <button
+                v-else-if="props.variant === 'chat'"
+                type="button"
+                class="sticky-composer__go sticky-composer__go--chat"
                 :disabled="sendDisabled"
                 @click="sendAll"
             >{{ t('send') }}</button>
@@ -465,6 +475,46 @@ async function sendAll() {
 }
 
 .sticky-composer__go--workbench {
+    background: #1e88e5;
+    border-radius: 9px;
+    font-size: 12px;
+    padding: 8px 15px;
+    font-weight: 650;
+}
+
+.sticky-composer--chat {
+    background: #fff;
+    border: 1px solid #dfe4ea;
+    border-radius: 14px;
+    padding: 11px 14px;
+    box-shadow: 0 1px 3px rgba(30, 45, 62, 0.05);
+}
+
+.sticky-composer--chat .sticky-composer__attach {
+    font-size: 15px;
+    color: #9ca3af;
+}
+
+.sticky-composer--chat .sticky-composer__area {
+    font-size: 12px;
+    color: #111827;
+    padding: 4px 0;
+}
+
+.sticky-composer--chat .sticky-composer__area::placeholder {
+    color: #aab2bd;
+}
+
+.sticky-composer--chat .sticky-composer__file {
+    background: #f1f5f9;
+    color: #475569;
+}
+
+.sticky-composer--chat .sticky-composer__progress {
+    color: #111827;
+}
+
+.sticky-composer__go--chat {
     background: #1e88e5;
     border-radius: 9px;
     font-size: 12px;
