@@ -84,9 +84,10 @@ jobs:
       - name: Migrate senderClientID column (idempotent)
         working-directory: cloudflare/workers
         run: |
+          # 递归查找 .c 值，兼容 wrangler v4 数组格式与旧版对象格式
           HAS_COL=$(wrangler d1 execute cloud-clipboard-db --remote --yes --json \
             --command "SELECT count(*) AS c FROM pragma_table_info('messages') WHERE name='senderClientID';" \
-            | jq -r '.result[0].c // 0')
+            | jq -r '[.. | objects | .c? // empty] | .[0] // 0')
           if [ "$HAS_COL" != "1" ]; then
             echo "messages 表缺少 senderClientID 列，执行 ALTER TABLE..."
             wrangler d1 execute cloud-clipboard-db --remote --yes \
