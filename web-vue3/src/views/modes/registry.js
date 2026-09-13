@@ -2,6 +2,7 @@ import DefaultMode from './DefaultMode.vue';
 import StickyWall from './StickyWall.vue';
 import MegaWall from './MegaWall.vue';
 import TerminalWall from './TerminalWall.vue';
+import WorkbenchWall from './WorkbenchWall.vue';
 
 export const MODES = [
     {
@@ -21,6 +22,12 @@ export const MODES = [
         labelKey: 'uiModeMega',
         icon: 'mdi-newspaper-variant-outline',
         component: MegaWall,
+    },
+    {
+        key: 'workbench',
+        labelKey: 'uiModeWorkbench',
+        icon: 'mdi-view-column-outline',
+        component: WorkbenchWall,
     },
     {
         key: 'terminal',

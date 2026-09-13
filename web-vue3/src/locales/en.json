@@ -215,5 +215,14 @@
   "terminalEnter": "ENTER ↵",
   "terminalToday": "CLIPBOARD · TERM",
   "collapseToolbar": "Collapse toolbar",
-  "expandToolbar": "Expand toolbar"
+  "expandToolbar": "Expand toolbar",
+  "uiModeWorkbench": "Workbench",
+  "workbenchTodayFiles": "Files",
+  "workbenchRecentTexts": "Recent text",
+  "workbenchAllRecords": "All records",
+  "workbenchCount": "{count} items",
+  "workbenchNoFiles": "No files",
+  "workbenchNoTexts": "No text",
+  "workbenchNoRecords": "No records",
+  "workbenchInputHint": "Clipboard content appears here…"
 }

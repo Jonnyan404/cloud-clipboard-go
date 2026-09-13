@@ -200,5 +200,14 @@
   "terminalEnter": "ENTER ↵",
   "terminalToday": "剪貼簿 · 終端",
   "collapseToolbar": "收合工具列",
-  "expandToolbar": "展開工具列"
+  "expandToolbar": "展開工具列",
+  "uiModeWorkbench": "工作台",
+  "workbenchTodayFiles": "今日檔案",
+  "workbenchRecentTexts": "最近文字",
+  "workbenchAllRecords": "全部記錄",
+  "workbenchCount": "{count} 筆",
+  "workbenchNoFiles": "暫無檔案",
+  "workbenchNoTexts": "暫無文字",
+  "workbenchNoRecords": "暫無記錄",
+  "workbenchInputHint": "剪貼簿內容自動出現…"
 }

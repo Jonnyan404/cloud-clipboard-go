@@ -200,5 +200,14 @@
   "terminalEnter": "ENTER ↵",
   "terminalToday": "クリップボード · ターミナル",
   "collapseToolbar": "ツールバーを畳む",
-  "expandToolbar": "ツールバーを広げる"
+  "expandToolbar": "ツールバーを広げる",
+  "uiModeWorkbench": "ワークベンチ",
+  "workbenchTodayFiles": "今日のファイル",
+  "workbenchRecentTexts": "最近のテキスト",
+  "workbenchAllRecords": "すべての記録",
+  "workbenchCount": "{count} 件",
+  "workbenchNoFiles": "ファイルなし",
+  "workbenchNoTexts": "テキストなし",
+  "workbenchNoRecords": "記録なし",
+  "workbenchInputHint": "クリップボードの内容がここに表示…"
 }
