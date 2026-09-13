@@ -240,5 +240,6 @@
   "chatTypeText": "text",
   "chatTypeFile": "file",
   "uiModeChatCount": "{count} items",
-  "chatPlaceholder": "Send a text or file…"
+  "chatPlaceholder": "Send a text or file…",
+  "chatSynced": "synced"
 }

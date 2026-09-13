@@ -22,6 +22,27 @@ const theme = useTheme();
 const isDark = computed(() => theme.current.value?.dark ?? false);
 const { t } = useI18n();
 
+const ownIp = ref(localStorage.getItem('ccgMyIp') || '');
+async function resolveOwnIp() {
+    if (ownIp.value) {
+        return;
+    }
+    try {
+        const response = await axios.get('myip', {
+            params: new URLSearchParams([['room', ws.room]]),
+        });
+        if (response.data && response.data.ip) {
+            ownIp.value = response.data.ip;
+            localStorage.setItem('ccgMyIp', ownIp.value);
+        }
+    } catch (error) {
+        console.error('获取本机IP失败:', error);
+    }
+}
+resolveOwnIp();
+
+const isOwnBubble = (item) => Boolean(item?.senderIP && item.senderIP === ownIp.value);
+
 const items = computed(() => app.received);
 const countLabel = computed(() => t('uiModeChatCount', { count: items.value.length }));
 
@@ -320,7 +341,8 @@ async function forwardLatest() {
                 <div
                     v-for="item in [...items].reverse()"
                     :key="item.id"
-                    class="chat-wall__bubble chat-wall__bubble--in"
+                    class="chat-wall__bubble"
+                    :class="isOwnBubble(item) ? 'chat-wall__bubble--out' : 'chat-wall__bubble--in'"
                 >
                     <div v-if="item.type === 'file'" class="chat-wall__file" role="button" tabindex="0" @click="detailItem = item" @keydown.enter.prevent="detailItem = item">
                         <span class="chat-wall__file-icon">{{ fileIcon(item) }}</span>
@@ -331,7 +353,7 @@ async function forwardLatest() {
                     </div>
                     <div v-else class="chat-wall__text">{{ decodedContent(item) }}</div>
                     <span class="chat-wall__bubble-time">
-                        {{ shortTime(item) }} · {{ item.type === 'text' ? t('chatTypeText') : t('chatTypeFile') }}
+                        {{ shortTime(item) }} · {{ item.type === 'text' ? t('chatTypeText') : t('chatTypeFile') }}<template v-if="isOwnBubble(item)"> · {{ t('chatSynced') }}</template>
                     </span>
                     <span class="chat-wall__bubble-ops">
                         <button v-if="item.type === 'text'" type="button" class="chat-wall__op" :title="t('copyText')" @click="copyContent(item)">
@@ -597,6 +619,22 @@ async function forwardLatest() {
     background: #1d2128;
     border-color: #2b3138;
     color: #e7eaf0;
+}
+
+.chat-wall__bubble--out {
+    align-self: flex-end;
+    background: #1e88e5;
+    color: #fff;
+    border-bottom-right-radius: 5px;
+}
+
+.chat-wall__bubble--out .chat-wall__file-icon {
+    background: rgba(255, 255, 255, 0.18);
+}
+
+.chat-wall__bubble--out .chat-wall__file-name,
+.chat-wall__bubble--out .chat-wall__bubble-time {
+    color: #fff;
 }
 
 .chat-wall__text {

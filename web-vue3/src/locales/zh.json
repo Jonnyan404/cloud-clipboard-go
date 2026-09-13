@@ -240,5 +240,6 @@
   "chatTypeText": "文本",
   "chatTypeFile": "文件",
   "uiModeChatCount": "{count} 条",
-  "chatPlaceholder": "发送文字或文件…"
+  "chatPlaceholder": "发送文字或文件…",
+  "chatSynced": "已同步"
 }

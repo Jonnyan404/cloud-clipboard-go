@@ -225,5 +225,6 @@
   "chatTypeText": "テキスト",
   "chatTypeFile": "ファイル",
   "uiModeChatCount": "{count} 件",
-  "chatPlaceholder": "テキストまたはファイルを送る…"
+  "chatPlaceholder": "テキストまたはファイルを送る…",
+  "chatSynced": "同期済み"
 }
