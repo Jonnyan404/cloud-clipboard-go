@@ -346,7 +346,7 @@ watch(detailItem, (item) => {
                     class="workbench-wall__tab"
                     :class="{ 'workbench-wall__tab--active': activeRoom === room }"
                     @click="switchToRoom(room)"
-                ><i></i><span class="workbench-wall__tab-name">{{ room || 'default' }}</span>
+                ><i></i><span class="workbench-wall__tab-name">{{ room || t('publicRoom') }}</span>
                     <span
                         v-if="room"
                         class="workbench-wall__tab-close"
