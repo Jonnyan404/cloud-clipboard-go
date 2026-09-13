@@ -1,4 +1,4 @@
-<script setup>import { computed, inject } from 'vue';
+<script setup>import { computed, inject, ref } from 'vue';
 import { useAppStore } from '@/store/app';
 import { useWebSocketStore } from '@/store/websocket';
 import { useTheme } from 'vuetify';
@@ -14,6 +14,13 @@ const ws = useWebSocketStore();
 const theme = useTheme();
 const isDark = computed(() => theme.current.value?.dark ?? false);
 const { t } = useI18n();
+
+const toolbarCollapsed = ref(localStorage.getItem('pageToolbarCollapsed') === 'true');
+
+function toggleToolbar() {
+    toolbarCollapsed.value = !toolbarCollapsed.value;
+    localStorage.setItem('pageToolbarCollapsed', String(toolbarCollapsed.value));
+}
 
 const actions = inject('pageToolbarActions', {});
 
@@ -54,10 +61,11 @@ const currentMode = computed(() => MODES.find(mode => mode.key === app.uiMode) |
         class="page-toolbar"
         :class="[
             `page-toolbar--${variant}`,
-            { 'page-toolbar--dark': isDark }
+            { 'page-toolbar--dark': isDark },
+            { 'page-toolbar--collapsed': toolbarCollapsed }
         ]"
     >
-        <div class="page-toolbar__inner">
+        <div class="page-toolbar__inner" v-show="!toolbarCollapsed">
             <div class="page-toolbar__leading">
                 <v-tooltip v-if="ws.room" :text="t('backToDefaultRoom')" location="bottom">
                     <template v-slot:activator="{ props }">
@@ -70,7 +78,7 @@ const currentMode = computed(() => MODES.find(mode => mode.key === app.uiMode) |
                 <v-chip
                     size="small"
                     variant="tonal"
-                    :color="variant === 'sticky' ? 'amber-darken-1' : 'primary'"
+                    :color="variant === 'sticky' ? 'amber-darken-1' : variant === 'terminal' ? 'success' : 'primary'"
                     class="page-toolbar__room"
                     :title="t('showQrCode')"
                     @click="actions.openPageQr && actions.openPageQr()"
@@ -166,6 +174,16 @@ const currentMode = computed(() => MODES.find(mode => mode.key === app.uiMode) |
                 </v-tooltip>
             </div>
         </div>
+
+        <button
+            type="button"
+            class="page-toolbar__collapse-toggle"
+            :class="{ 'page-toolbar__collapse-toggle--opened': !toolbarCollapsed }"
+            :title="toolbarCollapsed ? t('expandToolbar') : t('collapseToolbar')"
+            @click="toggleToolbar"
+        >
+            <v-icon size="small">{{ toolbarCollapsed ? 'mdi-chevron-double-down' : 'mdi-chevron-double-up' }}</v-icon>
+        </button>
     </div>
 </template>
 
@@ -174,6 +192,41 @@ const currentMode = computed(() => MODES.find(mode => mode.key === app.uiMode) |
     position: sticky;
     top: 0;
     z-index: 40;
+}
+
+.page-toolbar--collapsed .page-toolbar__inner {
+    display: none !important;
+}
+
+.page-toolbar__collapse-toggle {
+    position: absolute;
+    left: 50%;
+    bottom: -2px;
+    transform: translateX(-50%);
+    z-index: 5;
+    width: 26px;
+    height: 4px;
+    border-radius: 999px;
+    border: none;
+    background: currentColor;
+    opacity: 0.35;
+    cursor: pointer;
+    padding: 0;
+    transition: opacity 0.15s, width 0.15s;
+}
+
+.page-toolbar__collapse-toggle:hover {
+    opacity: 0.8;
+    width: 36px;
+}
+
+.page-toolbar__collapse-toggle .v-icon {
+    display: none;
+}
+
+.page-toolbar--dark .page-toolbar__collapse-toggle {
+    background: currentColor;
+    opacity: 0.3;
 }
 
 .page-toolbar--default {
@@ -191,6 +244,11 @@ const currentMode = computed(() => MODES.find(mode => mode.key === app.uiMode) |
     border-bottom: 1px solid rgba(17, 24, 39, 0.12);
 }
 
+.page-toolbar--terminal {
+    background: #ffffff;
+    border-bottom: 1px solid #d0d7de;
+}
+
 .page-toolbar--dark.page-toolbar--default {
     background: #1e1e24;
     border-bottom-color: rgba(148, 163, 184, 0.22);
@@ -204,6 +262,11 @@ const currentMode = computed(() => MODES.find(mode => mode.key === app.uiMode) |
 .page-toolbar--dark.page-toolbar--mega {
     background: #101318;
     border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+.page-toolbar--terminal.page-toolbar--dark {
+    background: #0d1117;
+    border-bottom-color: #21262d;
 }
 
 .page-toolbar__inner {

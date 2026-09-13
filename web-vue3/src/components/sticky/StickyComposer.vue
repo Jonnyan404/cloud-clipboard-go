@@ -17,7 +17,15 @@ const textarea = ref(null);
 const selectFile = ref(null);
 const sending = ref(false);
 const uploadedSizes = ref([]);
-const placeholder = computed(() => props.variant === 'mega' ? t('composerPlaceholder') : t('stickyNewNote'));
+const placeholder = computed(() => {
+    if (props.variant === 'mega') {
+        return t('composerPlaceholder');
+    }
+    if (props.variant === 'terminal') {
+        return t('terminalPlaceholder');
+    }
+    return t('stickyNewNote');
+});
 const fileSize = computed(() => app.send.files.length ? app.send.files.reduce((acc, cur) => acc += cur.size, 0) : 0);
 const uploadedSize = computed(() => uploadedSizes.value.length ? uploadedSizes.value.reduce((acc, cur) => acc += cur, 0) : 0);
 const uploadProgress = computed(() => Math.min(fileSize.value !== 0 ? (uploadedSize.value / fileSize.value) : 0, 1));
@@ -198,19 +206,26 @@ async function sendAll() {
                 @keydown="onKeydown"
             ></textarea>
             <button
-                v-if="props.variant !== 'mega'"
-                type="button"
-                class="sticky-composer__go"
-                :disabled="sendDisabled"
-                @click="sendAll"
-            >{{ t('stickyStick') }}</button>
-            <button
-                v-else
+                v-if="props.variant === 'mega'"
                 type="button"
                 class="sticky-composer__go sticky-composer__go--mega"
                 :disabled="sendDisabled"
                 @click="sendAll"
             >{{ t('send') }}</button>
+            <button
+                v-else-if="props.variant === 'terminal'"
+                type="button"
+                class="sticky-composer__go sticky-composer__go--terminal"
+                :disabled="sendDisabled"
+                @click="sendAll"
+            >{{ t('terminalEnter') }}</button>
+            <button
+                v-else
+                type="button"
+                class="sticky-composer__go"
+                :disabled="sendDisabled"
+                @click="sendAll"
+            >{{ t('stickyStick') }}</button>
             <input
                 ref="selectFile"
                 type="file"
@@ -353,5 +368,53 @@ async function sendAll() {
 
 .sticky-composer--mega .sticky-composer__progress {
     color: #1f2937;
+}
+
+.sticky-composer--terminal {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 9px 11px;
+    box-shadow: none;
+    font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
+}
+
+.sticky-composer--terminal .sticky-composer__row {
+    gap: 8px;
+}
+
+.sticky-composer--terminal .sticky-composer__attach {
+    font-size: 13px;
+    color: #8b949e;
+}
+
+.sticky-composer--terminal .sticky-composer__area {
+    font-family: inherit;
+    font-size: 12px;
+    color: #c9d1d9;
+    padding: 4px 0;
+}
+
+.sticky-composer--terminal .sticky-composer__area::placeholder {
+    color: #6e7681;
+}
+
+.sticky-composer--terminal .sticky-composer__file {
+    background: #21262d;
+    color: #c9d1d9;
+}
+
+.sticky-composer--terminal .sticky-composer__progress {
+    color: #58a6ff;
+}
+
+.sticky-composer__go--terminal {
+    background: #238636;
+    color: #fff;
+    border-radius: 6px;
+    font-size: 11px;
+    padding: 5px 12px;
+    font-weight: 700;
+    font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
 }
 </style>

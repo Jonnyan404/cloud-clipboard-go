@@ -207,5 +207,13 @@
   "stickyDropHere": "Release to attach",
   "backToDefaultRoom": "Back to default room",
   "expiresAt": "Expires {time}",
-  "composerPlaceholder": "Send text or a file…"
+  "composerPlaceholder": "Send text or a file…",
+  "uiModeTerminal": "Terminal",
+  "terminalPlaceholder": "clipboard.txt …",
+  "terminalCursor": "type to send",
+  "terminalLogCount": "{count} entries",
+  "terminalEnter": "ENTER ↵",
+  "terminalToday": "CLIPBOARD · TERM",
+  "collapseToolbar": "Collapse toolbar",
+  "expandToolbar": "Expand toolbar"
 }

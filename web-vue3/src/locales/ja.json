@@ -192,5 +192,13 @@
   "stickyDropHere": "離して追加",
   "backToDefaultRoom": "デフォルトルームに戻る",
   "expiresAt": "{time} に期限切れ",
-  "composerPlaceholder": "テキストまたはファイルを送信…"
+  "composerPlaceholder": "テキストまたはファイルを送信…",
+  "uiModeTerminal": "ターミナル",
+  "terminalPlaceholder": "clipboard.txt …",
+  "terminalCursor": "送信する内容を入力",
+  "terminalLogCount": "{count} 件",
+  "terminalEnter": "ENTER ↵",
+  "terminalToday": "クリップボード · ターミナル",
+  "collapseToolbar": "ツールバーを畳む",
+  "expandToolbar": "ツールバーを広げる"
 }

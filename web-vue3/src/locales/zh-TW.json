@@ -192,5 +192,13 @@
   "stickyDropHere": "放開即可新增",
   "backToDefaultRoom": "返回預設房間",
   "expiresAt": "{time} 過期",
-  "composerPlaceholder": "發送文字或檔案…"
+  "composerPlaceholder": "發送文字或檔案…",
+  "uiModeTerminal": "終端",
+  "terminalPlaceholder": "clipboard.txt …",
+  "terminalCursor": "輸入要傳送的內容",
+  "terminalLogCount": "{count} 筆記錄",
+  "terminalEnter": "ENTER ↵",
+  "terminalToday": "剪貼簿 · 終端",
+  "collapseToolbar": "收合工具列",
+  "expandToolbar": "展開工具列"
 }

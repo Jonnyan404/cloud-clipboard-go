@@ -1,6 +1,7 @@
 import DefaultMode from './DefaultMode.vue';
 import StickyWall from './StickyWall.vue';
 import MegaWall from './MegaWall.vue';
+import TerminalWall from './TerminalWall.vue';
 
 export const MODES = [
     {
@@ -20,6 +21,12 @@ export const MODES = [
         labelKey: 'uiModeMega',
         icon: 'mdi-newspaper-variant-outline',
         component: MegaWall,
+    },
+    {
+        key: 'terminal',
+        labelKey: 'uiModeTerminal',
+        icon: 'mdi-console-line',
+        component: TerminalWall,
     },
 ];
 

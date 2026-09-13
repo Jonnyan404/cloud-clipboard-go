@@ -207,5 +207,13 @@
   "stickyDropHere": "松开即添加到便签",
   "backToDefaultRoom": "返回默认房间",
   "expiresAt": "{time} 过期",
-  "composerPlaceholder": "发送文字或文件…"
+  "composerPlaceholder": "发送文字或文件…",
+  "uiModeTerminal": "终端",
+  "terminalPlaceholder": "clipboard.txt …",
+  "terminalCursor": "输入要发送的内容",
+  "terminalLogCount": "{count} 条记录",
+  "terminalEnter": "ENTER ↵",
+  "terminalToday": "剪贴板 · 终端",
+  "collapseToolbar": "收起工具条",
+  "expandToolbar": "展开工具条"
 }
