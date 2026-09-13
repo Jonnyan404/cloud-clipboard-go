@@ -15,6 +15,7 @@ import {
 } from '@/util.js';
 import PageToolbar from '@/components/PageToolbar.vue';
 import StickyComposer from '@/components/sticky/StickyComposer.vue';
+import { useStickyAutoscroll } from '@/composables/useStickyAutoscroll';
 
 const app = useAppStore();
 const ws = useWebSocketStore();
@@ -98,8 +99,14 @@ function switchToRoom(room) {
 }
 
 const items = computed(() => app.received);
-const filesPane = computed(() => items.value.filter(item => item.type === 'file'));
-const textsPane = computed(() => items.value.filter(item => item.type === 'text'));
+const streamItems = computed(() => [...items.value].reverse());
+const filesPane = computed(() => streamItems.value.filter(item => item.type === 'file'));
+const textsPane = computed(() => streamItems.value.filter(item => item.type === 'text'));
+const streamEl = ref(null);
+const { pinToBottom } = useStickyAutoscroll(streamEl, {
+    items: () => [...streamItems.value],
+    room: () => ws.room,
+});
 
 const detailItem = ref(null);
 const downloading = ref(false);
@@ -359,7 +366,7 @@ watch(detailItem, (item) => {
                 <button type="button" class="workbench-wall__plus" :title="t('workbenchNewRoom')" @click="openNewRoomDialog">＋</button>
             </div>
 
-            <div class="workbench-wall__panes">
+            <div ref="streamEl" class="workbench-wall__panes">
                 <section class="workbench-wall__pane">
                     <header class="workbench-wall__pane-head">
                         <span class="workbench-wall__pane-title">📄 {{ t('workbenchTodayFiles') }}</span>
@@ -418,7 +425,7 @@ watch(detailItem, (item) => {
                     </header>
                     <div v-if="items.length" class="workbench-wall__pane-body">
                         <div
-                            v-for="item in items"
+                            v-for="item in streamItems"
                             :key="'all-' + item.id"
                             class="workbench-wall__row"
                             :class="`workbench-wall__row--${item.type}`"
@@ -450,7 +457,7 @@ watch(detailItem, (item) => {
         </div>
 
         <div class="workbench-wall__composer">
-            <sticky-composer variant="workbench"></sticky-composer>
+            <sticky-composer variant="workbench" @sent="pinToBottom()"></sticky-composer>
         </div>
 
         <v-dialog v-model="newRoomDialog" max-width="360">

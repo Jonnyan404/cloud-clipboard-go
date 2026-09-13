@@ -9,6 +9,7 @@ import { prettyFileSize } from '@/util.js';
 const props = defineProps({
     variant: { type: String, default: 'sticky' },
 });
+const emit = defineEmits(['sent']);
 
 const app = useAppStore();
 const ws = useWebSocketStore();
@@ -187,6 +188,7 @@ async function sendAll() {
         }
     } finally {
         sending.value = false;
+        emit('sent');
     }
 }
 </script>

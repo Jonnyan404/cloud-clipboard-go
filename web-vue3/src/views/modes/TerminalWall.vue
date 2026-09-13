@@ -14,6 +14,7 @@ import {
 } from '@/util.js';
 import PageToolbar from '@/components/PageToolbar.vue';
 import StickyComposer from '@/components/sticky/StickyComposer.vue';
+import { useStickyAutoscroll } from '@/composables/useStickyAutoscroll';
 
 const app = useAppStore();
 const ws = useWebSocketStore();
@@ -22,6 +23,12 @@ const isDark = computed(() => theme.current.value?.dark ?? false);
 const { t } = useI18n();
 
 const items = computed(() => app.received);
+const streamItems = computed(() => [...app.received].reverse());
+const streamEl = ref(null);
+const { pinToBottom } = useStickyAutoscroll(streamEl, {
+    items: () => [...streamItems.value],
+    room: () => ws.room,
+});
 const countLabel = computed(() => t('terminalLogCount', { count: items.value.length }));
 
 const detailItem = ref(null);
@@ -243,8 +250,8 @@ watch(detailItem, (item) => {
                 <span class="terminal-wall__count">{{ countLabel }}</span>
             </div>
 
-            <div v-if="items.length" class="terminal-wall__stream">
-                <div v-for="item in items" :key="item.id" class="terminal-wall__log">
+            <div v-if="items.length" ref="streamEl" class="terminal-wall__stream">
+                <div v-for="item in streamItems" :key="item.id" class="terminal-wall__log">
                     <span class="terminal-wall__ts">{{ timeLabel(item) }}</span>
                     <span v-if="item.type === 'file'" class="terminal-wall__tag terminal-wall__tag--file">[FILE]</span>
                     <span v-else class="terminal-wall__tag terminal-wall__tag--text">[TEXT]</span>
@@ -289,7 +296,7 @@ watch(detailItem, (item) => {
             </div>
 
             <div class="terminal-wall__composer">
-                <sticky-composer variant="terminal"></sticky-composer>
+                <sticky-composer variant="terminal" @sent="pinToBottom()"></sticky-composer>
             </div>
         </div>
 

@@ -8,6 +8,7 @@ import { prettyFileSize } from '@/util.js';
 import PageToolbar from '@/components/PageToolbar.vue';
 import StickyNote from '@/components/sticky/StickyNote.vue';
 import StickyComposer from '@/components/sticky/StickyComposer.vue';
+import { useStickyAutoscroll } from '@/composables/useStickyAutoscroll';
 
 const app = useAppStore();
 const ws = useWebSocketStore();
@@ -15,6 +16,12 @@ const theme = useTheme();
 const isDark = computed(() => theme.current.value?.dark ?? false);
 const { t } = useI18n();
 const composer = ref(null);
+const streamItems = computed(() => [...app.received].reverse());
+const streamEl = ref(null);
+const { pinToBottom } = useStickyAutoscroll(streamEl, {
+    items: () => [...streamItems.value],
+    room: () => ws.room,
+});
 const pageDragover = ref(false);
 const dragDepth = ref(0);
 const historyUsageLabel = computed(() => {
@@ -82,9 +89,9 @@ function handlePageDrop(event) {
                 <span class="sticky-wall__count">{{ historyUsageLabel }} {{ t('uiModeStickyCount') }}</span>
             </div>
 
-            <div v-if="app.received.length" class="sticky-wall__stream">
+            <div v-if="app.received.length" ref="streamEl" class="sticky-wall__stream">
                 <div
-                    v-for="item in app.received"
+                    v-for="item in streamItems"
                     :key="item.id"
                     class="sticky-wall__item"
                 >
@@ -101,7 +108,7 @@ function handlePageDrop(event) {
             </div>
 
             <div class="sticky-wall__composer">
-                <sticky-composer ref="composer"></sticky-composer>
+                <sticky-composer ref="composer" @sent="pinToBottom()"></sticky-composer>
             </div>
         </div>
     </div>

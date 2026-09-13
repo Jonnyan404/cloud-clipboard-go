@@ -15,12 +15,21 @@ import {
 } from '@/util.js';
 import PageToolbar from '@/components/PageToolbar.vue';
 import StickyComposer from '@/components/sticky/StickyComposer.vue';
+import { useStickyAutoscroll } from '@/composables/useStickyAutoscroll';
 
 const app = useAppStore();
 const ws = useWebSocketStore();
 const theme = useTheme();
 const isDark = computed(() => theme.current.value?.dark ?? false);
 const { t } = useI18n();
+
+const items = computed(() => app.received);
+const streamItems = computed(() => [...app.received].reverse());
+const streamEl = ref(null);
+const { pinToBottom } = useStickyAutoscroll(streamEl, {
+    items: () => [...streamItems.value],
+    room: () => ws.room,
+});
 
 const ownIp = ref(localStorage.getItem('ccgMyIp') || '');
 async function resolveOwnIp() {
@@ -43,7 +52,6 @@ resolveOwnIp();
 
 const isOwnBubble = (item) => Boolean(item?.senderIP && item.senderIP === ownIp.value);
 
-const items = computed(() => app.received);
 const countLabel = computed(() => t('uiModeChatCount', { count: items.value.length }));
 
 const detailItem = ref(null);
@@ -301,10 +309,9 @@ watch(detailItem, (item) => {
                 </div>
             </div>
 
-            <div v-if="items.length" class="chat-wall__stream">
-                <div class="chat-wall__day">{{ t('chatToday') }} · {{ timeLabel(items[0]) }}</div>
+            <div v-if="items.length" ref="streamEl" class="chat-wall__stream">
                 <div
-                    v-for="item in items"
+                    v-for="item in streamItems"
                     :key="item.id"
                     class="chat-wall__bubble"
                     :class="isOwnBubble(item) ? 'chat-wall__bubble--out' : 'chat-wall__bubble--in'"
@@ -332,6 +339,7 @@ watch(detailItem, (item) => {
                         </button>
                     </span>
                 </div>
+                <div class="chat-wall__day">{{ t('chatToday') }} · {{ timeLabel(streamItems[streamItems.length - 1]) }}</div>
             </div>
 
             <div v-else class="chat-wall__empty">
@@ -340,7 +348,7 @@ watch(detailItem, (item) => {
             </div>
 
             <div class="chat-wall__composer">
-                <sticky-composer variant="chat"></sticky-composer>
+                <sticky-composer variant="chat" @sent="pinToBottom()"></sticky-composer>
             </div>
         </div>
 

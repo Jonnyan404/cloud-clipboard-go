@@ -15,6 +15,7 @@ import {
 } from '@/util.js';
 import PageToolbar from '@/components/PageToolbar.vue';
 import StickyComposer from '@/components/sticky/StickyComposer.vue';
+import { useStickyAutoscroll } from '@/composables/useStickyAutoscroll';
 
 const app = useAppStore();
 const ws = useWebSocketStore();
@@ -23,6 +24,12 @@ const isDark = computed(() => theme.current.value?.dark ?? false);
 const { t } = useI18n();
 
 const items = computed(() => app.received);
+const streamItems = computed(() => [...app.received].reverse());
+const streamEl = ref(null);
+const { pinToBottom } = useStickyAutoscroll(streamEl, {
+    items: () => [...streamItems.value],
+    room: () => ws.room,
+});
 const countLabel = computed(() => t('uiModeMegaCount', { count: items.value.length }));
 
 const detailItem = ref(null);
@@ -266,8 +273,8 @@ watch(detailItem, (item) => {
                 <span class="mega-wall__count">{{ countLabel }}</span>
             </div>
 
-            <div v-if="items.length" class="mega-wall__stream">
-                <div v-for="item in items" :key="item.id" class="mega-wall__item">
+            <div v-if="items.length" ref="streamEl" class="mega-wall__stream">
+                <div v-for="item in streamItems" :key="item.id" class="mega-wall__item">
                     <div class="mega-wall__kicker">
                         <span>{{ timeLabel(item) }} · {{ item.type.toUpperCase() }}</span>
                         <span class="mega-wall__ops">
@@ -300,7 +307,7 @@ watch(detailItem, (item) => {
             </div>
 
             <div class="mega-wall__composer">
-                <sticky-composer variant="mega"></sticky-composer>
+                <sticky-composer variant="mega" @sent="pinToBottom()"></sticky-composer>
             </div>
         </div>
 
