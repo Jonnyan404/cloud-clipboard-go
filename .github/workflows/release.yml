@@ -25,6 +25,7 @@ jobs:
       tag: ${{ steps.get_tag.outputs.tag }}
       version_name: ${{ steps.get_tag.outputs.version_name }}
       version_code: ${{ steps.get_tag.outputs.version_code }}
+      is_prerelease: ${{ steps.get_tag.outputs.is_prerelease }}
     steps:
       - name: Determine Tag Name
         id: get_tag
@@ -40,6 +41,11 @@ jobs:
           MINOR=$(echo "${TAG#v}" | cut -d. -f2)
           PATCH=$(echo "${TAG#v}" | cut -d. -f3)
           echo "version_code=$((MAJOR * 100000 + MINOR * 1000 + PATCH))" >> $GITHUB_OUTPUT
+          if [[ "${{ github.event_name }}" == "release" && "${{ github.event.release.prerelease }}" == "true" ]] || [[ "$TAG" == *-* ]]; then
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+          fi
   # ====================================================================
   # Job 1: Build Frontend Assets (只构建一次)
   # ====================================================================
@@ -373,7 +379,7 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ github.event.repository.name }}
           tags: |
             type=raw,value=${{ needs.determine-tag.outputs.tag }}
-            type=raw,value=latest
+            type=raw,value=latest,enable=${{ needs.determine-tag.outputs.is_prerelease != 'true' }}
       - name: Set up QEMU and Docker Buildx
         uses: docker/setup-qemu-action@v4
       - uses: docker/setup-buildx-action@v4
