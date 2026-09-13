@@ -30,16 +30,24 @@ const newRoomName = ref('');
 const newRoomNameInput = ref(null);
 
 function loadLocalRooms() {
+    const rooms = [];
     try {
         const parsed = JSON.parse(localStorage.getItem(WORKBENCH_ROOMS_KEY) || '[]');
         if (Array.isArray(parsed)) {
-            const rooms = parsed.map(ws.normalizeRoomName).filter(Boolean);
-            return [...new Set(rooms)];
+            for (const room of parsed) {
+                const normalized = ws.normalizeRoomName(room);
+                if (!rooms.includes(normalized)) {
+                    rooms.push(normalized);
+                }
+            }
         }
     } catch (error) {
         console.error('解析本地房间列表失败:', error);
     }
-    return [];
+    if (!rooms.includes('')) {
+        rooms.unshift('');
+    }
+    return rooms;
 }
 
 function saveLocalRooms() {
@@ -65,12 +73,24 @@ function createRoom() {
         return;
     }
     if (!localRooms.value.includes(name)) {
-        localRooms.value.unshift(name);
+        localRooms.value.push(name);
         saveLocalRooms();
     }
     newRoomDialog.value = false;
     ws.switchRoom(name);
     toast(t('workbenchRoomCreated', { room: name }));
+}
+
+function removeRoom(room) {
+    const index = localRooms.value.indexOf(room);
+    if (index === -1) {
+        return;
+    }
+    localRooms.value.splice(index, 1);
+    saveLocalRooms();
+    if (activeRoom.value === room) {
+        ws.switchRoom('');
+    }
 }
 
 function switchToRoom(room) {
@@ -321,17 +341,20 @@ watch(detailItem, (item) => {
             <div class="workbench-wall__tabs">
                 <button
                     v-for="room in localRooms"
-                    :key="room"
+                    :key="'wb-'+room"
                     type="button"
                     class="workbench-wall__tab"
                     :class="{ 'workbench-wall__tab--active': activeRoom === room }"
                     @click="switchToRoom(room)"
-                ><i></i>{{ room }}</button>
-                <button
-                    v-if="!activeRoom && !localRooms.length"
-                    type="button"
-                    class="workbench-wall__tab workbench-wall__tab--active"
-                ><i></i>{{ t('publicRoom') }}</button>
+                ><i></i><span class="workbench-wall__tab-name">{{ room || 'default' }}</span>
+                    <span
+                        v-if="room"
+                        class="workbench-wall__tab-close"
+                        role="button"
+                        :title="t('delete')"
+                        @click.stop="removeRoom(room)"
+                    >✕</span>
+                </button>
                 <div class="workbench-wall__tabs-spacer"></div>
                 <button type="button" class="workbench-wall__plus" :title="t('workbenchNewRoom')" @click="openNewRoomDialog">＋</button>
             </div>
@@ -582,9 +605,34 @@ watch(detailItem, (item) => {
     gap: 5px;
     cursor: pointer;
     white-space: nowrap;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.workbench-wall__tab-name {
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
-    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.workbench-wall__tab-close {
+    margin-left: auto;
+    padding: 0 3px;
+    border-radius: 5px;
+    font-size: 10px;
+    line-height: 1.4;
+    opacity: 0;
+    transition: opacity 0.15s;
+    flex-shrink: 0;
+}
+
+.workbench-wall__tab:hover .workbench-wall__tab-close,
+.workbench-wall__tab--active .workbench-wall__tab-close {
+    opacity: 0.8;
+}
+
+.workbench-wall__tab-close:hover {
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.25);
 }
 
 .workbench-wall__tab i {
