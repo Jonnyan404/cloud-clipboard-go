@@ -279,41 +279,6 @@ watch(detailItem, (item) => {
         loadPreview();
     }
 });
-
-function buffItem() {
-    toast(t('chatBufferOk'));
-}
-
-async function copyLatest() {
-    const latest = items.value[0];
-    if (!latest) {
-        return;
-    }
-    try {
-        await copyTextToClipboard(decodedContent(latest));
-        toast(t('copySuccess'));
-    } catch (err) {
-        console.error('复制失败:', err);
-        toast(t('copyFailedGeneral'));
-    }
-}
-
-async function forwardLatest() {
-    const latest = items.value[0];
-    if (!latest) {
-        return;
-    }
-    try {
-        const url = latest.type === 'file'
-            ? (latest.cache ? await ensureFileShareUrl(latest) : contentUrlOf(latest))
-            : contentUrlOf(latest);
-        await copyTextToClipboard(url);
-        toast(t('chatForwardSuccess'));
-    } catch (err) {
-        console.error('复制失败:', err);
-        toast(t('copyFailedGeneral'));
-    }
-}
 </script>
 
 <template>
@@ -339,7 +304,7 @@ async function forwardLatest() {
             <div v-if="items.length" class="chat-wall__stream">
                 <div class="chat-wall__day">{{ t('chatToday') }} · {{ timeLabel(items[0]) }}</div>
                 <div
-                    v-for="item in [...items].reverse()"
+                    v-for="item in items"
                     :key="item.id"
                     class="chat-wall__bubble"
                     :class="isOwnBubble(item) ? 'chat-wall__bubble--out' : 'chat-wall__bubble--in'"
@@ -353,7 +318,7 @@ async function forwardLatest() {
                     </div>
                     <div v-else class="chat-wall__text">{{ decodedContent(item) }}</div>
                     <span class="chat-wall__bubble-time">
-                        {{ shortTime(item) }} · {{ item.type === 'text' ? t('chatTypeText') : t('chatTypeFile') }}<template v-if="isOwnBubble(item)"> · {{ t('chatSynced') }}</template>
+                        {{ shortTime(item) }} · {{ item.type === 'text' ? t('chatTypeText') : t('chatTypeFile') }}<template v-if="isOwnBubble(item)"> · {{ t('chatSynced') }}</template><template v-if="item.senderIP"> · {{ item.senderIP }}</template>
                     </span>
                     <span class="chat-wall__bubble-ops">
                         <button v-if="item.type === 'text'" type="button" class="chat-wall__op" :title="t('copyText')" @click="copyContent(item)">
@@ -372,12 +337,6 @@ async function forwardLatest() {
             <div v-else class="chat-wall__empty">
                 <div class="text-h6 font-weight-medium mb-2">{{ t('emptyTimelineTitle') }}</div>
                 <div class="text-body-2 text-medium-emphasis mb-4">{{ t('timelineEmptySubtitle') }}</div>
-            </div>
-
-            <div v-if="items.length" class="chat-wall__actions">
-                <span class="chat-wall__qa" role="button" tabindex="0" @click="buffItem()">👍 {{ t('chatQuickBuffer') }}</span>
-                <span class="chat-wall__qa" role="button" tabindex="0" @click="copyLatest()">❓ {{ t('chatQuickCopy') }}</span>
-                <span class="chat-wall__qa" role="button" tabindex="0" @click="forwardLatest()">🔗 {{ t('chatQuickForward') }}</span>
             </div>
 
             <div class="chat-wall__composer">
@@ -637,6 +596,14 @@ async function forwardLatest() {
     color: #fff;
 }
 
+.chat-wall__bubble--out .chat-wall__op {
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.chat-wall__bubble--out .chat-wall__op:hover {
+    color: #fff;
+}
+
 .chat-wall__text {
     white-space: pre-wrap;
 }
@@ -688,32 +655,32 @@ async function forwardLatest() {
     opacity: 0.6;
     margin-top: 4px;
     display: block;
-    text-align: right;
+    text-align: left;
+    padding-right: 58px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .chat-wall__bubble-ops {
     position: absolute;
-    top: -16px;
-    right: 0;
+    right: 4px;
+    bottom: 6px;
     display: none;
     gap: 2px;
     align-items: center;
-    background: #fff;
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
-    padding: 1px 3px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     z-index: 2;
-}
-
-.chat-wall--dark .chat-wall__bubble-ops {
-    background: #2b3138;
-    border-color: #3a424c;
 }
 
 .chat-wall__bubble:hover .chat-wall__bubble-ops,
 .chat-wall__bubble:focus-within .chat-wall__bubble-ops {
     display: flex;
+}
+
+@media (max-width: 768px) {
+    .chat-wall__bubble-ops {
+        display: flex;
+    }
 }
 
 .chat-wall__op {
@@ -748,42 +715,6 @@ async function forwardLatest() {
     justify-content: center;
     padding: 24px;
     text-align: center;
-}
-
-.chat-wall__actions {
-    display: flex;
-    gap: 9px;
-    padding: 2px 0 9px;
-    flex-shrink: 0;
-}
-
-.chat-wall__qa {
-    background: none;
-    border: 1px solid #e3e6ea;
-    color: #4b5563;
-    font-size: 11px;
-    border-radius: 999px;
-    padding: 4px 11px;
-    flex: 1;
-    text-align: center;
-    cursor: pointer;
-    user-select: none;
-    transition: background 0.15s, border-color 0.15s;
-}
-
-.chat-wall__qa:hover {
-    background: #fff;
-    border-color: #cbd5e1;
-}
-
-.chat-wall--dark .chat-wall__qa {
-    border-color: #3a424c;
-    color: #c6ccd4;
-}
-
-.chat-wall--dark .chat-wall__qa:hover {
-    background: #2b3138;
-    border-color: #4a525c;
 }
 
 .chat-wall__composer {
