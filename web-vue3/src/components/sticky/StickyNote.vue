@@ -291,7 +291,7 @@ async function deleteItem() {
                         v-bind="props"
                         icon
                         density="compact"
-                        size="x-small"
+                        size="small"
                         variant="text"
                         class="sticky-note__op"
                         :loading="isFile && downloading"
@@ -304,14 +304,14 @@ async function deleteItem() {
             </v-tooltip>
             <v-tooltip v-if="!isFile" :text="t('copyLink')" location="top">
                 <template v-slot:activator="{ props }">
-                    <v-btn v-bind="props" icon density="compact" size="x-small" variant="text" class="sticky-note__op" @click.stop="copyLink">
+                    <v-btn v-bind="props" icon density="compact" size="small" variant="text" class="sticky-note__op" @click.stop="copyLink">
                         <v-icon size="large">mdi-link-variant</v-icon>
                     </v-btn>
                 </template>
             </v-tooltip>
             <v-tooltip :text="t('delete')" location="top">
                 <template v-slot:activator="{ props }">
-                    <v-btn v-bind="props" icon density="compact" size="x-small" variant="text" class="sticky-note__op" @click.stop="deleteItem">
+                    <v-btn v-bind="props" icon density="compact" size="small" variant="text" class="sticky-note__op" @click.stop="deleteItem">
                         <v-icon size="large">mdi-close</v-icon>
                     </v-btn>
                 </template>
@@ -530,9 +530,10 @@ async function deleteItem() {
     top: 6px;
     right: 6px;
     display: none;
+    gap: 2px;
     background: rgba(255, 255, 255, 0.55);
     border-radius: 999px;
-    padding: 1px 2px;
+    padding: 2px 3px;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
     z-index: 3;
 }

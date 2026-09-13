@@ -525,8 +525,8 @@ watch(detailItem, (item) => {
     border: none;
     background: transparent;
     border-radius: 50%;
-    width: 22px;
-    height: 22px;
+    width: 30px;
+    height: 30px;
     cursor: pointer;
     color: var(--tw-muted);
     transition: background 0.15s, color 0.15s;

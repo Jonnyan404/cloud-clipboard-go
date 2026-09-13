@@ -544,8 +544,8 @@ watch(detailItem, (item) => {
     }
 
     .mega-wall__op {
-        width: 24px;
-        height: 24px;
+        width: 28px;
+        height: 28px;
     }
 }
 
@@ -556,8 +556,8 @@ watch(detailItem, (item) => {
     border: none;
     background: transparent;
     border-radius: 50%;
-    width: 26px;
-    height: 26px;
+    width: 32px;
+    height: 32px;
     cursor: pointer;
     color: rgba(17, 24, 39, 0.5);
     transition: background 0.15s, color 0.15s;
