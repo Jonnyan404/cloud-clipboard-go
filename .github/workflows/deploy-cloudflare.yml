@@ -81,6 +81,20 @@ jobs:
         working-directory: cloudflare/workers
         run: wrangler d1 execute cloud-clipboard-db --file=../d1/schema.sql --remote --yes
 
+      - name: Migrate senderClientID column (idempotent)
+        working-directory: cloudflare/workers
+        run: |
+          HAS_COL=$(wrangler d1 execute cloud-clipboard-db --remote --yes --json \
+            --command "SELECT count(*) AS c FROM pragma_table_info('messages') WHERE name='senderClientID';" \
+            | jq -r '.result[0].c // 0')
+          if [ "$HAS_COL" != "1" ]; then
+            echo "messages 表缺少 senderClientID 列，执行 ALTER TABLE..."
+            wrangler d1 execute cloud-clipboard-db --remote --yes \
+              --command "ALTER TABLE messages ADD COLUMN senderClientID TEXT;"
+          else
+            echo "senderClientID 列已存在，跳过迁移"
+          fi
+
       - name: Deploy Worker
         working-directory: cloudflare/workers
         env:

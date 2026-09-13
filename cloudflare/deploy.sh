@@ -63,6 +63,31 @@ should_run_local_d1() {
     return 0
 }
 
+# 为已存在的 messages 表幂等补充 senderClientID 列
+# 说明: schema.sql 的 CREATE TABLE IF NOT EXISTS 不会给已有表加列,
+# 这里用 pragma_table_info 检查列是否存在,缺列时才执行 ALTER TABLE。
+migrate_senderClientID_col() {
+    local scope="$1"
+    local flags=""
+    [ "$scope" = "remote" ] && flags="--remote"
+    [ "$scope" = "local" ] && flags="--local"
+
+    info "检查 senderClientID 列 ($scope)..."
+    local has_col
+    has_col=$(wrangler d1 execute cloud-clipboard-db $flags \
+      --command "SELECT count(*) AS c FROM pragma_table_info('messages') WHERE name='senderClientID';" 2>/dev/null \
+      | grep -oE '"c"[[:space:]]*:[[:space:]]*[01]' | grep -oE '[01]' | head -1)
+
+    if [ "$has_col" != "1" ]; then
+        info "为 messages 表添加 senderClientID 列 ($scope)..."
+        wrangler d1 execute cloud-clipboard-db $flags --yes \
+          --command "ALTER TABLE messages ADD COLUMN senderClientID TEXT;" \
+          || warn "添加 senderClientID 列失败 ($scope)，请手动执行迁移"
+    else
+        info "senderClientID 列已存在，跳过迁移 ($scope)"
+    fi
+}
+
 # 检查必要工具
 check_requirements() {
     info "检查必要工具..."
@@ -143,10 +168,14 @@ deploy_worker() {
     info "执行远程数据库迁移..."
     wrangler d1 execute cloud-clipboard-db --file=../d1/schema.sql --remote
     
+    # 幂等补齐旧库缺失的 senderClientID 列（每次部署都安全执行）
+    migrate_senderClientID_col "remote"
+
     # 可选：同时迁移本地数据库用于开发
     if should_run_local_d1; then
         info "执行本地数据库迁移..."
         wrangler d1 execute cloud-clipboard-db --file=../d1/schema.sql --local
+        migrate_senderClientID_col "local"
     else
         info "已跳过本地数据库迁移，不影响远程部署。"
     fi

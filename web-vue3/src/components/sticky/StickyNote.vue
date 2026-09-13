@@ -298,21 +298,21 @@ async function deleteItem() {
                         :disabled="isFile && expired"
                         @click.stop="isFile ? downloadFile() : copyContent()"
                     >
-                        <v-icon size="small">{{ isFile ? 'mdi-download' : 'mdi-content-copy' }}</v-icon>
+                        <v-icon size="medium">{{ isFile ? 'mdi-download' : 'mdi-content-copy' }}</v-icon>
                     </v-btn>
                 </template>
             </v-tooltip>
             <v-tooltip v-if="!isFile" :text="t('copyLink')" location="top">
                 <template v-slot:activator="{ props }">
                     <v-btn v-bind="props" icon density="compact" size="x-small" variant="text" class="sticky-note__op" @click.stop="copyLink">
-                        <v-icon size="small">mdi-link-variant</v-icon>
+                        <v-icon size="medium">mdi-link-variant</v-icon>
                     </v-btn>
                 </template>
             </v-tooltip>
             <v-tooltip :text="t('delete')" location="top">
                 <template v-slot:activator="{ props }">
                     <v-btn v-bind="props" icon density="compact" size="x-small" variant="text" class="sticky-note__op" @click.stop="deleteItem">
-                        <v-icon size="small">mdi-close</v-icon>
+                        <v-icon size="medium">mdi-close</v-icon>
                     </v-btn>
                 </template>
             </v-tooltip>

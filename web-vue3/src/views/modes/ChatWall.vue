@@ -11,6 +11,7 @@ import {
     buildCleanAbsoluteRouteUrl,
     createShareLink,
     copyTextToClipboard,
+    getClientId,
     SHARE_DEFAULT_TTL,
 } from '@/util.js';
 import PageToolbar from '@/components/PageToolbar.vue';
@@ -50,7 +51,12 @@ async function resolveOwnIp() {
 }
 resolveOwnIp();
 
-const isOwnBubble = (item) => Boolean(item?.senderIP && item.senderIP === ownIp.value);
+const myClientId = getClientId();
+// 优先按服务端回传的 senderClientID 归类收发;老消息(无该字段)回退到 IP 判断
+const isOwnBubble = (item) => Boolean(
+    (item?.senderClientID && item.senderClientID === myClientId)
+    || (!item?.senderClientID && item?.senderIP && item.senderIP === ownIp.value),
+);
 
 const countLabel = computed(() => t('uiModeChatCount', { count: items.value.length }));
 
@@ -329,13 +335,13 @@ watch(detailItem, (item) => {
                     </span>
                     <span class="chat-wall__bubble-ops">
                         <button v-if="item.type === 'text'" type="button" class="chat-wall__op" :title="t('copyText')" @click="copyContent(item)">
-                            <v-icon size="x-small">mdi-content-copy</v-icon>
+                            <v-icon size="medium">mdi-content-copy</v-icon>
                         </button>
                         <button v-if="item.type === 'file'" type="button" class="chat-wall__op" :title="isItemExpired(item) ? t('expired') : t('download')" @click="downloadItem(item)">
-                            <v-icon size="x-small">mdi-download</v-icon>
+                            <v-icon size="medium">mdi-download</v-icon>
                         </button>
                         <button type="button" class="chat-wall__op chat-wall__op--danger" :title="t('delete')" @click="deleteItem(item)">
-                            <v-icon size="x-small">mdi-delete-outline</v-icon>
+                            <v-icon size="medium">mdi-delete-outline</v-icon>
                         </button>
                     </span>
                 </div>

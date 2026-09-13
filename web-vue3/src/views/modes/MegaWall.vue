@@ -279,13 +279,13 @@ watch(detailItem, (item) => {
                         <span>{{ timeLabel(item) }} · {{ item.type.toUpperCase() }}</span>
                         <span class="mega-wall__ops">
                             <button v-if="item.type === 'text'" type="button" class="mega-wall__op" :title="t('copyText')" @click="copyContent(item)">
-                                <v-icon size="small">mdi-content-copy</v-icon>
+                                <v-icon size="medium">mdi-content-copy</v-icon>
                             </button>
                             <button v-if="item.type === 'file'" type="button" class="mega-wall__op" :title="isItemExpired(item) ? t('expired') : t('download')" @click="downloadItem(item)">
-                                <v-icon size="small">mdi-download</v-icon>
+                                <v-icon size="medium">mdi-download</v-icon>
                             </button>
                             <button type="button" class="mega-wall__op mega-wall__op--danger" :title="t('delete')" @click="deleteItem(item)">
-                                <v-icon size="small">mdi-close</v-icon>
+                                <v-icon size="medium">mdi-close</v-icon>
                             </button>
                         </span>
                     </div>

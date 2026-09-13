@@ -158,3 +158,20 @@ export function copyTextToClipboard(textToCopy) {
         }
     });
 }
+
+const CLIENT_ID_KEY = 'ccgDeviceId';
+
+export function getClientId() {
+    try {
+        let id = localStorage.getItem(CLIENT_ID_KEY);
+        if (!id) {
+            id = (globalThis.crypto && typeof crypto.randomUUID === 'function')
+                ? crypto.randomUUID()
+                : `ccg-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+            localStorage.setItem(CLIENT_ID_KEY, id);
+        }
+        return id;
+    } catch (err) {
+        return '';
+    }
+}

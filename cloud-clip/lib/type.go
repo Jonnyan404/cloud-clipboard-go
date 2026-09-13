@@ -140,12 +140,13 @@ type History struct {
 
 // ReceiveBase is the common structure for all receive types
 type ReceiveBase struct {
-	ID           int               `json:"id"`
-	Type         string            `json:"type"`
-	Room         string            `json:"room"`
-	Timestamp    int64             `json:"timestamp"`    // Unix timestamp (seconds)
-	SenderIP     string            `json:"senderIP"`     // 发送者 IP 地址
-	SenderDevice map[string]string `json:"senderDevice"` // 发送者设备信息 (来自 User-Agent 解析)
+	ID             int               `json:"id"`
+	Type           string            `json:"type"`
+	Room           string            `json:"room"`
+	Timestamp      int64             `json:"timestamp"`                // Unix timestamp (seconds)
+	SenderIP       string            `json:"senderIP"`                 // 发送者 IP 地址
+	SenderClientID string            `json:"senderClientID,omitempty"` // 发送端持久客户端 ID (用于收发气泡归属)
+	SenderDevice   map[string]string `json:"senderDevice"`             // 发送者设备信息 (来自 User-Agent 解析)
 }
 
 // "text" type item in Receive[]

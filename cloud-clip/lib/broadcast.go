@@ -2,6 +2,7 @@ package lib
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -96,11 +97,12 @@ func (s *ClipboardServer) addMessageToQueueAndBroadcast(dataType string, data in
 	// Create ReceiveBase first
 	receiveBase := ReceiveBase{
 		// ID will be set by PostList.Append
-		Type:         dataType, // This is the inner type for ReceiveHolder (e.g., "text", "file")
-		Room:         room,
-		Timestamp:    time.Now().Unix(),
-		SenderIP:     ip,
-		SenderDevice: ua,
+		Type:           dataType, // This is the inner type for ReceiveHolder (e.g., "text", "file")
+		Room:           room,
+		Timestamp:      time.Now().Unix(),
+		SenderIP:       ip,
+		SenderDevice:   ua,
+		SenderClientID: strings.TrimSpace(r.URL.Query().Get("client")), // 前端每客户端持久 ID,用于气泡收发归属
 	}
 
 	// Create ReceiveHolder

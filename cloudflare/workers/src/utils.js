@@ -79,8 +79,8 @@ export async function saveToD1(db, messageData, env) { // 修复：添加 env �
 
     // 保存新消息
     const result = await db.prepare(`
-      INSERT INTO messages (type, content, name, size, room, timestamp, senderIP, userAgent, uuid, expireTime, url)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO messages (type, content, name, size, room, timestamp, senderIP, senderClientID, userAgent, uuid, expireTime, url)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       messageData.type,
       messageData.content || null,
@@ -89,6 +89,7 @@ export async function saveToD1(db, messageData, env) { // 修复：添加 env �
       room,
       messageData.timestamp,
       messageData.senderIP || 'unknown',
+      messageData.senderClientID || '',
       messageData.userAgent || 'unknown',
       messageData.uuid || null,
       messageData.expireTime || null,

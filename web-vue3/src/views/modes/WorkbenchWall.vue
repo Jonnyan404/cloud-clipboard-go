@@ -407,10 +407,10 @@ watch(detailItem, (item) => {
                             <span class="workbench-wall__row-time">{{ timeLabel(item) }}</span>
                             <span class="workbench-wall__row-ops">
                                 <button type="button" class="workbench-wall__op" :title="t('copyText')" @click="copyContent(item)">
-                                    <v-icon size="x-small">mdi-content-copy</v-icon>
+                                    <v-icon size="medium">mdi-content-copy</v-icon>
                                 </button>
                                 <button type="button" class="workbench-wall__op workbench-wall__op--danger" :title="t('delete')" @click="deleteItem(item)">
-                                    <v-icon size="x-small">mdi-delete-outline</v-icon>
+                                    <v-icon size="medium">mdi-delete-outline</v-icon>
                                 </button>
                             </span>
                         </div>
@@ -440,13 +440,13 @@ watch(detailItem, (item) => {
                             <span class="workbench-wall__row-time">{{ timeLabel(item) }}</span>
                             <span class="workbench-wall__row-ops">
                                 <button v-if="item.type === 'file'" type="button" class="workbench-wall__op" :title="isItemExpired(item) ? t('expired') : t('download')" @click.stop="item.cache && downloadItem(item)">
-                                    <v-icon size="x-small">mdi-download</v-icon>
+                                    <v-icon size="medium">mdi-download</v-icon>
                                 </button>
                                 <button type="button" class="workbench-wall__op" :title="t('copyText')" @click.stop="item.type === 'text' ? copyContent(item) : copyFileLink(item)">
-                                    <v-icon size="x-small">mdi-content-copy</v-icon>
+                                    <v-icon size="medium">mdi-content-copy</v-icon>
                                 </button>
                                 <button type="button" class="workbench-wall__op workbench-wall__op--danger" :title="t('delete')" @click.stop="deleteItem(item)">
-                                    <v-icon size="x-small">mdi-delete-outline</v-icon>
+                                    <v-icon size="medium">mdi-delete-outline</v-icon>
                                 </button>
                             </span>
                         </div>

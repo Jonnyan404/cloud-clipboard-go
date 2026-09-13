@@ -31,6 +31,7 @@ function buildJsonContentPayload(row) {
     timestamp: row.timestamp,
     room: row.room || 'default',
     senderIP: row.senderIP || 'unknown',
+    senderClientID: row.senderClientID || '',
     senderDevice: buildSenderDevice(row.userAgent || 'unknown'),
   };
 

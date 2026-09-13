@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS messages (
   room TEXT DEFAULT 'default',
   timestamp INTEGER NOT NULL,
   senderIP TEXT,
+  senderClientID TEXT, -- 前端每客户端持久ID,用于气泡收发归属
   userAgent TEXT,
   uuid TEXT, -- 文件的 UUID (仅文件消息)
   expireTime INTEGER, -- 过期时间 (仅文件消息)

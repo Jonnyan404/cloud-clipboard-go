@@ -64,6 +64,7 @@ export class TextHandler {
         room,
         timestamp: Math.floor(Date.now() / 1000), // 使用毫秒时间戳
         senderIP: request.headers.get('CF-Connecting-IP') || 'unknown',
+        senderClientID: String(url.searchParams.get('client') || '').trim(), // 前端每客户端持久ID
         userAgent: request.headers.get('User-Agent') || 'unknown'
       };
       const senderDevice = buildSenderDevice(messageData.userAgent);
@@ -187,14 +188,15 @@ export class TextHandler {
 
     const timestamp = Math.floor(Date.now() / 1000);
     const senderIP = request.headers.get('CF-Connecting-IP') || 'unknown';
+    const senderClientID = String(url.searchParams.get('client') || '').trim();
     const userAgent = request.headers.get('User-Agent') || 'unknown';
     const senderDevice = buildSenderDevice(userAgent);
 
     await env.DB.prepare(`
       UPDATE messages
-      SET content = ?, timestamp = ?, senderIP = ?, userAgent = ?
+      SET content = ?, timestamp = ?, senderIP = ?, senderClientID = ?, userAgent = ?
       WHERE id = ? AND room = ? AND type = 'text'
-    `).bind(content, timestamp, senderIP, userAgent, numericId, room).run();
+    `).bind(content, timestamp, senderIP, senderClientID, userAgent, numericId, room).run();
 
     await broadcastMessage(env, room, {
       event: 'update',
@@ -205,6 +207,7 @@ export class TextHandler {
         timestamp,
         room,
         senderIP,
+        senderClientID,
         senderDevice,
       }
     });

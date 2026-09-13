@@ -4,7 +4,7 @@ import { useAppStore } from '@/store/app';
 import { useWebSocketStore } from '@/store/websocket';
 import { useI18n } from 'vue-i18n';
 import { toast } from '@/plugins/toast';
-import { prettyFileSize } from '@/util.js';
+import { prettyFileSize, getClientId } from '@/util.js';
 
 const props = defineProps({
     variant: { type: String, default: 'sticky' },
@@ -13,6 +13,7 @@ const emit = defineEmits(['sent']);
 
 const app = useAppStore();
 const ws = useWebSocketStore();
+const clientId = getClientId();
 const { t } = useI18n();
 const textarea = ref(null);
 const selectFile = ref(null);
@@ -123,7 +124,7 @@ async function sendText() {
         'text',
         app.send.text,
         {
-            params: new URLSearchParams([['room', ws.room]]),
+            params: new URLSearchParams([['room', ws.room], ['client', clientId]]),
             headers: {
                 'Content-Type': 'text/plain',
             },
@@ -145,7 +146,7 @@ async function sendFiles() {
             const formData = new FormData;
             formData.set('file', file);
             await axios.postForm('upload', formData, {
-                params: new URLSearchParams([['room', ws.room]]),
+                params: new URLSearchParams([['room', ws.room], ['client', clientId]]),
                 onUploadProgress: event => uploadedSizes.value[index] = event.loaded,
             });
             return;
@@ -165,7 +166,7 @@ async function sendFiles() {
             uploadedSize += chunkSize;
         }
         await axios.post(`upload/finish/${uuid}`, null, {
-            params: new URLSearchParams([['room', ws.room]]),
+            params: new URLSearchParams([['room', ws.room], ['client', clientId]]),
         });
     }));
     app.send.files.splice(0);

@@ -104,6 +104,7 @@ async function finalizeUploadedFile({ request, env, url, room, uuid, fileName, f
     room,
     timestamp: Math.floor(Date.now() / 1000),
     senderIP: request.headers.get('CF-Connecting-IP') || 'unknown',
+    senderClientID: String(url.searchParams.get('client') || '').trim(), // 前端每客户端持久ID
     userAgent: request.headers.get('User-Agent') || 'unknown',
     uuid,
     expireTime,
