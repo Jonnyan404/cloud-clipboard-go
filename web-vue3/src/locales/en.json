@@ -192,5 +192,15 @@
   "open": "Open",
   "cloudPromoHint": "Looking for cloud server deals?\nThese promos happen to support development too 👇",
   "supportSectionTitle": "Support the author",
-  "cloudSectionTitle": "Cloud server deals (support development)"
+  "cloudSectionTitle": "Cloud server deals (support development)",
+  "uiMode": "Mode",
+  "uiModeDefault": "Classic",
+  "uiModeSticky": "Sticky",
+  "uiModeStickyCount": "notes",
+  "stickyNewNote": "New note…",
+  "stickyStick": "Stick",
+  "stickyFromDevice": "from {device}",
+  "stickyImage": "image",
+  "stickyDropHere": "Release to attach",
+  "backToDefaultRoom": "Back to default room"
 }

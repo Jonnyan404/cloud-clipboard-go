@@ -1,0 +1,284 @@
+<script setup>import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
+import axios from 'axios';
+import { useAppStore } from '@/store/app';
+import { useWebSocketStore } from '@/store/websocket';
+import { useI18n } from 'vue-i18n';
+import { toast } from '@/plugins/toast';
+import { prettyFileSize } from '@/util.js';
+
+const app = useAppStore();
+const ws = useWebSocketStore();
+const { t } = useI18n();
+const textarea = ref(null);
+const selectFile = ref(null);
+const sending = ref(false);
+const uploadedSizes = ref([]);
+const fileSize = computed(() => app.send.files.length ? app.send.files.reduce((acc, cur) => acc += cur.size, 0) : 0);
+const uploadedSize = computed(() => uploadedSizes.value.length ? uploadedSizes.value.reduce((acc, cur) => acc += cur, 0) : 0);
+const uploadProgress = computed(() => Math.min(fileSize.value !== 0 ? (uploadedSize.value / fileSize.value) : 0, 1));
+const sendDisabled = computed(() => !ws.websocket || sending.value || (!app.send.text && !app.send.files.length) || app.send.text.length > app.config.text.limit);
+
+function focus() {
+    nextTick(() => {
+        if (textarea.value && typeof textarea.value.focus === 'function') {
+            textarea.value.focus();
+        }
+    });
+}
+defineExpose({ focus, addFiles });
+function addFiles(fileList) {
+    handleSelectFiles(fileList);
+}
+
+function openFilePicker() {
+    selectFile.value.click();
+}
+
+function handlePaste(event) {
+    if (!(event && event.clipboardData)) {
+        return;
+    }
+    const items = Array.from(event.clipboardData.items || []);
+    const files = items.filter(item => item.kind === 'file').map(item => item.getAsFile()).filter(Boolean);
+    if (files.length) {
+        handleSelectFiles(files);
+    }
+}
+
+onMounted(() => {
+    document.addEventListener('paste', handlePaste);
+});
+onBeforeUnmount(() => {
+    document.removeEventListener('paste', handlePaste);
+});
+
+function handleSelectFiles(fileList) {
+    const files = Array.from(fileList || []);
+    if (!files.length) {
+        return;
+    }
+    if (files.some(file => !file.size)) {
+        toast(t('cannotSendEmptyFile'));
+        return;
+    }
+    if (files.some(file => file.size > app.config.file.limit)) {
+        toast(t('fileSizeExceeded', { limit: prettyFileSize(app.config.file.limit) }));
+        return;
+    }
+    app.send.files.splice(0);
+    app.send.files.push(...files);
+}
+
+function removeFile(index) {
+    app.send.files.splice(index, 1);
+}
+
+function onKeydown(event) {
+    const isMac = /mac|iphone|ipad|ipod/i.test(navigator.userAgent || '');
+    if ((event.key === 'Enter' && (event.metaKey || event.ctrlKey)) || (event.key === 'Enter' && event.shiftKey === false && !isMac)) {
+        sendAll();
+    }
+}
+
+async function sendText() {
+    if (!app.send.text) {
+        return;
+    }
+    await axios.post(
+        'text',
+        app.send.text,
+        {
+            params: new URLSearchParams([['room', ws.room]]),
+            headers: {
+                'Content-Type': 'text/plain',
+            },
+        },
+    );
+    app.send.text = '';
+}
+
+async function sendFiles() {
+    if (!app.send.files.length) {
+        return;
+    }
+    const chunkSize = app.config.file.chunk;
+    uploadedSizes.value.splice(0);
+    uploadedSizes.value.push(...Array(app.send.files.length).fill(0));
+    sending.value = true;
+    await Promise.all(app.send.files.map(async (file, index) => {
+        if (file.size < chunkSize) {
+            const formData = new FormData;
+            formData.set('file', file);
+            await axios.postForm('upload', formData, {
+                params: new URLSearchParams([['room', ws.room]]),
+                onUploadProgress: event => uploadedSizes.value[index] = event.loaded,
+            });
+            return;
+        }
+        const response = await axios.post('upload/chunk', file.name, {
+            headers: { 'Content-Type': 'text/plain' },
+            params: new URLSearchParams([['room', ws.room]]),
+        });
+        const uuid = response.data.result.uuid;
+        let uploadedSize = 0;
+        while (uploadedSize < file.size) {
+            const chunk = file.slice(uploadedSize, uploadedSize + chunkSize);
+            await axios.post(`upload/chunk/${uuid}`, chunk, {
+                headers: { 'Content-Type': 'application/octet-stream' },
+                onUploadProgress: event => uploadedSizes.value[index] = uploadedSize + event.loaded,
+            });
+            uploadedSize += chunkSize;
+        }
+        await axios.post(`upload/finish/${uuid}`, null, {
+            params: new URLSearchParams([['room', ws.room]]),
+        });
+    }));
+    app.send.files.splice(0);
+}
+
+async function sendAll() {
+    if (sendDisabled.value) {
+        return;
+    }
+    try {
+        await sendText();
+        await sendFiles();
+        toast(t('sendSuccess'));
+        focus();
+    } catch (error) {
+        if (error.response && error.response.data.msg) {
+            toast(t('sendFailedMsg', { msg: error.response.data.msg }));
+        } else {
+            toast(t('sendFailed'));
+        }
+    } finally {
+        sending.value = false;
+    }
+}
+</script>
+
+<template>
+    <div class="sticky-composer">
+        <div v-if="app.send.files.length" class="sticky-composer__files">
+            <span
+                v-for="(file, index) in app.send.files"
+                :key="file.name + index"
+                class="sticky-composer__file"
+            >{{ file.name }} <b class="sticky-composer__closer" @click="removeFile(index)">✕</b></span>
+            <span v-if="sending" class="sticky-composer__progress">{{ Math.round(uploadProgress * 100) }}%</span>
+        </div>
+        <div class="sticky-composer__row">
+            <button type="button" class="sticky-composer__attach" title="📎" @click="openFilePicker">➕</button>
+            <textarea
+                ref="textarea"
+                v-model="app.send.text"
+                class="sticky-composer__area"
+                rows="1"
+                :placeholder="t('stickyNewNote')"
+                @keydown="onKeydown"
+            ></textarea>
+            <button
+                type="button"
+                class="sticky-composer__go"
+                :disabled="sendDisabled"
+                @click="sendAll"
+            >{{ t('stickyStick') }}</button>
+            <input
+                ref="selectFile"
+                type="file"
+                multiple
+                class="d-none"
+                @change="handleSelectFiles(Array.from($event.target.files)); $event.target.value = ''"
+            >
+        </div>
+    </div>
+</template>
+
+<style scoped>
+.sticky-composer {
+    background: #fffbe8;
+    border: 1.5px dashed #d5c49a;
+    border-radius: 12px;
+    padding: 10px 13px;
+    box-shadow: 0 2px 6px rgba(68, 64, 42, 0.08);
+}
+
+.sticky-composer__files {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.sticky-composer__file {
+    font-size: 11px;
+    background: rgba(213, 196, 154, 0.28);
+    color: #6f6548;
+    border-radius: 6px;
+    padding: 3px 8px;
+}
+
+.sticky-composer__closer {
+    font-weight: 700;
+    cursor: pointer;
+    margin-left: 4px;
+    opacity: 0.6;
+}
+
+.sticky-composer__progress {
+    font-size: 11px;
+    font-weight: 700;
+    color: #0a0d24;
+}
+
+.sticky-composer__row {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+}
+
+.sticky-composer__attach {
+    font-size: 16px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    color: #b8ae9a;
+}
+
+.sticky-composer__area {
+    flex: 1;
+    min-width: 0;
+    resize: none;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #444034;
+    font-family: inherit;
+    padding: 6px 0;
+}
+
+.sticky-composer__area::placeholder {
+    color: #b8ae9a;
+}
+
+.sticky-composer__go {
+    background: #d97706;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 12px;
+    padding: 6px 14px;
+    font-weight: 650;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.sticky-composer__go:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+</style>

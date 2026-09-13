@@ -192,5 +192,15 @@
   "open": "打开",
   "cloudPromoHint": "你有云服务器需求的话，\n可以看看这些活动价，顺带也支持到了项目开发 👇",
   "supportSectionTitle": "给作者一点支持",
-  "cloudSectionTitle": "云服务器活动（可支持开发）"
+  "cloudSectionTitle": "云服务器活动（可支持开发）",
+  "uiMode": "界面模式",
+  "uiModeDefault": "标准",
+  "uiModeSticky": "便签",
+  "uiModeStickyCount": "张便签",
+  "stickyNewNote": "新建便签…",
+  "stickyStick": "贴",
+  "stickyFromDevice": "来自 {device}",
+  "stickyImage": "图片",
+  "stickyDropHere": "松开即添加到便签",
+  "backToDefaultRoom": "返回默认房间"
 }

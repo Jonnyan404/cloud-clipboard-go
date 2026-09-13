@@ -30,6 +30,7 @@ export const useAppStore = defineStore('app', {
         fullscreenSendClose: localStorage.getItem('fullscreenSendClose') !== null
             ? localStorage.getItem('fullscreenSendClose') === 'true'
             : true,
+        uiMode: localStorage.getItem('uiMode') || 'default',
     }),
     actions: {
         setConfig(config) {
@@ -42,6 +43,10 @@ export const useAppStore = defineStore('app', {
         toggleFullscreenSendClose() {
             this.fullscreenSendClose = !this.fullscreenSendClose;
             localStorage.setItem('fullscreenSendClose', String(this.fullscreenSendClose));
+        },
+        setUiMode(mode) {
+            this.uiMode = mode;
+            localStorage.setItem('uiMode', mode);
         },
     },
     getters: {

@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useAppStore } from '@/store/app';
 import { useWebSocketStore } from '@/store/websocket';
@@ -12,7 +12,6 @@ import TraditionalColorDialog from '@/components/TraditionalColorDialog.vue';
 import QrcodeVue from 'qrcode.vue';
 
 const mdiBrightness4 = 'mdi-brightness-4';
-const mdiDoorOpen = 'mdi-door-open';
 const mdiChevronLeft = 'mdi-chevron-left';
 const mdiChevronRight = 'mdi-chevron-right';
 const mdiClockOutline = 'mdi-clock-outline';
@@ -26,15 +25,9 @@ const mdiHeartOutline = 'mdi-heart-outline';
 const mdiHome = 'mdi-home';
 const mdiHomeOutline = 'mdi-home-outline';
 const mdiIpNetworkOutline = 'mdi-ip-network-outline';
-const mdiLanConnect = 'mdi-lan-connect';
-const mdiLanDisconnect = 'mdi-lan-disconnect';
-const mdiLanPending = 'mdi-lan-pending';
-const mdiEarth = 'mdi-earth';
 const mdiLock = 'mdi-lock';
-const mdiCog = 'mdi-cog';
 const mdiMagnify = 'mdi-magnify';
 const mdiOpenInNew = 'mdi-open-in-new';
-const mdiBroom = 'mdi-broom';
 const mdiPalette = 'mdi-palette';
 const mdiPaletteSwatch = 'mdi-palette-swatch';
 const mdiCurrencyCny = 'mdi-currency-cny';
@@ -66,6 +59,35 @@ const roomDockVisible = ref(true);
 const roomDockSide = ref('right');
 const availableRooms = ref([]);
 const roomsLoading = ref(false);
+
+provide('stickyAppActions', {
+    openSettings: () => { settingsDialog.value = true; },
+    openClearAll: () => { clearAllDialog.value = true; },
+    openRoomDialog: () => { ws.roomInput = ws.room; ws.roomDialog = true; },
+    toggleConnection: () => {
+        if (!ws.websocket && !ws.websocketConnecting) {
+            ws.retry = 0;
+            ws.connect();
+        }
+    },
+});
+
+provide('pageToolbarActions', {
+    openSettings: () => { settingsDialog.value = true; },
+    openClearAll: () => { clearAllDialog.value = true; },
+    openRoomDialog: () => { ws.roomInput = ws.room; ws.roomDialog = true; },
+    toggleConnection: () => {
+        if (!ws.websocket && !ws.websocketConnecting) {
+            ws.retry = 0;
+            ws.connect();
+        }
+    },
+    openRoomBrowser: () => { openRoomBrowser(); },
+    openPageQr: () => { pageQrDialogVisible.value = true; },
+    goHome: () => { goHome(); },
+    roomCount: computed(() => availableRooms.value.length),
+    roomListEnabled: computed(() => Boolean(app.config?.server?.roomList)),
+});
 
 const languageOptions = [
     { code: 'zh', name: '简体中文' },
@@ -500,100 +522,13 @@ watch(() => route.fullPath, () => {
 
 <template>
     <v-app class="app-shell" :class="{ 'app-shell--dark': isDark }">
-        <v-app-bar
-            app
-            color="primary"
-            dark
-            flat
-            density="compact"
-            class="app-shell__bar"
-        >
-            <v-toolbar-title @click="goHome" style="cursor: pointer;" class="d-flex align-center ga-2">
-                <v-btn icon density="compact" variant="text" class="room-title__logo-btn" @click.stop="goHome">
-                    <v-icon>{{ mdiHome }}</v-icon>
-                </v-btn>
-                <span class="d-none d-sm-inline">{{ t('cloudClipboard') }}</span>
-                <v-chip
-                    size="small"
-                    variant="tonal"
-                    color="white"
-                    class="room-title__chip"
-                    :title="t('showQrCode')"
-                    @click.stop="pageQrDialogVisible = true"
-                >
-                    <v-icon start size="x-small">
-                        {{ ws.room ? (currentRoomEntry && currentRoomEntry.isProtected ? mdiLock : mdiEarth) : mdiEarth }}
-                    </v-icon>
-                    <span v-if="ws.room" class="room-title__roomname">{{ ws.room }}</span>
-                    <span v-else>{{ t('publicRoom') }}</span>
-                    <span v-if="ws.websocket && ws.latency !== null" class="room-title__latency" :style="{ color: latencyHexColor }">
-                        {{ latencyValue }}
-                    </span>
-                </v-chip>
-            </v-toolbar-title>
-
-            <v-tooltip left>
-                <template v-slot:activator="{ props }">
-                    <v-btn icon density="compact" variant="text" v-bind="props" @click="settingsDialog = true">
-                        <v-icon>{{ mdiCog }}</v-icon>
-                    </v-btn>
-                </template>
-                <span>{{ t('settings') }}</span>
-            </v-tooltip>
-
-            <v-tooltip left v-if="app.config && app.config.server && app.config.server.roomList">
-                <template v-slot:activator="{ props }">
-                    <v-btn icon density="compact" variant="text" v-bind="props" @click="openRoomBrowser()">
-                        <v-badge
-                            :content="availableRooms.length"
-                            :model-value="availableRooms.length > 0"
-                            color="accent"
-                            overlap
-                        >
-                            <v-icon>{{mdiViewList}}</v-icon>
-                        </v-badge>
-                    </v-btn>
-                </template>
-                <span>{{ t('roomList') }} ({{ availableRooms.length }})</span>
-            </v-tooltip>
-
-            <v-tooltip left>
-                <template v-slot:activator="{ props }">
-                    <v-btn icon density="compact" variant="text" v-bind="props" @click="clearAllDialog = true">
-                        <v-icon>{{mdiBroom}}</v-icon>
-                    </v-btn>
-                </template>
-                <span>{{ t('clearClipboard') }}</span>
-            </v-tooltip>
-            <v-tooltip left>
-                <template v-slot:activator="{ props }">
-                    <v-btn icon density="compact" variant="text" v-bind="props" @click="ws.roomInput = ws.room; ws.roomDialog = true">
-                        <v-icon>{{mdiDoorOpen}}</v-icon>
-                    </v-btn>
-                </template>
-                <span>{{ t('enterRoom') }}</span>
-            </v-tooltip>
-            <v-tooltip left>
-                <template v-slot:activator="{ props }">
-                    <v-btn icon density="compact" variant="text" v-bind="props" @click="if (!ws.websocket && !ws.websocketConnecting) {ws.retry = 0; ws.connect();}">
-                        <v-icon v-if="ws.websocket">{{mdiLanConnect}}</v-icon>
-                        <v-icon v-else-if="ws.websocketConnecting">{{mdiLanPending}}</v-icon>
-                        <v-icon v-else>{{mdiLanDisconnect}}</v-icon>
-                    </v-btn>
-                </template>
-                <span v-if="ws.websocket">{{ t('connected') }}</span>
-                <span v-else-if="ws.websocketConnecting">{{ t('connecting') }}</span>
-                <span v-else>{{ t('disconnected') }}</span>
-            </v-tooltip>
-        </v-app-bar>
-
         <v-alert
             v-model="clipboardClearedMessageVisible"
             type="error"
             dismissible
             dense
             class="ma-0 text-center"
-            style="position: sticky; top: 48px; z-index: 5;"
+            style="position: sticky; top: 0; z-index: 5;"
         >
             {{ t('clipboardClearedRefresh') }}
         </v-alert>
@@ -1346,32 +1281,6 @@ watch(() => route.fullPath, () => {
     background: #0f172a;
 }
 
-.app-shell__bar {
-    box-shadow: 0 14px 34px rgba(15, 23, 42, 0.18) !important;
-}
-
-.app-shell__bar .v-toolbar-title {
-    margin-inline-start: 0;
-    min-width: 0;
-}
-
-.app-shell__bar :deep(.v-toolbar-title__placeholder) {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex: 1 1 auto;
-    min-width: 0;
-}
-
-.room-title__logo-btn {
-    margin-inline-start: 4px;
-    margin-right: 0;
-}
-
-.app-shell--dark .app-shell__bar {
-    box-shadow: 0 14px 34px rgba(2, 6, 23, 0.42) !important;
-}
-
 .app-shell__main {
     background: transparent;
 }
@@ -1380,8 +1289,8 @@ watch(() => route.fullPath, () => {
     display: flex;
     align-items: flex-start;
     gap: 20px;
-    min-height: calc(100vh - 48px);
-    padding: 16px 20px 24px;
+    min-height: 100vh;
+    padding: 0;
 }
 
 .app-shell__workspace--dock-left {
@@ -1530,7 +1439,7 @@ watch(() => route.fullPath, () => {
 }
 
 .v-alert {
-    top: 48px;
+    top: 0;
     z-index: 5;
 }
 
@@ -1551,41 +1460,6 @@ watch(() => route.fullPath, () => {
 .room-browser__header--dock {
     padding: 16px 18px 12px;
     border-bottom: 1px solid rgba(148, 163, 184, 0.18);
-}
-
-.room-title__logo-btn {
-    margin-inline-start: 4px;
-    margin-right: 0;
-}
-
-.room-title__chip {
-    flex-shrink: 1;
-    min-width: 0;
-    max-width: 100%;
-    cursor: pointer;
-}
-
-.room-title__chip :deep(.v-chip__content) {
-    min-width: 0;
-}
-
-.room-title__chip :deep(.v-chip__content > span) {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    min-width: 0;
-}
-
-.room-title__latency {
-    font-size: 13px;
-    font-weight: 500;
-}
-
-@media (max-width: 600px) {
-    .room-title__chip {
-        flex-shrink: 1;
-        max-width: 100%;
-    }
 }
 
 .room-browser__title-wrap {

@@ -174,5 +174,18 @@
   "open": "開啟",
   "cloudPromoHint": "你有雲端伺服器需求的話，\n可以看看這些活動價，順帶也支持到了專案開發 👇",
   "supportSectionTitle": "給作者一點支持",
-  "cloudSectionTitle": "雲端伺服器活動（可支持開發）"
+  "cloudSectionTitle": "雲端伺服器活動（可支持開發）",
+  "uiMode": "介面模式",
+  "uiModeDefault": "標準",
+  "uiModeSticky": "便籤",
+  "uiModeStickyCount": "張便籤",
+  "stickyNewNote": "新增便籤…",
+  "stickyStick": "貼",
+  "stickyFromDevice": "來自 {device}",
+  "stickyImage": "圖片",
+  "collapseTextPreview": "收起預覽",
+  "expandTextPreview": "顯示全部",
+  "textPreviewTruncated": "預覽已截斷（{limit}）",
+  "stickyDropHere": "放開即可新增",
+  "backToDefaultRoom": "返回預設房間"
 }
