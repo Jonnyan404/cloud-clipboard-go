@@ -178,6 +178,9 @@
   "uiMode": "介面模式",
   "uiModeDefault": "標準",
   "uiModeSticky": "便籤",
+  "uiModeMega": "巨型",
+  "uiModeMegaToday": "剪貼簿 · 今日",
+  "uiModeMegaCount": "{count} 條",
   "uiModeStickyCount": "張便籤",
   "stickyNewNote": "新增便籤…",
   "stickyStick": "貼",
@@ -187,5 +190,7 @@
   "expandTextPreview": "顯示全部",
   "textPreviewTruncated": "預覽已截斷（{limit}）",
   "stickyDropHere": "放開即可新增",
-  "backToDefaultRoom": "返回預設房間"
+  "backToDefaultRoom": "返回預設房間",
+  "expiresAt": "{time} 過期",
+  "composerPlaceholder": "發送文字或檔案…"
 }

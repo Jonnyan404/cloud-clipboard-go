@@ -178,6 +178,9 @@
   "uiMode": "表示モード",
   "uiModeDefault": "標準",
   "uiModeSticky": "付箋",
+  "uiModeMega": "巨大",
+  "uiModeMegaToday": "クリップボード · 今日",
+  "uiModeMegaCount": "{count} 件",
   "uiModeStickyCount": "枚",
   "stickyNewNote": "付箋を作成…",
   "stickyStick": "貼る",
@@ -187,5 +190,7 @@
   "expandTextPreview": "すべて表示",
   "textPreviewTruncated": "プレビューは {limit} まで切り詰められています",
   "stickyDropHere": "離して追加",
-  "backToDefaultRoom": "デフォルトルームに戻る"
+  "backToDefaultRoom": "デフォルトルームに戻る",
+  "expiresAt": "{time} に期限切れ",
+  "composerPlaceholder": "テキストまたはファイルを送信…"
 }

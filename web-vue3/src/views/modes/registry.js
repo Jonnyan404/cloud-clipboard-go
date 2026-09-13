@@ -1,5 +1,6 @@
 import DefaultMode from './DefaultMode.vue';
 import StickyWall from './StickyWall.vue';
+import MegaWall from './MegaWall.vue';
 
 export const MODES = [
     {
@@ -13,6 +14,12 @@ export const MODES = [
         labelKey: 'uiModeSticky',
         icon: 'mdi-pin-outline',
         component: StickyWall,
+    },
+    {
+        key: 'mega',
+        labelKey: 'uiModeMega',
+        icon: 'mdi-newspaper-variant-outline',
+        component: MegaWall,
     },
 ];
 

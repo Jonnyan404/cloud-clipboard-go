@@ -196,11 +196,16 @@
   "uiMode": "界面模式",
   "uiModeDefault": "标准",
   "uiModeSticky": "便签",
+  "uiModeMega": "巨型",
+  "uiModeMegaToday": "剪贴板 · 今日",
+  "uiModeMegaCount": "{count} 条",
   "uiModeStickyCount": "张便签",
   "stickyNewNote": "新建便签…",
   "stickyStick": "贴",
   "stickyFromDevice": "来自 {device}",
   "stickyImage": "图片",
   "stickyDropHere": "松开即添加到便签",
-  "backToDefaultRoom": "返回默认房间"
+  "backToDefaultRoom": "返回默认房间",
+  "expiresAt": "{time} 过期",
+  "composerPlaceholder": "发送文字或文件…"
 }

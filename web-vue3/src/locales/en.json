@@ -196,11 +196,16 @@
   "uiMode": "Mode",
   "uiModeDefault": "Classic",
   "uiModeSticky": "Sticky",
+  "uiModeMega": "Mega",
+  "uiModeMegaToday": "Clipboard · Today",
+  "uiModeMegaCount": "{count} items",
   "uiModeStickyCount": "notes",
   "stickyNewNote": "New note…",
   "stickyStick": "Stick",
   "stickyFromDevice": "from {device}",
   "stickyImage": "image",
   "stickyDropHere": "Release to attach",
-  "backToDefaultRoom": "Back to default room"
+  "backToDefaultRoom": "Back to default room",
+  "expiresAt": "Expires {time}",
+  "composerPlaceholder": "Send text or a file…"
 }

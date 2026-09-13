@@ -45,6 +45,8 @@ const latencyHexColor = computed(() => {
 function setMode(mode) {
     app.setUiMode(mode);
 }
+
+const currentMode = computed(() => MODES.find(mode => mode.key === app.uiMode) || MODES[0]);
 </script>
 
 <template>
@@ -89,19 +91,32 @@ function setMode(mode) {
             </div>
 
             <div class="page-toolbar__actions">
-                <div class="page-toolbar__modes">
-                    <button
-                        v-for="mode in MODES"
-                        :key="mode.key"
-                        class="page-toolbar__mode"
-                        :title="t(mode.labelKey)"
-                        :class="{ 'page-toolbar__mode--on': app.uiMode === mode.key }"
-                        @click="setMode(mode.key)"
-                    >
-                        <v-icon size="small">{{ mode.icon }}</v-icon>
-                        <span class="page-toolbar__mode-label d-none d-sm-inline">{{ t(mode.labelKey) }}</span>
-                    </button>
-                </div>
+                <v-menu location="bottom end" min-width="192" :close-on-content-click="true">
+                    <template v-slot:activator="{ props: menuProps }">
+                        <button
+                            v-bind="menuProps"
+                            class="page-toolbar__mode"
+                            :title="t('uiMode')"
+                        >
+                            <v-icon size="small">{{ currentMode.icon }}</v-icon>
+                            <span class="page-toolbar__mode-label d-none d-sm-inline">{{ t(currentMode.labelKey) }}</span>
+                            <v-icon size="x-small" class="page-toolbar__mode-caret">mdi-chevron-down</v-icon>
+                        </button>
+                    </template>
+                    <v-list density="compact" nav>
+                        <v-list-item
+                            v-for="mode in MODES"
+                            :key="mode.key"
+                            :active="app.uiMode === mode.key"
+                            @click="setMode(mode.key)"
+                        >
+                            <template v-slot:prepend>
+                                <v-icon size="small">{{ mode.icon }}</v-icon>
+                            </template>
+                            <v-list-item-title>{{ t(mode.labelKey) }}</v-list-item-title>
+                        </v-list-item>
+                    </v-list>
+                </v-menu>
 
                 <v-tooltip v-if="roomListEnabled" :text="t('roomList')" location="bottom">
                     <template v-slot:activator="{ props }">
@@ -171,6 +186,11 @@ function setMode(mode) {
     border-bottom: 1px solid rgba(120, 90, 40, 0.16);
 }
 
+.page-toolbar--mega {
+    background: #fdfdfb;
+    border-bottom: 1px solid rgba(17, 24, 39, 0.12);
+}
+
 .page-toolbar--dark.page-toolbar--default {
     background: #1e1e24;
     border-bottom-color: rgba(148, 163, 184, 0.22);
@@ -179,6 +199,11 @@ function setMode(mode) {
 .page-toolbar--dark.page-toolbar--sticky {
     background: #211d12;
     border-bottom-color: rgba(238, 232, 214, 0.12);
+}
+
+.page-toolbar--dark.page-toolbar--mega {
+    background: #101318;
+    border-bottom-color: rgba(255, 255, 255, 0.1);
 }
 
 .page-toolbar__inner {
@@ -248,27 +273,12 @@ function setMode(mode) {
     min-width: 0;
 }
 
-.page-toolbar__modes {
-    display: flex;
-    align-items: center;
-    gap: 2px;
-    margin-right: 6px;
-    border: 1px solid rgba(148, 163, 184, 0.35);
-    border-radius: 999px;
-    padding: 2px;
-    background: rgba(255, 255, 255, 0.6);
-}
-
-.page-toolbar--dark .page-toolbar__modes {
-    background: rgba(0, 0, 0, 0.25);
-}
-
 .page-toolbar__mode {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    border: none;
-    background: transparent;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    background: rgba(255, 255, 255, 0.6);
     border-radius: 999px;
     padding: 3px 10px;
     font-size: 0.72rem;
@@ -278,28 +288,27 @@ function setMode(mode) {
 }
 
 .page-toolbar--dark .page-toolbar__mode {
+    background: rgba(0, 0, 0, 0.25);
     color: rgba(148, 163, 184, 0.9);
 }
 
-.page-toolbar__mode--on {
-    background: #1e88e5;
-    color: #fff;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-}
-
-.page-toolbar--dark .page-toolbar__mode--on {
+.page-toolbar__mode:hover {
     background: #1e88e5;
     color: #fff;
 }
 
-.page-toolbar__mode--on :deep(.v-icon) {
+.page-toolbar__mode-caret {
+    opacity: 0.75;
+}
+
+.page-toolbar__mode:hover :deep(.v-icon) {
     color: #fff;
 }
 
 @media (max-width: 600px) {
     .page-toolbar__room {
-        flex: 1 1 auto;
-        max-width: none;
+        flex: 0 1 auto;
+        max-width: 100%;
     }
 }
 </style>

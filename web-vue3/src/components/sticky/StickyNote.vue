@@ -76,6 +76,13 @@ const expired = computed(() => {
     }
     return Date.now() / 1000 > props.meta.expire;
 });
+const isExpirable = computed(() => Boolean(props.meta.expire && props.meta.expire > 0));
+const expireLabel = computed(() => {
+    if (!isExpirable.value) {
+        return '';
+    }
+    return `${expired.value ? t('expired') : t('expiresAt', { time: formatTimestamp(props.meta.expire) })}`;
+});
 const timestampLabel = computed(() => {
     if (!props.meta.timestamp) {
         return '';
@@ -324,6 +331,10 @@ async function deleteItem() {
                     <span class="sticky-note__fic">{{ fileIcon }}</span>
                     <span class="sticky-note__reader-name">{{ meta.name }}</span>
                     <span class="sticky-note__meta">{{ fileMetaLabel }}</span>
+                </div>
+                <div v-if="isFile && isExpirable" class="sticky-note__reader-expire" :class="{ 'sticky-note__reader-expire--past': expired }">
+                    <v-icon size="x-small">mdi-clock-outline</v-icon>
+                    {{ expireLabel }}
                 </div>
                 <div v-else class="sticky-note__reader-text" :class="isLink ? 'sticky-note__text--link' : ''">{{ decodedContent }}</div>
 
@@ -614,6 +625,23 @@ async function deleteItem() {
 
 .sticky-note__reader-file .sticky-note__meta {
     margin-top: 0;
+}
+
+.sticky-note__reader-expire {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    color: rgba(68, 64, 42, 0.65);
+    background: rgba(0, 0, 0, 0.06);
+    border-radius: 6px;
+    padding: 3px 8px;
+    margin-top: 8px;
+}
+
+.sticky-note__reader-expire--past {
+    color: #c62828;
+    background: rgba(198, 40, 40, 0.1);
 }
 
 .sticky-note__reader-actions {

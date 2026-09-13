@@ -582,6 +582,9 @@ export const useWebSocketStore = defineStore('websocket', {
             this.syncRoomView(newRoom);
             // 5. 连接新房间
             this.connect();
+            // 6. 同步地址栏（使用 replace 避免历史堆栈膨胀）
+            const targetQuery = newRoom ? { room: newRoom } : {};
+            router.replace({ path: '/', query: targetQuery });
         },
         failure() {
             const app = useAppStore();
