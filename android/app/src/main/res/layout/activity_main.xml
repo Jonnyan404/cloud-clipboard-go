@@ -924,6 +924,15 @@
                     </LinearLayout>
 
                     <TextView
+                        android:id="@+id/versionText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:padding="4dp"
+                        android:textSize="11sp"
+                        android:textColor="#B0B8C4" />
+
+                    <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:padding="16dp"

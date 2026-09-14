@@ -78,6 +78,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var saveConfigButton: TextView
     private lateinit var languageRow: View
     private lateinit var languageValue: TextView
+    private lateinit var versionText: TextView
 
     private val handler = Handler(Looper.getMainLooper())
     private val updateRunnable = object : Runnable {
@@ -156,6 +157,10 @@ class MainActivity : AppCompatActivity() {
         saveConfigButton = findViewById(R.id.saveConfigButton)
         languageRow = findViewById(R.id.languageRow)
         languageValue = findViewById(R.id.languageValue)
+        versionText = findViewById(R.id.versionText)
+
+        val pkgInfo = packageManager.getPackageInfo(packageName, 0)
+        versionText.text = "v${pkgInfo.versionName}"
 
         loadConfig()
         loadMoreSettings()
