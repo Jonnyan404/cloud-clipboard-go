@@ -27,32 +27,13 @@ start_service() {
     mkdir -p /etc/cloud-clipboard/data/upload
     mkdir -p /tmp/cloud-clipboard
 
-    # 如果配置文件不存在，创建默认配置
+    # 如果配置文件不存在，创建默认配置（仅保留必要路径，其余由服务端内置默认值提供）
     if [ ! -f "$config" ]; then
         cat > "$config" <<EOF
 {
     "server": {
-        "host": "",
-        "port": 9501,
-        "prefix": "",
-        "history": 100,
         "historyFile": "/etc/cloud-clipboard/data/history.json",
-        "storageDir": "/etc/cloud-clipboard/data/upload",
-        "auth": false,
-        "roomAuth": {
-            "private": "",
-            "finance": "finance-pass"
-        },
-        "roomList": false,
-        "roomCleanup": 3600
-    },
-    "text": {
-        "limit": 4096
-    },
-    "file": {
-        "expire": 3600,
-        "chunk": 2097152,
-        "limit": 268435456
+        "storageDir": "/etc/cloud-clipboard/data/upload"
     }
 }
 EOF

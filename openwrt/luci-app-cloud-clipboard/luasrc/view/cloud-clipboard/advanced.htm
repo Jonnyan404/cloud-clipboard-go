@@ -1,0 +1,456 @@
+<%+header%>
+
+<style>
+  .cc-title { font-size: 19px; font-weight: 700; margin-bottom: 4px; }
+  .cc-desc { color: #7b8494; font-size: 13px; margin-bottom: 18px; }
+  .cc-desc code { background: #f2f7fd; color: #1677d0; border-radius: 4px; padding: 1px 5px; font-size: 12px; }
+  .cc-card { background: #fff; border-radius: 12px; border: 1px solid #e6eaf1; box-shadow: 0 2px 8px rgba(22,48,84,.05); margin-bottom: 18px; overflow: hidden; }
+  .cc-card-head { padding: 13px 18px; border-bottom: 1px solid #eef1f6; display: flex; align-items: center; gap: 9px; }
+  .cc-card-head .ico { font-size: 17px; line-height: 1; }
+  .cc-card-head .ttl { font-size: 14.5px; font-weight: 700; }
+  .cc-card-head .spacer { flex: 1; }
+  .cc-body { padding: 18px; padding-top: 4px; }
+  .cc-row { display: flex; gap: 18px; }
+  .cc-row > .cc-card { flex: 1; }
+
+  .cc-field { display: flex; align-items: center; gap: 16px; padding: 12px 0; border-bottom: 1px solid #f2f4f8; }
+  .cc-field:last-child { border-bottom: none; }
+  .cc-field.compact { padding: 9px 0; }
+  .cc-field .label { width: 190px; flex-shrink: 0; }
+  .cc-field .label b { font-size: 13.5px; }
+  .cc-field .label small { display: block; color: #9aa2b0; font-size: 11.5px; margin-top: 2px; }
+  .cc-field .ctrl { flex: 1; }
+  .cc-hint { color: #8b93a1; font-size: 12px; }
+
+  input[type=text], input[type=number], input[type=password], select {
+    width: 100%; border: 1px solid #d5dce6; border-radius: 8px; padding: 8px 11px; font-size: 13px; background: #fff; color: #22304a; outline: none;
+  }
+  input:focus, select:focus { border-color: #1677d0; box-shadow: 0 0 0 3px rgba(22,119,208,.12); }
+
+  .cc-switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+  .cc-switch input { opacity: 0; width: 0; height: 0; }
+  .cc-switch .slider { position: absolute; inset: 0; background: #cdd4df; border-radius: 24px; transition: .2s; cursor: pointer; }
+  .cc-switch .slider:before { content: ""; position: absolute; width: 18px; height: 18px; border-radius: 50%; background: #fff; left: 3px; top: 3px; transition: .2s; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+  .cc-switch input:checked + .slider { background: #1677d0; }
+  .cc-switch input:checked + .slider:before { transform: translateX(20px); }
+
+  .cc-inline { display: flex; gap: 12px; align-items: center; }
+  .cc-inline .grow { flex: 1; }
+  .cc-pill { background: #eef4fc; color: #1677d0; font-size: 12px; padding: 3px 11px; border-radius: 14px; }
+
+  .cc-sub { border: 1px solid #edf0f5; border-radius: 10px; margin: 12px 0 18px; overflow: hidden; }
+  .cc-sub-head { background: #f7f9fc; padding: 10px 14px; font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #edf0f5; }
+  .cc-sub-head .tag { font-size: 11px; font-weight: 500; background: #eef3fb; color: #1677d0; border-radius: 10px; padding: 1px 8px; }
+  .cc-sub-body { padding: 4px 14px 8px; }
+
+  .cc-conf-actions { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+  .cc-room-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .cc-room-table th { text-align: left; color: #8b93a1; font-weight: 600; font-size: 12px; padding: 7px 10px; border-bottom: 1px solid #eef1f6; }
+  .cc-room-table td { padding: 7px 10px; border-bottom: 1px solid #f4f6f9; }
+  .cc-room-table td input { width: 100%; }
+  .cc-room-table .a span { color: #1677d0; cursor: pointer; margin-right: 10px; font-size: 12px; }
+
+  .cc-btn { display: inline-flex; align-items: center; gap: 7px; border: none; border-radius: 8px; padding: 9px 16px; font-size: 13px; font-weight: 600; cursor: pointer; transition: .15s; }
+  .cc-btn:disabled { opacity: .55; cursor: not-allowed; }
+  .cc-btn.primary { background: #1677d0; color: #fff; }
+  .cc-btn.primary:hover:not(:disabled) { background: #1266b4; }
+  .cc-btn.danger { background: #fff; color: #c92a2a; border: 1px solid #f0c1c1; }
+  .cc-btn.danger:hover:not(:disabled) { background: #fff5f5; }
+  .cc-btn.neutral { background: #fff; color: #4a5468; border: 1px solid #d9e0ea; }
+  .cc-btn.neutral:hover:not(:disabled) { background: #f4f6fa; }
+  .cc-btn.sm { padding: 6px 12px; font-size: 12px; }
+
+  .cc-actions-bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .cc-actions-bar .right { flex: 1; text-align: right; }
+
+  .cc-expert { display: none; }
+  .cc-expert.on { display: block; }
+  .cc-expert-toggle { background: #fdf3e1; color: #a05b00; border: 1px dashed #ecb84d; border-radius: 8px; padding: 7px 13px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+  .cc-expert-toggle:hover { background: #fae8c8; }
+  .cc-jsonwrap { position: relative; }
+  .cc-jsonwrap textarea { width: 100%; height: 300px; background: #0f1520; color: #cdd6e4; border: none; border-radius: 10px; padding: 14px 16px; font: 12.5px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; resize: vertical; outline: none; }
+  .cc-json-toolbar { position: absolute; top: 10px; right: 10px; display: flex; gap: 6px; }
+  .cc-json-toolbar button { background: rgba(255,255,255,.08); color: #b9c2cf; border: 1px solid rgba(255,255,255,.15); border-radius: 6px; padding: 5px 10px; font-size: 11px; cursor: pointer; }
+  .cc-json-toolbar button:hover { background: rgba(255,255,255,.16); color: #fff; }
+
+  .cc-path { background: #f7f9fc; border: 1px solid #edf0f5; border-radius: 9px; padding: 10px 14px; font-size: 13px; color: #1677d0; margin-bottom: 12px; }
+
+  .cc-toast { position: fixed; left: 50%; bottom: 30px; transform: translateX(-50%) translateY(20px); background: #22304a; color: #fff; padding: 10px 20px; border-radius: 8px; font-size: 13px; opacity: 0; transition: .25s; pointer-events: none; box-shadow: 0 6px 18px rgba(0,0,0,.2); z-index: 99; }
+
+  @media (max-width: 960px) {
+    .cc-row { flex-direction: column; gap: 14px; }
+    .cc-field { flex-wrap: wrap; gap: 8px; }
+    .cc-field .label { width: 100%; }
+    .cc-sub-body { overflow-x: auto; }
+    .cc-room-table { min-width: 520px; }
+  }
+</style>
+
+<h2 class="cc-title"><%:高级设置%></h2>
+<div class="cc-desc"><%:结构化编辑%> <code>/etc/cloud-clipboard/config.json</code> <span id="ccPath" class="cc-pill">—</span> <%:改动在保存并应用后生效%>。</div>
+
+<div class="cc-card">
+  <div class="cc-card-head"><span class="ico">🏠</span><span class="ttl"><%:房间 / 历史%></span><span class="spacer"></span><span class="cc-pill">server</span></div>
+  <div class="cc-body">
+    <div class="cc-field compact">
+      <div class="label"><b><%:启用房间列表%></b><small><%:在 Web 端展示可用房间%></small></div>
+      <div class="ctrl"><label class="cc-switch"><input type="checkbox" id="fRoomList"><span class="slider"></span></label></div>
+    </div>
+    <div class="cc-field compact">
+      <div class="label"><b><%:房间清理周期%></b><small><%:秒，清理消息数为 0 的房间%></small></div>
+      <div class="ctrl" style="max-width:180px"><input type="number" id="fRoomCleanup" placeholder="<%=translate("留空 = 使用后端默认值")%>" /></div>
+    </div>
+    <div class="cc-field compact">
+      <div class="label"><b><%:历史记录条数%></b><small><%:每房间最多保留 N 条%></small></div>
+      <div class="ctrl cc-inline">
+        <input type="number" id="fHistory" style="max-width:140px" placeholder="<%=translate("留空 = 使用后端默认值")%>" />
+        <button class="cc-btn danger sm" onclick="ccClearHistory()">🗑 <%:清空历史%></button>
+      </div>
+    </div>
+    <div class="cc-field compact">
+      <div class="label"><b><%:Web 前缀%></b><small><%:如 /clipboard%></small></div>
+      <div class="ctrl" style="max-width:220px"><input type="text" id="fPrefix" placeholder="<%=translate("留空 = 根路径")%>" /></div>
+    </div>
+
+    <div class="cc-sub">
+      <div class="cc-sub-head">🔑 <%:房间密码%> <span class="tag">roomAuth</span><span class="tag">fileExpire</span></div>
+      <div class="cc-sub-body">
+        <div class="cc-conf-actions">
+          <button class="cc-btn neutral sm" onclick="ccAddRoom()">＋ <%:添加房间%></button>
+          <span class="cc-hint"><%:留空密码 → 沿用全局密码；留空文件过期 → 沿用全局文件过期%></span>
+        </div>
+        <table class="cc-room-table">
+          <thead><tr>
+            <th style="width:30%"><%:房间名%></th>
+            <th style="width:26%"><%:密码%></th>
+            <th style="width:24%"><%:文件过期（秒）%></th>
+            <th style="width:20%"><%:行为%></th>
+          </tr></thead>
+          <tbody id="ccRooms"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="cc-row">
+  <div class="cc-card">
+    <div class="cc-card-head"><span class="ico">📝</span><span class="ttl"><%:文本%></span><span class="spacer"></span><span class="cc-pill">text</span></div>
+    <div class="cc-body">
+      <div class="cc-field compact">
+        <div class="label"><b><%:单条文本上限%></b><small><%:字节%></small></div>
+        <div class="ctrl" style="max-width:160px"><input type="number" id="fTextLimit" placeholder="<%=translate("留空 = 使用后端默认值")%>" /></div>
+      </div>
+    </div>
+  </div>
+  <div class="cc-card">
+    <div class="cc-card-head"><span class="ico">📁</span><span class="ttl"><%:文件传输%></span><span class="spacer"></span><span class="cc-pill">file</span></div>
+    <div class="cc-body">
+      <div class="cc-field compact">
+        <div class="label"><b><%:文件过期%></b><small><%:秒%></small></div>
+        <div class="ctrl" style="max-width:160px"><input type="number" id="fFileExpire" placeholder="<%=translate("留空 = 使用后端默认值")%>" /></div>
+      </div>
+      <div class="cc-field compact">
+        <div class="label"><b><%:分片大小%></b><small><%:字节%></small></div>
+        <div class="ctrl" style="max-width:180px"><input type="number" id="fFileChunk" placeholder="<%=translate("留空 = 使用后端默认值")%>" /></div>
+      </div>
+      <div class="cc-field compact" style="border-bottom:none">
+        <div class="label"><b><%:单文件上限%></b><small><%:字节%></small></div>
+        <div class="ctrl" style="max-width:180px"><input type="number" id="fFileLimit" placeholder="<%=translate("留空 = 使用后端默认值")%>" /></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="cc-actions-bar" style="margin-bottom:18px;margin-top:-4px">
+  <span class="cc-hint"><%:保存后若服务正在运行将自动重启以生效%></span>
+  <span class="right">
+    <button class="cc-btn danger" onclick="ccResetDefault()"><%:恢复默认%></button>
+    <button class="cc-btn primary" onclick="ccSaveForm()">💾 <%:保存并应用%></button>
+  </span>
+</div>
+
+<div class="cc-card">
+  <div class="cc-card-head">
+    <span class="ico">🧑‍💻</span>
+    <span class="ttl"><%:专家模式 — JSON 编辑%></span>
+    <span class="cc-hint" style="flex:1"><%:对高级选项的完整控制%></span>
+    <button class="cc-expert-toggle" id="ccExpertToggle" onclick="ccToggleExpert()"><%:点击展开 JSON 编辑器%></button>
+  </div>
+  <div class="cc-body">
+    <div class="cc-expert" id="ccExpertBody">
+      <div class="cc-jsonwrap">
+        <div class="cc-json-toolbar">
+          <button onclick="ccValidateJson()"><%:验证%></button>
+          <button onclick="ccFormatJson()"><%:格式化%></button>
+          <button onclick="ccResetJson()"><%:恢复默认%></button>
+        </div>
+        <textarea id="ccJsonArea" spellcheck="false"></textarea>
+      </div>
+      <div class="cc-actions-bar" style="margin-top:12px">
+        <span class="cc-hint"><%:直接编辑 JSON 需要熟悉配置结构；保存前会自动校验合法性%></span>
+        <span class="right"><button class="cc-btn primary" onclick="ccSaveExpert()"><%:保存专家配置%></button></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="cc-toast" id="ccToast"></div>
+
+<script type="text/javascript">
+//<![CDATA[
+  var CC_ADV = {
+    base: '<%=luci.dispatcher.build_url("admin", "services", "cloud-clipboard")%>',
+    getUrl: '<%=luci.dispatcher.build_url("admin", "services", "cloud-clipboard", "getconfig")%>',
+    saveUrl: '<%=luci.dispatcher.build_url("admin", "services", "cloud-clipboard", "saveconfig")%>',
+    actionUrl: '<%=luci.dispatcher.build_url("admin", "services", "cloud-clipboard", "action")%>',
+    statusUrl: '<%=luci.dispatcher.build_url("admin", "services", "cloud-clipboard", "status")%>',
+    config: null,
+    path: '',
+    toastTimer: null
+  };
+
+  function ccToast(msg) {
+    var t = document.getElementById('ccToast');
+    if (!t) return;
+    t.textContent = msg;
+    t.style.opacity = '1';
+    t.style.transform = 'translateX(-50%) translateY(0)';
+    clearTimeout(CC_ADV.toastTimer);
+    CC_ADV.toastTimer = setTimeout(function() {
+      t.style.opacity = '0';
+      t.style.transform = 'translateX(-50%) translateY(20px)';
+    }, 1800);
+  }
+
+  function ccPost(url, body, cb) {
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', url, true);
+    xhr.timeout = 12000;
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.onreadystatechange = function() {
+      if (xhr.readyState !== 4) return;
+      var r = null;
+      try { r = JSON.parse(xhr.responseText || '{}'); } catch(e) { r = { ok: false, error: '服务端响应异常' }; }
+      cb(r);
+    };
+    xhr.onerror = function() { cb({ ok: false, error: '请求失败' }); };
+    xhr.ontimeout = function() { cb({ ok: false, error: '请求超时' }); };
+    xhr.send(body);
+  }
+  function ccGet(url, cb) {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', url, true);
+    xhr.onreadystatechange = function() {
+      if (xhr.readyState !== 4) return;
+      var r = null;
+      try { r = JSON.parse(xhr.responseText || 'null'); } catch(e) { r = null; }
+      cb(r);
+    };
+    xhr.send();
+  }
+
+  function ccLoad() {
+    ccGet(CC_ADV.getUrl, function(r) {
+      if (!r || !r.config) { alert('<%:读取配置失败%>'); return; }
+      CC_ADV.config = r.config;
+      CC_ADV.path = r.path || '';
+      document.getElementById('ccPath').textContent = CC_ADV.path;
+      ccFillForm();
+    });
+  }
+
+  function ccFillForm() {
+    var s = CC_ADV.config.server || {};
+    document.getElementById('fRoomList').checked = (s.roomList === true);
+    document.getElementById('fRoomCleanup').value = (typeof s.roomCleanup === 'number' && s.roomCleanup > 0) ? s.roomCleanup : '';
+    document.getElementById('fHistory').value = (typeof s.history === 'number' && s.history > 0) ? s.history : '';
+    document.getElementById('fPrefix').value = s.prefix || '';
+    var t = CC_ADV.config.text || {};
+    document.getElementById('fTextLimit').value = (typeof t.limit === 'number' && t.limit > 0) ? t.limit : '';
+    var f = CC_ADV.config.file || {};
+    document.getElementById('fFileExpire').value = (typeof f.expire === 'number' && f.expire > 0) ? f.expire : '';
+    document.getElementById('fFileChunk').value = (typeof f.chunk === 'number' && f.chunk > 0) ? f.chunk : '';
+    document.getElementById('fFileLimit').value = (typeof f.limit === 'number' && f.limit > 0) ? f.limit : '';
+    ccRenderRooms(s.roomAuth || {});
+  }
+
+  function ccRenderRooms(roomAuth) {
+    var tb = document.getElementById('ccRooms');
+    tb.innerHTML = '';
+    var names = Object.keys(roomAuth || {}).sort();
+    if (names.length === 0) ccAddRoom();
+    names.forEach(function(name) {
+      ccAddRoomRow(name, roomAuth[name]);
+    });
+  }
+
+  function ccRoomValues(entry) {
+    var pwd = '', fe = '';
+    if (entry === null || entry === undefined) return { pwd: pwd, fe: fe };
+    if (typeof entry === 'string') { pwd = entry; return { pwd: pwd, fe: fe }; }
+    if (typeof entry === 'number') { pwd = String(entry); return { pwd: pwd, fe: fe }; }
+    if (typeof entry === 'object') {
+      pwd = entry.password !== undefined && entry.password !== null ? String(entry.password) : '';
+      fe = (entry.fileExpire !== undefined && entry.fileExpire !== null) ? String(entry.fileExpire) : '';
+      return { pwd: pwd, fe: fe };
+    }
+    return { pwd: pwd, fe: fe };
+  }
+
+  function ccAddRowEl(name, vals, lockName) {
+    var tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td><input type="text" class="cc-room-name" value="' + ccEsc(name) + '" ' + (lockName ? 'readonly' : '') + ' /></td>' +
+      '<td><input type="password" class="cc-room-pwd" value="' + ccEsc(vals.pwd) + '" placeholder="<%=translate("空 = 沿用全局密码")%>" /></td>' +
+      '<td><input type="number" class="cc-room-fe" value="' + ccEsc(vals.fe) + '" placeholder="<%=translate("空 = 沿用全局文件过期")%>" /></td>' +
+      '<td class="a"><span onclick="ccSaveToast()"><%:保存%></span><span onclick="ccRemoveRoom(this)" ><%:删除%></span></td>';
+    tb_insert(tr);
+    return tr;
+  }
+
+  function tb_insert(tr) { document.getElementById('ccRooms').appendChild(tr); }
+
+  function ccAddRoomRow(name, entry) {
+    ccAddRowEl(name, ccRoomValues(entry), false);
+  }
+
+  function ccAddRoom() {
+    ccAddRowEl('', { pwd: '', fe: '' }, false);
+  }
+
+  function ccRemoveRoom(el) {
+    var tr = el.closest('tr');
+    var name = tr.querySelector('.cc-room-name').value.trim();
+    if (name && CC_ADV.config && CC_ADV.config.server && CC_ADV.config.server.roomAuth &&
+        Object.keys(CC_ADV.config.server.roomAuth).indexOf(name) !== -1 && CC_ADV.config.server.roomAuth[name] !== '') {
+      if (!confirm('<%:确定删除房间 %>' + name + '<%: ?%>')) return;
+    }
+    tr.remove();
+  }
+
+  function ccCollectRooms() {
+    var names = document.querySelectorAll('#ccRooms tr');
+    var roomAuth = {};
+    names.forEach(function(tr) {
+      var name = tr.querySelector('.cc-room-name').value.trim();
+      if (!name) return;
+      var pwd = tr.querySelector('.cc-room-pwd').value;
+      var fe = tr.querySelector('.cc-room-fe').value.trim();
+      if (pwd === '' && fe === '') { roomAuth[name] = ''; return; }
+      var o = { password: pwd };
+      if (fe !== '') { var n = parseInt(fe, 10); if (!isNaN(n)) o.fileExpire = n; }
+      roomAuth[name] = o;
+    });
+    return roomAuth;
+  }
+
+  function ccCollectInt(id) {
+    var v = document.getElementById(id).value.trim();
+    if (v === '') return undefined;
+    var n = parseInt(v, 10);
+    if (isNaN(n)) return undefined;
+    return n;
+  }
+
+  function ccApplyFormToConfig() {
+    var s = CC_ADV.config.server || (CC_ADV.config.server = {});
+    s.roomList = document.getElementById('fRoomList').checked;
+    var rc = ccCollectInt('fRoomCleanup');
+    if (rc !== undefined) s.roomCleanup = rc; else delete s.roomCleanup;
+    var hs = ccCollectInt('fHistory');
+    if (hs !== undefined) s.history = hs; else delete s.history;
+    s.prefix = document.getElementById('fPrefix').value.trim();
+    if (s.roomAuth === undefined) s.roomAuth = {};
+    s.roomAuth = ccCollectRooms();
+    CC_ADV.config.text = CC_ADV.config.text || {};
+    var tl = ccCollectInt('fTextLimit');
+    if (tl !== undefined) CC_ADV.config.text.limit = tl; else delete CC_ADV.config.text.limit;
+    CC_ADV.config.file = CC_ADV.config.file || {};
+    var fe = ccCollectInt('fFileExpire');
+    if (fe !== undefined) CC_ADV.config.file.expire = fe; else delete CC_ADV.config.file.expire;
+    var fc = ccCollectInt('fFileChunk');
+    if (fc !== undefined && fc > 0) CC_ADV.config.file.chunk = fc; else delete CC_ADV.config.file.chunk;
+    var fl = ccCollectInt('fFileLimit');
+    if (fl !== undefined) CC_ADV.config.file.limit = fl; else delete CC_ADV.config.file.limit;
+  }
+
+  function ccSave(payload) {
+    ccPost(CC_ADV.saveUrl, payload, function(r) {
+      if (!r.ok) {
+        alert('<%:保存失败:%> ' + (r.error || ''));
+        return;
+      }
+      ccGet(CC_ADV.statusUrl, function(st) {
+        if (st && st.running) {
+          ccPost(CC_ADV.actionUrl + '?act=restart', '', function() {
+            ccToast('<%:配置已保存，服务已重启%>');
+          });
+        } else {
+          ccToast('<%:配置已保存（服务未运行）%>');
+        }
+      });
+    });
+  }
+
+  function ccSaveForm() {
+    ccApplyFormToConfig();
+    ccSave(JSON.stringify(CC_ADV.config, null, 2));
+  }
+
+  function ccClearHistory() {
+    if (!confirm('<%:确定清空历史记录文件?%>')) return;
+    ccPost(CC_ADV.actionUrl + '?act=clearhistory', '', function() {
+      ccToast('<%:已清空历史记录%>');
+    });
+  }
+
+  function ccSaveToast() {
+    ccToast('<%:已保存（提交时统一生效）%>');
+  }
+
+  /* ---- 专家模式 JSON ---- */
+  function ccToggleExpert() {
+    var body = document.getElementById('ccExpertBody');
+    var on = !body.classList.contains('on');
+    body.classList.toggle('on', on);
+    document.getElementById('ccExpertToggle').textContent = on ? '<%:收起 JSON 编辑器%>' : '<%:点击展开 JSON 编辑器%>';
+    if (on) document.getElementById('ccJsonArea').value = JSON.stringify(CC_ADV.config, null, 2);
+  }
+
+  function ccValidateJson() {
+    try { JSON.parse(document.getElementById('ccJsonArea').value); ccToast('<%:JSON 格式有效!%>'); }
+    catch (e) { alert('<%:JSON 格式无效:%> ' + e.message); }
+  }
+  function ccFormatJson() {
+    try { document.getElementById('ccJsonArea').value = JSON.stringify(JSON.parse(document.getElementById('ccJsonArea').value), null, 2); }
+    catch (e) { alert('<%:无法格式化:%> ' + e.message); }
+  }
+  function ccResetJson() { document.getElementById('ccJsonArea').value = JSON.stringify(CC_ADV.config, null, 2); }
+  function ccSaveExpert() {
+    var text = document.getElementById('ccJsonArea').value.trim();
+    if (!text) { alert('<%:请输入 JSON 内容%>'); return; }
+    try { CC_ADV.config = JSON.parse(text); } catch (e) { alert('<%:JSON 格式无效:%> ' + e.message); return; }
+    ccSave(JSON.stringify(CC_ADV.config, null, 2));
+  }
+  function ccResetDefault() {
+    if (!confirm('<%:确定恢复默认配置?当前内容将丢失。%>')) return;
+    var hist = (CC_ADV.config.server && CC_ADV.config.server.historyFile) || '/etc/cloud-clipboard/data/history.json';
+    var stor = (CC_ADV.config.server && CC_ADV.config.server.storageDir) || '/etc/cloud-clipboard/data/upload';
+    CC_ADV.config = {
+      server: { historyFile: hist, storageDir: stor, roomAuth: {}, roomList: false },
+      text: {},
+      file: {}
+    };
+    ccFillForm();
+  }
+
+  function ccEsc(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  window.addEventListener('load', ccLoad);
+//]]>
+</script>
+
+<%+footer%>

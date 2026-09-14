@@ -1,20 +1,95 @@
 <%+header%>
 
-<h2 name="content"><%:Cloud Clipboard 日志%></h2>
+<style>
+  .cc-title { font-size: 19px; font-weight: 700; margin-bottom: 4px; }
+  .cc-desc { color: #7b8494; font-size: 13px; margin-bottom: 18px; }
+  .cc-desc code { background: #f2f7fd; color: #1677d0; border-radius: 4px; padding: 1px 5px; font-size: 12px; }
 
-<!-- 使用pre标签代替textarea，避免可能的样式问题 -->
-<div id="content_syslog" style="background-color: #f9f9f9; border: 1px solid #e4e4e4; padding: 10px; border-radius: 4px;">
-<pre id="syslog" style="width:100%; height:500px; overflow:auto; white-space:pre-wrap; word-break:break-all; margin:0; font-size:12px; font-family:monospace;"><%:加载中...%></pre>
+  .cc-btn { display: inline-flex; align-items: center; gap: 7px; border: none; border-radius: 8px; padding: 9px 16px; font-size: 13px; font-weight: 600; cursor: pointer; transition: .15s; }
+  .cc-btn:disabled { opacity: .55; cursor: not-allowed; }
+  .cc-btn.danger { background: #fff; color: #c92a2a; border: 1px solid #f0c1c1; }
+  .cc-btn.danger:hover:not(:disabled) { background: #fff5f5; }
+  .cc-btn.neutral { background: #fff; color: #4a5468; border: 1px solid #d9e0ea; }
+  .cc-btn.neutral:hover:not(:disabled) { background: #f4f6fa; }
+  .cc-btn.sm { padding: 6px 12px; font-size: 12px; }
+
+  .cc-switch { position: relative; display: inline-block; width: 36px; height: 20px; }
+  .cc-switch input { opacity: 0; width: 0; height: 0; }
+  .cc-switch .slider { position: absolute; inset: 0; background: #cdd4df; border-radius: 20px; transition: .2s; cursor: pointer; }
+  .cc-switch .slider:before { content: ""; position: absolute; width: 14px; height: 14px; border-radius: 50%; background: #fff; left: 3px; top: 3px; transition: .2s; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+  .cc-switch input:checked + .slider { background: #1677d0; }
+  .cc-switch input:checked + .slider:before { transform: translateX(16px); }
+
+  .cc-log-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .cc-log-head .autoupdate { font-size: 12px; color: #8b93a1; display: flex; align-items: center; gap: 6px; }
+
+  .cc-log-view { background: #0f1520; color: #cdd6e4; border-radius: 10px; padding: 14px 16px; font: 12.5px/1.8 ui-monospace, SFMono-Regular, Menlo, monospace; height: 480px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; }
+  .cc-log-view .t { color: #5f6b7d; }
+  .cc-log-view .ts { color: #e06175; }
+  .cc-log-view .info { color: #9fe8b8; }
+  .cc-log-view .warn { color: #ffd43b; }
+
+  .cc-toast { position: fixed; left: 50%; bottom: 30px; transform: translateX(-50%) translateY(20px); background: #22304a; color: #fff; padding: 10px 20px; border-radius: 8px; font-size: 13px; opacity: 0; transition: .25s; pointer-events: none; box-shadow: 0 6px 18px rgba(0,0,0,.2); z-index: 99; }
+
+  @media (max-width: 960px) {
+    .cc-log-view { height: 320px; }
+  }
+</style>
+
+<h2 class="cc-title"><%:运行日志%></h2>
+<div class="cc-desc"><%:实时查看%> <code>/var/log/cloud-clipboard.log</code>，<%:默认每 5 秒自动刷新%>。</div>
+
+<div class="cc-log-head">
+  <div class="autoupdate"><label class="cc-switch"><input type="checkbox" id="ccAuto" checked onchange="ccToggleAuto()"><span class="slider"></span></label> <%:自动刷新%></div>
+  <span style="flex:1"></span>
+  <button class="cc-btn neutral sm" onclick="refreshLog()"><%:刷新%></button>
+  <button class="cc-btn danger sm" onclick="clearLog()">🗑 <%:清除日志%></button>
 </div>
+<div class="cc-log-view" id="syslog"><%:加载中…%></div>
+
+<div class="cc-toast" id="ccToast"></div>
 
 <script type="text/javascript">
+//<![CDATA[
   var syslog = document.getElementById('syslog');
   var refreshLogTimer;
+  var toastTimer;
   var logUrl = '<%=luci.dispatcher.build_url("admin", "services", "cloud-clipboard", "getlog")%>';
   var clearUrl = '<%=luci.dispatcher.build_url("admin", "services", "cloud-clipboard", "clearlog")%>';
-  
+
+  function ccToast(msg) {
+    var t = document.getElementById('ccToast');
+    if (!t) return;
+    t.textContent = msg;
+    t.style.opacity = '1';
+    t.style.transform = 'translateX(-50%) translateY(0)';
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function() {
+      t.style.opacity = '0';
+      t.style.transform = 'translateX(-50%) translateY(20px)';
+    }, 1800);
+  }
+
+  function ccEsc(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function ccColorize(text) {
+    return text.split('\n').map(function(line) {
+      var esc = ccEsc(line);
+      if (/WARN|ERROR|FAIL/i.test(esc)) return '<span class="warn">' + esc + '</span>';
+      var m = esc.match(/^(\[\d{4}-\d{2}-\d{2}[^\]]*\])?\s*(\[\d{2}:\d{2}:\d{2}\])\s*(.*)$/);
+      if (m) {
+        var ts = (m[2] || '') + ' ';
+        var rest = m[3] || '';
+        return '<span class="t">' + ts + '</span>' + (rest ? '<span class="info">' + rest + '</span>' : '');
+      }
+      if (/INFO/i.test(esc)) return '<span class="info">' + esc + '</span>';
+      return '<span class="t">' + esc + '</span>';
+    }).join('\n');
+  }
+
   function refreshLog() {
-    // 使用原生 XMLHttpRequest 替代 LuCI 的 XHR
     var xhr = new XMLHttpRequest();
     xhr.open('GET', logUrl, true);
     xhr.onreadystatechange = function() {
@@ -22,34 +97,42 @@
         if (xhr.status === 200) {
           if (xhr.responseText && xhr.responseText.length > 0) {
             syslog.textContent = xhr.responseText;
+            syslog.innerHTML = ccColorize(xhr.responseText);
           } else {
             syslog.textContent = '<%:日志为空%>';
           }
           syslog.scrollTop = syslog.scrollHeight;
-          console.log("日志更新成功，长度:", xhr.responseText ? xhr.responseText.length : 0);
-          console.log("日志内容:", xhr.responseText);
         } else {
           syslog.textContent = '<%:获取日志失败%>: ' + xhr.status;
-          console.error("获取日志失败:", xhr.status);
         }
       }
     };
     xhr.onerror = function() {
       syslog.textContent = '<%:获取日志失败，请检查网络连接%>';
-      console.error("获取日志请求失败");
     };
     xhr.send();
   }
-  
+
+  function ccToggleAuto() {
+    var cb = document.getElementById('ccAuto');
+    if (cb.checked) {
+      refreshLogTimer = setInterval(refreshLog, 5000);
+      ccToast('<%:自动刷新已开启%>');
+    } else {
+      if (refreshLogTimer) clearInterval(refreshLogTimer);
+      ccToast('<%:自动刷新已关闭%>');
+    }
+  }
+
   function clearLog() {
     if (!confirm('<%:确定要清空日志?%>')) return;
-    
     var xhr = new XMLHttpRequest();
     xhr.open('GET', clearUrl, true);
     xhr.onreadystatechange = function() {
       if (xhr.readyState === 4) {
         if (xhr.status === 200) {
           refreshLog();
+          ccToast('<%:日志已清空%>');
         } else {
           alert('<%:清空日志失败%>');
         }
@@ -57,26 +140,15 @@
     };
     xhr.send();
   }
-  
-  // 页面加载完成后初始化
+
   window.onload = function() {
-    // 初始化加载日志
     refreshLog();
-    
-    // 每5秒刷新一次
     refreshLogTimer = setInterval(refreshLog, 5000);
   };
-  
-  // 页面离开时清除定时器
   window.addEventListener('beforeunload', function() {
     if (refreshLogTimer) clearInterval(refreshLogTimer);
   });
+//]]>
 </script>
-
-<div style="text-align:right; margin-right:30px; margin-top: 10px;">
-  <small><%:自动刷新已启用%></small><br />
-  <input class="cbi-button cbi-button-apply" type="button" value="<%:刷新%>" onclick="refreshLog()" />
-  <input class="cbi-button cbi-button-remove" type="button" value="<%:清空日志%>" onclick="clearLog()" />
-</div>
 
 <%+footer%>

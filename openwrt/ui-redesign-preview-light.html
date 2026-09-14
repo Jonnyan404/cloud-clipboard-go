@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Cloud Clipboard · LuCI 界面设计 C — 轻量移动设置风</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: linear-gradient(180deg,#f4f5f7,#eaeef4); color: #1b2733; padding: 28px 20px 56px;
+  }
+  .page-title { text-align: center; font-size: 22px; font-weight: 700; }
+  .page-sub { text-align: center; color: #8a94a3; font-size: 13px; margin: 4px 0 26px; }
+  .page-sub b { color: #16a34a; }
+
+  .phone {
+    max-width: 420px; margin: 0 auto; border-radius: 30px; overflow: hidden;
+    box-shadow: 0 24px 60px rgba(20,40,80,.22); border: 1px solid #dde3ec;
+    background: #fff; position: relative;
+  }
+  .phone-notch { background:#1b2733; height: 8px; }
+  .phone-top { background:#1b2733; color:#fff; padding: 18px 20px 14px; display:flex; align-items:center; gap:10px; }
+  .phone-top .logo { width:34px; height:34px; border-radius:10px; background:#16a34a; color:#fff; display:inline-flex; align-items:center; justify-content:center; font-weight:800; font-size:16px; }
+  .phone-top b { font-size:15px; }
+  .phone-top small { display:block; color:#a9b4c4; font-size:10.5px; font-weight:400; }
+  .phone-top .sp { flex:1; }
+  .phone-top .chip { background:rgba(255,255,255,.12); color:#bfe6cc; font-size:11px; padding:3px 10px; border-radius:14px; }
+
+  .seg { display:flex; gap:8px; padding:12px 16px; background:#f4f6f8; border-bottom:1px solid #e7ebf1; }
+  .seg button { flex:1; border:none; background:transparent; color:#6b7688; font-size:13px; font-weight:600; padding:8px 0; border-radius:9px; cursor:pointer; }
+  .seg button.on { background:#fff; color:#16a34a; box-shadow:0 1px 4px rgba(20,40,80,.08); }
+
+  .screen { padding: 14px 16px 26px; min-height: 620px; }
+  .tab-page { display:none; }
+  .tab-page.active { display:block; animation: fade .22s ease; }
+  @keyframes fade { from { opacity:0; transform:translateY(4px);} to { opacity:1; transform:none;} }
+
+  .group { background:#fff; border-radius:18px; box-shadow:0 2px 10px rgba(20,40,80,.06); border:1px solid #e7ebf1; margin-bottom:16px; overflow:hidden; }
+  .group-title { padding:16px 20px 6px; font-size:12.5px; color:#8a94a3; font-weight:600; letter-spacing:.3px; }
+
+  .row { display:flex; align-items:center; gap:12px; padding:14px 20px; border-bottom:1px solid #f1f3f7; }
+  .row:last-child { border-bottom:none; }
+  .row .ic { width:34px; height:34px; border-radius:9px; display:inline-flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0; }
+  .row .ic.blue { background:#e8f1ff; } .row .ic.green { background:#e6f7ee; } .row .ic.red { background:#ffece9; } .row .ic.yellow { background:#fff5de; }
+  .row .body { flex:1; min-width:0; }
+  .row .body b { font-size:14.5px; font-weight:600; display:block; }
+  .row .body small { font-size:11.5px; color:#8a94a3; display:block; margin-top:1px; }
+  .row .val { font-size:13px; color:#16a34a; font-weight:600; }
+  .row .chev { color:#c3cad6; font-size:18px; font-weight:600; }
+  .row.chev { cursor:pointer; }
+  .row.chev:active { background:#f7f9fc; }
+
+  .switch { position:relative; display:inline-block; width:46px; height:26px; flex-shrink:0; }
+  .switch input { opacity:0; width:0; height:0; }
+  .switch .slider { position:absolute; inset:0; background:#d7dde6; border-radius:26px; transition:.2s; cursor:pointer; }
+  .switch .slider:before { content:""; position:absolute; width:20px; height:20px; border-radius:50%; background:#fff; left:3px; top:3px; transition:.2s; box-shadow:0 1px 3px rgba(0,0,0,.22); }
+  .switch input:checked + .slider { background:#16a34a; }
+  .switch input:checked + .slider:before { transform:translateX(20px); }
+
+  input[type=text], input[type=number], input[type=password] {
+    border:1px solid #dde3ec; border-radius:10px; padding:9px 12px; font-size:14px; background:#f8fafc; color:#1b2733; outline:none; width:100%;
+  }
+  input:focus { border-color:#16a34a; background:#fff; box-shadow:0 0 0 3px rgba(22,163,74,.12); }
+  .pill { display:inline-flex; align-items:center; gap:5px; background:#e6f7ee; color:#15803d; font-size:12px; font-weight:600; padding:3px 11px; border-radius:14px; }
+  .pill.red { background:#ffece9; color:#c2410c; }
+  .pill.gray { background:#eef1f5; color:#6b7688; }
+
+  .btn { border:none; border-radius:11px; padding:11px 0; font-size:14px; font-weight:600; cursor:pointer; width:100%; transition:.15s; }
+  .btn:active { transform: scale(.98); }
+  .btn.primary { background:#16a34a; color:#fff; }
+  .btn.primary:hover { background:#15803d; }
+  .btn.neutral { background:#eef1f5; color:#3c4a5c; }
+  .btn.danger { background:#fff1f0; color:#d64541; }
+  .btn.sm { width:auto; padding:7px 14px; font-size:12.5px; border-radius:9px; }
+
+  .btn-row { display:flex; gap:10px; }
+
+  .log { background:#0f1720; color:#9fe8b8; border-radius:16px; padding:13px 15px; font:12px/1.75 ui-monospace,Menlo,monospace; height:200px; overflow:hidden; }
+  .log .dim { color:#54657d; } .log .warn { color:#ffd43b; }
+  .about-copy { text-align:center; color:#a7b0be; font-size:11px; margin-top:18px; }
+
+  #toast { position:fixed; left:50%; bottom:30px; transform:translateX(-50%) translateY(20px); background:#1b2733; color:#fff; padding:10px 20px; border-radius:12px; font-size:13px; opacity:0; transition:.25s; pointer-events:none; box-shadow:0 8px 20px rgba(0,0,0,.25); z-index:99; }
+</style>
+</head>
+<body>
+
+  <div class="page-title">设计 C · 轻量移动设置风</div>
+  <div class="page-sub">窄栏 · iOS 设置式分组列表 · 大圆角 · 一眼扫完 — 强调色 <b>#16a34a</b></div>
+
+  <div class="phone">
+    <div class="phone-notch"></div>
+    <div class="phone-top">
+      <div class="logo">CC</div>
+      <div><b>Cloud Clipboard</b><small>服务管理 · OpenWrt</small></div>
+      <span class="sp"></span>
+      <span class="chip" id="topChip">● 运行中</span>
+    </div>
+
+    <div class="seg">
+      <button class="on" id="nav-overview" onclick="go('overview')">总览</button>
+      <button id="nav-basic" onclick="go('basic')">基本</button>
+      <button id="nav-advanced" onclick="go('advanced')">高级</button>
+      <button id="nav-log" onclick="go('log')">日志</button>
+    </div>
+
+    <div class="screen">
+
+      <!-- ===== 总览 ===== -->
+      <div class="tab-page active" id="page-overview">
+        <div class="group">
+          <div class="row">
+            <div class="ic green">⚡</div>
+            <div class="body"><b>服务状态</b><small>procd 托管 · 自启</small></div>
+            <label class="switch"><input type="checkbox" checked onchange="setSvc(this.checked)"><span class="slider"></span></label>
+          </div>
+          <div class="row">
+            <div class="ic blue">🌐</div>
+            <div class="body"><b>访问地址</b><small>局域网</small></div>
+            <span class="val" onclick="toast('已复制')" style="cursor:pointer">http://192.168.1.1:9501</span>
+          </div>
+          <div class="row">
+            <div class="ic blue">🔑</div>
+            <div class="body"><b>鉴权</b><small>全局密码</small></div>
+            <span class="pill">已启用</span>
+          </div>
+          <div class="row">
+            <div class="ic blue">📊</div>
+            <div class="body"><b>存储占用</b><small>uploads 12.1MB · history 6.3MB</small></div>
+            <span class="val">18.4 MB</span>
+          </div>
+        </div>
+
+        <div class="group">
+          <div class="group-title">快捷操作</div>
+          <div class="row chev" onclick="restartSvc()"><div class="ic yellow">🔄</div><div class="body"><b>重启服务</b><small>保留当前配置</small></div><span class="chev">›</span></div>
+          <div class="row chev" onclick="reloadCfg()"><div class="ic yellow">♻️</div><div class="body"><b>重载配置</b><small>不中断连接</small></div><span class="chev">›</span></div>
+          <div class="row chev" onclick="toggleStopBtn()"><div class="ic red">⏹</div><div class="body"><b id="stopLbl">停止服务</b><small id="stopSub">下次开机不会自启…</small></div><span class="chev">›</span></div>
+        </div>
+
+        <div class="group">
+          <div class="group-title">版本</div>
+          <div class="row">
+            <div class="ic green">🚀</div>
+            <div class="body"><b>已安装 v5.0.7-beta.1</b><small id="verSub">版本通道: beta</small></div>
+            <span class="pill red" id="verPill" style="display:none">有更新 v5.0.8</span>
+          </div>
+          <div class="row" style="padding:12px 20px 16px">
+            <div class="btn-row" style="width:100%">
+              <button class="btn neutral sm" id="btnCheck" onclick="checkUpdate()">检查更新</button>
+              <button class="btn primary sm" id="btnUpdate" style="display:none;flex:1" onclick="doUpdate()">更新到 v5.0.8</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="group">
+          <div class="group-title">最近日志</div>
+          <div class="row" style="padding:12px 16px">
+            <div class="log" style="width:100%">
+              <div><span class="dim">10:12:04</span> 服务已启动 0.0.0.0:9501</div>
+              <div><span class="dim">10:15:22</span> 客户端接入 room=private</div>
+              <div><span class="dim">10:18:40</span> <span class="warn">上传超限拒绝 273MB</span></div>
+            </div>
+          </div>
+          <div class="row chev" onclick="go('log')"><div class="body" style="text-align:center"><span style="color:#16a34a;font-size:13px;font-weight:600">查看全部日志</span></div></div>
+        </div>
+      </div>
+
+      <!-- ===== 基本 ===== -->
+      <div class="tab-page" id="page-basic">
+        <div class="group-title">服务器</div>
+        <div class="group">
+          <div class="row">
+            <div class="body"><b>启用服务</b><small>开机自启 + 立即运行</small></div>
+            <label class="switch"><input type="checkbox" checked><span class="slider"></span></label>
+          </div>
+          <div class="row"><div class="body"><b>监听地址</b></div></div>
+          <div class="row" style="padding-top:0"><input type="text" value="0.0.0.0" id="bHost" /></div>
+          <div class="row"><div class="body"><b>监听端口</b></div></div>
+          <div class="row" style="padding-top:0"><input type="number" value="9501" id="bPort" /></div>
+          <div class="row"><div class="body"><b>访问密码</b><small>留空可匿名访问</small></div></div>
+          <div class="row" style="padding-top:0"><input type="password" value="clipboard-pass" /></div>
+        </div>
+        <div class="btn-row" style="margin-top:2px">
+          <button class="btn neutral" onclick="toast('已还原')">还原</button>
+          <button class="btn primary" onclick="saveBasic()">保存并应用</button>
+        </div>
+        <div class="about-copy">改动已同步到 /etc/config/cloud-clipboard</div>
+      </div>
+
+      <!-- ===== 高级 ===== -->
+      <div class="tab-page" id="page-advanced">
+        <div class="group-title">房间</div>
+        <div class="group">
+          <div class="row">
+            <div class="body"><b>启用房间列表</b><small>Web 端展示可用房间</small></div>
+            <label class="switch"><input type="checkbox" id="roomList"><span class="slider"></span></label>
+          </div>
+          <div class="row"><div class="body"><b>清理周期</b><small>秒</small></div><input type="number" value="3600" style="width:110px" /></div>
+          <div class="row"><div class="body"><b>历史条数</b><small>每房间保留</small></div><input type="number" value="100" style="width:110px" /></div>
+          <div class="row chev" onclick="toggleRooms()"><div class="ic green">🔑</div><div class="body"><b>房间密码与文件过期</b><small>逐房间独立配置</small></div><span class="chev" id="roomsChev">›</span></div>
+        </div>
+
+        <div id="roomsPanel" style="display:none">
+          <div class="group-title">房间明细</div>
+          <div class="group" style="padding:6px 16px 14px">
+            <div class="row" style="padding:12px 4px 8px"><div class="body"><b>private</b><small>密码留空 → 沿用全局 · 过期 3600s</small></div></div>
+            <div class="row" style="padding:0 0 8px"><input type="password" value="" placeholder="密码（留空沿用全局）" style="font-size:13px" /></div>
+            <div class="row" style="padding:8px 0 12px"><input type="number" value="" placeholder="文件过期（秒，留空沿用全局 3600）" style="font-size:13px" /></div>
+            <div class="row" style="padding:12px 4px 8px"><div class="body"><b>finance</b><small>独立密码 · 文件过期 1800s</small></div></div>
+            <div class="row" style="padding:0 0 8px"><input type="password" value="finance-pass" style="font-size:13px" /></div>
+            <div class="row" style="padding:8px 0 16px"><input type="number" value="1800" style="font-size:13px" /></div>
+            <div class="btn-row">
+              <button class="btn neutral sm" onclick="addRoom()">＋ 添加房间</button>
+              <button class="btn primary sm" style="flex:1" onclick="toast('房间配置已保存')">保存全部房间</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="group-title">传输限制</div>
+        <div class="group">
+          <div class="row"><div class="body"><b>文本上限</b><small>字节</small></div><input type="number" value="4096" style="width:110px" /></div>
+          <div class="row"><div class="body"><b>文件过期</b><small>全局默认秒数</small></div><input type="number" value="3600" style="width:110px" /></div>
+          <div class="row"><div class="body"><b>分片大小</b><small>字节</small></div><input type="number" value="2097152" style="width:110px" /></div>
+          <div class="row"><div class="body"><b>单文件上限</b><small>字节</small></div><input type="number" value="268435456" style="width:110px" /></div>
+        </div>
+
+        <div class="btn-row" style="margin-top:2px">
+          <button class="btn neutral" onclick="toast('已恢复默认')">恢复默认</button>
+          <button class="btn primary" onclick="toast('高级配置已保存并应用')">保存并应用</button>
+        </div>
+      </div>
+
+      <!-- ===== 日志 ===== -->
+      <div class="tab-page" id="page-log">
+        <div class="group-title">运行日志</div>
+        <div class="group" style="padding:14px 16px">
+          <div class="log" id="logBox">
+            <div><span class="dim">10:12:04</span> 服务已启动 0.0.0.0:9501</div>
+            <div><span class="dim">10:15:22</span> 客户端接入 room=private</div>
+            <div><span class="dim">10:15:27</span> 文本同步 12B → private</div>
+            <div><span class="dim">10:18:40</span> <span class="warn">上传超限拒绝 273MB</span></div>
+            <div><span class="dim">10:20:03</span> 文件 report.pdf(2.1MB) → finance</div>
+          </div>
+          <div class="row" style="padding:12px 0 0"><span style="font-size:12px;color:#8a94a3">每 5 秒自动刷新</span><span style="flex:1"></span><button class="btn neutral sm" onclick="toast('已刷新')">刷新</button><button class="btn danger sm" onclick="clearLog2()">清空</button></div>
+        </div>
+        <div class="group">
+          <div class="row chev" onclick="toast('已复制内部 API 地址')"><div class="ic blue">🧩</div><div class="body"><b>API 端点</b><small>/cgi-bin/luci/admin/services/cloud-clipboard/getlog</small></div><span class="chev">›</span></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="about-copy" style="margin-top:20px">预览 C · 轻量移动设置风 · 纯静态原型</div>
+  <div id="toast"></div>
+
+<script>
+  var checked=false, toastTimer, stopped=false;
+  function toast(m){ var t=document.getElementById('toast'); t.textContent=m; t.style.opacity='1'; t.style.transform='translateX(-50%) translateY(0)'; clearTimeout(toastTimer); toastTimer=setTimeout(function(){ t.style.opacity='0'; t.style.transform='translateX(-50%) translateY(20px)'; },1800); }
+
+  function go(p){
+    document.querySelectorAll('.tab-page').forEach(function(x){ x.classList.remove('active'); });
+    document.querySelectorAll('.seg button').forEach(function(x){ x.classList.remove('on'); });
+    document.getElementById('nav-'+p).classList.add('on');
+    document.getElementById('page-'+p).classList.add('active');
+  }
+  function setSvc(on){
+    var chip=document.getElementById('topChip');
+    chip.textContent=on?'● 运行中':'○ 已停止';
+    chip.style.background=on?'':'#ffece9'; chip.style.color=on?'':'#c2410c';
+    toast(on?'服务已启动':'服务已停止');
+  }
+  function restartSvc(){ toast('正在重启…'); setTimeout(function(){ toast('服务已重启 ✓'); },700); }
+  function reloadCfg(){ toast('配置已重载 ✓'); }
+  function toggleStopBtn(){ stopped=!stopped; document.getElementById('stopLbl').textContent=stopped?'启动服务':'停止服务'; document.getElementById('stopSub').textContent=stopped?'当前为停止状态':'下次开机不会自启…'; setSvc(!stopped); }
+
+  function saveBasic(){
+    document.getElementById('topChip').textContent='● 运行中';
+    toast('基本设置已保存并应用 ✓');
+  }
+
+  function checkUpdate(){
+    var b=document.getElementById('btnCheck');
+    if(checked){ toast('已是最新版本 v5.0.8'); return; }
+    b.disabled=true; b.textContent='检查中…';
+    setTimeout(function(){
+      b.disabled=false; b.textContent='再查一次'; checked=true;
+      document.getElementById('verSub').textContent='发现新版本 2026-09-10';
+      document.getElementById('verPill').style.display='';
+      document.getElementById('btnUpdate').style.display='';
+      toast('发现新版本 v5.0.8');
+    },900);
+  }
+  function doUpdate(){
+    var b=document.getElementById('btnUpdate');
+    b.disabled=true; b.textContent='下载中…';
+    setTimeout(function(){ b.textContent='✓ 更新完成，服务已重启'; toast('在线更新完成 ✓'); },1400);
+  }
+
+  function toggleRooms(){
+    var p=document.getElementById('roomsPanel'), on=p.style.display!=='none';
+    p.style.display=on?'none':'block';
+    document.getElementById('roomsChev').textContent=on?'›':'⌄';
+  }
+  function addRoom(){ toast('已添加房间（在 config.json 中生效）'); }
+
+  function clearLog2(){ document.getElementById('logBox').innerHTML='<div><span class="dim">--:--:--</span> 日志已清空</div>'; toast('日志已清空'); }
+</script>
+</body>
+</html>

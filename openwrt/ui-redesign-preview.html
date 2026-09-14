@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Cloud Clipboard · OpenWrt LuCI 界面重设计预览</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #eef1f6; color: #22304a; padding: 28px 20px 56px;
+  }
+  .page-title { text-align: center; font-size: 22px; font-weight: 700; }
+  .page-sub { text-align: center; color: #8b93a1; font-size: 13px; margin: 4px 0 26px; }
+  .page-sub code { background: #f2f7fd; color: #1677d0; border-radius: 4px; padding: 1px 5px; font-size: 12px; }
+
+  /* ===== 模拟 OpenWrt 浏览器框架 ===== */
+  .browser {
+    max-width: 1160px; margin: 0 auto; border-radius: 14px; overflow: hidden;
+    box-shadow: 0 14px 40px rgba(22,48,84,.18); border: 1px solid #d5dce6;
+    background: #fff;
+  }
+  .browser-bar {
+    background: #2b3444; color: #cfd6e0; font-size: 12px;
+    padding: 9px 14px; display: flex; align-items: center; gap: 10px;
+  }
+  .browser-dots { display: flex; gap: 6px; }
+  .browser-dots i { width: 11px; height: 11px; border-radius: 50%; display: block; }
+  .browser-dots i:nth-child(1){ background:#ff5f57 } .browser-dots i:nth-child(2){ background:#febc2e } .browser-dots i:nth-child(3){ background:#28c840 }
+  .browser-url { flex: 1; background: #1c222e; border-radius: 6px; padding: 5px 12px; color: #8f9aa8; max-width: 520px; }
+
+  /* ===== LuCI 应用骨架 ===== */
+  .luci { display: flex; min-height: 640px; background: #f6f7f9; }
+  .luci-side { width: 230px; background: #3a4356; color: #cfd6e0; flex-shrink: 0; font-size: 13px; }
+  .luci-brand { padding: 16px 18px 14px; border-bottom: 1px solid #454f64; display: flex; align-items: center; gap: 10px; }
+  .luci-brand .logo { width: 30px; height: 30px; border-radius: 8px; background: #1677d0; color: #fff; display:inline-flex; align-items:center; justify-content:center; font-weight:800; font-size:15px; }
+  .luci-brand b { color: #fff; font-size: 14px; }
+  .luci-brand small { display:block; color:#8f9aa8; font-size:10px; font-weight:400; }
+  .luci-menu a { display: flex; align-items: center; gap: 9px; padding: 9px 18px; color: #b9c2cf; text-decoration: none; border-left: 3px solid transparent; }
+  .luci-menu a:hover { background: #424c62; color:#fff; }
+  .luci-menu .group { padding: 12px 18px 5px; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #7d8798; }
+  .cc-menu a { border-left-color: transparent; }
+  .cc-menu .active { background: #1677d0; color: #fff; border-left-color: #ffd43b; font-weight: 600; }
+  .luci-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .luci-top { background: #fff; border-bottom: 1px solid #e4e8ee; display:flex; align-items:center; gap:12px; padding: 12px 22px; }
+  .luci-top .crumb { font-size: 13px; color: #6b7484; }
+  .luci-top .crumb b { color: #22304a; }
+  .luci-top .spacer { flex: 1; }
+  .luci-top .user { font-size: 12.5px; color:#566070; display:flex; align-items:center; gap:8px; }
+  .luci-top .avatar { width: 26px; height: 26px; border-radius: 50%; background: #dbe6f5; color:#1677d0; display:inline-flex; align-items:center; justify-content:center; font-weight:700; font-size:12px; }
+  .luci-body { padding: 24px; }
+
+  /* ===== 内容容器 ===== */
+  .tab-page { display: none; animation: fade .25s ease; }
+  .tab-page.active { display: block; }
+  @keyframes fade { from { opacity: 0; transform: translateY(4px);} to { opacity:1; transform:none;} }
+
+  h2.content-title { font-size: 19px; margin-bottom: 4px; }
+  .content-desc { color: #7b8494; font-size: 13px; margin-bottom: 18px; }
+  .card { background:#fff; border-radius: 12px; border:1px solid #e6eaf1; box-shadow:0 2px 8px rgba(22,48,84,.05); margin-bottom: 18px; overflow:hidden; }
+  .card-head { padding: 13px 18px; border-bottom:1px solid #eef1f6; display:flex; align-items:center; gap:9px; }
+  .card-head .ttl { font-size: 14.5px; font-weight:700; }
+  .card-head .desc { color:#8b93a1; font-size:12px; }
+  .card-head .spacer { flex:1; }
+  .card-body { padding: 18px; }
+
+  .row { display: flex; gap: 18px; }
+  .row > .card { flex:1; }
+
+  /* 状态卡 */
+  .status-badge { display:inline-flex; align-items:center; gap:7px; font-weight:600; font-size:13px; padding:4px 12px; border-radius: 20px; }
+  .status-badge .dot { width:9px; height:9px; border-radius:50%; }
+  .status-badge.running { color:#1a7f49; background:#e9f7ef; }
+  .status-badge.running .dot { background:#19a560; box-shadow:0 0 0 3px rgba(25,165,96,.18); }
+  .status-badge.stopped { color:#a52a2a; background:#fdeaea; }
+  .status-badge.stopped .dot { background:#e03131; box-shadow:0 0 0 3px rgba(224,49,49,.15); }
+
+  .stat-grid { display:grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .stat { background:#f7f9fc; border:1px solid #edf0f5; border-radius:10px; padding:14px 16px; }
+  .stat .k { font-size:12px; color:#8b93a1; display:flex; align-items:center; gap:6px; }
+  .stat .v { font-size:20px; font-weight:800; margin-top:6px; color:#22304a; }
+  .stat .v small { font-size:12px; font-weight:500; color:#8b93a1; }
+
+  .btn { display:inline-flex; align-items:center; gap:7px; border:none; border-radius:8px; padding:9px 16px; font-size:13px; font-weight:600; cursor:pointer; transition:.15s; }
+  .btn:disabled { opacity:.55; cursor:not-allowed; }
+  .btn.primary { background:#1677d0; color:#fff; }
+  .btn.primary:hover:not(:disabled) { background:#1266b4; }
+  .btn.danger { background:#fff; color:#c92a2a; border:1px solid #f0c1c1; }
+  .btn.danger:hover:not(:disabled) { background:#fff5f5; }
+  .btn.neutral { background:#fff; color:#4a5468; border:1px solid #d9e0ea; }
+  .btn.neutral:hover:not(:disabled) { background:#f4f6fa; }
+  .btn.sm { padding:6px 12px; font-size:12px; }
+  .btn.green { background:#1a9d5c; color:#fff; }
+  .btn.gray { background:#5c6779; color:#fff; }
+
+  .url-box { display:flex; align-items:center; gap:10px; background:#f7f9fc; border:1px solid #edf0f5; border-radius:9px; padding:10px 14px; }
+  .url-box code { font-size:13px; color:#1677d0; flex:1; word-break:break-all; }
+  .url-box .lock { color:#8b93a1; font-size:12px; display:flex; align-items:center; gap:5px; }
+
+  .actions-bar { display:flex; gap:10px; flex-wrap:wrap; }
+  .mini-log { background:#0f1520; color:#9fe8b8; border-radius:10px; padding:12px 14px; font:12px/1.7 ui-monospace, SFMono-Regular, Menlo, monospace; height:168px; overflow:hidden; }
+  .mini-log .dim { color:#5f6b7d; }
+  .mini-log .warn { color:#ffd43b; }
+
+  /* 表单 */
+  .field { display:flex; align-items:center; gap:16px; padding:12px 0; border-bottom:1px solid #f2f4f8; }
+  .field:last-child { border-bottom:none; }
+  .field .label { width:170px; flex-shrink:0; }
+  .field .label b { font-size:13.5px; }
+  .field .label small { display:block; color:#9aa2b0; font-size:11.5px; margin-top:2px; }
+  .field .ctrl { flex:1; }
+  .field .hint { color:#8b93a1; font-size:12px; }
+  input[type=text], input[type=number], input[type=password], select, textarea {
+    width:100%; border:1px solid #d5dce6; border-radius:8px; padding:8px 11px; font-size:13px; background:#fff; color:#22304a; outline:none;
+  }
+  input:focus, select:focus, textarea:focus { border-color:#1677d0; box-shadow:0 0 0 3px rgba(22,119,208,.12); }
+  .switch { position:relative; display:inline-block; width:44px; height:24px; }
+  .switch input { opacity:0; width:0; height:0; }
+  .switch .slider { position:absolute; inset:0; background:#cdd4df; border-radius:24px; transition:.2s; cursor:pointer; }
+  .switch .slider:before { content:""; position:absolute; width:18px; height:18px; border-radius:50%; background:#fff; left:3px; top:3px; transition:.2s; box-shadow:0 1px 3px rgba(0,0,0,.25); }
+  .switch input:checked + .slider { background:#1677d0; }
+  .switch input:checked + .slider:before { transform:translateX(20px); }
+  .inline-row { display:flex; gap:12px; align-items:center; }
+  .inline-row .grow { flex:1; }
+
+  /* 高级设置子面板 */
+  .subpanel { border:1px solid #edf0f5; border-radius:10px; margin: 12px 0 18px; overflow:hidden; }
+  .subpanel .sp-head { background:#f7f9fc; padding:10px 14px; font-size:13px; font-weight:700; display:flex; align-items:center; gap:8px; border-bottom:1px solid #edf0f5; }
+  .subpanel .sp-head .tag { font-size:11px; font-weight:500; background:#eef3fb; color:#1677d0; border-radius:10px; padding:1px 8px; }
+  .subpanel .sp-body { padding: 4px 14px 8px; }
+  .field.compact { padding:9px 0; }
+  .field.compact .label { width:200px; }
+
+  /* 房间编辑器 */
+  .conf-actions { display:flex; gap:8px; margin-bottom:12px; }
+  .room-table { width:100%; border-collapse:collapse; font-size:13px; }
+  .room-table th { text-align:left; color:#8b93a1; font-weight:600; font-size:12px; padding:7px 10px; border-bottom:1px solid #eef1f6; }
+  .room-table td { padding:7px 10px; border-bottom:1px solid #f4f6f9; }
+  .room-table .actions span { color:#1677d0; cursor:pointer; margin-right:10px; font-size:12px; }
+
+  /* 日志 */
+  .log-head { display:flex; align-items:center; gap:12px; margin-bottom:12px; }
+  .log-head .autoupdate { font-size:12px; color:#8b93a1; display:flex; align-items:center; gap:6px; }
+  .log-view { background:#0f1520; color:#cdd6e4; border-radius:10px; padding:14px 16px; font:12.5px/1.8 ui-monospace, SFMono-Regular, Menlo, monospace; height:380px; overflow:hidden; display:flex; flex-direction:column; gap:2px; }
+  .log-view .t { color:#5f6b7d; }
+  .log-view .ts { color:#e06175; }
+  .log-view .info { color:#9fe8b8; }
+  .log-view .warn { color:#ffd43b; }
+  .log-view .dim { color:#7d8798; }
+
+  /* 专家模式：JSON 编辑器 */
+  .expert { display:none; }
+  .expert.on { display:block; }
+  .expert-bar { display:flex; align-items:center; gap:10px; }
+  .expert-toggle {
+    background:#fdf3e1; color:#a05b00; border:1px dashed #ecb84d;
+    border-radius:8px; padding:7px 13px; font-size:12.5px; font-weight:600; cursor:pointer;
+  }
+  .expert-toggle:hover { background:#fae8c8; }
+  .jsonwrap { position:relative; }
+  .jsonwrap pre { background:#0f1520; color:#c7d2e2; border-radius:10px; padding:14px 16px; font:12.5px/1.7 ui-monospace, SFMono-Regular, Menlo, monospace; overflow:auto; height:280px; }
+  .jsonwrap pre .k { color:#7aa2f7; }
+  .jsonwrap pre .b { color:#9fe8b8; }
+  .jsonwrap pre .n { color:#f08c76; }
+  .jsonwrap .json-toolbar { position:absolute; top:10px; right:10px; display:flex; gap:6px; }
+  .json-toolbar button { background:rgba(255,255,255,.08); color:#b9c2cf; border:1px solid rgba(255,255,255,.15); border-radius:6px; padding:5px 10px; font-size:11px; cursor:pointer; }
+  .json-toolbar button:hover { background:rgba(255,255,255,.16); color:#fff; }
+
+  .foot-note { text-align:center; color:#a4acb8; font-size:12px; margin-top:18px; }
+  .pill-list { display:flex; gap:8px; flex-wrap:wrap; }
+  .pill { background:#eef4fc; color:#1677d0; font-size:12px; padding:3px 11px; border-radius:14px; }
+
+  /* ===== 响应式 ===== */
+  @media (max-width: 960px) {
+    .luci-side { display: none; }
+    .luci { min-height: 560px; }
+    .luci-body { padding: 18px 16px; }
+    .row { flex-direction: column; gap: 14px; }
+    .stat-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  }
+  @media (max-width: 560px) {
+    .browser-bar { padding: 8px 10px; }
+    .browser-url { font-size: 11px; padding: 4px 8px; }
+    .luci-top .crumb small, .luci-top .user { display: none; }
+    .content-tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .content-tabs a { white-space: nowrap; }
+    h2.content-title { font-size: 17px; }
+    .field { flex-wrap: wrap; gap: 8px; }
+    .field .label { width: 100%; }
+    .stat-grid { gap: 10px; }
+    .stat-grid { grid-template-columns: repeat(2, 1fr) !important; }
+    .stat .v { font-size: 17px; }
+    .url-box { flex-wrap: wrap; }
+    .url-box code { width: 100%; order: -1; }
+    .actions-bar .btn { flex: 1; justify-content: center; }
+    .subpanel .sp-body { overflow-x: auto; }
+    .room-table { min-width: 480px; }
+    .mini-log, .log-view { height: 150px; }
+    .card-body { padding: 14px; }
+    .inline-row { flex-wrap: wrap; }
+    .inline-row .btn { width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="page-title">Cloud Clipboard · OpenWrt LuCI 界面重设计</div>
+  <div class="page-sub">交互预览 — 导航: <code>服务 &gt; Cloud Clipboard</code> | 目标结构: <code>总览 / 基本设置 / 高级设置 / 日志</code></div>
+
+  <div class="browser">
+    <div class="browser-bar">
+      <div class="browser-dots"><i></i><i></i><i></i></div>
+      <div class="browser-url">http://192.168.1.1/cgi-bin/luci/admin/services/cloud-clipboard</div>
+    </div>
+
+    <div class="luci">
+      <!-- ===== 左侧导航 ===== -->
+      <aside class="luci-side">
+        <div class="luci-brand">
+          <div class="logo">CC</div>
+          <div><b>OpenWrt</b><small>LuCI 管理平台</small></div>
+        </div>
+        <nav class="luci-menu">
+          <div class="group">状态</div>
+          <a>📊 总览</a><a>🖥 防火墙</a><a>📡 无线</a><a>🌐 网络</a>
+          <div class="group">服务</div>
+          <div class="cc-menu">
+            <a class="active" onclick="go('overview')">📋 Cloud Clipboard</a>
+            <a href="#" onclick="event.preventDefault();toast('示例:其他服务');">🔧 其他服务</a>
+          </div>
+          <div class="group">系统</div>
+          <a>⚙️ 系统</a><a>👤 管理权</a><a>🔌 软件包</a>
+        </nav>
+      </aside>
+
+      <!-- ===== 主区域 ===== -->
+      <div class="luci-main">
+        <div class="luci-top">
+          <div class="crumb">服务 / <b>Cloud Clipboard</b> <span class="pill" style="margin-left:6px">v5.0.7-beta.1</span></div>
+          <div class="spacer"></div>
+          <div class="user"><span class="avatar">A</span> admin</div>
+        </div>
+
+        <div class="luci-body">
+
+          <!-- ========== 子页面 Tab ========== -->
+          <div class="content-tabs" style="display:flex;gap:6px;margin-bottom:20px;border-bottom:1px solid #e4e8ee;">
+            <a onclick="go('overview')" id="nav-overview" style="padding:8px 16px;font-size:13.5px;color:#566070;cursor:pointer;border-bottom:2px solid transparent;font-weight:600;">总览</a>
+            <a onclick="go('basic')" id="nav-basic" style="padding:8px 16px;font-size:13.5px;color:#566070;cursor:pointer;border-bottom:2px solid transparent;font-weight:600;">基本设置</a>
+            <a onclick="go('advanced')" id="nav-advanced" style="padding:8px 16px;font-size:13.5px;color:#566070;cursor:pointer;border-bottom:2px solid transparent;font-weight:600;">高级设置</a>
+            <a onclick="go('log')" id="nav-log" style="padding:8px 16px;font-size:13.5px;color:#566070;cursor:pointer;border-bottom:2px solid transparent;font-weight:600;">日志</a>
+            <span style="flex:1"></span>
+            <span style="padding:8px 4px;font-size:12px;color:#8b93a1;">service: cloud-clipboard</span>
+          </div>
+
+          <!-- ========== 总览页 ========== -->
+          <div class="tab-page active" id="page-overview">
+            <h2 class="content-title">服务总览</h2>
+            <div class="content-desc">一眼查看服务运行状态、连接参数与最近活动，快速启停。</div>
+
+            <div class="row">
+              <div class="card">
+                <div class="card-head">
+                  <span style="font-size:17px">🩺</span>
+                  <div><span class="ttl">运行状态</span> <span class="desc">· procd 托管</span></div>
+                  <span class="spacer"></span>
+                  <span class="status-badge running" id="statusBadge"><span class="dot"></span><span id="statusText">运行中</span></span>
+                </div>
+                <div class="card-body">
+                  <div class="stat-grid">
+                    <div class="stat"><div class="k">监听地址</div><div class="v" id="stHost">0.0.0.0</div></div>
+                    <div class="stat"><div class="k">端口</div><div class="v" id="stPort">9501</div></div>
+                    <div class="stat"><div class="k">访问鉴权</div><div class="v" id="stAuth">🔑 已启用</div></div>
+                    <div class="stat"><div class="k">进程</div><div class="v">🧠 <small>#2314</small></div></div>
+                  </div>
+                  <div style="margin-top:16px" class="actions-bar">
+                    <button class="btn gray" id="btnStop" onclick="stopSvc()">⏹ 停止</button>
+                    <button class="btn neutral" onclick="restartSvc()">🔄 重启</button>
+                    <button class="btn neutral" onclick="reloadCfg()">重载配置</button>
+                    <span style="flex:1"></span>
+                    <button class="btn green" id="btnStart" style="display:none" onclick="startSvc()">▶ 启动</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-head"><span style="font-size:17px">🚀</span><span class="ttl">软件版本</span><span class="spacer"></span><span class="pill">发布源: GitHub Releases</span></div>
+              <div class="card-body">
+                <div class="stat-grid" style="grid-template-columns: repeat(3, 1fr)">
+                  <div class="stat"><div class="k">已安装版本</div><div class="v">v5.0.7-beta.1</div></div>
+                  <div class="stat"><div class="k">最新版本</div><div class="v" id="latestVer" style="color:#8b93a1">—</div></div>
+                  <div class="stat"><div class="k">更新通道</div><div class="v" id="updChan">beta</div></div>
+                </div>
+                <div class="actions-bar" style="margin-top:14px;align-items:center">
+                  <button class="btn neutral" id="btnCheck" onclick="checkUpdate()">🔍 检查更新</button>
+                  <button class="btn primary" id="btnUpdate" style="display:none" onclick="doUpdate()">⬇ 立即更新到 v5.0.8</button>
+                  <span class="hint" id="updHint">点击检查上游是否有新版本发布</span>
+                </div>
+                <div id="updNote" style="display:none;margin-top:12px;background:#eef7ef;border:1px solid #bfe3c7;border-radius:9px;padding:10px 14px;font-size:12.5px;color:#1d6b3a">
+                  🎉 发现新版本 <b>v5.0.8</b>（2026-09-10）· 更新内容：新增按房间文件过期、修复存储目录清理等
+                </div>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="card" style="flex:1.4">
+                <div class="card-head"><span style="font-size:17px">🔗</span><span class="ttl">访问入口</span><span class="spacer"></span><span class="pill">局域网</span></div>
+                <div class="card-body">
+                  <div class="url-box">
+                    <span>🌐</span>
+                    <code>http://192.168.1.1:9501</code>
+                    <span class="lock">🔒 需密码: ****</span>
+                    <button class="btn primary sm" onclick="toast('已复制访问地址')">复制</button>
+                    <button class="btn neutral sm" onclick="toast('正在浏览器中打开')">打开</button>
+                  </div>
+                  <div class="pill-list" style="margin-top:12px">
+                    <span class="pill">房间列表: 关闭</span>
+                    <span class="pill">历史记录: 100 条</span>
+                    <span class="pill">文本上限: 4 KB</span>
+                    <span class="pill">文件上限: 256 MB</span>
+                  </div>
+                </div>
+              </div>
+              <div class="card" style="flex:1">
+                <div class="card-head"><span style="font-size:17px">👁</span><span class="ttl">数据盘占用</span><span class="spacer"></span><span class="pill">/etc/cloud-clipboard</span></div>
+                <div class="card-body">
+                  <div style="font-size:24px;font-weight:800" id="usageBig">18.4 MB</div>
+                  <div style="font-size:12px;color:#8b93a1;margin:2px 0 12px">上传与历史记录共占用</div>
+                  <div style="height:8px;background:#eef1f6;border-radius:6px;overflow:hidden">
+                    <div style="width:38%;height:100%;background:#1677d0;border-radius:6px"></div>
+                  </div>
+                  <div style="font-size:11.5px;color:#8b93a1;margin-top:6px">上传目录 12.1MB · 历史 6.3MB</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-head"><span style="font-size:17px">📄</span><span class="ttl">最近日志</span><span class="spacer"></span><a style="font-size:12.5px;color:#1677d0;cursor:pointer" onclick="go('log')">查看全部 →</a></div>
+              <div class="card-body" style="padding:14px 18px">
+                <div class="mini-log">
+                  <div><span class="dim">10:12:04</span> [INFO] Cloud Clipboard started on 0.0.0.0:9501</div>
+                  <div><span class="dim">10:12:06</span> [INFO] 配置已加载: /etc/cloud-clipboard/config.json</div>
+                  <div><span class="dim">10:15:22</span> [INFO] 客户端接入: room=<span class="info">private</span> · 手机(Android)</div>
+                  <div><span class="dim">10:15:27</span> [INFO] 文本同步: 12 bytes → room=<span class="info">private</span></div>
+                  <div><span class="dim">10:18:40</span> <span class="warn">[WARN] 文件上传超限被拒绝: 273MB</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ========== 基本设置页 ========== -->
+          <div class="tab-page" id="page-basic">
+            <h2 class="content-title">基本设置</h2>
+            <div class="content-desc">服务开关、监听地址与访问密码。改动后点「保存并应用」才会生效。</div>
+
+            <div class="card">
+              <div class="card-head"><span style="font-size:17px">⚙️</span><span class="ttl">服务器</span><span class="spacer"></span><span class="pill">/etc/config/cloud-clipboard</span></div>
+              <div class="card-body" style="padding-top:4px">
+                <div class="field">
+                  <div class="label"><b>启用服务</b><small>开机自启 & 立即运行</small></div>
+                  <div class="ctrl">
+                    <label class="switch"><input type="checkbox" id="enabled" checked><span class="slider"></span></label>
+                    <span class="hint" style="margin-left:10px" id="enabledHint">服务将在保存后运行</span>
+                  </div>
+                </div>
+                <div class="field">
+                  <div class="label"><b>监听地址</b><small>绑定的 IP 地址</small></div>
+                  <div class="ctrl"><input type="text" value="0.0.0.0" id="bHost" /></div>
+                </div>
+                <div class="field">
+                  <div class="label"><b>监听端口</b><small>默认 9501</small></div>
+                  <div class="ctrl"><input type="number" value="9501" id="bPort" style="max-width:160px" /></div>
+                </div>
+                <div class="field">
+                  <div class="label"><b>访问密码</b><small>
+                    <span style="display:inline-flex;align-items:center;gap:4px">🔒 已启用鉴权</span></small></div>
+                  <div class="ctrl inline-row">
+                    <input type="password" value="clipboard-pass" id="bAuth" />
+                    <button class="btn neutral sm" onclick="toast('密码已保存到 UCI')">保存密码</button>
+                  </div>
+                </div>
+                <div class="field">
+                  <div class="label"><b>配置文件路径</b><small class="hint">高级设置由此文件驱动</small></div>
+                  <div class="ctrl inline-row">
+                    <input type="text" value="/etc/cloud-clipboard/config.json" />
+                    <button class="btn neutral sm" onclick="toast('已跳转至高级设置')">打开高级设置 →</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div style="text-align:right;margin-bottom:18px">
+              <button class="btn primary" onclick="saveBasic()">💾 保存并应用</button>
+              <button class="btn neutral" onclick="toast('已还原为上次保存的值')">重置</button>
+            </div>
+
+            <div class="card" style="background:#fdfbf5;border-color:#eee3c4">
+              <div class="card-body" style="display:flex;gap:12px;align-items:flex-start;padding:14px 18px">
+                <span style="font-size:18px">💡</span>
+                <div style="font-size:12.5px;color:#7b6b3d;line-height:1.7">
+                  <b>鉴权说明：</b>此处密码作为全局默认密码。<code style="background:#f7efd9;border-radius:4px;padding:1px 5px">config.json</code> 中可针对指定房间设置独立密码，
+                  空字符串的房间将自动回退使用全局密码。
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ========== 高级设置页 ========== -->
+          <div class="tab-page" id="page-advanced">
+            <h2 class="content-title">高级设置</h2>
+            <div class="content-desc">对应 <code>/etc/cloud-clipboard/config.json</code> — 结构化的房间、文本与文件参数。</div>
+
+            <div class="card">
+              <div class="card-head"><span style="font-size:17px">🏠</span><span class="ttl">房间 / 历史</span><span class="spacer"></span><span class="pill">server</span></div>
+              <div class="card-body" style="padding-top:4px">
+                <div class="field compact">
+                  <div class="label"><b>启用房间列表</b><small class="hint">在 Web 端展示可用房间</small></div>
+                  <div class="ctrl"><label class="switch"><input type="checkbox" id="roomList"><span class="slider"></span></label></div>
+                </div>
+                <div class="field compact">
+                  <div class="label"><b>房间清理周期</b><small class="hint">秒，清理消息数为 0 的房间</small></div>
+                  <div class="ctrl" style="max-width:180px"><input type="number" value="3600" /></div>
+                </div>
+                <div class="field compact">
+                  <div class="label"><b>历史记录条数</b><small class="hint">每房间最多保留 N 条</small></div>
+                  <div class="ctrl inline-row">
+                    <input type="number" value="100" style="max-width:140px" />
+                    <button class="btn danger sm" onclick="toast('已清空历史记录文件')">🗑 清空历史</button>
+                  </div>
+                </div>
+                <div class="field compact" style="border-bottom:none;padding-bottom:6px">
+                  <div class="label"><b>Web 前缀</b><small class="hint">如 /clipboard</small></div>
+                  <div class="ctrl" style="max-width:220px"><input type="text" value="" placeholder="留空 = 根路径" /></div>
+                </div>
+
+                <div class="subpanel">
+                  <div class="sp-head">🔑 房间密码 <span class="tag">roomAuth</span></div>
+                  <div class="sp-body">
+                    <div class="conf-actions">
+                      <button class="btn neutral sm" onclick="addRoom()">＋ 添加房间</button>
+                      <span class="hint" style="align-self:center">留空密码 → 沿用全局密码；留空过期时间 → 沿用全局文件过期（3600s）</span>
+                    </div>
+                    <table class="room-table">
+                      <thead><tr><th style="width:30%">房间名</th><th style="width:26%">密码</th><th style="width:24%">文件过期（秒）</th><th style="width:20%">行为</th></tr></thead>
+                      <tbody id="roomRows">
+                        <tr><td><input type="text" value="private" /></td><td><input type="password" value="" placeholder="沿用全局密码" /></td><td><input type="number" placeholder="沿用全局 3600" /></td><td><span class="actions"><span onclick="toast('房间已保存')">保存</span><span onclick="toast('已有房客，无法删除')">删除</span></span></td></tr>
+                        <tr><td><input type="text" value="finance" /></td><td><input type="password" value="finance-pass" /></td><td><input type="number" value="1800" /></td><td><span class="actions"><span onclick="toast('房间已保存')">保存</span><span onclick="removeRoom(this)">删除</span></span></td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="card">
+                <div class="card-head"><span style="font-size:17px">📝</span><span class="ttl">文本</span><span class="spacer"></span><span class="pill">text</span></div>
+                <div class="card-body" style="padding-top:2px">
+                  <div class="field compact">
+                    <div class="label"><b>单条文本上限</b><small class="hint">字节</small></div>
+                    <div class="ctrl" style="max-width:160px"><input type="number" value="4096" /></div>
+                  </div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-head"><span style="font-size:17px">📁</span><span class="ttl">文件传输</span><span class="spacer"></span><span class="pill">file</span></div>
+                <div class="card-body" style="padding-top:2px">
+                  <div class="field compact">
+                    <div class="label"><b>文件过期</b><small class="hint">秒</small></div>
+                    <div class="ctrl" style="max-width:160px"><input type="number" value="3600" /></div>
+                  </div>
+                  <div class="field compact">
+                    <div class="label"><b>分片大小</b><small class="hint">字节</small></div>
+                    <div class="ctrl" style="max-width:160px"><input type="number" value="2097152" /></div>
+                  </div>
+                  <div class="field compact" style="border-bottom:none">
+                    <div class="label"><b>单文件上限</b><small class="hint">字节</small></div>
+                    <div class="ctrl" style="max-width:160px"><input type="number" value="268435456" /></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div style="text-align:right;margin-bottom:18px">
+              <button class="btn primary" onclick="saveAdv()">💾 保存并应用</button>
+              <button class="btn danger" onclick="toast('已重置为默认配置')">恢复默认</button>
+            </div>
+
+            <!-- 专家模式 -->
+            <div class="card" id="expertCard">
+              <div class="card-head">
+                <span style="font-size:17px">🧑‍💻</span><span class="ttl">专家模式 — JSON 编辑</span>
+                <span class="desc">对高级选项的完整控制，改动将直接写入配置文件</span>
+                <span class="spacer"></span>
+                <button class="expert-toggle" onclick="toggleExpert(this)">点击展开 JSON 编辑器</button>
+              </div>
+              <div class="card-body expert" id="expertBody">
+                <div class="jsonwrap">
+                  <div class="json-toolbar">
+                    <button onclick="toast('JSON 格式有效 ✓')">验证</button>
+                    <button onclick="toast('已格式化')">格式化</button>
+                    <button onclick="toast('已恢复默认')">恢复默认</button>
+                  </div>
+                  <pre id="jsonPre"></pre>
+                </div>
+                <div class="url-box" style="margin-top:12px;background:#fff8ec;border-color:#eed7a1">
+                  <span>⚠️</span>
+                  <span style="font-size:12.5px;color:#8a6a21">直接编辑 JSON 需要熟悉配置结构；所有修改在「保存并应用」前不会生效，保存前会自动校验合法性。</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ========== 日志页 ========== -->
+          <div class="tab-page" id="page-log">
+            <h2 class="content-title">运行日志</h2>
+            <div class="content-desc">实时查看 <code>/var/log/cloud-clipboard.log</code>，默认每 5 秒自动刷新。</div>
+
+            <div class="log-head">
+              <div class="autoupdate"><label class="switch" style="width:36px;height:20px"><input type="checkbox" checked onchange="toggleAuto(this)"><span class="slider" style="width:36px;height:20px"></span></label> 自动刷新</div>
+              <span style="flex:1"></span>
+              <button class="btn neutral sm" onclick="toast('日志已刷新')">刷新</button>
+              <button class="btn danger sm" onclick="clearLog(this)">清除日志</button>
+            </div>
+            <div class="log-view" id="logView"></div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot-note">预览为静态原型 · 与 LuCI 实际主题 (CBI/JS) 无关 · 仅供视觉与交互评审</div>
+
+  <div id="toast" style="position:fixed;left:50%;bottom:30px;transform:translateX(-50%) translateY(20px);background:#22304a;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;opacity:0;transition:.25s;pointer-events:none;box-shadow:0 6px 18px rgba(0,0,0,.2);z-index:99"></div>
+
+<script>
+  var RUNNING = true;
+  var toastTimer;
+
+  function toast(msg) {
+    var t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.opacity = '1'; t.style.transform = 'translateX(-50%) translateY(0)';
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ t.style.opacity='0'; t.style.transform='translateX(-50%) translateY(20px)'; }, 1800);
+  }
+
+  function go(page) {
+    document.querySelectorAll('.tab-page').forEach(function(p){ p.classList.remove('active'); });
+    document.querySelectorAll('#nav-' + page).forEach(function(a){ a.classList.add('active'); });
+    document.getElementById('page-' + page).classList.add('active');
+    if (page === 'advanced') renderJson();
+  }
+
+  var navTabs = ['overview','basic','advanced','log'];
+  navTabs.forEach(function(n){
+    var el = document.getElementById('nav-' + n);
+    if (el) el.addEventListener('click', function(){
+      navTabs.forEach(function(x){ document.getElementById('nav-'+x).style.cssText = 'padding:8px 16px;font-size:13.5px;color:#566070;cursor:pointer;border-bottom:2px solid transparent;font-weight:600;'; });
+      el.style.borderBottomColor = '#1677d0'; el.style.color = '#1677d0';
+    });
+  });
+  document.getElementById('nav-overview').style.borderBottomColor = '#1677d0';
+  document.getElementById('nav-overview').style.color = '#1677d0';
+
+  /* 状态模拟 */
+  function setState(running) {
+    RUNNING = running;
+    var badge = document.getElementById('statusBadge');
+    var text = document.getElementById('statusText');
+    var btnStop = document.getElementById('btnStop');
+    var btnStart = document.getElementById('btnStart');
+    badge.className = 'status-badge ' + (running ? 'running' : 'stopped');
+    text.textContent = running ? '运行中' : '已停止';
+    btnStop.style.display = running ? '' : 'none';
+    btnStart.style.display = running ? 'none' : '';
+    if (running) toast('服务已启动'); else toast('服务已停止');
+  }
+  function stopSvc() { setState(false); }
+  function startSvc() { setState(true); }
+  function restartSvc() { toast('正在重启服务…'); setTimeout(function(){ toast('服务已重启 ✓'); }, 700); }
+  function reloadCfg()  { toast('配置已重新加载 ✓'); }
+
+  /* 检查更新模拟 */
+  var checked = false;
+  function checkUpdate() {
+    var b = document.getElementById('btnCheck');
+    if (checked) { toast('已是最新版本 v5.0.8，无需更新'); return; }
+    b.disabled = true; b.textContent = '检查中…';
+    document.getElementById('updHint').textContent = '正在向 GitHub Releases 查询…';
+    setTimeout(function () {
+      b.disabled = false; b.textContent = '再查一次';
+      checked = true;
+      document.getElementById('latestVer').textContent = 'v5.0.8';
+      document.getElementById('latestVer').style.color = '#1677d0';
+      document.getElementById('btnUpdate').style.display = '';
+      document.getElementById('updNote').style.display = '';
+      document.getElementById('updHint').textContent = '发现新版本，可直接在线更新';
+      toast('发现新版本 v5.0.8');
+    }, 900);
+  }
+  function doUpdate() {
+    var b = document.getElementById('btnUpdate');
+    b.disabled = true; b.innerHTML = '⬇ 正在下载更新包…';
+    setTimeout(function () { b.textContent = '✓ 更新完成，服务已重启'; document.getElementById('updHint').textContent = '当前已是最新版本'; toast('在线更新完成 ✓'); }, 1400);
+  }
+
+  function saveBasic() {
+    var host = document.getElementById('bHost').value;
+    var port = document.getElementById('bPort').value;
+    var auth = document.getElementById('bAuth').value;
+    document.getElementById('stHost').textContent = host;
+    document.getElementById('stPort').textContent = port;
+    document.getElementById('stAuth').textContent = auth ? '🔑 已启用' : '开放访问';
+    toast('基本设置已保存并应用 ✓');
+  }
+  function saveAdv() { toast('高级设置已保存并应用 ✓'); }
+
+  /**** 高级 - 房间编辑器 ****/
+  function addRoom() {
+    var tbody = document.getElementById('roomRows');
+    var tr = document.createElement('tr');
+    tr.innerHTML = '<td><input type="text" placeholder="新房间名" /></td><td><input type="password" placeholder="留空=全局密码" /></td><td><input type="number" placeholder="沿用全局 3600" /></td><td><span class="actions"><span onclick="toast(\'房间已保存\')">保存</span><span onclick="removeRoom(this)">删除</span></span></td>';
+    tbody.appendChild(tr);
+    toast('已添加房间，填写后保存');
+  }
+  function removeRoom(el) { el.closest('tr').remove(); toast('房间已删除'); }
+
+  /**** JSON 高亮渲染 ****/
+  var DEFAULT_JSON = {
+    server: { host: "", port: 9501, prefix: "", history: 100, historyFile: "/etc/cloud-clipboard/data/history.json", storageDir: "/etc/cloud-clipboard/data/upload", auth: true, roomAuth: { private: "", finance: "finance-pass" }, roomList: false, roomCleanup: 3600 },
+    text: { limit: 4096 },
+    file: { expire: 3600, chunk: 2097152, limit: 268435456 }
+  };
+
+  function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function highlight(obj) {
+    var json = JSON.stringify(obj, null, 2);
+    return esc(json)
+      .replace(/("(?:\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*")(\s*:)?/g, function(m, key, colon){
+        if (colon) return '<span class="k">' + key + '</span>:';
+        if (key.indexOf('"') === 0) return '<span class="b">' + key + '</span>';
+        return key;
+      })
+      .replace(/\b(true|false)\b/g, '<span class="b">$1</span>')
+      .replace(/\b(\d+)\b/g, '<span class="n">$1</span>');
+  }
+  function renderJson() {
+    document.getElementById('jsonPre').innerHTML = highlight(DEFAULT_JSON);
+  }
+  function toggleExpert(btn) {
+    var body = document.getElementById('expertBody');
+    var on = !body.classList.contains('on');
+    body.classList.toggle('on', on);
+    btn.textContent = on ? '收起 JSON 编辑器' : '点击展开 JSON 编辑器';
+    if (on) renderJson();
+  }
+
+  /**** 日志模拟 ****/
+  var LOG_LINES = [
+    ['10:12:04','warn','[WARN] 文件上传超限被拒绝: 273MB (limit 256MB)'],
+    ['10:12:04','dim','[INFO] Cloud Clipboard started on 0.0.0.0:9501'],
+    ['10:15:22','info','[INFO] 客户端接入: room=private · 手机(Android)'],
+    ['10:15:27','info','[INFO] 文本同步: 12 bytes → room=private'],
+    ['10:18:40','dim','[INFO] 配置已加载: /etc/cloud-clipboard/config.json'],
+    ['10:20:03','info','[INFO] 文件上传: report.pdf (2.1MB) → room=finance'],
+    ['10:20:09','dim','[INFO] 历史记录已写入: 24 条'],
+  ];
+  var logIdx = 0;
+  function renderLog() {
+    var el = document.getElementById('logView');
+    var html = '';
+    LOG_LINES.forEach(function(l){
+      html += '<div><span class="t">[' + l[0] + ']</span> <span class="' + l[1] + '">' + l[1].replace('warn','').replace('info','').replace('dim','') + l[2] + '</span></div>';
+    });
+    el.innerHTML = html;
+    el.scrollTop = el.scrollHeight;
+  }
+  function toggleAuto(cb) { toast(cb.checked ? '自动刷新已开启 (5s)' : '自动刷新已关闭'); }
+  function clearLog(btn){ LOG_LINES = [['11:00:00','dim','[INFO] 日志已清空']]; renderLog(); toast('日志已清空'); }
+
+  /* 初始化 */
+  renderJson();
+  renderLog();
+</script>
+</body>
+</html>

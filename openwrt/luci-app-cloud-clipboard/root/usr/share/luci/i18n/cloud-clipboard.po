@@ -15,17 +15,173 @@ msgstr ""
 msgid "Cloud Clipboard"
 msgstr "云剪贴板"
 
+msgid "总览"
+msgstr "总览"
+
+msgid "服务总览"
+msgstr "服务总览"
+
+msgid "一眼查看服务运行状态、连接参数与最近活动，快速启停。"
+msgstr "一眼查看服务运行状态、连接参数与最近活动，快速启停。"
+
+msgid "运行状态"
+msgstr "运行状态"
+
+msgid "procd 托管"
+msgstr "procd 托管"
+
+msgid "检测中…"
+msgstr "检测中…"
+
+msgid "监听地址"
+msgstr "监听地址"
+
+msgid "端口"
+msgstr "端口"
+
+msgid "访问鉴权"
+msgstr "访问鉴权"
+
+msgid "已启用"
+msgstr "已启用"
+
+msgid "开放访问"
+msgstr "开放访问"
+
+msgid "进程 PID"
+msgstr "进程 PID"
+
+msgid "启动"
+msgstr "启动"
+
+msgid "停止"
+msgstr "停止"
+
+msgid "重启"
+msgstr "重启"
+
+msgid "重载配置"
+msgstr "重载配置"
+
+msgid "访问入口"
+msgstr "访问入口"
+
+msgid "局域网"
+msgstr "局域网"
+
+msgid "复制"
+msgstr "复制"
+
+msgid "打开"
+msgstr "打开"
+
+msgid "需密码"
+msgstr "需密码"
+
+msgid "房间列表:"
+msgstr "房间列表:"
+
+msgid "历史记录:"
+msgstr "历史记录:"
+
+msgid "文本上限:"
+msgstr "文本上限:"
+
+msgid "文件上限:"
+msgstr "文件上限:"
+
+msgid "开启"
+msgstr "开启"
+
+msgid "关闭"
+msgstr "关闭"
+
+msgid "数据盘占用"
+msgstr "数据盘占用"
+
+msgid "上传与历史记录共占用"
+msgstr "上传与历史记录共占用"
+
+msgid "上传目录"
+msgstr "上传目录"
+
+msgid "历史"
+msgstr "历史"
+
+msgid "软件版本"
+msgstr "软件版本"
+
+msgid "发布源:"
+msgstr "发布源:"
+
+msgid "已安装版本"
+msgstr "已安装版本"
+
+msgid "最新版本"
+msgstr "最新版本"
+
+msgid "更新通道"
+msgstr "更新通道"
+
+msgid "检查更新"
+msgstr "检查更新"
+
+msgid "查看发布页"
+msgstr "查看发布页"
+
+msgid "点击检查上游是否有新版本发布"
+msgstr "点击检查上游是否有新版本发布"
+
+msgid "正在向 GitHub Releases 查询…"
+msgstr "正在向 GitHub Releases 查询…"
+
+msgid "检查失败:"
+msgstr "检查失败:"
+
+msgid "发现新版本"
+msgstr "发现新版本"
+
+msgid "，可前往发布页获取对应架构的 APK/IPK 后在线安装"
+msgstr "，可前往发布页获取对应架构的 APK/IPK 后在线安装"
+
+msgid "当前已是最新版本"
+msgstr "当前已是最新版本"
+
+msgid "查询失败，请检查路由器的网络连接"
+msgstr "查询失败，请检查路由器的网络连接"
+
+msgid "最近日志"
+msgstr "最近日志"
+
+msgid "查看全部 →"
+msgstr "查看全部 →"
+
+msgid "日志为空"
+msgstr "日志为空"
+
+msgid "加载中…"
+msgstr "加载中…"
+
+msgid "操作失败"
+msgstr "操作失败"
+
+msgid "已复制"
+msgstr "已复制"
+
+msgid "请手动复制"
+msgstr "请手动复制"
+
+msgid "再查一次"
+msgstr "再查一次"
+
+msgid "检查中…"
+msgstr "检查中…"
+
 msgid "基本设置"
 msgstr "基本设置"
 
 msgid "启用"
 msgstr "启用"
-
-msgid "监听地址"
-msgstr "监听地址"
-
-msgid "监听端口"
-msgstr "监听端口"
 
 msgid "访问密码"
 msgstr "访问密码"
@@ -33,26 +189,320 @@ msgstr "访问密码"
 msgid "如果设置，访问时需要输入此密码。留空表示不需要密码。"
 msgstr "如果设置，访问时需要输入此密码。留空表示不需要密码。"
 
-msgid "服务控制"
-msgstr "服务控制"
+msgid "高级设置"
+msgstr "高级设置"
 
-msgid "运行状态"
-msgstr "运行状态"
+msgid "高级选项：配置文件路径。房间密码、文件过期等高级参数请前往高级设置页面配置。"
+msgstr "高级选项：配置文件路径。房间密码、文件过期等高级参数请前往高级设置页面配置。"
 
-msgid "启动"
-msgstr "启动"
+msgid "打开高级设置"
+msgstr "打开高级设置"
 
-msgid "启动服务"
-msgstr "启动服务"
+msgid "结构化编辑"
+msgstr "结构化编辑"
 
-msgid "停止"
-msgstr "停止"
+msgid "改动在保存并应用后生效"
+msgstr "改动在保存并应用后生效"
 
-msgid "停止服务"
-msgstr "停止服务"
+msgid "房间 / 历史"
+msgstr "房间 / 历史"
 
-msgid "重启"
-msgstr "重启"
+msgid "启用房间列表"
+msgstr "启用房间列表"
 
-msgid "重启服务"
-msgstr "重启服务"
+msgid "在 Web 端展示可用房间"
+msgstr "在 Web 端展示可用房间"
+
+msgid "房间清理周期"
+msgstr "房间清理周期"
+
+msgid "秒，清理消息数为 0 的房间"
+msgstr "秒，清理消息数为 0 的房间"
+
+msgid "历史记录条数"
+msgstr "历史记录条数"
+
+msgid "每房间最多保留 N 条"
+msgstr "每房间最多保留 N 条"
+
+msgid "Web 前缀"
+msgstr "Web 前缀"
+
+msgid "如 /clipboard"
+msgstr "如 /clipboard"
+
+msgid "留空 = 根路径"
+msgstr "留空 = 根路径"
+
+msgid "房间密码与文件过期"
+msgstr "房间密码与文件过期"
+
+msgid "添加房间"
+msgstr "添加房间"
+
+msgid "留空密码 → 沿用全局密码；留空过期时间 → 沿用全局过期 (3600s)"
+msgstr "留空密码 → 沿用全局密码；留空过期时间 → 沿用全局过期 (3600s)"
+
+msgid "房间名"
+msgstr "房间名"
+
+msgid "密码"
+msgstr "密码"
+
+msgid "文件过期（秒）"
+msgstr "文件过期（秒）"
+
+msgid "行为"
+msgstr "行为"
+
+msgid "沿用全局密码"
+msgstr "沿用全局密码"
+
+msgid "沿用全局 3600"
+msgstr "沿用全局 3600"
+
+msgid "保存"
+msgstr "保存"
+
+msgid "删除"
+msgstr "删除"
+
+msgid "已保存（提交时统一生效）"
+msgstr "已保存（提交时统一生效）"
+
+msgid "确定删除房间 %s ?"
+msgstr "确定删除房间 %s ?"
+
+msgid "文本"
+msgstr "文本"
+
+msgid "单条文本上限"
+msgstr "单条文本上限"
+
+msgid "字节"
+msgstr "字节"
+
+msgid "文件传输"
+msgstr "文件传输"
+
+msgid "全局过期"
+msgstr "全局过期"
+
+msgid "秒，房间可单独覆盖"
+msgstr "秒，房间可单独覆盖"
+
+msgid "分片大小"
+msgstr "分片大小"
+
+msgid "单文件上限"
+msgstr "单文件上限"
+
+msgid "保存后若服务正在运行将自动重启以生效"
+msgstr "保存后若服务正在运行将自动重启以生效"
+
+msgid "恢复默认"
+msgstr "恢复默认"
+
+msgid "保存并应用"
+msgstr "保存并应用"
+
+msgid "专家模式 — JSON 编辑"
+msgstr "专家模式 — JSON 编辑"
+
+msgid "对高级选项的完整控制"
+msgstr "对高级选项的完整控制"
+
+msgid "点击展开 JSON 编辑器"
+msgstr "点击展开 JSON 编辑器"
+
+msgid "收起 JSON 编辑器"
+msgstr "收起 JSON 编辑器"
+
+msgid "验证"
+msgstr "验证"
+
+msgid "格式化"
+msgstr "格式化"
+
+msgid "直接编辑 JSON 需要熟悉配置结构；保存前会自动校验合法性"
+msgstr "直接编辑 JSON 需要熟悉配置结构；保存前会自动校验合法性"
+
+msgid "保存专家配置"
+msgstr "保存专家配置"
+
+msgid "JSON 格式有效!"
+msgstr "JSON 格式有效!"
+
+msgid "JSON 格式无效:"
+msgstr "JSON 格式无效:"
+
+msgid "无法格式化:"
+msgstr "无法格式化:"
+
+msgid "请输入 JSON 内容"
+msgstr "请输入 JSON 内容"
+
+msgid "读取配置失败"
+msgstr "读取配置失败"
+
+msgid "保存失败:"
+msgstr "保存失败:"
+
+msgid "配置已保存，服务已重启"
+msgstr "配置已保存，服务已重启"
+
+msgid "配置已保存（服务未运行）"
+msgstr "配置已保存（服务未运行）"
+
+msgid "确定恢复默认配置?当前内容将丢失。"
+msgstr "确定恢复默认配置?当前内容将丢失。"
+
+msgid "No related logs found"
+msgstr "暂无相关日志"
+
+msgid "运行日志"
+msgstr "运行日志"
+
+msgid "实时查看"
+msgstr "实时查看"
+
+msgid "默认每 5 秒自动刷新"
+msgstr "默认每 5 秒自动刷新"
+
+msgid "自动刷新"
+msgstr "自动刷新"
+
+msgid "刷新"
+msgstr "刷新"
+
+msgid "清除日志"
+msgstr "清除日志"
+
+msgid "日志已清空"
+msgstr "日志已清空"
+
+msgid "自动刷新已开启"
+msgstr "自动刷新已开启"
+
+msgid "自动刷新已关闭"
+msgstr "自动刷新已关闭"
+
+msgid "获取日志失败"
+msgstr "获取日志失败"
+
+msgid "获取日志失败，请检查网络连接"
+msgstr "获取日志失败，请检查网络连接"
+
+msgid "确定要清空日志?"
+msgstr "确定要清空日志?"
+
+msgid "进程"
+msgstr "进程"
+
+msgid "运行中"
+msgstr "运行中"
+
+msgid "已停止"
+msgstr "已停止"
+
+msgid "服务已停止"
+msgstr "服务已停止"
+
+msgid "服务已启动"
+msgstr "服务已启动"
+
+msgid "服务已重启"
+msgstr "服务已重启"
+
+msgid "已重载配置"
+msgstr "已重载配置"
+
+msgid "服务开关、监听地址与访问密码。改动后点「保存并应用」才会生效。"
+msgstr "服务开关、监听地址与访问密码。改动后点「保存并应用」才会生效。"
+
+msgid "服务器"
+msgstr "服务器"
+
+msgid "启用服务"
+msgstr "启用服务"
+
+msgid "开机自启 & 立即运行"
+msgstr "开机自启 & 立即运行"
+
+msgid "服务将在保存后运行"
+msgstr "服务将在保存后运行"
+
+msgid "绑定的 IP 地址"
+msgstr "绑定的 IP 地址"
+
+msgid "默认 9501"
+msgstr "默认 9501"
+
+msgid "已启用鉴权"
+msgstr "已启用鉴权"
+
+msgid "高级设置由此文件驱动"
+msgstr "高级设置由此文件驱动"
+
+msgid "留空 = 开放访问"
+msgstr "留空 = 开放访问"
+
+msgid "打开高级设置 →"
+msgstr "打开高级设置 →"
+
+msgid "重置"
+msgstr "重置"
+
+msgid "已还原为上次保存的值"
+msgstr "已还原为上次保存的值"
+
+msgid "鉴权说明："
+msgstr "鉴权说明："
+
+msgid "此处密码作为全局默认密码。"
+msgstr "此处密码作为全局默认密码。"
+
+msgid "中可针对指定房间设置独立密码，空字符串的房间将自动回退使用全局密码。"
+msgstr "中可针对指定房间设置独立密码，空字符串的房间将自动回退使用全局密码。"
+
+msgid "监听地址不能为空"
+msgstr "监听地址不能为空"
+
+msgid "已保存并应用（服务已启动）"
+msgstr "已保存并应用（服务已启动）"
+
+msgid "已保存并应用（服务已停止）"
+msgstr "已保存并应用（服务已停止）"
+
+msgid "房间密码"
+msgstr "房间密码"
+
+msgid "留空密码 → 沿用全局密码；留空文件过期 → 沿用全局文件过期"
+msgstr "留空密码 → 沿用全局密码；留空文件过期 → 沿用全局文件过期"
+
+msgid "空 = 沿用全局密码"
+msgstr "空 = 沿用全局密码"
+
+msgid "空 = 沿用全局文件过期"
+msgstr "空 = 沿用全局文件过期"
+
+msgid "留空 = 使用后端默认值"
+msgstr "留空 = 使用后端默认值"
+
+msgid "确定恢复默认配置?当前内容将丢失。"
+msgstr "确定恢复默认配置?当前内容将丢失。"
+
+msgid "文件过期"
+msgstr "文件过期"
+
+msgid "秒"
+msgstr "秒"
+
+msgid "清空历史"
+msgstr "清空历史"
+
+msgid "确定清空历史记录文件?"
+msgstr "确定清空历史记录文件?"
+
+msgid "已清空历史记录"
+msgstr "已清空历史记录"

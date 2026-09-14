@@ -1,0 +1,337 @@
+<%+header%>
+
+<style>
+  .cc-title { font-size: 19px; font-weight: 700; margin-bottom: 4px; }
+  .cc-desc { color: #7b8494; font-size: 13px; margin-bottom: 18px; }
+  .cc-card { background: #fff; border-radius: 12px; border: 1px solid #e6eaf1; box-shadow: 0 2px 8px rgba(22,48,84,.05); margin-bottom: 18px; overflow: hidden; }
+  .cc-card-head { padding: 13px 18px; border-bottom: 1px solid #eef1f6; display: flex; align-items: center; gap: 9px; }
+  .cc-card-head .ico { font-size: 17px; line-height: 1; }
+  .cc-card-head .ttl { font-size: 14.5px; font-weight: 700; }
+  .cc-card-head .desc { color: #8b93a1; font-size: 12px; }
+  .cc-card-head .spacer { flex: 1; }
+  .cc-body { padding: 18px; }
+  .cc-row { display: flex; gap: 18px; }
+  .cc-row > .cc-card { flex: 1; }
+
+  .cc-badge { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; font-size: 13px; padding: 4px 12px; border-radius: 20px; }
+  .cc-badge .dot { width: 9px; height: 9px; border-radius: 50%; }
+  .cc-badge.running { color: #1a7f49; background: #e9f7ef; }
+  .cc-badge.running .dot { background: #19a560; box-shadow: 0 0 0 3px rgba(25,165,96,.18); }
+  .cc-badge.stopped { color: #a52a2a; background: #fdeaea; }
+  .cc-badge.stopped .dot { background: #e03131; box-shadow: 0 0 0 3px rgba(224,49,49,.15); }
+
+  .cc-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .cc-stat { background: #f7f9fc; border: 1px solid #edf0f5; border-radius: 10px; padding: 14px 16px; }
+  .cc-stat .k { font-size: 12px; color: #8b93a1; display: flex; align-items: center; gap: 6px; }
+  .cc-stat .v { font-size: 20px; font-weight: 800; margin-top: 6px; color: #22304a; word-break: break-all; }
+  .cc-stat .v small { font-size: 12px; font-weight: 500; color: #8b93a1; }
+
+  .cc-btn { display: inline-flex; align-items: center; gap: 7px; border: none; border-radius: 8px; padding: 9px 16px; font-size: 13px; font-weight: 600; cursor: pointer; transition: .15s; }
+  .cc-btn:disabled { opacity: .55; cursor: not-allowed; }
+  .cc-btn.primary { background: #1677d0; color: #fff; }
+  .cc-btn.primary:hover:not(:disabled) { background: #1266b4; }
+  .cc-btn.danger { background: #fff; color: #c92a2a; border: 1px solid #f0c1c1; }
+  .cc-btn.danger:hover:not(:disabled) { background: #fff5f5; }
+  .cc-btn.neutral { background: #fff; color: #4a5468; border: 1px solid #d9e0ea; }
+  .cc-btn.neutral:hover:not(:disabled) { background: #f4f6fa; }
+  .cc-btn.green { background: #1a9d5c; color: #fff; }
+  .cc-btn.gray { background: #5c6779; color: #fff; }
+  .cc-btn.sm { padding: 6px 12px; font-size: 12px; }
+  .cc-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+  .cc-actions .spacer { flex: 1; }
+
+  .cc-url { display: flex; align-items: center; gap: 10px; background: #f7f9fc; border: 1px solid #edf0f5; border-radius: 9px; padding: 10px 14px; flex-wrap: wrap; }
+  .cc-url code { font-size: 13px; color: #1677d0; flex: 1; word-break: break-all; }
+  .cc-lock { color: #8b93a1; font-size: 12px; white-space: nowrap; }
+
+  .cc-pills { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .cc-pill { background: #eef4fc; color: #1677d0; font-size: 12px; padding: 3px 11px; border-radius: 14px; }
+
+  .cc-log { background: #0f1520; color: #9fe8b8; border-radius: 10px; padding: 12px 14px; font: 12px/1.7 ui-monospace, SFMono-Regular, Menlo, monospace; height: 150px; overflow: hidden; white-space: pre-wrap; word-break: break-all; }
+  .cc-log .dim { color: #5f6b7d; }
+
+  .cc-version-note { display: none; margin-top: 12px; background: #eef7ef; border: 1px solid #bfe3c7; border-radius: 9px; padding: 10px 14px; font-size: 12.5px; color: #1d6b3a; }
+  #ccUpdError { color: #a52a2a; background: #fdeaea; border-color: #f0c1c1; }
+
+  .cc-toast { position: fixed; left: 50%; bottom: 30px; transform: translateX(-50%) translateY(20px); background: #22304a; color: #fff; padding: 10px 20px; border-radius: 8px; font-size: 13px; opacity: 0; transition: .25s; pointer-events: none; box-shadow: 0 6px 18px rgba(0,0,0,.2); z-index: 99; }
+
+  @media (max-width: 960px) {
+    .cc-row { flex-direction: column; gap: 14px; }
+    .cc-stats { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  }
+</style>
+
+<h2 class="cc-title" style="display:flex;align-items:center;gap:10px"><%:服务总览%> <span class="cc-pill" id="ccVersion" style="display:none"></span></h2>
+<div class="cc-desc"><%:一眼查看服务运行状态、连接参数与最近活动，快速启停。%></div>
+
+<div class="cc-card">
+  <div class="cc-card-head">
+    <span class="ico">🩺</span>
+    <div><span class="ttl"><%:运行状态%></span> <span class="desc">· <%:procd 托管%></span></div>
+    <span class="spacer"></span>
+    <span class="cc-badge stopped" id="ccBadge"><span class="dot"></span><span id="ccStatusText"><%:检测中…%></span></span>
+  </div>
+  <div class="cc-body">
+    <div class="cc-stats">
+      <div class="cc-stat"><div class="k"><%:监听地址%></div><div class="v" id="ccHost">—</div></div>
+      <div class="cc-stat"><div class="k"><%:端口%></div><div class="v" id="ccPort">—</div></div>
+      <div class="cc-stat"><div class="k"><%:访问鉴权%></div><div class="v" id="ccAuth">—</div></div>
+      <div class="cc-stat"><div class="k">🧠 <%:进程%></div><div class="v" id="ccPid">—</div></div>
+    </div>
+    <div class="cc-actions">
+      <button class="cc-btn gray" id="ccBtnStop" onclick="ccAction('stop')">⏹ <%:停止%></button>
+      <button class="cc-btn neutral" onclick="ccAction('restart')">🔄 <%:重启%></button>
+      <button class="cc-btn neutral" onclick="ccAction('reload')"><%:重载配置%></button>
+      <span class="spacer"></span>
+      <button class="cc-btn green" id="ccBtnStart" style="display:none" onclick="ccAction('start')">▶ <%:启动%></button>
+    </div>
+  </div>
+</div>
+
+<div class="cc-card">
+  <div class="cc-card-head">
+    <span class="ico">🚀</span><span class="ttl"><%:软件版本%></span>
+    <span class="spacer"></span><span class="cc-pill"><%:发布源:%> GitHub Releases</span>
+  </div>
+  <div class="cc-body">
+    <div class="cc-stats" style="grid-template-columns:repeat(3,1fr)">
+      <div class="cc-stat"><div class="k"><%:已安装版本%></div><div class="v" id="ccInstalled">—</div></div>
+      <div class="cc-stat"><div class="k"><%:最新版本%></div><div class="v" id="ccLatest" style="color:#8b93a1">—</div></div>
+      <div class="cc-stat"><div class="k"><%:更新通道%></div><div class="v" id="ccChannel">—</div></div>
+    </div>
+    <div class="cc-actions" style="align-items:center">
+      <button class="cc-btn neutral" id="ccBtnCheck" onclick="ccCheckUpdate(false)">🔍 <%:检查更新%></button>
+      <button class="cc-btn primary" id="ccBtnUpdate" style="display:none" onclick="ccOpenRelease()"><%:查看发布页%></button>
+      <span class="cc-desc" style="margin-bottom:0;align-self:center" id="ccUpdHint"><%:点击检查上游是否有新版本发布%></span>
+    </div>
+    <div class="cc-version-note" id="ccUpdNote"></div>
+  </div>
+</div>
+
+<div class="cc-row">
+  <div class="cc-card" style="flex:1.4">
+    <div class="cc-card-head"><span class="ico">🔗</span><span class="ttl"><%:访问入口%></span><span class="spacer"></span><span class="cc-pill"><%:局域网%></span></div>
+    <div class="cc-body">
+      <div class="cc-url">
+        <span>🌐</span>
+        <code id="ccUrl">http://—:—</code>
+        <span class="cc-lock" id="ccLock" style="display:none">🔒 <%:需密码%></span>
+        <button class="cc-btn primary sm" onclick="ccCopyAddr()"><%:复制%></button>
+        <button class="cc-btn neutral sm" onclick="window.open(document.getElementById('ccUrl').textContent, '_blank')"><%:打开%></button>
+      </div>
+      <div class="cc-pills">
+        <span class="cc-pill"><%:房间列表:%> <span id="ccPillRoomList">—</span></span>
+        <span class="cc-pill"><%:历史记录:%> <span id="ccPillHistory">—</span></span>
+        <span class="cc-pill"><%:文本上限:%> <span id="ccPillText">—</span></span>
+        <span class="cc-pill"><%:文件上限:%> <span id="ccPillFile">—</span></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="cc-card" style="flex:1">
+    <div class="cc-card-head"><span class="ico">👁</span><span class="ttl"><%:数据盘占用%></span><span class="spacer"></span><span class="cc-pill">/etc/cloud-clipboard</span></div>
+    <div class="cc-body">
+      <div style="font-size:24px;font-weight:800" id="ccUsageBig">—</div>
+      <div style="font-size:12px;color:#8b93a1;margin:2px 0 12px"><%:上传与历史记录共占用%></div>
+      <div style="height:8px;background:#eef1f6;border-radius:6px;overflow:hidden">
+        <div id="ccUsageBar" style="width:0%;height:100%;background:#1677d0;border-radius:6px;transition:width .3s"></div>
+      </div>
+      <div style="font-size:11.5px;color:#8b93a1;margin-top:6px" id="ccUsageDetail"></div>
+    </div>
+  </div>
+</div>
+
+<div class="cc-card">
+  <div class="cc-card-head">
+    <span class="ico">📄</span><span class="ttl"><%:最近日志%></span><span class="spacer"></span>
+    <a style="font-size:12.5px;color:#1677d0" href="<%=luci.dispatcher.build_url("admin", "services", "cloud-clipboard", "log")%>"><%:查看全部 →%></a>
+  </div>
+  <div class="cc-body" style="padding:14px 18px">
+    <div class="cc-log" id="ccMiniLog"><%:加载中…%></div>
+  </div>
+</div>
+
+<div class="cc-toast" id="ccToast"></div>
+
+<script type="text/javascript">
+//<![CDATA[
+  var CC = {
+    statusUrl: '<%=luci.dispatcher.build_url("admin", "services", "cloud-clipboard", "status")%>',
+    versionUrl: '<%=luci.dispatcher.build_url("admin", "services", "cloud-clipboard", "version")%>',
+    actionUrl: '<%=luci.dispatcher.build_url("admin", "services", "cloud-clipboard", "action")%>',
+    logUrl: '<%=luci.dispatcher.build_url("admin", "services", "cloud-clipboard", "getlog")%>',
+    timer: null,
+    toastTimer: null,
+    latest: { installed: '', release_url: '' }
+  };
+
+  function ccToast(msg) {
+    var t = document.getElementById('ccToast');
+    if (!t) return;
+    t.textContent = msg;
+    t.style.opacity = '1';
+    t.style.transform = 'translateX(-50%) translateY(0)';
+    clearTimeout(CC.toastTimer);
+    CC.toastTimer = setTimeout(function() {
+      t.style.opacity = '0';
+      t.style.transform = 'translateX(-50%) translateY(20px)';
+    }, 1800);
+  }
+
+  function ccFetch(url, cb) {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', url, true);
+    xhr.timeout = 12000;
+    xhr.onreadystatechange = function() {
+      if (xhr.readyState !== 4) return;
+      cb(xhr.status === 200 ? xhr.responseText : null);
+    };
+    xhr.onerror = function() { cb(null); };
+    xhr.ontimeout = function() { cb(null); };
+    xhr.send();
+  }
+
+  function ccAction(act) {
+    ccFetch(CC.actionUrl + '?act=' + encodeURIComponent(act), function(t) {
+      if (!t) { alert('<%:操作失败%>'); return; }
+      var done = { stop: '<%:服务已停止%>', start: '<%:服务已启动%>', restart: '<%:服务已重启%>', reload: '<%:已重载配置%>' }[act];
+      if (done) ccToast(done);
+      ccLoadStatus();
+    });
+  }
+
+  function ccFormatBytes(b) {
+    if (!b && b !== 0) return '—';
+    if (b < 1024) return b + ' B';
+    if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+    if (b < 1073741824) return (b / 1048576).toFixed(1) + ' MB';
+    return (b / 1073741824).toFixed(2) + ' GB';
+  }
+
+  function ccLoadStatus() {
+    ccFetch(CC.statusUrl, function(t) {
+      if (!t) return;
+      var s;
+      try { s = JSON.parse(t); } catch(e){ return; }
+
+      var badge = document.getElementById('ccBadge');
+      badge.className = 'cc-badge ' + (s.running ? 'running' : 'stopped');
+      document.getElementById('ccStatusText').textContent = s.running ? '<%:运行中%>' : '<%:已停止%>';
+      document.getElementById('ccHost').textContent = s.host;
+      document.getElementById('ccPort').textContent = s.port;
+      document.getElementById('ccAuth').textContent = s.auth ? '🔑 <%:已启用%>' : '<%:开放访问%>';
+      document.getElementById('ccPid').textContent = s.pid ? String(s.pid) : '—';
+      document.getElementById('ccInstalled').textContent = s.version || '—';
+      CC.latest.installed = s.version || '';
+      if (s.version) {
+        var vd = document.getElementById('ccVersion');
+        vd.textContent = 'v' + s.version;
+        vd.style.display = '';
+      }
+
+      document.getElementById('ccBtnStop').style.display = s.running ? '' : 'none';
+      document.getElementById('ccBtnStart').style.display = s.running ? 'none' : '';
+
+      var host = s.host === '0.0.0.0' ? (window.location.hostname || 'router') : s.host;
+      document.getElementById('ccUrl').textContent = 'http://' + host + ':' + s.port;
+      document.getElementById('ccLock').style.display = s.auth ? '' : 'none';
+
+      document.getElementById('ccPillRoomList').textContent = s.summary.roomList ? '<%:开启%>' : '<%:关闭%>';
+      document.getElementById('ccPillHistory').textContent = s.summary.history;
+      document.getElementById('ccPillText').textContent = ccFormatBytes(s.summary.textLimit);
+      document.getElementById('ccPillFile').textContent = ccFormatBytes(s.summary.fileLimit);
+
+      var usage = s.usage || {};
+      var total = usage.total || 0;
+      document.getElementById('ccUsageBig').textContent = ccFormatBytes(total);
+      document.getElementById('ccUsageBar').style.width = Math.min(100, (total / (256 * 1048576)) * 100) + '%';
+      document.getElementById('ccUsageDetail').textContent = '<%:上传目录%> ' + ccFormatBytes(usage.upload) + ' · <%:历史%> ' + ccFormatBytes(usage.history);
+
+      ccLoadMiniLog();
+    });
+  }
+
+  function ccLoadMiniLog() {
+    ccFetch(CC.logUrl, function(t) {
+      var el = document.getElementById('ccMiniLog');
+      if (!t || t === '') { el.textContent = '<%:日志为空%>'; return; }
+      var lines = t.replace(/\s+$/,'').split('\n');
+      var tail = lines.slice(-5);
+      var html = tail.map(function(line) {
+        var esc = line.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        var cls = /(WARN|ERROR|FAIL)/i.test(line) ? 'warn' : 'dim';
+        return '<span class="' + cls + '">' + esc + '</span>\n';
+      }).join('');
+      el.innerHTML = html || '<%:日志为空%>';
+    });
+  }
+
+  function ccCopyAddr() {
+    var t = document.getElementById('ccUrl').textContent;
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(t).then(function(){ ccToast('<%:已复制%>: ' + t); });
+    } else {
+      ccToast('<%:请手动复制%>: ' + t);
+    }
+  }
+
+  function ccCheckUpdate(force) {
+    var btn = document.getElementById('ccBtnCheck');
+    btn.disabled = true;
+    btn.textContent = '<%:检查中…%>';
+    document.getElementById('ccUpdHint').textContent = '<%:正在向 GitHub Releases 查询…%>';
+    ccFetch(CC.versionUrl + (force ? '?force=1' : ''), function(t) {
+      btn.disabled = false;
+      btn.textContent = '<%:再查一次%>';
+      if (!t) {
+        document.getElementById('ccUpdHint').textContent = '<%:查询失败，请检查路由器的网络连接%>';
+        return;
+      }
+      var v;
+      try { v = JSON.parse(t); } catch(e){ return; }
+      if (v.error && !v.latest) {
+        var note = document.getElementById('ccUpdNote');
+        note.style.display = '';
+        note.style.background = '#fdeaea';
+        note.style.borderColor = '#f0c1c1';
+        note.style.color = '#a52a2a';
+        note.textContent = '<%:检查失败:%> ' + v.error;
+        document.getElementById('ccUpdHint').textContent = '';
+        return;
+      }
+      var note = document.getElementById('ccUpdNote');
+      note.style.background = '#eef7ef';
+      note.style.borderColor = '#bfe3c7';
+      note.style.color = '#1d6b3a';
+      document.getElementById('ccLatest').textContent = v.latest || '—';
+      if (v.latest) {
+        document.getElementById('ccLatest').style.color = '#1677d0';
+        CC.latest.release_url = v.release_url || '';
+      }
+      if (v.update) {
+        document.getElementById('ccBtnUpdate').style.display = '';
+        note.style.display = '';
+        note.innerHTML = '🎉 <%:发现新版本%> <b>' + v.latest + '</b><%:，可前往发布页获取对应架构的 APK/IPK 后在线安装%>';
+      } else if (!v.error) {
+        note.textContent = '<%:当前已是最新版本%>';
+        note.style.display = '';
+      }
+      document.getElementById('ccUpdHint').textContent = '';
+    });
+  }
+
+  function ccOpenRelease() {
+    if (CC.latest.release_url) window.open(CC.latest.release_url, '_blank');
+  }
+
+  window.addEventListener('load', function() {
+    ccLoadStatus();
+    CC.timer = setInterval(ccLoadStatus, 10000);
+  });
+  window.addEventListener('beforeunload', function() {
+    if (CC.timer) clearInterval(CC.timer);
+  });
+//]]>
+</script>
+
+<%+footer%>

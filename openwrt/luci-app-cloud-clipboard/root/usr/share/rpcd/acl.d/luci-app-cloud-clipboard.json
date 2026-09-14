@@ -9,7 +9,10 @@
                 "/etc/init.d/cloud-clipboard": ["exec"],
                 "/usr/bin/cloud-clipboard": ["exec"],
                 "/bin/busybox": ["exec"],
-                "/usr/bin/pgrep": ["exec"]
+                "/usr/bin/pgrep": ["exec"],
+                "/usr/bin/curl": ["exec"],
+                "/usr/bin/wget": ["exec"],
+                "/usr/bin/du": ["exec"]
             }
         },
         "write": {
@@ -26,7 +29,10 @@
                 "/usr/bin/cloud-clipboard": ["exec"],
                 "/etc/init.d/cloud-clipboard": ["exec"],
                 "/bin/busybox": ["exec"],
-                "/usr/bin/pgrep": ["exec"]
+                "/usr/bin/pgrep": ["exec"],
+                "/usr/bin/curl": ["exec"],
+                "/usr/bin/wget": ["exec"],
+                "/usr/bin/du": ["exec"]
             }
         }
     }

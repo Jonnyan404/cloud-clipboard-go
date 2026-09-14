@@ -1,0 +1,186 @@
+<%+header%>
+
+<style>
+  .cc-title { font-size: 19px; font-weight: 700; margin-bottom: 4px; }
+  .cc-desc { color: #7b8494; font-size: 13px; margin-bottom: 18px; }
+  .cc-desc code { background: #f2f7fd; color: #1677d0; border-radius: 4px; padding: 1px 5px; font-size: 12px; }
+  .cc-card { background: #fff; border-radius: 12px; border: 1px solid #e6eaf1; box-shadow: 0 2px 8px rgba(22,48,84,.05); margin-bottom: 18px; overflow: hidden; }
+  .cc-card-head { padding: 13px 18px; border-bottom: 1px solid #eef1f6; display: flex; align-items: center; gap: 9px; }
+  .cc-card-head .ico { font-size: 17px; line-height: 1; }
+  .cc-card-head .ttl { font-size: 14.5px; font-weight: 700; }
+  .cc-card-head .spacer { flex: 1; }
+  .cc-body { padding: 18px; padding-top: 4px; }
+  .cc-pill { background: #eef4fc; color: #1677d0; font-size: 12px; padding: 3px 11px; border-radius: 14px; }
+
+  .cc-field { display: flex; align-items: center; gap: 16px; padding: 12px 0; border-bottom: 1px solid #f2f4f8; }
+  .cc-field:last-child { border-bottom: none; }
+  .cc-field .label { width: 190px; flex-shrink: 0; }
+  .cc-field .label b { font-size: 13.5px; }
+  .cc-field .label small { display: block; color: #9aa2b0; font-size: 11.5px; margin-top: 2px; }
+  .cc-field .ctrl { flex: 1; }
+  .cc-hint { color: #8b93a1; font-size: 12px; }
+
+  input[type=text], input[type=number], input[type=password] {
+    width: 100%; border: 1px solid #d5dce6; border-radius: 8px; padding: 8px 11px; font-size: 13px; background: #fff; color: #22304a; outline: none;
+  }
+  input:focus { border-color: #1677d0; box-shadow: 0 0 0 3px rgba(22,119,208,.12); }
+
+  .cc-switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+  .cc-switch input { opacity: 0; width: 0; height: 0; }
+  .cc-switch .slider { position: absolute; inset: 0; background: #cdd4df; border-radius: 24px; transition: .2s; cursor: pointer; }
+  .cc-switch .slider:before { content: ""; position: absolute; width: 18px; height: 18px; border-radius: 50%; background: #fff; left: 3px; top: 3px; transition: .2s; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+  .cc-switch input:checked + .slider { background: #1677d0; }
+  .cc-switch input:checked + .slider:before { transform: translateX(20px); }
+
+  .cc-inline { display: flex; gap: 12px; align-items: center; }
+  .cc-inline .grow { flex: 1; }
+
+  .cc-btn { display: inline-flex; align-items: center; gap: 7px; border: none; border-radius: 8px; padding: 9px 16px; font-size: 13px; font-weight: 600; cursor: pointer; transition: .15s; }
+  .cc-btn:disabled { opacity: .55; cursor: not-allowed; }
+  .cc-btn.primary { background: #1677d0; color: #fff; }
+  .cc-btn.primary:hover:not(:disabled) { background: #1266b4; }
+  .cc-btn.neutral { background: #fff; color: #4a5468; border: 1px solid #d9e0ea; }
+  .cc-btn.neutral:hover:not(:disabled) { background: #f4f6fa; }
+  .cc-btn.sm { padding: 6px 12px; font-size: 12px; }
+
+  .cc-note { background: #fdfbf5; border: 1px solid #eee3c4; border-radius: 10px; padding: 14px 18px; font-size: 12.5px; color: #7b6b3d; line-height: 1.7; display: flex; gap: 12px; align-items: flex-start; }
+  .cc-note code { background: #f7efd9; border-radius: 4px; padding: 1px 5px; }
+
+  .cc-toast { position: fixed; left: 50%; bottom: 30px; transform: translateX(-50%) translateY(20px); background: #22304a; color: #fff; padding: 10px 20px; border-radius: 8px; font-size: 13px; opacity: 0; transition: .25s; pointer-events: none; box-shadow: 0 6px 18px rgba(0,0,0,.2); z-index: 99; }
+
+  @media (max-width: 960px) {
+    .cc-field { flex-wrap: wrap; gap: 8px; }
+    .cc-field .label { width: 100%; }
+  }
+</style>
+
+<h2 class="cc-title"><%:基本设置%></h2>
+<div class="cc-desc"><%:服务开关、监听地址与访问密码。改动后点「保存并应用」才会生效。%></div>
+
+<div class="cc-card">
+  <div class="cc-card-head"><span class="ico">⚙️</span><span class="ttl"><%:服务器%></span><span class="spacer"></span><span class="cc-pill">/etc/config/cloud-clipboard</span></div>
+  <div class="cc-body" style="padding-top:4px">
+    <div class="cc-field">
+      <div class="label"><b><%:启用服务%></b><small><%:开机自启 & 立即运行%></small></div>
+      <div class="ctrl">
+        <label class="cc-switch"><input type="checkbox" id="bEnabled"><span class="slider"></span></label>
+        <span class="cc-hint" style="margin-left:10px" id="bEnabledHint"><%:服务将在保存后运行%></span>
+      </div>
+    </div>
+    <div class="cc-field">
+      <div class="label"><b><%:监听地址%></b><small><%:绑定的 IP 地址%></small></div>
+      <div class="ctrl"><input type="text" id="bHost" /></div>
+    </div>
+    <div class="cc-field">
+      <div class="label"><b><%:监听端口%></b><small><%:默认 9501%></small></div>
+      <div class="ctrl" style="max-width:160px"><input type="number" id="bPort" /></div>
+    </div>
+    <div class="cc-field">
+      <div class="label"><b><%:访问密码%></b><small><span id="bAuthState">🔒︎ <%:已启用鉴权%></span></small></div>
+      <div class="ctrl" style="max-width:320px"><input type="password" id="bAuth" placeholder="<%=translate("留空 = 开放访问")%>" /></div>
+    </div>
+    <div class="cc-field">
+      <div class="label"><b><%:配置文件路径%></b><small class="cc-hint"><%:高级设置由此文件驱动%></small></div>
+      <div class="ctrl cc-inline">
+        <input type="text" id="bConfig" class="grow" />
+        <button class="cc-btn neutral sm" onclick="ccGoAdvanced()"><%:打开高级设置 →%></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="text-align:right;margin-bottom:18px">
+  <button class="cc-btn primary" onclick="ccSaveBasic()">💾 <%:保存并应用%></button>
+  <button class="cc-btn neutral" onclick="ccReloadBasic()"><%:重置%></button>
+</div>
+
+<div class="cc-note">
+  <span style="font-size:18px">💡</span>
+  <div>
+    <b><%:鉴权说明：%></b><%:此处密码作为全局默认密码。%> <code>config.json</code> <%:中可针对指定房间设置独立密码，空字符串的房间将自动回退使用全局密码。%>
+  </div>
+</div>
+
+<div class="cc-toast" id="ccToast"></div>
+
+<script type="text/javascript">
+//<![CDATA[
+  var CC_BASIC = {
+    getUrl: '<%=luci.dispatcher.build_url("admin", "services", "cloud-clipboard", "getbasic")%>',
+    saveUrl: '<%=luci.dispatcher.build_url("admin", "services", "cloud-clipboard", "savebasic")%>',
+    advUrl: '<%=luci.dispatcher.build_url("admin", "services", "cloud-clipboard", "advanced")%>',
+    toastTimer: null
+  };
+
+  function ccToast(msg) {
+    var t = document.getElementById('ccToast');
+    if (!t) return;
+    t.textContent = msg;
+    t.style.opacity = '1';
+    t.style.transform = 'translateX(-50%) translateY(0)';
+    clearTimeout(CC_BASIC.toastTimer);
+    CC_BASIC.toastTimer = setTimeout(function() {
+      t.style.opacity = '0';
+      t.style.transform = 'translateX(-50%) translateY(20px)';
+    }, 1800);
+  }
+
+  function ccGet(url, cb) {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', url, true);
+    xhr.timeout = 12000;
+    xhr.onreadystatechange = function() {
+      if (xhr.readyState !== 4) return;
+      var r = null;
+      try { r = JSON.parse(xhr.responseText || 'null'); } catch(e) { r = null; }
+      cb(r);
+    };
+    xhr.send();
+  }
+
+  function ccReloadBasic() {
+    ccGet(CC_BASIC.getUrl, function(r) {
+      if (!r) { alert('<%:读取配置失败%>'); return; }
+      document.getElementById('bEnabled').checked = (r.enabled === '1' || r.enabled === true);
+      document.getElementById('bHost').value = r.host || '0.0.0.0';
+      document.getElementById('bPort').value = r.port || '9501';
+      document.getElementById('bAuth').value = r.auth || '';
+      document.getElementById('bConfig').value = r.config || '/etc/cloud-clipboard/config.json';
+      document.getElementById('bAuthState').textContent = (r.auth && r.auth !== '') ? '🔒 <%:已启用鉴权%>' : '<%:开放访问%>';
+      ccToast('<%:已还原为上次保存的值%>');
+    });
+  }
+
+  function ccSaveBasic() {
+    var payload = {
+      enabled: document.getElementById('bEnabled').checked ? '1' : '0',
+      host: document.getElementById('bHost').value.trim(),
+      port: document.getElementById('bPort').value.trim(),
+      auth: document.getElementById('bAuth').value,
+      config: document.getElementById('bConfig').value.trim()
+    };
+    if (!payload.host) { alert('<%:监听地址不能为空%>'); return; }
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', CC_BASIC.saveUrl, true);
+    xhr.timeout = 15000;
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.onreadystatechange = function() {
+      if (xhr.readyState !== 4) return;
+      var r = null;
+      try { r = JSON.parse(xhr.responseText || '{}'); } catch(e) { r = { ok: false }; }
+      if (r.ok === false || r.ok === undefined && xhr.status !== 200) { alert('<%:保存失败:%> ' + (r.error || '')); return; }
+      document.getElementById('bAuthState').textContent = (payload.auth) ? '🔒 <%:已启用鉴权%>' : '<%:开放访问%>';
+      ccToast(payload.enabled === '1' ? '<%:已保存并应用（服务已启动）%>' : '<%:已保存并应用（服务已停止）%>');
+    };
+    xhr.send(JSON.stringify(payload));
+  }
+
+  function ccGoAdvanced() {
+    window.location.href = CC_BASIC.advUrl;
+  }
+
+  window.addEventListener('load', ccReloadBasic);
+//]]>
+</script>
+
+<%+footer%>
