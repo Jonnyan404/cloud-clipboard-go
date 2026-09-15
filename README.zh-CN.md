@@ -44,8 +44,7 @@
 <details>
 <summary><b>📡 路由器</b></summary>
 
-LuCI 界面设计预览（浅色 / 深色）：
-[浅色](https://htmlpreview.github.io/?https://github.com/Jonnyan404/cloud-clipboard-go/blob/main/ui-redesign-preview-light.html) · [深色](https://htmlpreview.github.io/?https://github.com/Jonnyan404/cloud-clipboard-go/blob/main/ui-redesign-preview-dark.html)
+![OpenWrt Preview](https://github.com/Jonnyan404/cloud-clipboard-go/blob/main/openwrt/demo.png)
 
 </details>
 

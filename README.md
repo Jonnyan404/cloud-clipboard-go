@@ -44,8 +44,7 @@
 <details>
 <summary><b>📡 Router (OpenWrt)</b></summary>
 
-Design previews of the LuCI interface (light / dark):
-[Light](https://htmlpreview.github.io/?https://github.com/Jonnyan404/cloud-clipboard-go/blob/main/ui-redesign-preview-light.html) · [Dark](https://htmlpreview.github.io/?https://github.com/Jonnyan404/cloud-clipboard-go/blob/main/ui-redesign-preview-dark.html)
+![OpenWrt Preview](https://github.com/Jonnyan404/cloud-clipboard-go/blob/main/openwrt/demo.png)
 
 </details>
 
