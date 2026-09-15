@@ -44,7 +44,8 @@
 <details>
 <summary><b>📡 Router (OpenWrt)</b></summary>
 
-![OpenWrt Preview](https://github.com/Jonnyan404/cloud-clipboard-go/blob/main/openwrt/demo.png)
+Design previews of the LuCI interface (light / dark):
+[Light](https://htmlpreview.github.io/?https://github.com/Jonnyan404/cloud-clipboard-go/blob/main/ui-redesign-preview-light.html) · [Dark](https://htmlpreview.github.io/?https://github.com/Jonnyan404/cloud-clipboard-go/blob/main/ui-redesign-preview-dark.html)
 
 </details>
 
@@ -223,6 +224,7 @@ go run -tags embed .
 | :--- | :--- | :--- |
 | **Web UI** | Modern Browsers | Built-in responsive web app with PWA desktop installation support |
 | **HTTP Shortcuts** | Android / iOS | Send & receive clipboard content via system share sheet with [shortcuts package](./shortcuts/) |
+| **Apple Shortcuts** | iOS / macOS | Native shortcuts for sharing text/files and pulling latest content — [get them here](./shortcuts/apple/) |
 | **Clipboard Sync** | Win / Mac / Linux | Silent bidirectional clipboard synchronization desktop app (donors only) |
 | **Cloud Clipboard Go Launcher** | Win / Mac / Linux | [Desktop GUI launcher](https://github.com/jonnyan404/cloud-clipboard-go-launcher) without terminal |
 | **Universal Shell** | Win / Mac / Linux | [GUI utility helper](https://github.com/Jonnyan404/universal-shell/releases) |

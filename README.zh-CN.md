@@ -44,7 +44,8 @@
 <details>
 <summary><b>📡 路由器</b></summary>
 
-![OpenWrt Preview](https://github.com/Jonnyan404/cloud-clipboard-go/blob/main/openwrt/demo.png)
+LuCI 界面设计预览（浅色 / 深色）：
+[浅色](https://htmlpreview.github.io/?https://github.com/Jonnyan404/cloud-clipboard-go/blob/main/ui-redesign-preview-light.html) · [深色](https://htmlpreview.github.io/?https://github.com/Jonnyan404/cloud-clipboard-go/blob/main/ui-redesign-preview-dark.html)
 
 </details>
 
@@ -222,6 +223,7 @@ go run -tags embed .
 | :--- | :--- | :--- |
 | **Web 前端** | 全平台浏览器 | 内置开箱即用，响应式 UI，支持 PWA 安装至桌面 |
 | **HTTP Shortcuts 快捷指令** | Android / iOS | 配合 [快捷指令包](./shortcuts/) 实现系统分享与快速发送 |
+| **Apple 快捷指令** | iOS / macOS | 原生快捷指令，支持分享文本/文件与拉取最新内容 — [在此获取](./shortcuts/apple/) |
 | **Clipboard Sync** | Win / Mac / Linux | 桌面双向静默剪贴板同步工具（捐赠用户专享） |
 | **Cloud Clipboard Go Launcher** | Win / Mac / Linux | [图形化启动器](https://github.com/jonnyan404/cloud-clipboard-go-launcher)，无需接触命令行 |
 | **Universal Shell** | Win / Mac / Linux | [图形化辅助运行工具](https://github.com/Jonnyan404/universal-shell/releases) |
