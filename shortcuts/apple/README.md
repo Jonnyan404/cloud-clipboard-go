@@ -12,6 +12,26 @@
 | `verify.py` | 构建后断言：把已知的坑变成检查项 |
 | `*.shortcut` | 签名产物（`--mode anyone`，iOS / macOS 均可导入） |
 
+## 部署兼容性（重要）
+
+快捷指令依赖的接口**只在 Go 服务端实现**。若部署的是 Cloudflare Worker 版本，请先看这张表：
+
+| 接口 | 用途 | Go 服务端 | Cloudflare Worker |
+| :--- | :--- | :--- | :--- |
+| `POST /upload/raw` | Send 上传（body 即原始字节） | ✅ | ❌ **缺失** |
+| `POST /upload/base64` | Send 上传的 base64 变体 | ✅ | ❌ **缺失** |
+| `GET /content/latest?json=1` | Receive 拉取最新内容 | ✅ | ✅ |
+| `GET /file/:uuid/:filename` | Receive 下载文件 | ✅ | ✅ |
+
+**结论：Send 在 Cloudflare Worker 部署上不可用（会 404）；Receive 可用。**
+
+Worker 的路由注释写着「无 /api 前缀，与自托管 Go 后端路径对齐」，新增的这两个端点打破了这个约定。
+要在 Worker 上支持 Send，需在 `cloudflare/workers/src/index.js` 补上这两个路由，
+并把内容嗅探、UTF-16/32 解码、HTML 降级这套逻辑用 JS 重写一遍。
+
+> 说明：上表由**阅读路由定义**得出，未实际对 Worker 部署发起请求。若要确认，可对 Worker 的
+> `/upload/raw` 发一次 POST，观察是否 404。
+
 ## 构建
 
 ```bash
