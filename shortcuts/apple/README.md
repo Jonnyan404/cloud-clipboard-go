@@ -88,6 +88,19 @@
 
 `Cloud-Clipboard-Send-Min` 是简化版：动作数 **121 → 68**，本地化类型名比较 **29 → 0**，客户端不再判断类型、改由服务端按魔数嗅探单点决策。
 
+### 发送结果用通知，不用结果卡片
+
+原先用 `show()`（Show Result），每次发送都会在屏幕中央弹一张卡片，打断视线。现改为：
+
+```cherri
+showNotification("已发送 {@savedID}", "Cloud Clipboard", false)
+```
+
+cherri 的动作名是 **`showNotification(body, title, playSound, attachment)`**，不是 `notification`。`playSound` 传 `false`，连续发送时不会反复响铃。两个 Send 源码同步修改，动作数不变。
+
+**验证状态**：流程已验证（跑通后服务端正常收到消息，产物里 `notification=1`、`showresult=0`）。
+**但通知是否真的显示，尚未验证**——系统日志被沙箱挡住（`log: Cannot run while sandboxed`），通知数据库需要全盘访问权限，ncprefs 里的位掩码含义未确认。若通知不出现，检查 **系统设置 → 通知 → 快捷指令**。
+
 ### Receive 验收（2026-09-16，首次）
 
 `Cloud-Clipboard-Receive` 此前从未安装、从未验收。补上入口（原先 `WFWorkflowTypes` 只有 `[Watch, ShowInSearch]`，等于没有可用入口）后实测四类：
