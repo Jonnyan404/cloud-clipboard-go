@@ -1,0 +1,79 @@
+#define name Cloud-Clipboard-Receive
+#define color green
+#define version 26
+
+#include 'actions/web'
+#include 'actions/text'
+#include 'actions/sharing'
+#include 'actions/documents'
+#include 'actions/device'
+
+// 导入时填写配置（也可之后在快捷指令顶部"文本"动作中修改）
+#question qServerURL "服务器地址，例如 https://clip.example.com 或 http://127.0.0.1:9501" "http://127.0.0.1:9501"
+#question qRoomName "房间名，与发送端一致；默认填 default" "default"
+#question qRoomPassword "全局访问密码或房间密码；未设密码则留空" ""
+
+@rawEndpoint = text(qServerURL)
+@endpoint = getText(@rawEndpoint)
+@rawRoom = text(qRoomName)
+@room = getText(@rawRoom)
+@password = text(qRoomPassword)
+@endpoint = replaceText('^\s+|\s+$', '', @endpoint, true, true)
+@endpoint = replaceText('/+$', "", @endpoint, true, true)
+@room = replaceText('^\s+|\s+$', '', @room, true, true)
+if !@room { @room = "default" }
+if !@endpoint {
+    alert("请先编辑快捷指令顶部的部署地址、房间名和密码。")
+    stop()
+}
+@encodedRoom = urlEncode(@room)
+@authorization = "Bearer {@password}"
+@response = downloadURL("{@endpoint}/content/latest?room={@encodedRoom}&json=1", {"Authorization":"{@authorization}", "Accept":"application/json", "Cache-Control":"no-cache"})
+@record = getDictionary(@response)
+@error = getValue(@record, "error")
+if @error {
+    @message = getValue(@record, "message")
+    alert("获取失败：{@error}\n{@message}")
+    stop()
+}
+const uuidValue = getValue(@record, "uuid")
+@uuid = getText(uuidValue)
+const nameValue = getValue(@record, "name")
+@filename = getText(nameValue)
+const typeValue = getValue(@record, "type")
+@msgType = getText(typeValue)
+@modelName = getDeviceDetail('Device Model')
+@model = getText(@modelName)
+if @uuid {
+    if @filename {
+        @encodedUUID = urlEncode(@uuid)
+        @encodedName = urlEncode(@filename)
+        @download = downloadURL("{@endpoint}/file/{@encodedUUID}/{@encodedName}?room={@encodedRoom}", {"Authorization":"{@authorization}", "Cache-Control":"no-cache"})
+        if @msgType == "image" {
+            @picture = getFirstItem(@download)
+            setClipboard(@picture, true)
+            if @model != "Mac" {
+                vibrate()
+            }
+        } else {
+            @named = setName(@download, @filename)
+            @saved = saveFilePrompt(@named, false)
+            if @model == "Mac" {
+                reveal(@saved)
+            }
+            if @model != "Mac" {
+                vibrate()
+            }
+        }
+        stop()
+    }
+}
+@content = getValue(@record, "content")
+if !@content {
+    alert("服务器没有返回文字内容。")
+    stop()
+}
+setClipboard(@content, true)
+if @model != "Mac" {
+    vibrate()
+}

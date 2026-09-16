@@ -1,0 +1,64 @@
+#define name Cloud-Clipboard-Send-Min
+#define inputs file, image, text, url, pdf
+#define from sharesheet
+#define noinput getclipboard
+#define color blue
+#define version 26
+
+#include 'actions/web'
+#include 'actions/text'
+#include 'actions/sharing'
+
+// 导入时填写配置（也可之后在快捷指令顶部"文本"动作中修改）
+#question qServerURL "服务器地址，例如 https://clip.example.com 或 http://127.0.0.1:9501" "http://127.0.0.1:9501"
+#question qRoomName "房间名，多设备接收同一内容时使用相同房间；默认填 default" "default"
+#question qRoomPassword "全局访问密码或房间密码；未设密码则留空" ""
+
+// 服务器按内容魔数嗅探决定存为文本消息还是文件，客户端不做任何类型判断。
+action 'downloadurl' rawUpload(text url: 'WFURL', variable body: 'WFRequestVariable', dictionary! headers: 'WFHTTPHeaders') {
+    "WFHTTPMethod": "POST",
+    "WFHTTPBodyType": "File"
+}
+
+@endpoint = text(qServerURL)
+@room = text(qRoomName)
+@password = text(qRoomPassword)
+@endpoint = replaceText('^\s+|\s+$', '', @endpoint, true, true)
+@endpoint = replaceText('/+$', "", @endpoint, true, true)
+@room = replaceText('^\s+|\s+$', '', @room, true, true)
+if !@room { @room = "default" }
+if !@endpoint {
+    alert("请先编辑快捷指令顶部的部署地址、房间名和密码。")
+    stop()
+}
+@encodedRoom = urlEncode(@room)
+
+@source = ShortcutInput
+if !@source { @source = getClipboard() }
+// cherri 的条件不能内联函数调用（会 panic），必须先落到变量
+@amount = count(@source)
+if @amount != 1 {
+    alert("请复制一条文字或一张图片后运行，或从分享菜单发送一个文件/一张照片。每次发送一项。")
+    stop()
+}
+@item = getFirstItem(@source)
+
+// 直接上传原始条目：不做命名、不做类型转换。
+// 依据 2026-09-16 验收基线：setName() 会把剪贴板纯文本变成空内容（场景 b 稳定失败），
+// 而原始条目直传对 URL / 文件 / 图片都能保真（场景 c/e/f 已通过）。
+@uploadURL = "{@endpoint}/upload/raw?room={@encodedRoom}&client=ios-shortcuts"
+@response = rawUpload(@uploadURL, @item, {"Authorization":"Bearer {@password}"})
+
+@record = getDictionary(@response)
+@error = getValue(@record, "error")
+if @error {
+    @message = getValue(@record, "message")
+    alert("发送失败：{@error}\n{@message}")
+    stop()
+}
+@savedID = getValue(@record, "id")
+if !@savedID {
+    alert("服务器未确认保存，请检查部署地址及服务器状态。")
+    stop()
+}
+show("已发送 {@savedID}")
