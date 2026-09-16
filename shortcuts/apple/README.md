@@ -78,31 +78,30 @@
 | # | 场景 | 期望 | 原版 `Cloud-Clipboard-Send` | `Cloud-Clipboard-Send-Min` |
 | :--- | :--- | :--- | :--- | :--- |
 | a | HTML / 富文本剪贴板 | 纯文本无标签 | ✅ | ✅ |
-| b | 纯文本剪贴板（**含中文**） | 文本非空 | ❌ 空 | ❌ **空** |
+| b | 纯文本剪贴板（含中文） | 文本非空 | ✅ | ✅ |
 | c | 链接剪贴板 | URL 原文 | ✅ | ✅ |
 | d | 右键选中文本（`.txt`） | 文本消息 | ❌ 存成文件 `clipboard.txt` | ✅ 文本 |
 | e | `.icns` 文件 | 文件 | ✅ | ✅ |
 | f | 二进制文件 | 文件 | ✅ | ✅ |
 
+**原版 5/6，简化版 6/6。** 简化版修好了 d（把 `.txt` 当文件存的那个回归），其余场景行为一致。
+
 `Cloud-Clipboard-Send-Min` 是简化版：动作数 **121 → 68**，本地化类型名比较 **29 → 0**，客户端不再判断类型、改由服务端按魔数嗅探单点决策。
 
-### b 场景的根因（抓包实证）
+### ⚠️ 测试手法陷阱：不要用 `pbcopy` 写非 ASCII 内容
 
-架一个中间人服务端记录捷径实际发出的请求，结果是：**问题不在「纯文本」，而在「含非 ASCII 字符」**。
+本机 shell 的 `LANG` / `LC_ALL` 为空、`LC_CTYPE=C`。在这个环境下 `printf '中文' | pbcopy` 会写出**损坏的剪贴板条目**：
 
-| 剪贴板内容 | 实际发出 body |
-| :--- | :--- |
-| `hello world ascii only` | 22 字节 ✅ |
-| `abc 123 def` | 11 字节 ✅ |
-| `纯文本 你好` | **0 字节** ❌ |
-| `中` | **0 字节** ❌ |
+```
+$ printf '纯文本 你好' | pbcopy; osascript -e 'clipboard info'
+«class utf8», 0, «class ut16», 2, string, 0, Unicode text, 0       ← 长度全是 0
+$ osascript -e 'set the clipboard to "纯文本 你好"'; osascript -e 'clipboard info'
+Unicode text, 12, string, 11, «class utf8», 16, «class ut16», 14   ← 正常
+```
 
-失败时请求特征：`Content-Length: 0`，`Content-Type: text/plain;charset=utf-8` —— Shortcuts 认得那是 UTF-8 文本，但一个字节都不发。**原版同样中招**，属继承缺陷。
+拿这个坏掉的剪贴板去跑捷径，会看到「上传 0 字节」，**极易误判为 Shortcuts 不支持中文**。实测证明是假象：用 AppleScript 正确写入后，中文文本在原版与简化版上都能正常上传。
 
-纯 ASCII 文本、文件、图片都正常；**文件内含中文也正常**（场景 d 的 `.txt` 含中文反而成功）。坏的只有「文本条目」这一条路径。
+**因此设置含非 ASCII 的剪贴板时，必须用 `osascript -e 'set the clipboard to "…"'`，不要用 `pbcopy`。**
 
-> 曾把 b 的失败归因于 `setName`，**该判断已证伪**：简化版已完全移除 `setName`（原始条目直传），中文依然发 0 字节。
+> 订正记录：曾据此误判「Shortcuts 对含非 ASCII 的文本条目发不出字节」，并一度写进本文档与 `docs/handover.md`。**该结论已证伪**（2026-09-16 晚）。
 
-### 未验证的修法
-
-`Base64 Encode(item)` → base64 为纯 ASCII → 以文本 body 发到 `/upload/base64`（服务端已实现该端点）。可绕开上述缺陷且天然无分支，代价是体积 +33%、大文件内存压力。**尚未真机验证。**

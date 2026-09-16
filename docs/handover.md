@@ -16,33 +16,36 @@
 
 服务端用隔离配置（去 auth、storageDir/historyFile 指向 /tmp、host 收窄 127.0.0.1），未污染仓库数据。结果：
 
-| # | 场景 | 期望 | 实测 |
-|---|---|---|---|
-| a | 富文本/HTML 剪贴板 | 纯文本无标签 | ✅ `标题 Hello & 你好` |
-| b | 纯文本剪贴板 | 文本非空 | ❌ 空（**稳定 3/3**） |
-| c | 链接剪贴板 | URL 原文 | ✅ |
-| d | `-i rightclick.txt` | 文本消息 | ❌ 存成文件 `clipboard.txt`（**稳定 4/4**，且是从「文本」退化而来） |
-| e | `-i GenericDocumentIcon.icns` | 文件 | ✅ |
-| f | `-i u.bin` | 文件 | ✅ |
+| # | 场景 | 期望 | 原版 PK170 | 简化版 Min |
+|---|---|---|---|---|
+| a | 富文本/HTML 剪贴板 | 纯文本无标签 | ✅ `标题 Hello & 你好` | ✅ |
+| b | 纯文本剪贴板（含中文） | 文本非空 | ✅ | ✅ |
+| c | 链接剪贴板 | URL 原文 | ✅ | ✅ |
+| d | `-i rightclick.txt` | 文本消息 | ❌ 存成文件 `clipboard.txt`（**稳定 4/4**） | ✅ 文本 |
+| e | `-i GenericDocumentIcon.icns` | 文件 | ✅ | ✅ |
+| f | `-i u.bin` | 文件 | ✅ | ✅ |
 
-→ 用户问题 #2（HTML 泄漏）已修复；**#1（右键文本被当文件）未修复**。
+→ 用户问题 #2（HTML 泄漏）已修复；**#1（右键文本被当文件）在原版未修复，简化版已修复**。原版 5/6，简化版 6/6。
 
-### b 场景的根因与原文判断不同
+### ⚠️ 排查 b 场景前必读：`pbcopy` 写非 ASCII 会损坏剪贴板
 
-原文 §7 建议「b/c 若空，优先排查剪贴板注入竞态（sleep 1）；仍空再考虑回退 v160 结构」。实测 sleep 1.5–2s 仍空，且**根因不是竞态、也不是 `setName`**。
+原文 §7 建议「b/c 若空，优先排查剪贴板注入竞态」。**这个方向是错的，而且很容易把人带进沟里。**
 
-用中间人服务端抓请求，确认是 **Shortcuts 对「含非 ASCII 字符的文本条目」发不出字节**：
+本机 shell 的 `LANG` / `LC_ALL` 为空、`LC_CTYPE=C`。在这个环境下 `printf '中文' | pbcopy` 会写出**长度为 0 的剪贴板条目**：
 
-| 剪贴板内容 | 实际发出 body |
-|---|---|
-| `hello world ascii only` | 22 字节 ✅ |
-| `abc 123 def` | 11 字节 ✅ |
-| `纯文本 你好` | **0 字节** ❌ |
-| `中` | **0 字节** ❌ |
+```
+$ printf '纯文本 你好' | pbcopy; osascript -e 'clipboard info'
+«class utf8», 0, «class ut16», 2, string, 0, Unicode text, 0       ← 全是 0
+$ osascript -e 'set the clipboard to "纯文本 你好"'; osascript -e 'clipboard info'
+Unicode text, 12, string, 11, «class utf8», 16, «class ut16», 14   ← 正常
+```
 
-纯 ASCII 文本、文件、图片均正常；**文件内含中文也正常**（场景 d 的 `.txt` 含中文反而成功）。坏的只有「文本条目」这条路径。原版与简化版同样中招，属继承缺陷。
+拿坏掉的剪贴板跑捷径，会看到「上传 0 字节」，**极易误判成「Shortcuts 不支持中文」**——本次接续时就一度这样误判并写进文档，随后被证伪：用 AppleScript 正确写入后，中文在**原版与简化版上都能正常上传**。
+
+**所以：设置含非 ASCII 的剪贴板必须用 `osascript -e 'set the clipboard to "…"'`，不要用 `pbcopy`。**
 
 → 详细记录、构建管线与已知坑见 **`shortcuts/apple/README.md`**；构建用 `shortcuts/apple/build.sh`，校验用 `verify.py`。
+
 
 
 ## 0. 仓库未提交改动（全部在本机工作区，未 commit）

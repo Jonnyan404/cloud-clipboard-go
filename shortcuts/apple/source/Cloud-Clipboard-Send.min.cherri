@@ -1,6 +1,8 @@
 #define name Cloud-Clipboard-Send-Min
 #define inputs file, image, text, url, pdf
-#define from sharesheet
+// 三个入口同时声明：iOS 分享菜单 + macOS Finder 快速操作 + macOS 菜单栏。
+// 只写 sharesheet 的话，macOS 上不会出现在 Finder 右键的「快速操作」里，而那是 macOS 最自然的入口。
+#define from sharesheet,quickactions,menubar
 #define noinput getclipboard
 #define color blue
 #define version 26
