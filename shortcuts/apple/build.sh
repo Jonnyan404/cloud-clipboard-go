@@ -100,12 +100,10 @@ build_one() {
     "$PY" "$SRC/inject_import_questions.py" "$src" "$unsigned"
 
     if [ "$DO_SIGN" = "1" ]; then
-        # 签名前必须重启 Shortcuts，否则 sign 会拿到过期的动作定义。
-        # 注意：这一步会扰动用户已安装的捷径（观察到被重命名、动作数 +1），属已知副作用。
-        pkill -x Shortcuts 2>/dev/null || true
-        sleep 2
-        open -a Shortcuts
-        sleep 6
+        # 直接签名即可，不需要先重启 Shortcuts。
+        # 曾照抄交接文档的流程加入「pkill Shortcuts → 重开 → 再签名」，并在注释里断言
+        # 「否则会拿到过期的动作定义」——那是没有依据的推测。2026-09-16 实测：不重启直接
+        # 签名完全正常。而重启会扰动用户已安装的捷径（观察到被重命名、动作数 +1），故移除。
         shortcuts sign -i "$unsigned" -o "$signed" --mode anyone
         # sign 会打印若干 ObjC "Unrecognized attribute string flag" 噪音，属正常现象。
         cp "$signed" "$OUT/"

@@ -41,7 +41,7 @@ Worker 的路由注释写着「无 /api 前缀，与自托管 Go 后端路径对
 ./build.sh --verify-only      # 只跑校验
 ```
 
-签名阶段会重启 Shortcuts.app，这是必须的——否则 `shortcuts sign` 会读到过期的动作定义。签名时打印的若干 `Unrecognized attribute string flag` 属正常噪音。
+签名直接执行即可，**不需要先重启 Shortcuts.app**。曾照抄交接文档加入「`pkill Shortcuts` → 重开 → 再签名」的步骤，并断言「否则会拿到过期的动作定义」——那是没有依据的推测。2026-09-16 实测：不重启直接签名完全正常；而重启会扰动已安装的捷径（观察到被重命名、动作数 +1），因此已从 `build.sh` 移除。签名时打印的若干 `Unrecognized attribute string flag` 属正常噪音。
 
 **cherri 的身份必须钉死。** 它当前是从源码构建的裸二进制，`cherri --version` 打印的 `v2.3.0` 只是版本常量，实际代码来自 commit `dc82114f346f`（`go version -m` 可验证，`build.sh` 会检查并在不一致时告警）。
 
@@ -127,7 +127,7 @@ cherri 的动作名是 **`showNotification(body, title, playSound, attachment)`*
 
 ### Receive 验收（2026-09-16，首次）
 
-`Cloud-Clipboard-Receive` 此前从未安装、从未验收。补上入口（原先 `WFWorkflowTypes` 只有 `[Watch, ShowInSearch]`，等于没有可用入口）后实测四类：
+`Cloud-Clipboard-Receive-Min`（2026-09-16 由 `Cloud-Clipboard-Receive` 改名，与 Send 保持 `-Min` 命名一致）此前从未安装、从未验收。补上入口（原先 `WFWorkflowTypes` 只有 `[Watch, ShowInSearch]`，等于没有可用入口）后实测四类：
 
 | # | 服务端内容 | 期望 | 实测 |
 | :--- | :--- | :--- | :--- |
