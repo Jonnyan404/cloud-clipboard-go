@@ -34,3 +34,14 @@ openwrt/build/
 # build caches / local artifacts
 /.vite/
 /cloud-clip/cloud-clipboard-go-embed
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Apple 快捷指令：构建中间产物（可由 shortcuts/apple/build.sh 重建）
+/shortcuts/apple/source/*_unsigned.shortcut
+/shortcuts/apple/source/*.plist
+
+# 本地 AI 工作数据（项目记忆，不入库）
+/.workbuddy-ai/
