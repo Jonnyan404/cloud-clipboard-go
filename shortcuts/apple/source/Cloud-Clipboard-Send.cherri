@@ -84,4 +84,5 @@ if !@savedID {
 if @model != "Mac" {
     vibrate()
 }
-show("已发送 {@savedID}")
+// 用通知而不是 show()：show() 会在屏幕中央弹一张结果卡片，每次发送都打断视线。
+showNotification("已发送 {@savedID}", "Cloud Clipboard", false)

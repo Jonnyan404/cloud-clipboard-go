@@ -63,4 +63,6 @@ if !@savedID {
     alert("服务器未确认保存，请检查部署地址及服务器状态。")
     stop()
 }
-show("已发送 {@savedID}")
+// 用通知而不是 show()：show() 会在屏幕中央弹一张结果卡片，每次发送都打断视线；
+// 通知只进通知中心。playSound 传 false，避免连续发送时反复响铃。
+showNotification("已发送 {@savedID}", "Cloud Clipboard", false)

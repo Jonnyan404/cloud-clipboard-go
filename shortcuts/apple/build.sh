@@ -41,6 +41,8 @@ export PATH="/usr/local/bin:$PATH"
 PY="$(command -v python3)"
 GO="$(command -v go || true)"
 
+VERIFY_FAILED=0
+
 check_cherri() {
     if ! command -v cherri >/dev/null 2>&1; then
         cat >&2 <<EOF
@@ -99,6 +101,7 @@ build_one() {
 
     if [ "$DO_SIGN" = "1" ]; then
         # 签名前必须重启 Shortcuts，否则 sign 会拿到过期的动作定义。
+        # 注意：这一步会扰动用户已安装的捷径（观察到被重命名、动作数 +1），属已知副作用。
         pkill -x Shortcuts 2>/dev/null || true
         sleep 2
         open -a Shortcuts
@@ -109,7 +112,11 @@ build_one() {
         echo "   已签名并放置: $OUT/$(basename "$signed")"
     fi
 
-    "$PY" "$HERE/verify.py" "$src" "$unsigned"
+    # 校验失败不立即中止——否则一个不合规的源码会挡住后面所有源码的构建。
+    # 改为累积失败，全部跑完后再以非零码退出。
+    if ! "$PY" "$HERE/verify.py" "$src" "$unsigned"; then
+        VERIFY_FAILED=1
+    fi
 }
 
 if [ "$VERIFY_ONLY" = "1" ]; then
@@ -117,8 +124,11 @@ if [ "$VERIFY_ONLY" = "1" ]; then
         [ -n "$FILTER" ] && case "$src" in *"$FILTER"*) ;; *) continue ;; esac
         name="$(awk '/^#define name /{print $3; exit}' "$src")"
         unsigned="$SRC/${name}_unsigned.shortcut"
-        [ -f "$unsigned" ] && "$PY" "$HERE/verify.py" "$src" "$unsigned"
+        if [ -f "$unsigned" ]; then
+            "$PY" "$HERE/verify.py" "$src" "$unsigned" || VERIFY_FAILED=1
+        fi
     done
+    [ "${VERIFY_FAILED:-0}" = "0" ] || { echo "有产物未通过校验" >&2; exit 1; }
     exit 0
 fi
 
@@ -135,4 +145,9 @@ for src in "$SRC"/*.cherri; do
 done
 
 [ "$found" = "1" ] || { echo "没有匹配 '$FILTER' 的源码" >&2; exit 1; }
+
+if [ "${VERIFY_FAILED:-0}" != "0" ]; then
+    echo "构建完成，但有源码未通过校验（见上方 ✗ 项）。" >&2
+    exit 1
+fi
 echo "完成。"

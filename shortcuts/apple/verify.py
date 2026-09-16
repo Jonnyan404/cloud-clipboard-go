@@ -41,6 +41,23 @@ def collect_compared_strings(obj, out):
             collect_compared_strings(v, out)
 
 
+def compared_strings_by_conditional(actions):
+    """按「单个条件动作」分组收集比较字符串。
+
+    必须分组统计：若在整个动作列表上累加，几处正常的少量比较（如 `== "image"`、
+    `== "Mac"`）会被凑成大数字，误报成类型清单链式比较。
+    """
+    groups = []
+    for a in actions:
+        if a.get("WFWorkflowActionIdentifier") != "is.workflow.actions.conditional":
+            continue
+        found = []
+        collect_compared_strings(a.get("WFWorkflowActionParameters", {}), found)
+        if found:
+            groups.append(found)
+    return groups
+
+
 def main():
     if len(sys.argv) != 3:
         print(__doc__)
@@ -82,22 +99,24 @@ def main():
         print(f"   导入问答: {len(questions)} 个，ActionIndex={[q.get('ActionIndex') for q in questions]}")
 
     # 2. 本地化类型名比较
-    compared = []
-    collect_compared_strings(actions, compared)
-    bad_names = sorted({s for s in compared if s in LOCALIZED_TYPE_NAMES})
+    groups = compared_strings_by_conditional(actions)
+    flat = [s for g in groups for s in g]
+    bad_names = sorted({s for s in flat if s in LOCALIZED_TYPE_NAMES})
     if bad_names:
         failures.append(f"条件里出现本地化类型名比较：{bad_names}（非中英文系统会静默走错分支）")
-    if len(compared) >= TYPE_LIST_THRESHOLD:
+    heavy = sorted((g for g in groups if len(g) >= TYPE_LIST_THRESHOLD), key=len, reverse=True)
+    if heavy:
         failures.append(
-            f"单个条件里比较了 {len(compared)} 个字符串，疑似「类型清单」链式比较：{compared[:8]}"
+            f"某个条件里比较了 {len(heavy[0])} 个字符串，疑似「类型清单」链式比较：{heavy[0][:8]}"
         )
+    print(f"   条件比较: 共 {len(groups)} 处条件含比较，单处最多 {max((len(g) for g in groups), default=0)} 个字符串")
 
     # 3. 已知会出问题的动作
     ids = collections.Counter(a.get("WFWorkflowActionIdentifier") for a in actions)
     if ids.get("is.workflow.actions.getitemtype"):
         notes.append(f"使用了 typeOf（{ids['is.workflow.actions.getitemtype']} 次）—— 本机实测会闪变，别拿它做唯一判据")
     if ids.get("is.workflow.actions.setitemname"):
-        notes.append(f"使用了 setName（{ids['is.workflow.actions.setitemname']} 次）—— 对含非 ASCII 的文本条目可能产生空内容")
+        notes.append(f"使用了 setName（{ids['is.workflow.actions.setitemname']} 次）—— 确认是有意为之（本项目里用于给下载文件恢复原始文件名）")
 
     # 4. 平台入口
     types = data.get("WFWorkflowTypes", [])
