@@ -98,8 +98,9 @@ showNotification("已发送 {@savedID}", "Cloud Clipboard", false)
 
 cherri 的动作名是 **`showNotification(body, title, playSound, attachment)`**，不是 `notification`。`playSound` 传 `false`，连续发送时不会反复响铃。两个 Send 源码同步修改，动作数不变。
 
-**验证状态**：流程已验证（跑通后服务端正常收到消息，产物里 `notification=1`、`showresult=0`）。
-**但通知是否真的显示，尚未验证**——系统日志被沙箱挡住（`log: Cannot run while sandboxed`），通知数据库需要全盘访问权限，ncprefs 里的位掩码含义未确认。若通知不出现，检查 **系统设置 → 通知 → 快捷指令**。
+**验证状态：已完整验证。** 跑通后服务端正常收到消息（产物里 `notification=1`、`showresult=0`），且已在界面上确认通知确实弹出。
+
+> 自查记录：这一步最初只能验到"流程没被破坏"，通知是否真显示无法自证——系统日志被沙箱挡住（`log: Cannot run while sandboxed`），通知数据库需要全盘访问权限，ncprefs 里的位掩码含义未确认。最后是人工目视确认的。**无法自证时如实标注为未验证，比含糊过去强。**
 
 ### Receive 验收（2026-09-16，首次）
 
