@@ -766,20 +766,25 @@ func (s *ClipboardServer) persistAndRespond(w http.ResponseWriter, r *http.Reque
 	}
 
 	event := s.addMessageToQueueAndBroadcast("file", fileReceiveData, room, r)
+	s.writeContentJSON(w, r, room, event.Data.ID(), DetermineResponseType(fileInfo.Name))
+	return true
+}
 
+// writeContentJSON 构造内容的绝对 URL 并输出统一的 JSON 响应。
+// persistAndRespond 与 storeRawText 都需要这一段，抽出来避免两处各写一遍
+// （含 room != "default" 时才拼 ?room= 这个容易漏掉的细节）。
+func (s *ClipboardServer) writeContentJSON(w http.ResponseWriter, r *http.Request, room string, id int, respType string) {
 	scheme := getScheme(r)
-	contentURL := fmt.Sprintf("%s://%s%s/content/%d", scheme, r.Host, s.config.Server.Prefix, event.Data.ID())
+	contentURL := fmt.Sprintf("%s://%s%s/content/%d", scheme, r.Host, s.config.Server.Prefix, id)
 	if room != "default" {
 		contentURL += fmt.Sprintf("?room=%s", room)
 	}
-	responseType := DetermineResponseType(fileInfo.Name)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
 		"url":  contentURL,
-		"id":   strconv.Itoa(event.Data.ID()),
-		"type": responseType,
+		"id":   strconv.Itoa(id),
+		"type": respType,
 	})
-	return true
 }
 
 // sniffPayload 通过内容魔数判断负载类型，返回内容类型与建议扩展名。
@@ -838,9 +843,9 @@ func sniffPayload(data []byte) (kind, ext string) {
 		}
 	}
 	if bytes.IndexByte(data, 0) >= 0 {
-		if _, ok := decodeUnicodeText(data); ok {
-			return "text", "txt"
-		}
+		// 含 NUL 且在上方未能解码为 Unicode 文本 → 二进制。
+		// 这里不要再调一次 decodeUnicodeText：data 中间没有任何变化，
+		// 上面的判断已经确认它解不出来，重复调用只会白跑一遍 O(n) 解码。
 		return "file", "bin"
 	}
 	if utf8.Valid(data) {
@@ -940,18 +945,7 @@ func (s *ClipboardServer) storeRawText(w http.ResponseWriter, r *http.Request, r
 
 	s.logger.Printf("收到文本消息 (房间: %s): %s", room, text)
 	event := s.addMessageToQueueAndBroadcast("text", text, room, r)
-
-	scheme := getScheme(r)
-	contentURL := fmt.Sprintf("%s://%s%s/content/%d", scheme, r.Host, s.config.Server.Prefix, event.Data.ID())
-	if room != "default" {
-		contentURL += fmt.Sprintf("?room=%s", room)
-	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
-		"url":  contentURL,
-		"id":   strconv.Itoa(event.Data.ID()),
-		"type": "text",
-	})
+	s.writeContentJSON(w, r, room, event.Data.ID(), "text")
 	return true
 }
 
