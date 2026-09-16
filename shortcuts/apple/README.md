@@ -88,6 +88,21 @@
 
 `Cloud-Clipboard-Send-Min` 是简化版：动作数 **121 → 68**，本地化类型名比较 **29 → 0**，客户端不再判断类型、改由服务端按魔数嗅探单点决策。
 
+### Receive 验收（2026-09-16，首次）
+
+`Cloud-Clipboard-Receive` 此前从未安装、从未验收。补上入口（原先 `WFWorkflowTypes` 只有 `[Watch, ShowInSearch]`，等于没有可用入口）后实测四类：
+
+| # | 服务端内容 | 期望 | 实测 |
+| :--- | :--- | :--- | :--- |
+| R1 | 纯文本 | 进剪贴板 | ✅ `阿岚的文本验收 12345` |
+| R2 | 富文本 HTML（服务端已剥成纯文本） | 进剪贴板、无标签 | ✅ `标题 Hello & 你好` |
+| R3 | PNG 图片 | 进剪贴板（图像） | ✅ 剪贴板出现 `PNGf` / TIFF / JPEG / BMP 等类型 |
+| R4 | 二进制文件 `u.bin` | 下载 + 保存 | ✅ 落盘 `~/Downloads/clipboard.bin`，SHA-256 与源文件一致 |
+
+**4/4 通过，且全程无需人工点击。** `saveFilePrompt` 的「询问保存位置」默认为关，会直接存到 `~/Downloads` 而不弹对话框。
+
+> 注意 `/content/latest` 只返回**最新一条**，所以逐条验收时必须在每个用例前重新上传该用例的内容。
+
 ### ⚠️ 测试手法陷阱：不要用 `pbcopy` 写非 ASCII 内容
 
 本机 shell 的 `LANG` / `LC_ALL` 为空、`LC_CTYPE=C`。在这个环境下 `printf '中文' | pbcopy` 会写出**损坏的剪贴板条目**：
