@@ -190,40 +190,31 @@ cherri 的动作名是 **`showNotification(body, title, playSound, attachment)`*
 - **重复拉取会累积文件**：`overwrite` 传 `false`，所以第二次存成 `clipboard-2.bin`、第三次 `clipboard-3.bin`…… 不会覆盖。
 - **文件名会退化**：客户端不传 `?name=`，服务端只能按嗅探到的扩展名命名，原名（如 `u.bin`）会变成 `clipboard.bin`。
 
-### 静默保存（已实现，路径格式待验）
+### 保存位置：只能每次询问（结论）
 
-Receive 新增第 4 个导入问答 `qSaveDir`：
+**「静默保存到指定目录」做不到**，所以 Receive 只保留「询问保存位置」一种行为，不提供保存目录配置项。
 
-- **填了保存目录**（绝对路径，如 `/Users/你的用户名/Downloads`）→ 收到文件时**静默直存**，不弹对话框。
-- **留空** → 回退到原来的「询问保存位置」。
+实测经过（2026-09-16）：
 
-实现方式：cherri 里其实有**两个**保存动作——
+1. cherri 里确实有**两个**保存动作，`saveFile` 自带 `WFAskWhereToSave: false`，理论上可以静默直存：
+   ```
+   action default 'documentpicker.save' saveFilePrompt(file, ?overwrite)                        ← 弹对话框
+   action 'documentpicker.save' saveFile(file: 'WFFileDestinationPath', content, ?overwrite) {
+       "WFAskWhereToSave": false                                                                ← 不弹，直存
+   }
+   ```
+   于是加了第 4 个导入问答 `qSaveDir`（填目录→静默直存，留空→询问）。
+2. 在捷径 App 里关掉「询问保存位置」并**点选文件夹**后实测：**文件落到了 iCloud 云盘，而不是所选的真实路径。**
 
-```
-action default 'documentpicker.save' saveFilePrompt(file, ?overwrite)                        ← 弹对话框
-action 'documentpicker.save' saveFile(file: 'WFFileDestinationPath', content, ?overwrite) {
-    "WFAskWhereToSave": false                                                                ← 不弹，直存
-}
-```
+**根因**：Shortcuts 的文件夹选择器作用域限于**文件提供者命名空间**（iCloud 云盘 / 我的 Mac），`WFFileDestinationPath` 是**该命名空间内的路径**，不是真实文件系统路径。因此 `/Users/…/Downloads` 这类绝对路径不可用——**「静默保存到任意本地目录」在 Shortcuts 里无法表达**。
 
-所以**不需要 patcher**，`saveFile` 本身就带 `WFAskWhereToSave: false`。产物已验证包含该键与 `WFFileDestinationPath`。
+→ 已撤回 `qSaveDir` 与静默保存分支：Receive 由 126 动作回到 **113**，导入问答由 4 个回到 **3** 个，保存动作只剩 1 个（询问式）。
 
-**待验**：`WFFileDestinationPath` 接受何种路径格式（绝对路径 `/Users/…/Downloads`，还是文件提供者命名空间内的相对路径）**尚未真机验证**。
+**「询问保存位置」本身就是原生保存对话框，也就是浏览选择器**——只是每次都要确认一次。这是当前唯一可行的行为。
 
-#### 为什么不做「导入时浏览选目录」
+> 备选（未采用）：若确实要静默，只能存到 iCloud 云盘内的固定位置，接受落点不在本地。
 
-按 Apple 文档，导入问答是绑定到动作的**可用参数**上的（在 App 里从参数列表挑选）。但**目录在 Shortcuts 里是安全作用域 bookmark（不透明的二进制 blob）**，无法随捷径分发；而 `saveFile` 的路径来自变量，没有静态参数值可挂问题。**所以导入时浏览选目录做不到。**
-
-三个可行方案，取舍不同：
-
-| 方案 | 操作 | 结果 |
-| :--- | :--- | :--- |
-| **A. 填路径**（当前） | 导入时手打绝对路径 | 静默保存，不弹窗 |
-| **B. 留空**（当前回退） | 什么都不填 | 每次弹**原生保存对话框**——那本身就是个浏览选择器，只是每次都要问 |
-| **C. App 内点选**（推荐给不熟路径的人） | 导入后打开捷径，在「存储文件」动作里点选目标文件夹 | 静默保存且无需打路径；**一次性操作** |
-
-> 方案 C 的代价：安装好的捷径会与 `.cherri` 源码不一致，**重新构建导入会覆盖掉这次点选**。
-> 另外方案 C 能否点选我无法在无界面环境验证，属预期行为。
+> 教训：`WFFileDestinationPath` 的路径语义我最初是靠猜的（还写进过文档），直到真机点选才发现是提供者命名空间。**涉及平台语义的参数，别靠推断，早点实测。**
 
 > 注意 `/content/latest` 只返回**最新一条**，逐条验收时必须在每个用例前重新上传该用例的内容。
 
