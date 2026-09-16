@@ -106,6 +106,9 @@ Worker 的路由注释写着「无 /api 前缀，与自托管 Go 后端路径对
 
 **原版 5/6，简化版 6/6。** 简化版修好了 d（把 `.txt` 当文件存的那个回归），其余场景行为一致。
 
+> **2026-09-16：原版 `Cloud-Clipboard-Send` 已退役并从仓库删除**（源码与签名产物均已移除，需要时可在 git 历史里找回）。
+> 上表的原版列保留作为对照记录。它的 29 项本地化类型名比较、4 路分支与 `?as=file` 协议都不再维护。
+
 `Cloud-Clipboard-Send-Min` 是简化版：动作数 **121 → 68**，本地化类型名比较 **29 → 0**，客户端不再判断类型、改由服务端按魔数嗅探单点决策。
 
 ### 发送结果用通知，不用结果卡片
@@ -145,10 +148,25 @@ cherri 的动作名是 **`showNotification(body, title, playSound, attachment)`*
 - **重复拉取会累积文件**：`overwrite` 传 `false`，所以第二次存成 `clipboard-2.bin`、第三次 `clipboard-3.bin`…… 不会覆盖。
 - **文件名会退化**：客户端不传 `?name=`，服务端只能按嗅探到的扩展名命名，原名（如 `u.bin`）会变成 `clipboard.bin`。
 
-### 如果要让它静默保存（未实施）
+### 静默保存（已实现，路径格式待验）
 
-在产物里给 `documentpicker.save` 补上 `"WFAskWhereToSave": false` 即可（cherri 表达不了，得走 patcher）。
-**未实施、未验证**——这是个取舍：静默保存不打断视线，但用户失去选择保存位置的自由。
+Receive 新增第 4 个导入问答 `qSaveDir`：
+
+- **填了保存目录**（绝对路径，如 `/Users/你的用户名/Downloads`）→ 收到文件时**静默直存**，不弹对话框。
+- **留空** → 回退到原来的「询问保存位置」。
+
+实现方式：cherri 里其实有**两个**保存动作——
+
+```
+action default 'documentpicker.save' saveFilePrompt(file, ?overwrite)                        ← 弹对话框
+action 'documentpicker.save' saveFile(file: 'WFFileDestinationPath', content, ?overwrite) {
+    "WFAskWhereToSave": false                                                                ← 不弹，直存
+}
+```
+
+所以**不需要 patcher**，`saveFile` 本身就带 `WFAskWhereToSave: false`。产物已验证包含该键与 `WFFileDestinationPath`。
+
+**待验**：`WFFileDestinationPath` 接受何种路径格式（绝对路径 `/Users/…/Downloads`，还是文件提供者命名空间内的相对路径）**尚未真机验证**。
 
 > 注意 `/content/latest` 只返回**最新一条**，逐条验收时必须在每个用例前重新上传该用例的内容。
 
