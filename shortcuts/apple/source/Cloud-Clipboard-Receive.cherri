@@ -1,4 +1,4 @@
-#define name Cloud-Clipboard-Receive-Min
+#define name Cloud-Clipboard-Receive
 #define color green
 #define version 26
 // Receive 不需要输入（它是"拉取"），所以不要 sharesheet / quickactions——那两个是给带输入的发送用的。
