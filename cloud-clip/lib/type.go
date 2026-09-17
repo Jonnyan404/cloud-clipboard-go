@@ -49,11 +49,12 @@ type PostData struct {
 
 // DeviceMeta 保存连接设备的信息
 type DeviceMeta struct {
-	ID      string `json:"id"`      // 设备ID
-	Type    string `json:"type"`    // 例如："Desktop", "Mobile"
-	Device  string `json:"device"`  // 例如："Apple Mac", "iPhone"
-	OS      string `json:"os"`      // 例如："macOS 14", "iOS 17"
-	Browser string `json:"browser"` // 例如："Chrome 120"
+	ID      string `json:"id"`             // 设备ID
+	Type    string `json:"type"`           // 例如："Desktop", "Mobile"
+	Name    string `json:"name,omitempty"` // 客户端声明的设备名；空表示未声明，前端按类型显示通用名称
+	Device  string `json:"device"`         // 例如："Apple Mac", "iPhone"
+	OS      string `json:"os"`             // 例如："macOS 14", "iOS 17"
+	Browser string `json:"browser"`        // 例如："Chrome 120"
 }
 
 // ClipboardServer 结构体定义

@@ -65,9 +65,10 @@ export class TextHandler {
         timestamp: Math.floor(Date.now() / 1000), // 使用毫秒时间戳
         senderIP: request.headers.get('CF-Connecting-IP') || 'unknown',
         senderClientID: String(url.searchParams.get('client') || '').trim(), // 前端每客户端持久ID
-        userAgent: request.headers.get('User-Agent') || 'unknown'
+        userAgent: request.headers.get('User-Agent') || 'unknown',
+        deviceName: String(url.searchParams.get('name') || '') // 客户端声明的设备名，空表示未声明
       };
-      const senderDevice = buildSenderDevice(messageData.userAgent);
+      const senderDevice = buildSenderDevice(messageData.userAgent, messageData.deviceName);
 
       console.log('准备保存文本消息:', messageData);
 
@@ -190,7 +191,8 @@ export class TextHandler {
     const senderIP = request.headers.get('CF-Connecting-IP') || 'unknown';
     const senderClientID = String(url.searchParams.get('client') || '').trim();
     const userAgent = request.headers.get('User-Agent') || 'unknown';
-    const senderDevice = buildSenderDevice(userAgent);
+    // 更新的是同一台设备自己发的消息，deviceName 列保持原值不动，这里只用于广播载荷
+    const senderDevice = buildSenderDevice(userAgent, url.searchParams.get('name'));
 
     await env.DB.prepare(`
       UPDATE messages

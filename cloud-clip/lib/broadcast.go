@@ -92,7 +92,7 @@ func (s *ClipboardServer) broadcastMessage(message PostEvent, room string) {
 // 这是一个辅助函数，供 handle_text, handle_finish 等调用
 func (s *ClipboardServer) addMessageToQueueAndBroadcast(dataType string, data interface{}, room string, r *http.Request) PostEvent {
 	ip := get_remote_ip(r)
-	ua := s.parse_user_agent(r.UserAgent())
+	ua := s.parse_user_agent(r.UserAgent(), resolveDeviceName(r))
 
 	// Create ReceiveBase first
 	receiveBase := ReceiveBase{

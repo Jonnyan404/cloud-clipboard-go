@@ -106,11 +106,12 @@ async function finalizeUploadedFile({ request, env, url, room, uuid, fileName, f
     senderIP: request.headers.get('CF-Connecting-IP') || 'unknown',
     senderClientID: String(url.searchParams.get('client') || '').trim(), // 前端每客户端持久ID
     userAgent: request.headers.get('User-Agent') || 'unknown',
+    deviceName: String(url.searchParams.get('name') || ''), // 客户端声明的设备名，空表示未声明
     uuid,
     expireTime,
     url: fileUrl
   };
-  const senderDevice = buildSenderDevice(messageData.userAgent);
+  const senderDevice = buildSenderDevice(messageData.userAgent, messageData.deviceName);
 
   const saveResult = await saveToD1(env.DB, messageData, env);
   const messageId = saveResult.messageId;

@@ -4,7 +4,8 @@ import { DatabaseSync } from 'node:sqlite';
 
 export function makeEnv() {
   const db = new DatabaseSync(':memory:');
-  // 与线上 D1 的 messages 表结构一致
+  // 刻意停留在「加 deviceName 列之前」的表结构 —— 线上已有部署就是这个样子，
+  // 让 saveToD1 里的自愈加列逻辑每次测试都真的被走到。
   db.exec(`CREATE TABLE messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT, type TEXT, content TEXT, name TEXT, size INTEGER,
     room TEXT, timestamp INTEGER, senderIP TEXT, senderClientID TEXT, userAgent TEXT,

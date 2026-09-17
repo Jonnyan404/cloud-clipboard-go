@@ -219,7 +219,8 @@ func (s *ClipboardServer) handle_push(w http.ResponseWriter, r *http.Request) {
 	clientUA := s.parser.Parse(userAgent)
 	deviceMeta := DeviceMeta{
 		ID:      deviceID,
-		Type:    detectDeviceType(userAgent),
+		Type:    detectDeviceType(userAgent, clientUA.Os.Family),
+		Name:    resolveDeviceName(r),
 		Device:  strings.TrimSpace(fmt.Sprintf("%s %s %s", clientUA.Device.Brand, clientUA.Device.Model, clientUA.Os.Family)),
 		OS:      fmt.Sprintf("%s %s", clientUA.Os.Family, clientUA.Os.Major),
 		Browser: fmt.Sprintf("%s %s", clientUA.UserAgent.Family, clientUA.UserAgent.Major),
@@ -589,7 +590,7 @@ func (s *ClipboardServer) updateTextMessage(id int, newContent string, room stri
 				s.messageQueue.List[i].Data.TextReceive.Content = newContent
 				s.messageQueue.List[i].Data.TextReceive.Timestamp = time.Now().Unix()
 				s.messageQueue.List[i].Data.TextReceive.SenderIP = get_remote_ip(r)
-				s.messageQueue.List[i].Data.TextReceive.SenderDevice = s.parse_user_agent(r.UserAgent())
+				s.messageQueue.List[i].Data.TextReceive.SenderDevice = s.parse_user_agent(r.UserAgent(), resolveDeviceName(r))
 
 				// 广播更新事件
 				wsMsg := WebSocketMessage{
@@ -872,7 +873,7 @@ func (s *ClipboardServer) handle_finish(w http.ResponseWriter, r *http.Request) 
 			Room:         room,
 			Timestamp:    timestamp,
 			SenderIP:     get_remote_ip(r),
-			SenderDevice: s.parse_user_agent(r.UserAgent()),
+			SenderDevice: s.parse_user_agent(r.UserAgent(), resolveDeviceName(r)),
 		},
 		Name:   fileInfo.Name,
 		Size:   fileInfo.Size,

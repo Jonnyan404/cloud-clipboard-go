@@ -32,7 +32,7 @@ function buildJsonContentPayload(row) {
     room: row.room || 'default',
     senderIP: row.senderIP || 'unknown',
     senderClientID: row.senderClientID || '',
-    senderDevice: buildSenderDevice(row.userAgent || 'unknown'),
+    senderDevice: buildSenderDevice(row.userAgent || 'unknown', row.deviceName),
   };
 
   if (row.type === 'text') {

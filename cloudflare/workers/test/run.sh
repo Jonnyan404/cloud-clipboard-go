@@ -2,6 +2,7 @@
 # 跑 Cloudflare Worker 的测试。
 #
 #   receive-path.test.mjs  —— 上传（/upload multipart 与 /text）→ /content/latest?json=1 → Receive 决策树
+#   device-name.test.mjs   —— 设备名（?name=）落库与回读，含自愈加列路径
 #
 # 端到端测试需要先打包处理器（Worker 源码用打包器风格的无后缀导入，Node 直接加载不了），
 # 并用 node:sqlite 充当 D1、Map 充当 R2，因此不需要 wrangler、不联网。
@@ -18,3 +19,7 @@ done
 echo
 echo "── 上传与 Receive 链路（/upload multipart 与 /text → content/latest → 决策树）"
 node --no-warnings test/receive-path.test.mjs
+
+echo
+echo "── 设备名链路（?name= → 落库 → content/latest 回读）"
+node --no-warnings test/device-name.test.mjs

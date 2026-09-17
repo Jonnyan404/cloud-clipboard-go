@@ -1,5 +1,5 @@
 import { normalizeRoomName, resolveRoomAuth } from '../auth';
-import { buildSenderDevice, parseUserAgent } from '../utils';
+import { buildSenderDevice, parseUserAgent, sanitizeDeviceName } from '../utils';
 
 function isRoomListEnabled(env) {
   return ['1', 'true', 'yes', 'on'].includes(String(env.ROOM_LIST || '').toLowerCase());
@@ -226,7 +226,7 @@ export class WebSocketRoom {
             room: row.room || 'default',
             senderIP: row.senderIP || 'unknown',
             senderClientID: row.senderClientID || '',
-            senderDevice: buildSenderDevice(row.userAgent || 'unknown')
+            senderDevice: buildSenderDevice(row.userAgent || 'unknown', row.deviceName)
           }
         };
 
@@ -349,7 +349,7 @@ export class WebSocketRoom {
     void this.removeSessionPresence(sessionId);
   }
 
-  broadcastDeviceConnect(sessionId, userAgent, room) {
+  broadcastDeviceConnect(sessionId, userAgent, room, deviceName = '') {
     try {
       const deviceInfo = parseUserAgent(userAgent);
       
@@ -358,6 +358,7 @@ export class WebSocketRoom {
         data: {
           id: sessionId,
           type: deviceInfo.type,
+          name: sanitizeDeviceName(deviceName),
           device: deviceInfo.device,
           os: deviceInfo.os,
           browser: deviceInfo.browser

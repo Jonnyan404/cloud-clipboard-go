@@ -118,6 +118,21 @@ $ curl http://localhost:9501/content/3?room=reisen-8fce
 }
 ```
 
+#### 声明设备名称
+
+发送文本、文件或连接 WebSocket（`/push`）时，可以用 `name` 参数声明发送端的显示名；不传则按 `User-Agent` 推断。
+
+```console
+$ curl -H "Content-Type: text/plain" --data-binary "来自树莓派" "http://localhost:9501/text?name=RaspberryPi"
+$ curl -F file=@image.png "http://localhost:9501/upload?name=RaspberryPi"
+```
+
+名字会写进消息的 `senderDevice.name`，Web 端优先显示它，没有才回落 `os` / `type`。主要给快捷指令、脚本这类 `User-Agent` 认不出来的来源用。
+
+- 最多 32 个字符，超出按字符截断（不会截坏多字节字符）
+- 控制字符会被剔除，首尾空白会被裁掉
+- 名字由客户端随每次请求带着走，服务端不存储、不记忆
+
 #### 密码认证
 
 ```console
