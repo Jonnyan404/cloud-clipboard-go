@@ -34,3 +34,16 @@ openwrt/build/
 # build caches / local artifacts
 /.vite/
 /cloud-clip/cloud-clipboard-go-embed
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Apple 快捷指令：source/ 只放源码与后处理脚本，产物一律在 shortcuts/apple/ 下。
+# 这里连签名产物也一并忽略——build.sh 曾把签名结果先写进 source/ 再 cp 上去，
+# 留下同字节副本，让人分不清该导入哪个。
+/shortcuts/apple/source/*.shortcut
+/shortcuts/apple/source/*.plist
+
+# 本地 AI 工作数据（项目记忆，不入库）
+/.workbuddy-ai/
