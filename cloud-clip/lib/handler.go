@@ -1294,6 +1294,15 @@ func (s *ClipboardServer) handleLatestContent(w http.ResponseWriter, r *http.Req
 			if msg.Data.Type() == "file" && msg.Data.FileReceive != nil {
 				// 确定文件类型
 				fileReceive := msg.Data.FileReceive
+
+				// 过期检查必须放在返回之前：否则客户端会拿着一条已过期的记录去下载，
+				// 拿到 404 的错误文本，然后存成一个顶着原文件名的假文件。
+				if fileReceive.Expire > 0 && fileReceive.Expire < time.Now().Unix() {
+					s.logger.Printf("尝试访问已过期的文件: %s (ID: %d)", fileReceive.Name, msg.Data.ID())
+					writeContentError(w, r, true, "文件已过期", http.StatusNotFound)
+					return
+				}
+
 				responseType = DetermineResponseType(fileReceive.Name)
 
 				// 构建JSON响应
@@ -1305,6 +1314,7 @@ func (s *ClipboardServer) handleLatestContent(w http.ResponseWriter, r *http.Req
 					"url":       filepath.Join(fileReceive.URL, fileReceive.Name),
 					"id":        strconv.Itoa(msg.Data.ID()),
 					"timestamp": fileReceive.Timestamp,
+					"expire":    fileReceive.Expire,
 				}
 			} else if msg.Data.Type() == "text" && msg.Data.TextReceive != nil {
 				responseType = "text"
