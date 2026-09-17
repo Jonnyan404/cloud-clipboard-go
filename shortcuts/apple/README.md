@@ -46,7 +46,7 @@
 
 | 接口 | 用途 | Go 服务端 | Cloudflare Worker |
 | :--- | :--- | :--- | :--- |
-| `POST /upload/raw` | 剪贴板路径（服务端按内容分流文字 / 图片） | ✅ | ✅ |
+| `POST /upload/raw` | 剪贴板路径（服务端读内容并分流文字 / 图片） | ✅ | ✅ |
 | `POST /upload` | 分享文件（multipart，part 自带真实文件名） | ✅ | ✅ |
 | `GET /content/latest?json=1` | 拉取最新内容 | ✅ | ✅ |
 | `GET /file/:uuid/:filename` | 下载文件 | ✅ | ✅ |
