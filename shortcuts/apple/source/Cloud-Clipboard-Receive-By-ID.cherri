@@ -1,0 +1,109 @@
+// 接收**指定 ID** 的那一条（不是最新一条）。
+//
+// 用途：发送成功的通知里会显示 ID（`已发送 <ID>`），想精确取回某一条时用这个。
+// 与「接收最新」的区别只有一处：请求的 URL 是 /content/<ID> 而不是 /content/latest。
+//
+// ID 有两个来源：
+//   1. 导入时填在「消息 ID」问答里 —— 适合固定取某一条
+//   2. 留空则每次运行时弹框询问 —— 适合临时取
+#define name Cloud-Clipboard-Receive-By-ID
+#define color green
+#define version 26
+// 与「接收最新」相同的入口：菜单栏 + Spotlight + 快捷指令搜索 + Apple Watch。
+#define from menubar,spotlight,search,watch
+
+#include 'actions/web'
+#include 'actions/text'
+#include 'actions/sharing'
+#include 'actions/documents'
+#include 'actions/device'
+
+#question qServerURL "服务器地址，例如 https://clip.example.com 或 http://127.0.0.1:9501" "http://127.0.0.1:9501"
+#question qRoomName "房间名，与发送端一致；默认填 default" "default"
+#question qRoomPassword "全局访问密码或房间密码；未设密码则留空" ""
+#question qMessageID "要接收的消息 ID（发送成功时的通知里有）。留空则每次运行时弹框询问" ""
+
+@rawEndpoint = text(qServerURL)
+@endpoint = getText(@rawEndpoint)
+@rawRoom = text(qRoomName)
+@room = getText(@rawRoom)
+@password = text(qRoomPassword)
+@endpoint = replaceText('^\s+|\s+$', '', @endpoint, true, true)
+@endpoint = replaceText('/+$', "", @endpoint, true, true)
+@room = replaceText('^\s+|\s+$', '', @room, true, true)
+if !@room { @room = "default" }
+if !@endpoint {
+    alert("请先编辑快捷指令顶部的部署地址、房间名和密码。")
+    stop()
+}
+@encodedRoom = urlEncode(@room)
+
+// 消息 ID：问答里填了就用，没填就当场问
+@rawID = text(qMessageID)
+@messageID = replaceText('^\s+|\s+$', '', @rawID, true, true)
+if !@messageID {
+    @asked = prompt("要接收哪一条？填消息 ID（发送成功时的通知里有）", "Text")
+    @messageID = replaceText('^\s+|\s+$', '', @asked, true, true)
+}
+if !@messageID {
+    alert("没有填消息 ID。")
+    stop()
+}
+
+@authorization = "Bearer {@password}"
+@response = downloadURL("{@endpoint}/content/{@messageID}?room={@encodedRoom}&json=1", {"Authorization":"{@authorization}", "Accept":"application/json", "Cache-Control":"no-cache"})
+@record = getDictionary(@response)
+@error = getValue(@record, "error")
+if @error {
+    @message = getValue(@record, "message")
+    alert("获取失败：{@error}\n{@message}")
+    stop()
+}
+const uuidValue = getValue(@record, "uuid")
+@uuid = getText(uuidValue)
+const nameValue = getValue(@record, "name")
+@filename = getText(nameValue)
+const typeValue = getValue(@record, "type")
+@msgType = getText(typeValue)
+@modelName = getDeviceDetail('Device Model')
+@model = getText(@modelName)
+if @uuid {
+    if @filename {
+        @encodedUUID = urlEncode(@uuid)
+        @encodedName = urlEncode(@filename)
+        @download = downloadURL("{@endpoint}/file/{@encodedUUID}/{@encodedName}?room={@encodedRoom}", {"Authorization":"{@authorization}", "Cache-Control":"no-cache"})
+        if @msgType == "image" {
+            @picture = getFirstItem(@download)
+            setClipboard(@picture, true)
+            if @model == "Mac" {
+                showNotification("已接收图片，已复制到剪贴板", "Cloud Clipboard", false)
+            }
+            if @model != "Mac" {
+                vibrate()
+            }
+        } else {
+            // 保存位置只能每次询问（Shortcuts 的文件夹选择器够不到任意本地绝对路径，见 NOTES.md）
+            @named = setName(@download, @filename)
+            @saved = saveFilePrompt(@named, false)
+            if @model == "Mac" {
+                reveal(@saved)
+            }
+            if @model != "Mac" {
+                vibrate()
+            }
+        }
+        stop()
+    }
+}
+@content = getValue(@record, "content")
+if !@content {
+    alert("服务器没有返回文字内容。")
+    stop()
+}
+setClipboard(@content, true)
+if @model == "Mac" {
+    showNotification("已接收文字，已复制到剪贴板", "Cloud Clipboard", false)
+}
+if @model != "Mac" {
+    vibrate()
+}

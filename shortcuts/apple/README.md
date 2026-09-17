@@ -6,7 +6,8 @@
 | :--- | :--- | :--- |
 | **Cloud-Clipboard-Send-Text** | 发送**文本** | iOS 分享菜单、macOS Finder 右键 →「快速操作」、菜单栏 |
 | **Cloud-Clipboard-Send-File** | 发送**文件 / 图片** | 同上 |
-| **Cloud-Clipboard-Receive** | 拉取：把最新一条放进剪贴板（是文件则保存） | macOS 菜单栏、Spotlight 搜索、Apple Watch |
+| **Cloud-Clipboard-Receive** | 拉取**最新一条**，放进剪贴板（是文件则保存） | macOS 菜单栏、Spotlight 搜索、Apple Watch |
+| **Cloud-Clipboard-Receive-By-ID** | 拉取**指定 ID** 的那一条 | 同上 |
 
 > **发送为什么要分成两个？** 因为剪贴板条目的「类型」在客户端判不准——它的名字反映的是
 > **剪贴板格式**（带 HTML 味就变 `Clipboard <日期>.html`、图片变 `.png`、纯文本没后缀），
@@ -14,7 +15,7 @@
 
 ## 安装
 
-1. 下载本目录下的 `Cloud-Clipboard-Send-Text.shortcut`、`Cloud-Clipboard-Send-File.shortcut` 与 `Cloud-Clipboard-Receive.shortcut`
+1. 下载本目录下的 `Cloud-Clipboard-Send-Text.shortcut`、`Cloud-Clipboard-Send-File.shortcut`、`Cloud-Clipboard-Receive.shortcut` 与 `Cloud-Clipboard-Receive-By-ID.shortcut`
 2. 双击导入「快捷指令」App
 3. 导入时会让你填三项：
    - **服务器地址** —— 如 `https://clip.example.com`，或局域网 `http://192.168.1.10:9501`
@@ -32,7 +33,14 @@
 - 发**文字** —— 复制好，运行「发送文本」（菜单栏或 Spotlight 都行）
 - 从浏览器/编辑器里分享选中的文字 —— 选「发送文本」
 
-**拉取** —— 运行 Cloud-Clipboard-Receive。最新一条会进剪贴板；如果是文件，会弹出保存对话框。
+**拉取**
+
+- **最新一条** —— 运行「接收最新」，直接进剪贴板
+- **指定某一条** —— 运行「按 ID 接收」，填上 ID
+  - ID 从哪来：**发送成功的通知里就有**（`已发送 <ID>`）
+  - 也可以在导入时把 ID 填进问答里固定住；留空则每次运行时弹框问
+
+如果是文件，会弹出保存对话框（见下方「已知限制」）。
 
 发送成功会弹通知；拉取成功也有通知（iOS 上是振动）。
 
