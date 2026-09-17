@@ -1,6 +1,6 @@
 import { Router } from 'itty-router';
 import { corsHeaders, handleCors } from './cors';
-import { canAccessRoom, canAccessRoomAsync, hasRoomAuthEntry, resolveRoomAuth, issueRoomSessionToken, validateRoomSessionToken, parseRoomSessionToken, extractAuthToken } from './auth';
+import { canAccessRoom, canAccessRoomAsync, hasRoomAuthEntry, resolveRoomAuth, issueRoomSessionToken, validateRoomSessionToken, parseRoomSessionToken, extractAuthToken, jsonError } from './auth';
 import { TextHandler } from './handlers/text';
 import { FileHandler } from './handlers/file';
 import { ContentHandler } from './handlers/content';
@@ -52,8 +52,31 @@ router.get('/push', WebSocketHandler.connect);
 // 健康检查
 router.get('/health', () => new Response('OK'));
 
+// 兜底路由：资源层没命中、上面也没命中时走这里。
+//
+// 为什么兜底要放在 Worker 而不是资源层（not_found_handling = "single-page-application"）：
+// 资源层的 SPA 回退只认「导航请求」，而浏览器点下载链接、打开分享链接正好就是导航请求，
+// 于是 /file/<uuid>/<name> 会被回成 index.html，文件下载就变成了「下载到一个 html」。
+// 放在这里之后，导航请求和 XHR 走同一条路，不再有两套行为。
+router.all('*', handleFallback);
+
 // 房间会话令牌有效期，默认 1 小时
 const ROOM_SESSION_TTL = 3600;
+
+// 兜底处理：GET/HEAD 回前端首页（等价于原来的 SPA 回退），其余方法明确 404。
+// 前端用的是 hash 路由，所以只有手输错地址之类的场景会走到这里。
+async function handleFallback(request, env) {
+  if (request.method !== 'GET' && request.method !== 'HEAD') {
+    return jsonError(404, '接口不存在', 'Not Found');
+  }
+
+  if (!env.ASSETS) {
+    return jsonError(404, '前端资源未部署', 'Not Found');
+  }
+
+  const indexUrl = new URL('/index.html', request.url);
+  return env.ASSETS.fetch(new Request(indexUrl, { method: request.method }));
+}
 
 // 处理 /auth/token 端点
 async function handleAuthToken(request, env) {

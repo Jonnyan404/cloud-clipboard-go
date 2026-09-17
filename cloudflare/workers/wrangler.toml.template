@@ -4,11 +4,22 @@ compatibility_date = "2025-08-01"
 compatibility_flags = ["nodejs_compat"]
 
 # 托管 Vue3 前端静态资源（web-vue3/dist 的拷贝）
-# 静态资源与 SPA 导航请求免费且不限量；
-# 非导航的 API 请求（/server、/text、/upload、/push 等，由前端 XHR/fetch 发起）才会调用 Worker。
+#
+# 规则只有一条：命中静态资源就直接免费发出去，没命中就整包交给 Worker。
+# 所以这里必须是 "none" —— 不能用 "single-page-application"。
+#
+# 踩过的坑：SPA 回退只对「导航请求」生效，而浏览器点下载链接、直接打开分享链接
+# 恰好就是导航请求。于是 GET /file/<uuid>/<name> 压根到不了 Worker，
+# 被资源层回了一份 index.html —— 表现就是「下载下来是个 html」。
+# 前端 XHR 走的 /server、/text 反而是非导航请求，所以一直没人发现。
+# 现在改成：找不到资源就交给 Worker，由 Worker 自己兜底（见 src/index.js 末尾的 catch-all），
+# 这样「导航请求」和「XHR」走的是同一条路，不会再有两套行为。
+#
+# 也不要改用 run_worker_first 白名单：数组形式下「未匹配」的路径同样不会回落到 Worker，
+# 得把所有接口前缀一个个列全，漏一个就静默变 html。
 [assets]
 directory = "./assets"
-not_found_handling = "single-page-application"
+not_found_handling = "none"
 binding = "ASSETS"
 
 # 环境变量
