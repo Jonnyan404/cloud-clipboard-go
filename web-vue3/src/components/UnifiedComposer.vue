@@ -230,11 +230,7 @@
                                 <v-icon v-else-if="item.type === 'smartphone' || item.type === 'mobile' || item.type === 'tablet'">{{mdiTabletCellphone}}</v-icon>
                                 <v-icon v-else>{{mdiDevices}}</v-icon>
                             </template>
-                            <v-list-item-title>{{
-                                item.type === 'desktop' ? t('desktopDevice') : (
-                                    (item.type === 'smartphone' || item.type === 'mobile' || item.type === 'tablet') ? t('mobileDevice') : t('otherDevice')
-                                )
-                            }}</v-list-item-title>
+                            <v-list-item-title>{{ item.name || deviceTypeLabel(item) }}</v-list-item-title>
                             <v-list-item-subtitle>{{item.os}} ({{item.browser}})</v-list-item-subtitle>
                         </v-list-item>
                     </v-list>

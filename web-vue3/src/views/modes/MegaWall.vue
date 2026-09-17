@@ -12,6 +12,7 @@ import {
     createShareLink,
     copyTextToClipboard,
     SHARE_DEFAULT_TTL,
+    deviceLabel,
 } from '@/util.js';
 import PageToolbar from '@/components/PageToolbar.vue';
 import StickyComposer from '@/components/sticky/StickyComposer.vue';
@@ -86,6 +87,23 @@ function fileIcon(item) {
 }
 
 const timeLabel = (item) => formatTimestamp(item.timestamp);
+
+// 元信息行：时间与设备各由对应设置控制，与默认/气泡/便签模式保持一致。
+// 类型（TEXT/FILE）不归设置管 —— 它标的是这条记录是文字还是文件，属结构信息。
+const metaLabel = (item) => {
+    const parts = [];
+    if (app.showTimestamp) {
+        parts.push(timeLabel(item));
+    }
+    parts.push(item.type.toUpperCase());
+    if (app.showDeviceInfo) {
+        const device = deviceLabel(item.senderDevice);
+        if (device) {
+            parts.push(device);
+        }
+    }
+    return parts.join(' · ');
+};
 
 const needsShareProtection = computed(() => Boolean(app.config?.auth));
 
@@ -276,7 +294,7 @@ watch(detailItem, (item) => {
             <div v-if="items.length" ref="streamEl" class="mega-wall__stream">
                 <div v-for="item in streamItems" :key="item.id" class="mega-wall__item">
                     <div class="mega-wall__kicker">
-                        <span>{{ timeLabel(item) }} · {{ item.type.toUpperCase() }}</span>
+                        <span>{{ metaLabel(item) }}</span>
                         <span class="mega-wall__ops">
                             <button v-if="item.type === 'text'" type="button" class="mega-wall__op" :title="t('copyText')" @click="copyContent(item)">
                                 <v-icon size="x-large">mdi-content-copy</v-icon>

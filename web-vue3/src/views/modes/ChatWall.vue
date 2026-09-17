@@ -13,6 +13,7 @@ import {
     copyTextToClipboard,
     getClientId,
     SHARE_DEFAULT_TTL,
+    deviceLabel,
 } from '@/util.js';
 import PageToolbar from '@/components/PageToolbar.vue';
 import StickyComposer from '@/components/sticky/StickyComposer.vue';
@@ -119,6 +120,29 @@ const shortTime = (item) => {
     const hours = String(date.getHours()).padStart(2, '0');
     const minutes = String(date.getMinutes()).padStart(2, '0');
     return `${hours}:${minutes}`;
+};
+
+// 气泡页脚：按设置逐段拼，而不是把时间/IP 写死。
+// 之前这里是硬编码的「时间 · 类型 · 已同步 · IP」——设备信息压根没出现，
+// 时间与 IP 则不看 showTimestamp / showSenderIP，导致同一组设置在不同模式下含义不同。
+// 改成数组再 join，顺带解决关掉首段后残留前导分隔符的问题。
+// 类型标签不归设置管，它标的是这条气泡是文字还是文件，属于结构信息。
+const bubbleFooter = (item) => {
+    const parts = [];
+    if (app.showTimestamp) {
+        parts.push(shortTime(item));
+    }
+    parts.push(item.type === 'text' ? t('chatTypeText') : t('chatTypeFile'));
+    if (isOwnBubble(item)) {
+        parts.push(t('chatSynced'));
+    }
+    if (app.showDeviceInfo && item.senderDevice) {
+        parts.push(deviceLabel(item.senderDevice));
+    }
+    if (app.showSenderIP && item.senderIP) {
+        parts.push(item.senderIP);
+    }
+    return parts.join(' · ');
 };
 
 const needsShareProtection = computed(() => Boolean(app.config?.auth));
@@ -330,9 +354,7 @@ watch(detailItem, (item) => {
                         </span>
                     </div>
                     <div v-else class="chat-wall__text">{{ decodedContent(item) }}</div>
-                    <span class="chat-wall__bubble-time">
-                        {{ shortTime(item) }} · {{ item.type === 'text' ? t('chatTypeText') : t('chatTypeFile') }}<template v-if="isOwnBubble(item)"> · {{ t('chatSynced') }}</template><template v-if="item.senderIP"> · {{ item.senderIP }}</template>
-                    </span>
+                    <span class="chat-wall__bubble-time">{{ bubbleFooter(item) }}</span>
                     <span class="chat-wall__bubble-ops">
                         <button v-if="item.type === 'text'" type="button" class="chat-wall__op" :title="t('copyText')" @click="copyContent(item)">
                             <v-icon size="large">mdi-content-copy</v-icon>

@@ -22,6 +22,7 @@ import {
     normalizeShareMaxUses,
     minutesToShareTTL,
     formatShareDuration,
+    deviceLabel,
 } from '@/util.js';
 
 const mdiCellphone = 'mdi-cellphone';
@@ -333,7 +334,7 @@ function deviceIcon(type) {
                         <span class="mr-3 text-no-wrap flex-shrink-0"><v-icon size="x-small" class="mr-1">{{ mdiClockOutline }}</v-icon>{{ formatTimestamp(meta.timestamp) }}</span>
                     </template>
                     <template v-if="app.showDeviceInfo && meta.senderDevice && meta.senderDevice.type">
-                        <span class="mr-3 text-no-wrap flex-shrink-0"><v-icon size="x-small" class="mr-1">{{ deviceIcon(meta.senderDevice.type) }}</v-icon>{{ meta.senderDevice.os || meta.senderDevice.type }}</span>
+                        <span class="mr-3 text-no-wrap flex-shrink-0"><v-icon size="x-small" class="mr-1">{{ deviceIcon(meta.senderDevice.type) }}</v-icon>{{ deviceLabel(meta.senderDevice) }}</span>
                     </template>
                     <template v-if="app.showSenderIP && meta.senderIP">
                         <span class="text-no-wrap flex-shrink-0"><v-icon size="x-small" class="mr-1">{{ mdiIpNetworkOutline }}</v-icon>{{ meta.senderIP }}</span>

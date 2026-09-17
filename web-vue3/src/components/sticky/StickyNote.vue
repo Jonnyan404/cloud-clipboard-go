@@ -11,6 +11,7 @@ import {
     createShareLink,
     copyTextToClipboard,
     SHARE_DEFAULT_TTL,
+    deviceLabel,
 } from '@/util.js';
 
 const props = defineProps({
@@ -83,16 +84,22 @@ const expireLabel = computed(() => {
     }
     return `${expired.value ? t('expired') : t('expiresAt', { time: formatTimestamp(props.meta.expire) })}`;
 });
+// 便签页脚：时间与设备各由对应设置控制，与默认模式、气泡模式保持一致。
+// 之前这两段是写死恒显的 —— 同一组「显示设置」在不同模式下含义不同，很费解。
+// 两段都关时返回空串，模板那边靠 v-if 收起整行（.sticky-note__time 有 padding-top，
+// 留着空标签会凭空多出 8px 空隙）。
 const timestampLabel = computed(() => {
-    if (!props.meta.timestamp) {
-        return '';
+    const parts = [];
+    if (props.meta.timestamp && app.showTimestamp) {
+        parts.push(formatTimestamp(props.meta.timestamp));
     }
-    const time = formatTimestamp(props.meta.timestamp);
-    const device = props.meta.senderDevice?.os || props.meta.senderDevice?.type || '';
-    if (device) {
-        return `${time} ${t('stickyFromDevice', { device })}`;
+    if (app.showDeviceInfo) {
+        const device = deviceLabel(props.meta.senderDevice);
+        if (device) {
+            parts.push(t('stickyFromDevice', { device }));
+        }
     }
-    return time;
+    return parts.join(' ');
 });
 const fileIcon = computed(() => {
     if (!props.meta.name) {
@@ -282,7 +289,7 @@ async function deleteItem() {
              :class="isLink ? 'sticky-note__text--link' : ''"
              :title="decodedContent"
         >{{ decodedContent }}</div>
-        <span class="sticky-note__time">{{ timestampLabel }}</span>
+        <span v-if="timestampLabel" class="sticky-note__time">{{ timestampLabel }}</span>
 
         <span class="sticky-note__ops" @click.stop>
             <v-tooltip :text="isFile ? (expired ? t('expired') : t('download')) : t('copyText')" location="top">
@@ -322,7 +329,7 @@ async function deleteItem() {
             <div class="sticky-note__reader" :class="[`sticky-note__reader--c${colorIndex}`]">
                 <div class="sticky-note__reader-head">
                     <div class="sticky-note__label">{{ noteLabel }}</div>
-                    <span class="sticky-note__reader-time">{{ timestampLabel }}</span>
+                    <span v-if="timestampLabel" class="sticky-note__reader-time">{{ timestampLabel }}</span>
                     <v-btn icon density="compact" size="x-small" variant="text" class="sticky-note__op" @click="expanded = false">
                         <v-icon size="small">mdi-close</v-icon>
                     </v-btn>

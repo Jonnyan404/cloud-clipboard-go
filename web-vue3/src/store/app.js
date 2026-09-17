@@ -20,9 +20,12 @@ export const useAppStore = defineStore('app', {
         showTimestamp: localStorage.getItem('showTimestamp') !== null
             ? localStorage.getItem('showTimestamp') === 'true'
             : true,
+        // 默认开：设备名是「这条消息从哪台设备发的」的唯一线索，尤其快捷指令这类
+        // UA 认不出来的来源。想关的人可以在设置里关掉，已显式设置过的用户不受影响
+        // （上面判了 !== null，只有从没碰过这个开关的人才会落到新默认值）。
         showDeviceInfo: localStorage.getItem('showDeviceInfo') !== null
             ? localStorage.getItem('showDeviceInfo') === 'true'
-            : false,
+            : true,
         showSenderIP: localStorage.getItem('showSenderIP') !== null
             ? localStorage.getItem('showSenderIP') === 'true'
             : false,

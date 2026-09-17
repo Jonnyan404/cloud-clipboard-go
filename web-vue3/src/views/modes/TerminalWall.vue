@@ -11,6 +11,7 @@ import {
     createShareLink,
     copyTextToClipboard,
     SHARE_DEFAULT_TTL,
+    deviceLabel,
 } from '@/util.js';
 import PageToolbar from '@/components/PageToolbar.vue';
 import StickyComposer from '@/components/sticky/StickyComposer.vue';
@@ -85,6 +86,15 @@ function timeLabel(item) {
     const date = new Date(item.timestamp * 1000);
     const pad = value => String(value).padStart(2, '0');
     return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+// 设备标签：开关关掉、或这条消息没带设备信息时返回空串，模板那边靠 v-if 收起整段。
+// 放在 [TEXT]/[FILE] 标签之后、正文之前，读起来像日志的来源前缀。
+function deviceTag(item) {
+    if (!app.showDeviceInfo) {
+        return '';
+    }
+    return deviceLabel(item?.senderDevice);
 }
 
 const needsShareProtection = computed(() => Boolean(app.config?.auth));
@@ -252,9 +262,10 @@ watch(detailItem, (item) => {
 
             <div v-if="items.length" ref="streamEl" class="terminal-wall__stream">
                 <div v-for="item in streamItems" :key="item.id" class="terminal-wall__log">
-                    <span class="terminal-wall__ts">{{ timeLabel(item) }}</span>
+                    <span v-if="app.showTimestamp" class="terminal-wall__ts">{{ timeLabel(item) }}</span>
                     <span v-if="item.type === 'file'" class="terminal-wall__tag terminal-wall__tag--file">[FILE]</span>
                     <span v-else class="terminal-wall__tag terminal-wall__tag--text">[TEXT]</span>
+                    <span v-if="deviceTag(item)" class="terminal-wall__device">{{ deviceTag(item) }}</span>
                     <template v-if="item.type === 'text'">
                         <span class="terminal-wall__val">{{ decodedContent(item) }}</span>
                         <span class="terminal-wall__ops">
@@ -456,6 +467,11 @@ watch(detailItem, (item) => {
 }
 
 .terminal-wall__ts {
+    color: var(--tw-subtle);
+    flex-shrink: 0;
+}
+
+.terminal-wall__device {
     color: var(--tw-subtle);
     flex-shrink: 0;
 }

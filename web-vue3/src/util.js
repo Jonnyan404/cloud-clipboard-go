@@ -175,3 +175,12 @@ export function getClientId() {
         return '';
     }
 }
+
+// 设备显示名：客户端声明的 name 优先，没有才回落 UA 推断出的 os / type。
+// 快捷指令、curl 这类 UA 认不出来的来源，就是靠 name 显示成可读的名字。
+export function deviceLabel(senderDevice, fallback = '') {
+    if (!senderDevice) {
+        return fallback;
+    }
+    return senderDevice.name || senderDevice.os || senderDevice.type || fallback;
+}
