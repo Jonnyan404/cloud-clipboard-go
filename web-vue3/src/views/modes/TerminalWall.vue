@@ -265,7 +265,7 @@ watch(detailItem, (item) => {
                     <span v-if="app.showTimestamp" class="terminal-wall__ts">{{ timeLabel(item) }}</span>
                     <span v-if="item.type === 'file'" class="terminal-wall__tag terminal-wall__tag--file">[FILE]</span>
                     <span v-else class="terminal-wall__tag terminal-wall__tag--text">[TEXT]</span>
-                    <span v-if="deviceTag(item)" class="terminal-wall__device">{{ deviceTag(item) }}</span>
+                    <span v-if="app.showDeviceInfo && deviceTag(item)" class="terminal-wall__device">{{ deviceTag(item) }}</span>
                     <template v-if="item.type === 'text'">
                         <span class="terminal-wall__val">{{ decodedContent(item) }}</span>
                         <span class="terminal-wall__ops">
@@ -279,7 +279,7 @@ watch(detailItem, (item) => {
                     </template>
                     <template v-else>
                         <span class="terminal-wall__file" role="button" tabindex="0" @click="detailItem = item" @keydown.enter.prevent="detailItem = item">
-                            {{ fileGlyph(item) }} {{ item.name || 'file' }}
+                            {{ item.name || 'file' }}
                         </span>
                         <span class="terminal-wall__dim">
                             {{ prettyFileSize(item.size || 0) }}{{ isItemExpired(item) ? ` · ${t('expired')}` : '' }}
@@ -531,6 +531,67 @@ watch(detailItem, (item) => {
 @media (hover: none) {
     .terminal-wall__ops {
         display: inline-flex;
+    }
+}
+
+/*
+ * 窄屏下把一行拆成两行：元信息一行，内容（文件名 / 文本）独占下一行。
+ *
+ * 为什么不能只在同一行里加省略号：375px 下可用宽度约 358px，而时间 + [类型]（固定 46px）
+ * + 设备名 + 大小 + 两个常显的操作按钮 + 间距加起来约 378px，已经超了。此时唯一可收缩的
+ * 就是内容那一格，flex 会把它的宽度压到 0 —— 文件名整个消失，文本消息被压成一列单字。
+ * 所以要让内容换到独立的一行，而不是继续和元信息抢空间。
+ *
+ * 元信息行里「设备名」是第一个让位的：它可收缩 + 省略号，其余各格保持原宽。
+ * 单行时它是 flex-shrink: 0 纹丝不动，结果牺牲的反而是文件名，优先级正好反了。
+ */
+@media (max-width: 768px) {
+    .terminal-wall__log {
+        display: grid;
+        /* 第 3 列必须是 1fr：auto 轨道会吸收剩余空间，导致设备名短的那些行
+           把 [FILE] 标签往右推，各行的标签就对不齐了。让设备列独占剩余空间，
+           时间/标签/大小/按钮都保持自然宽度。 */
+        grid-template-columns: auto 46px minmax(0, 1fr) auto auto;
+        grid-template-areas:
+            "ts tag device dim ops"
+            "body body body body body";
+        align-items: baseline;
+        column-gap: 8px;
+        row-gap: 0;
+    }
+    .terminal-wall__ts {
+        grid-area: ts;
+    }
+    .terminal-wall__tag {
+        grid-area: tag;
+    }
+    .terminal-wall__device {
+        grid-area: device;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .terminal-wall__dim {
+        grid-area: dim;
+        white-space: nowrap;
+    }
+    .terminal-wall__ops {
+        grid-area: ops;
+        justify-self: end;
+    }
+    /* word-break: break-all 是为桌面端的窄格准备的；这里格子够宽，保持单行更好读 */
+    .terminal-wall__file {
+        grid-area: body;
+        min-width: 0;
+        word-break: normal;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .terminal-wall__val {
+        grid-area: body;
+        min-width: 0;
     }
 }
 
