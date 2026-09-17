@@ -85,7 +85,10 @@ build_one() {
     fi
 
     local unsigned="$SRC/${name}_unsigned.shortcut"
-    local signed="$SRC/${name}.shortcut"
+    # 签名产物直接落到 shortcuts/apple/ 下，**不要先签进 source/ 再 cp 过去**。
+    # 那样会在 source/ 里留一份同字节的副本，用户面对 8 个 .shortcut 不知道该导入哪个
+    # （2026-09-17 清理掉的就是这批副产物）。
+    local signed="$OUT/${name}.shortcut"
 
     echo "── 构建 $name"
     ( cd "$SRC" && cherri "$(basename "$src")" --skip-sign )
@@ -110,8 +113,7 @@ build_one() {
         # 签名完全正常。而重启会扰动用户已安装的捷径（观察到被重命名、动作数 +1），故移除。
         shortcuts sign -i "$unsigned" -o "$signed" --mode anyone
         # sign 会打印若干 ObjC "Unrecognized attribute string flag" 噪音，属正常现象。
-        cp "$signed" "$OUT/"
-        echo "   已签名并放置: $OUT/$(basename "$signed")"
+        echo "   已签名: $signed"
     fi
 
     # 校验失败不立即中止——否则一个不合规的源码会挡住后面所有源码的构建。
