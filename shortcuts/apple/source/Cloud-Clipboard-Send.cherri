@@ -35,21 +35,55 @@ if !@endpoint {
 }
 @encodedRoom = urlEncode(@room)
 
+// 2026-09-17 结构定死：两个来源完全分叉，互不共享新原语。
+//   剪贴板路径 = 逐动作复刻 09-16 验收版（已实测仍可用，10:53 对照组）；
+//   分享路径   = getName 判型（4th road：分享字符串的名字=内容首行，真文件保留文件名），
+//                按名字里的扩展名匹配决定 as=file 与否，不调 getText、不用相等比较。
+// 教训：凡是在剪贴板路径上引入 text() 转换、getName/getText、变量相等比较，
+//       都会让 Shortcuts 抛"无法将文本转换为NSString"——它们只准出现在分享分支里。
 @source = ShortcutInput
-if !@source { @source = getClipboard() }
-// cherri 的条件不能内联函数调用（会 panic），必须先落到变量
-@amount = count(@source)
-if @amount != 1 {
-    alert("请复制一条文字或一张图片后运行，或从分享菜单发送一个文件/一张照片。每次发送一项。")
-    stop()
+if !@source {
+    // ── 剪贴板路径：与 09-16 验收版完全一致 ──
+    @source = getClipboard()
+    @amount = count(@source)
+    if @amount != 1 {
+        alert("请复制一条文字或一张图片后运行，或从分享菜单发送一个文件/一张照片。每次发送一项。")
+        stop()
+    }
+    @item = getFirstItem(@source)
+    @uploadURL = "{@endpoint}/upload/raw?room={@encodedRoom}&client=ios-shortcuts"
+    @response = rawUpload(@uploadURL, @item, {"Authorization":"Bearer {@password}"})
+} else {
+    // ── 分享路径：getName 判型 ──
+    @amount = count(@source)
+    if @amount != 1 {
+        alert("从分享菜单每次发送一项。")
+        stop()
+    }
+    @item = getFirstItem(@source)
+    // 判据（2026-09-17 实测，4th road）：
+    //   · 系统字符串（剪贴板/URL scheme）的名字 = "Clipboard <日期>" → 当文本；
+    //   · 右键选中文字等分享字符串的名字 = 内容首行 → beginsWith 命中 → 当文本；
+    //   · 真文件保留自己的名字（getName 会把扩展名剥掉，如 rightclick.txt → rightclick）
+    //     ，内容不以名为前缀 → as=file 保持文件。
+    //   · 误判安全：图片/二进制即使被判成文本，服务端仍按魔数嗅探重新分流为文件。
+    // getText/getName 只准在本分支使用——剪贴板条目上 getText 会抛"无法将文本转换为NSString"。
+    @nmRaw = getName(@item)
+    @nm = text(@nmRaw)
+    if @nm contains "Clipboard " {
+        @uploadURL = "{@endpoint}/upload/raw?room={@encodedRoom}&client=ios-shortcuts"
+    } else {
+        @tRaw = getText(@item)
+        @t = text(@tRaw)
+        if @t beginsWith @nm {
+            @uploadURL = "{@endpoint}/upload/raw?room={@encodedRoom}&client=ios-shortcuts"
+        } else {
+            @uploadURL = "{@endpoint}/upload/raw?as=file&room={@encodedRoom}&client=ios-shortcuts"
+        }
+    }
+    @response = rawUpload(@uploadURL, @item, {"Authorization":"Bearer {@password}"})
 }
-@item = getFirstItem(@source)
-
-// 直接上传原始条目：不做命名、不做类型转换。
-// 依据 2026-09-16 验收基线：setName() 会把剪贴板纯文本变成空内容（场景 b 稳定失败），
-// 而原始条目直传对 URL / 文件 / 图片都能保真（场景 c/e/f 已通过）。
-@uploadURL = "{@endpoint}/upload/raw?room={@encodedRoom}&client=ios-shortcuts"
-@response = rawUpload(@uploadURL, @item, {"Authorization":"Bearer {@password}"})
+// cherri 的条件不能内联函数调用（会 panic），必须先落到变量
 
 @record = getDictionary(@response)
 @error = getValue(@record, "error")
