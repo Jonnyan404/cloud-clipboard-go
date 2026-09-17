@@ -2,66 +2,14 @@
 // 请求包装 → 嗅探 → 委托给 TextHandler/FileHandler → D1/R2 落库 → 响应 JSON。
 // 用 esbuild 打包后的处理器 + mock env（D1 用 node:sqlite，R2 用 Map）。
 import { RawUploadHandler } from './.build/raw-upload.mjs';
-import { DatabaseSync } from 'node:sqlite';
+import { makeEnv, makeChecker, postJson } from './harness.mjs';
 
-function makeEnv() {
-  const db = new DatabaseSync(':memory:');
-  db.exec(`CREATE TABLE messages (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, type TEXT, content TEXT, name TEXT, size INTEGER,
-    room TEXT, timestamp INTEGER, senderIP TEXT, senderClientID TEXT, userAgent TEXT,
-    uuid TEXT, expireTime INTEGER, url TEXT)`);
-  const DB = {
-    prepare(sql) {
-      const stmt = db.prepare(sql);
-      let args = [];
-      const api = {
-        bind(...a) { args = a; return api; },
-        async run() { const r = stmt.run(...args); return { meta: { last_row_id: Number(r.lastInsertRowid) } }; },
-        async first() { return stmt.get(...args) ?? null; },
-        async all() { return { results: stmt.all(...args) }; },
-      };
-      return api;
-    },
-  };
-  const r2 = new Map();
-  const R2_BUCKET = {
-    async put(key, body, opts) { r2.set(key, { body, opts }); },
-    async delete(key) { r2.delete(key); },
-  };
-  // Durable Object 桩：链式调用不断，且必须让 then 为 undefined ——
-  // 否则 await 一个 Proxy 会无限递归（Proxy 对 then 也返回自身，成为永不 resolve 的 thenable）。
-  const makeStub = () => new Proxy(function () {}, {
-    get: (t, prop) => (prop === 'then' ? undefined : makeStub()),
-    apply: () => Promise.resolve(makeStub()),
-  });
-  const anyStub = makeStub();
-  const env = {
-    DB, R2_BUCKET, WEBSOCKET_ROOM: anyStub,
-    AUTH_PASSWORD: '123', ROOM_AUTH_JSON: '{}', HISTORY_LIMIT: '50',
-    TEXT_LIMIT: '40960', FILE_LIMIT: '204857600', FILE_EXPIRE: '3600',
-  };
-  return { env, db, r2 };
-}
+const { check, summary } = makeChecker();
 
-let pass = 0, fail = 0;
-const failures = [];
-function check(name, got, want) {
-  const g = JSON.stringify(got), w = JSON.stringify(want);
-  if (g === w) { pass++; console.log(`  ✓ ${name}`); }
-  else { fail++; failures.push(`${name}\n      实际: ${g}\n      期望: ${w}`); console.log(`  ✗ ${name}  实际=${g} 期望=${w}`); }
-}
-
+// 适配：e2e 测试既测 raw 也测 base64，所以保留一个可切换 handler 的包装
 async function call(env, path, body, { base64 = false, auth = 'Bearer 123' } = {}) {
-  const headers = {};
-  if (auth) headers.Authorization = auth;
-  const req = new Request(`http://worker.local${path}`, { method: 'POST', headers, body });
-  const res = base64
-    ? await RawUploadHandler.uploadBase64(req, env)
-    : await RawUploadHandler.upload(req, env);
-  const text = await res.text();
-  let json = null;
-  try { json = JSON.parse(text); } catch {}
-  return { status: res.status, json, text };
+  const handler = base64 ? RawUploadHandler.uploadBase64 : RawUploadHandler.upload;
+  return postJson(handler, env, path, body, { auth });
 }
 
 const lastMessage = (db) => db.prepare('SELECT * FROM messages ORDER BY id DESC LIMIT 1').get();
@@ -169,10 +117,4 @@ console.log('\n── 9. 空文本与超限文本 ──');
   check('文件名为 clipboard.txt', m.name, 'clipboard.txt');
 }
 
-console.log(`\n通过 ${pass} 项，失败 ${fail} 项`);
-if (failures.length) {
-  console.log('\n失败明细：');
-  for (const f of failures) console.log('  ✗ ' + f);
-  process.exit(1);
-}
-console.log('端到端全绿 ✅');
+summary('端到端全绿');
