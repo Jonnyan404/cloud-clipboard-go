@@ -41,8 +41,30 @@ if !@endpoint {
 // 教训：凡是在剪贴板路径上引入 text() 转换、getName/getText、变量相等比较，
 //       都可能让 Shortcuts 抛"无法将文本转换为NSString"——它们只出现在分享分支里。
 @source = ShortcutInput
+// ── 判定发送方式，然后统一发送 ──
+// 两条路径最终都归结为一个决定：当文本发，还是当文件发。
+//
+//   当文件 → POST /upload（multipart，字段 file = 条目）
+//            part 自带真实文件名（含扩展名），服务端直接用 —— 扩展名不用猜。
+//            表单字段必须是「文件」类型（WFItemType=5），cherri 表达不了，
+//            所以用字面量占位，由 source/patch_shortcut.py 构建后改造并指向 @item。
+//
+//   当文本 → getText → 替换文本(正则 \b\B，保证不匹配) → POST /text
+//            为什么文本要过一道「替换文本」：Shortcuts 从剪贴板读到的文本落成 HTTP 请求体时
+//            是 UTF-16（字节里能看到 A\x00B\x00C\x00 这种"字符后跟 NUL"的模式），
+//            直接发到只按 UTF-8 解析的 /text 会变乱码。任何文本类动作都会把它规范化成 UTF-8。
+//            查找串用 \b\B 是「保证不匹配」的写法 —— 同一位置不可能既是词边界又不是，
+//            所以一个字符都不会被替换，比填一个"很不可能出现的字符串"可靠。
+//
+// 判型依据：扩展名。真文件给真扩展名（md/sh/png…），分享字符串恒为 txt，
+// 剪贴板文本是纯数字（名字里日期的小数部分）。所以「扩展名含字母」= 文件，与系统语言无关。
+// 分享路径上扩展名是 txt 时，再用名字启发式区分"分享字符串"与"真的 .txt 文件"。
+@sendAs = "text"
+@fromInput = "n"
+
+@source = ShortcutInput
 if !@source {
-    // ── 剪贴板路径：与 09-16 验收版完全一致 ──
+    // ── 剪贴板路径 ──
     @source = getClipboard()
     @amount = count(@source)
     if @amount != 1 {
@@ -50,66 +72,73 @@ if !@source {
         stop()
     }
     @item = getFirstItem(@source)
-    @uploadURL = "{@endpoint}/upload/raw?room={@encodedRoom}&client=ios-shortcuts"
-    @response = rawUpload(@uploadURL, @item, {"Authorization":"Bearer {@password}"})
+    // 剪贴板路径不判型 —— 交回服务端按**内容**嗅探。
+    // 为什么不能判：剪贴板条目的名字反映的是**剪贴板格式**，不是内容 ——
+    //   纯文本 -> "Clipboard <日期>"（无后缀）
+    //   带 HTML 味 -> "Clipboard <日期>.html"
+    //   图片     -> "Clipboard <日期>.png"
+    // 所以"扩展名含字母 = 文件"在这里会把 HTML 味的文本误判成文件（实测踩过）。
+    @sendAs = "raw"
 } else {
-    // ── 分享路径：先用扩展名判型，再用名字启发式兜底 ──
+    // ── 分享路径 ──
     @amount = count(@source)
     if @amount != 1 {
         alert("从分享菜单每次发送一项。")
         stop()
     }
     @item = getFirstItem(@source)
+    @fromInput = "y"
+}
 
-    // 读扩展名（"获取文件详情 → 扩展名"）。这个动作没有显式输入参数、吃「上一个动作的输出」，
-    // 所以必须紧跟在取条目之后 —— 放在上报动作后面会拿到文本报告，扩展名恒为空。
-    // 另外它的显式 WFInput 由 source/patch_form_field.py 在构建后补上（cherri 的字典
-    // 只能生成 text token，表达不了指向变量的输入）。
-    @extRaw = rawAction("is.workflow.actions.properties.files", {"WFContentItemPropertyName": "File Extension"})
-    @ext = text(@extRaw)
+// 读扩展名（"获取文件详情 → 扩展名"）。它没有输入参数、吃「上一个动作的输出」，
+// 所以必须紧跟在取条目之后；显式 WFInput 由 source/patch_shortcut.py 构建后补上。
+// 只有分享路径用得到它 —— 剪贴板路径已经标记成 raw 了。
+@extRaw = rawAction("is.workflow.actions.properties.files", {"WFContentItemPropertyName": "File Extension"})
+@ext = text(@extRaw)
 
-    @nmRaw = getName(@item)
-    @nm = text(@nmRaw)
-    @tRaw = getText(@item)
-    @t = text(@tRaw)
+// 「扩展名里含字母」：剥掉所有非字母再判空，与系统语言无关
+@letters = replaceText('[^a-zA-Z]', '', @ext, true, true)
+if @fromInput == "y" {
+    if @letters {
+        @sendAs = "file"
+    }
+}
 
-    // 判据（2026-09-17 实测，五种输入 + 三种字符串各跑一遍）：
-    //   · 真文件的扩展名是自己的真扩展名（.md → md、.sh → sh、.png → png）；
-    //   · 分享字符串被物化成 <首行>.txt，扩展名恒为 txt；
-    //   · 所以「扩展名不是 txt」= 一定是文件，与系统语言无关。
-    //   · 扩展名是 txt 时才需要名字启发式：名字=内容首行 → 文本，否则是真的 .txt 文件。
-    //   · 取不到扩展名（动作异常/未打补丁）→ 落回名字启发式，不会更糟。
-    //
-    // 为什么需要这一层：原来的纯名字启发式（名字=内容首行 → 文本）会被 markdown 骗过 ——
-    // getText 把 "# 测试笔记" 渲染成 "测试笔记"，于是「内容以名字开头」成立，.md 被误判成文本。
-    @isFile = "n"
-    if @ext {
-        if @ext != "txt" {
-            @isFile = "y"
+// 分享路径：扩展名是 txt 时，再区分"分享字符串"与"真的 .txt 文件"
+//   名字以 Clipboard 开头 → 系统为无名字符串生成的名字 → 文本
+//   名字 = 内容首行     → 分享字符串（会被物化成 <首行>.txt）→ 文本
+//   否则                → 真的 .txt 文件
+if @fromInput == "y" {
+    if @sendAs == "text" {
+        @nmRaw = getName(@item)
+        @nm = text(@nmRaw)
+        @tRaw = getText(@item)
+        @t = text(@tRaw)
+        if @nm contains "Clipboard " {
+            @sendAs = "text"
+        } else {
+            if @t beginsWith @nm {
+                @sendAs = "text"
+            } else {
+                @sendAs = "file"
+            }
         }
     }
-    if @isFile == "y" {
-        // ── 真文件：走 multipart 表单上传 ──
-        // 为什么不用 /upload/raw?as=file：getName 会把扩展名剥掉（notes.md → notes），
-        // 而 multipart 的 part 自带真实文件名（含扩展名），服务端 /upload 直接用
-        // handler.Filename —— 扩展名根本不需要"猜"。
-        // 表单字段必须是「文件」类型（WFItemType=5），cherri 表达不了，
-        // 所以这里用字面量占位，由 source/patch_form_field.py 构建后改造并指向 @item。
+}
+
+if @sendAs == "raw" {
+    // 剪贴板路径：原始条目交给服务端 —— 它按内容嗅探分流、解码 UTF-16、剥 HTML 标签
+    @rawURL = "{@endpoint}/upload/raw?room={@encodedRoom}&client=ios-shortcuts"
+    @response = rawUpload(@rawURL, @item, {"Authorization":"Bearer {@password}"})
+} else {
+    if @sendAs == "file" {
         @uploadURL = "{@endpoint}/upload?room={@encodedRoom}&client=ios-shortcuts"
         @response = formRequest(@uploadURL, "POST", {"file": "PLACEHOLDER"}, {"Authorization":"Bearer {@password}"})
     } else {
-        if @nm contains "Clipboard " {
-            @uploadURL = "{@endpoint}/upload/raw?room={@encodedRoom}&client=ios-shortcuts"
-            @response = rawUpload(@uploadURL, @item, {"Authorization":"Bearer {@password}"})
-        } else {
-            if @t beginsWith @nm {
-                @uploadURL = "{@endpoint}/upload/raw?room={@encodedRoom}&client=ios-shortcuts"
-                @response = rawUpload(@uploadURL, @item, {"Authorization":"Bearer {@password}"})
-            } else {
-                @uploadURL = "{@endpoint}/upload?room={@encodedRoom}&client=ios-shortcuts"
-                @response = formRequest(@uploadURL, "POST", {"file": "PLACEHOLDER"}, {"Authorization":"Bearer {@password}"})
-            }
-        }
+        @asText = getText(@item)
+        @normalized = replaceText('\b\B', '', @asText, true, true)
+        @textURL = "{@endpoint}/text?room={@encodedRoom}&client=ios-shortcuts"
+        @response = rawUpload(@textURL, @normalized, {"Authorization":"Bearer {@password}"})
     }
 }
 // cherri 的条件不能内联函数调用（会 panic），必须先落到变量

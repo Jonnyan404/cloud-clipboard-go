@@ -26,21 +26,85 @@ cherri 有两类东西做不到，都靠本脚本在构建后补齐：
 用法：patch_shortcut.py <unsigned.shortcut> [变量名，默认 item] [字段名，默认 file]
      没有可补的结构时静默跳过（对所有源码安全）。
 """
+import os
 import plistlib
+import re
 import sys
 
 PLACEHOLDER = "PLACEHOLDER"
 FILE_ITEM_TYPE = 5
 EXT_ACTION = "is.workflow.actions.properties.files"
+MARKDOWN_ACTION = "is.workflow.actions.getmarkdownfromrichtext"
+MARKDOWN_ACTION = "is.workflow.actions.getmarkdownfromrichtext"
 
 
 def _variable_attachment(variable: str) -> dict:
     return {"Type": "Variable", "VariableName": variable}
 
 
+def raw_action_identifiers(unsigned_path: str) -> list:
+    """从源码里按顺序读出 rawAction("...") 的标识符。
+
+    cherri 的 rawAction 本应用第一个参数覆盖动作标识符（action.go 里的 overrideIdentifier），
+    但实测不稳定：同一个写法有时生效、有时不生效，产物里会留下占位符
+    is.workflow.actions.rawaction。而这些动作往往没有可辨识的参数，
+    所以按「源码顺序 == 产物顺序」来还原。
+    源码路径由产物路径推导：<Name>_unsigned.shortcut -> <Name>.cherri
+    """
+    base = unsigned_path[: -len("_unsigned.shortcut")] if unsigned_path.endswith("_unsigned.shortcut") else None
+    if not base:
+        return []
+    src = base + ".cherri"
+    if not os.path.exists(src):
+        return []
+    text = open(src, encoding="utf-8").read()
+    return re.findall(r'rawAction\s*\(\s*"([^"]+)"', text)
+
+
+def raw_action_identifiers(unsigned_path: str) -> list:
+    """从源码里按顺序读出 rawAction("...") 的标识符。
+
+    cherri 的 rawAction 本应用第一个参数覆盖动作标识符（action.go 里的 overrideIdentifier），
+    但实测不稳定：同一个写法有时生效、有时不生效，产物里会留下占位符
+    is.workflow.actions.rawaction。而这些动作往往没有可辨识的参数，
+    所以按「源码顺序 == 产物顺序」来还原。
+    源码路径由产物路径推导：<Name>_unsigned.shortcut -> <Name>.cherri
+    """
+    base = unsigned_path[: -len("_unsigned.shortcut")] if unsigned_path.endswith("_unsigned.shortcut") else None
+    if not base:
+        return []
+    src = base + ".cherri"
+    if not os.path.exists(src):
+        return []
+    text = open(src, encoding="utf-8").read()
+    return re.findall(r'rawAction\s*\(\s*"([^"]+)"', text)
+
+
 def patch(path: str, variable: str = "item", field: str = "file") -> dict:
     with open(path, "rb") as f:
         workflow = plistlib.load(f)
+
+    # 零、还原 rawAction 没覆盖成功的标识符（按源码顺序）
+    wanted = raw_action_identifiers(path)
+    raw_actions = [a for a in workflow.get("WFWorkflowActions", [])
+                   if a.get("WFWorkflowActionIdentifier") == "is.workflow.actions.rawaction"]
+    ident_fixes = 0
+    for action, ident in zip(raw_actions, wanted):
+        action["WFWorkflowActionIdentifier"] = ident
+        ident_fixes += 1
+    if ident_fixes and len(wanted) != len(raw_actions):
+        print(f"   ! rawAction 数量对不上：源码 {len(wanted)} 个，产物 {len(raw_actions)} 个")
+
+    # 零、还原 rawAction 没覆盖成功的标识符（按源码顺序）
+    wanted = raw_action_identifiers(path)
+    raw_actions = [a for a in workflow.get("WFWorkflowActions", [])
+                   if a.get("WFWorkflowActionIdentifier") == "is.workflow.actions.rawaction"]
+    ident_fixes = 0
+    for action, ident in zip(raw_actions, wanted):
+        action["WFWorkflowActionIdentifier"] = ident
+        ident_fixes += 1
+    if ident_fixes and len(wanted) != len(raw_actions):
+        print(f"   ! rawAction 数量对不上：源码 {len(wanted)} 个，产物 {len(raw_actions)} 个")
 
     ext_inputs = 0
     form_fields = 0
@@ -50,14 +114,23 @@ def patch(path: str, variable: str = "item", field: str = "file") -> dict:
         ident = action.get("WFWorkflowActionIdentifier")
         params = action.get("WFWorkflowActionParameters") or {}
 
-        # 零、修 rawAction 没覆盖成功的标识符
-        # cherri 的 rawAction 会用第一个参数覆盖动作标识符（action.go 里的 overrideIdentifier），
-        # 但实测不稳定：同一个写法在诊断 v1 生效、v2/v3 没生效，产物里留下占位标识符
-        # is.workflow.actions.rawaction。这里按参数特征还原成真正的标识符。
-        if ident == "is.workflow.actions.rawaction" and "WFContentItemPropertyName" in params:
-            action["WFWorkflowActionIdentifier"] = EXT_ACTION
-            ident = EXT_ACTION
-            fixed_idents += 1
+        # 一之二、Markdown 动作的显式输入（同样没有输入参数）
+        if ident == MARKDOWN_ACTION and "WFInput" not in params:
+            params["WFInput"] = {
+                "Value": _variable_attachment("asText"),
+                "WFSerializationType": "WFTextTokenAttachment",
+            }
+            action["WFWorkflowActionParameters"] = params
+            ext_inputs += 1
+
+        # 一之二、Markdown 动作的显式输入（同样没有输入参数）
+        if ident == MARKDOWN_ACTION and "WFInput" not in params:
+            params["WFInput"] = {
+                "Value": _variable_attachment("asText"),
+                "WFSerializationType": "WFTextTokenAttachment",
+            }
+            action["WFWorkflowActionParameters"] = params
+            ext_inputs += 1
 
         # 一、扩展名动作的显式输入
         if ident == EXT_ACTION and "WFInput" not in params:
@@ -90,6 +163,8 @@ def patch(path: str, variable: str = "item", field: str = "file") -> dict:
             }
             form_fields += 1
 
+    fixed_idents += ident_fixes
+    fixed_idents += ident_fixes
     if ext_inputs == 0 and form_fields == 0 and fixed_idents == 0:
         return {"ext_inputs": 0, "form_fields": 0, "fixed_idents": 0}
 

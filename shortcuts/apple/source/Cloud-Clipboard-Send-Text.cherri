@@ -1,0 +1,85 @@
+// 发送【文本】。与「发送文件」拆开 —— 判型交给用户，客户端不做任何类型判断。
+//
+// 为什么拆：剪贴板条目的名字反映的是**剪贴板格式**而非内容（纯文本 -> "Clipboard <日期>"、
+// 带 HTML 味 -> "Clipboard <日期>.html"、图片 -> "Clipboard <日期>.png"），
+// 所以客户端没法可靠判型；而用户自己知道发的是什么。
+// 拆开之后服务端的 /upload/raw（内容嗅探 + UTF-16 解码 + HTML 降级）可以整个删掉。
+//
+// 本捷径做的事：
+//   getText 拿到纯文本（Shortcuts 自己会剥 HTML）
+//   → 过一次「替换文本」，把 UTF-16 字节规范化成 UTF-8
+//   → POST /text
+#define name Cloud-Clipboard-Send-Text
+#define inputs file, image, text, url, pdf
+#define from sharesheet,quickactions,menubar
+#define noinput getclipboard
+#define color blue
+#define version 26
+
+#include 'actions/web'
+#include 'actions/text'
+#include 'actions/sharing'
+
+#question qServerURL "服务器地址，例如 https://clip.example.com 或 http://127.0.0.1:9501" "http://127.0.0.1:9501"
+#question qRoomName "房间名，多设备接收同一内容时使用相同房间；默认填 default" "default"
+#question qRoomPassword "全局访问密码或房间密码；未设密码则留空" ""
+
+action 'downloadurl' rawUpload(text url: 'WFURL', variable body: 'WFRequestVariable', dictionary! headers: 'WFHTTPHeaders') {
+    "WFHTTPMethod": "POST",
+    "WFHTTPBodyType": "File"
+}
+
+@endpoint = text(qServerURL)
+@room = text(qRoomName)
+@password = text(qRoomPassword)
+@endpoint = replaceText('^\s+|\s+$', '', @endpoint, true, true)
+@endpoint = replaceText('/+$', "", @endpoint, true, true)
+@room = replaceText('^\s+|\s+$', '', @room, true, true)
+if !@room { @room = "default" }
+if !@endpoint {
+    alert("请先编辑快捷指令顶部的部署地址、房间名和密码。")
+    stop()
+}
+@encodedRoom = urlEncode(@room)
+
+@source = ShortcutInput
+if !@source { @source = getClipboard() }
+@amount = count(@source)
+if @amount != 1 {
+    alert("请复制一段文字后运行，或从分享菜单发送一项。每次发送一项。")
+    stop()
+}
+// 直接对输入取文本 —— **不要**先 getFirstItem。
+// 实测：「取第一项」对文本条目会取到错的东西，结果是发出去的内容为空（只有 \xa0\n）。
+// 对照：UI 里「获取剪贴板 → 从输入获取文本」两步的捷径是正常的，差别就在这一步。
+//
+// getText：拿到纯文本（富文本的 HTML 由 Shortcuts 自己剥掉）。
+// 不要再包一层 text() —— 实测那一步会报「文本失败…无法将文本转换为 NSString」。
+@asText = getText(@source)
+
+// 规范化编码：Shortcuts 读到的文本落成 HTTP 请求体时是 UTF-16
+//（字节里能看到 A\x00B\x00C\x00 这种"字符后跟 NUL"的模式），直接发到只按 UTF-8 解析的
+// /text 会变乱码。过一道文本类动作即可规范化成 UTF-8。
+//
+// 用「从多信息文本获取 Markdown」而不是「替换文本」：实测替换文本会把**纯字符串剪贴板**
+// 的输出清空（富文本和文件正常），而 Markdown 这个动作对纯文本和富文本都能给出纯文本。
+// 这个动作 cherri 的动作表里没有，用 rawAction 调；它的显式 WFInput 由
+// source/patch_shortcut.py 构建后补上（指向变量 asText）。
+@normalized = rawAction("is.workflow.actions.getmarkdownfromrichtext")
+
+@uploadURL = "{@endpoint}/text?room={@encodedRoom}&client=ios-shortcuts"
+@response = rawUpload(@uploadURL, @normalized, {"Authorization":"Bearer {@password}"})
+
+@record = getDictionary(@response)
+@error = getValue(@record, "error")
+if @error {
+    @message = getValue(@record, "message")
+    alert("发送失败：{@error}\n{@message}")
+    stop()
+}
+@savedID = getValue(@record, "id")
+if !@savedID {
+    alert("服务器未确认保存，请检查部署地址及服务器状态。")
+    stop()
+}
+showNotification("已发送 {@savedID}", "Cloud Clipboard", false)
