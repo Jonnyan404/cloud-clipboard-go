@@ -17,10 +17,13 @@
 
 1. 下载本目录下的 `Cloud-Clipboard-Send-Text.shortcut`、`Cloud-Clipboard-Send-File.shortcut`、`Cloud-Clipboard-Receive.shortcut` 与 `Cloud-Clipboard-Receive-By-ID.shortcut`
 2. 双击导入「快捷指令」App
-3. 导入时会让你填三项：
+3. 导入时会让你填几项：
    - **服务器地址** —— 如 `https://clip.example.com`，或局域网 `http://192.168.1.10:9501`
    - **房间名** —— 多设备收发同一内容时填相同值；默认 `default`
    - **密码** —— 服务端设了密码就填，没设就留空
+   - **设备名称**（仅两个「发送」有）—— 接收端用它显示消息来自哪台设备，默认 `快捷指令`。
+     多台设备建议填成不同的名字（如「我的 iPhone」「办公室 Mac」），
+     接收端一眼就能看出是哪台发的；留空则按系统信息推断
 4. **导入后在快捷指令 App 里手动各跑一次**，把网络与通知权限授权掉，之后命令行/自动化才能用
 
 > 填错了随时能改：在捷径里找到最顶部那个「文本」动作，直接编辑。
@@ -98,7 +101,7 @@
 | `verify.py` | 构建后断言，把踩过的坑变成检查项 |
 | `*.shortcut` | 签名产物（`--mode anyone`，iOS / macOS 均可导入） |
 
-当前产物规模：Receive **123** 动作 / Receive-By-ID **141** / Send-Text **79** / Send-File **77**。
+当前产物规模：Receive **123** 动作 / Receive-By-ID **141** / Send-Text **83** / Send-File **81**。
 `build.sh` 每次都会打印动作数、导入问答的 ActionIndex 与校验结果。
 
 依赖 [Cherri](https://github.com/electrikmilk/cherri)（**Go 写的，不是 Swift**）。

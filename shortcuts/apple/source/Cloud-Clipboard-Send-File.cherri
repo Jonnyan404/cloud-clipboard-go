@@ -22,10 +22,12 @@
 #question qServerURL "服务器地址，例如 https://clip.example.com 或 http://127.0.0.1:9501" "http://127.0.0.1:9501"
 #question qRoomName "房间名，多设备接收同一内容时使用相同房间；默认填 default" "default"
 #question qRoomPassword "全局访问密码或房间密码；未设密码则留空" ""
+#question qDeviceName "设备名称，接收端用它显示消息来自哪台设备；同一账号下多台设备建议填不同名字，留空则按系统信息推断" "快捷指令"
 
 @endpoint = text(qServerURL)
 @room = text(qRoomName)
 @password = text(qRoomPassword)
+@deviceName = text(qDeviceName)
 @endpoint = replaceText('^\s+|\s+$', '', @endpoint, true, true)
 @endpoint = replaceText('/+$', "", @endpoint, true, true)
 @room = replaceText('^\s+|\s+$', '', @room, true, true)
@@ -35,6 +37,10 @@ if !@endpoint {
     stop()
 }
 @encodedRoom = urlEncode(@room)
+// 设备名走 name 参数带给服务端，服务端只认「这次请求声明的名字」，不存储。
+// 留空时服务端会回落到按 UA 推断（会显示成 "iOS 17 / BackgroundShortcutRunner" 那种），
+// 所以这里不做兜底 —— 空值本身就是合法的「不声明」。
+@encodedDeviceName = urlEncode(@deviceName)
 
 @source = ShortcutInput
 if !@source { @source = getClipboard() }
@@ -49,7 +55,7 @@ if @amount != 1 {
 // 字段类型必须是「文件」（WFItemType=5）—— cherri 的字典只能生成 text token，表达不了，
 // 所以这里用字面量占位，由 source/patch_shortcut.py 构建后改造并指向 @item。
 // 漏掉 WFItemType=5 会让服务端报「无法解析表单数据」。
-@uploadURL = "{@endpoint}/upload?room={@encodedRoom}&client=ios-shortcuts"
+@uploadURL = "{@endpoint}/upload?room={@encodedRoom}&client=ios-shortcuts&name={@encodedDeviceName}"
 @response = formRequest(@uploadURL, "POST", {"file": "PLACEHOLDER"}, {"Authorization":"Bearer {@password}"})
 
 @record = getDictionary(@response)
