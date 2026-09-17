@@ -1152,6 +1152,14 @@ func (s *ClipboardServer) handleContent(w http.ResponseWriter, r *http.Request) 
 						return
 					}
 
+					// 非 JSON 分支同样要拦过期：记录已声明过期，却还能把字节吐出去，
+					// 浏览器直连 /content/<id> 就能绕过上面的检查拿到已过期文件。
+					if msg.Data.FileReceive.Expire > 0 && msg.Data.FileReceive.Expire < time.Now().Unix() {
+						s.logger.Printf("尝试访问已过期的文件: %s (ID: %d)", msg.Data.FileReceive.Name, id)
+						writeContentError(w, r, isJSONRequest, "文件已过期", http.StatusNotFound)
+						return
+					}
+
 					filePath := filepath.Join(s.storageFolder, msg.Data.FileReceive.Cache)
 					file, openErr := os.Open(filePath)
 					if openErr != nil {
@@ -1329,6 +1337,13 @@ func (s *ClipboardServer) handleLatestContent(w http.ResponseWriter, r *http.Req
 		// 非JSON请求，按原有逻辑处理
 		if msg.Data.Type() == "file" && msg.Data.FileReceive != nil {
 			// 文件类型，直接提供文件内容而不是重定向
+			// 与 JSON 分支保持一致：过期记录不能再吐出字节（浏览器直连走的就是这条路）。
+			if msg.Data.FileReceive.Expire > 0 && msg.Data.FileReceive.Expire < time.Now().Unix() {
+				s.logger.Printf("尝试访问已过期的文件: %s (ID: %d)", msg.Data.FileReceive.Name, msg.Data.ID())
+				http.Error(w, "文件已过期", http.StatusNotFound)
+				return
+			}
+
 			cacheUUID := msg.Data.FileReceive.Cache
 			filename := msg.Data.FileReceive.Name
 
