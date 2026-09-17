@@ -15,7 +15,7 @@
                         <small class="d-block text-right text-medium-emphasis">
                             {{prettyFileSize(Math.min(uploadedSize, fileSize))}} / {{prettyFileSize(fileSize)}} ({{percentage(uploadProgress)}})
                         </small>
-                        <v-progress-linear :value="uploadProgress * 100"></v-progress-linear>
+                        <v-progress-linear :model-value="uploadProgress * 100"></v-progress-linear>
                     </div>
                 </template>
                 <template v-else>

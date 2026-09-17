@@ -96,7 +96,7 @@
                 <small class="d-block text-right text-medium-emphasis mb-1">
                     {{ prettyFileSize(Math.min(uploadedSize, fileSize)) }} / {{ prettyFileSize(fileSize) }}
                 </small>
-                <v-progress-linear :value="uploadProgress * 100"></v-progress-linear>
+                <v-progress-linear :model-value="uploadProgress * 100"></v-progress-linear>
             </div>
         </div>
 
