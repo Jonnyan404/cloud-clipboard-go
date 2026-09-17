@@ -173,7 +173,7 @@ cherri 的高层语法**做不到可靠判断**：条件只支持字符串比较
 
 验收矩阵与实测结果（服务端为本地隔离实例，无鉴权）：
 
-| # | 场景 | 期望 | 原版 `Cloud-Clipboard-Send` | `Cloud-Clipboard-Send-Min` |
+| # | 场景 | 期望 | 原版（已退役） | 现行 `Cloud-Clipboard-Send` |
 | :--- | :--- | :--- | :--- | :--- |
 | a | HTML / 富文本剪贴板 | 纯文本无标签 | ✅ | ✅ |
 | b | 纯文本剪贴板（含中文） | 文本非空 | ✅ | ✅ |
@@ -182,12 +182,13 @@ cherri 的高层语法**做不到可靠判断**：条件只支持字符串比较
 | e | `.icns` 文件 | 文件 | ✅ | ✅ |
 | f | 二进制文件 | 文件 | ✅ | ✅ |
 
-**原版 5/6，简化版 6/6。** 简化版修好了 d（把 `.txt` 当文件存的那个回归），其余场景行为一致。
+**原版 5/6，现行版 6/6。** 现行版修好了 d（把 `.txt` 当文件存的那个回归），其余场景行为一致。
 
-> **2026-09-16：原版 `Cloud-Clipboard-Send` 已退役并从仓库删除**（源码与签名产物均已移除，需要时可在 git 历史里找回）。
+> **2026-09-16：原版已退役并从仓库删除**（源码与签名产物均已移除，需要时可在 git 历史里找回）。
 > 上表的原版列保留作为对照记录。它的 29 项本地化类型名比较、4 路分支与 `?as=file` 协议都不再维护。
+> **注意**：原版曾占用 `Cloud-Clipboard-Send` 这个名字，该名字现已由现行的简化版接手，所以下表与提交历史里同名指的不是同一个东西。
 
-`Cloud-Clipboard-Send-Min` 是简化版：动作数 **121 → 68**，本地化类型名比较 **29 → 0**，客户端不再判断类型、改由服务端按魔数嗅探单点决策。
+现行的 `Cloud-Clipboard-Send` 是简化重写版：动作数 **121 → 68**，本地化类型名比较 **29 → 0**，客户端不再判断类型、改由服务端按魔数嗅探单点决策。
 
 ### 发送结果用通知，不用结果卡片
 
@@ -197,7 +198,7 @@ cherri 的高层语法**做不到可靠判断**：条件只支持字符串比较
 showNotification("已发送 {@savedID}", "Cloud Clipboard", false)
 ```
 
-cherri 的动作名是 **`showNotification(body, title, playSound, attachment)`**，不是 `notification`。`playSound` 传 `false`，连续发送时不会反复响铃。两个 Send 源码同步修改，动作数不变。
+cherri 的动作名是 **`showNotification(body, title, playSound, attachment)`**，不是 `notification`。`playSound` 传 `false`，连续发送时不会反复响铃。动作数不变（原版 121 / 现行 68）。
 
 **验证状态：已完整验证。** 跑通后服务端正常收到消息（产物里 `notification=1`、`showresult=0`），且已在界面上确认通知确实弹出。
 
@@ -205,7 +206,7 @@ cherri 的动作名是 **`showNotification(body, title, playSound, attachment)`*
 
 ### Receive 验收（2026-09-16，首次）
 
-`Cloud-Clipboard-Receive-Min`（2026-09-16 由 `Cloud-Clipboard-Receive` 改名，与 Send 保持 `-Min` 命名一致）此前从未安装、从未验收。补上入口（原先 `WFWorkflowTypes` 只有 `[Watch, ShowInSearch]`，等于没有可用入口）后实测四类：
+`Cloud-Clipboard-Receive` 此前从未安装、从未验收，2026-09-16 首次补测。先补上入口（原先 `WFWorkflowTypes` 只有 `[Watch, ShowInSearch]`，等于没有可用入口）后实测四类：
 
 | # | 服务端内容 | 期望 | 实测 |
 | :--- | :--- | :--- | :--- |
