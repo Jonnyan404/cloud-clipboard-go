@@ -423,6 +423,12 @@ async function deleteItem() {
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    /*
+     * 便签底色是固定的浅色（见下面的 --c0..--c4），跟主题无关。
+     * 不写死文字颜色的话会继承主题的 on-surface，深色主题下就变成浅色字配浅色底，
+     * 对比度低到几乎读不出来。详情弹窗 .sticky-note__reader 一直是写死的，卡片这边漏了。
+     */
+    color: #444034;
 }
 
 .sticky-note::before {
