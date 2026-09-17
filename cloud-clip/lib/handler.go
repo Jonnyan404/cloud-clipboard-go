@@ -1,8 +1,6 @@
 package lib
 
 import (
-	"bytes"
-	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,13 +8,10 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
-	"unicode/utf16"
-	"unicode/utf8"
 
 	"github.com/gorilla/websocket"
 )
@@ -770,7 +765,6 @@ func (s *ClipboardServer) persistAndRespond(w http.ResponseWriter, r *http.Reque
 }
 
 // writeContentJSON 构造内容的绝对 URL 并输出统一的 JSON 响应。
-// persistAndRespond 与 storeRawText 都需要这一段，抽出来避免两处各写一遍
 // （含 room != "default" 时才拼 ?room= 这个容易漏掉的细节）。
 func (s *ClipboardServer) writeContentJSON(w http.ResponseWriter, r *http.Request, room string, id int, respType string) {
 	scheme := getScheme(r)
@@ -786,237 +780,6 @@ func (s *ClipboardServer) writeContentJSON(w http.ResponseWriter, r *http.Reques
 	})
 }
 
-// sniffPayload 通过内容魔数判断负载类型，返回内容类型与建议扩展名。
-func sniffPayload(data []byte) (kind, ext string) {
-	// 含 NUL 的负载优先尝试按 UTF-16/UTF-32 文本解码。此判断必须放在魔数表之前，
-	// 否则 UTF-16LE 的 BOM(0xFF 0xFE)会命中下方 MP3 帧同步判断(0xFF + 0xE0 掩码)被误判为音频。
-	if bytes.IndexByte(data, 0) >= 0 {
-		if _, ok := decodeUnicodeText(data); ok {
-			return "text", "txt"
-		}
-	}
-	if len(data) >= 12 {
-		switch {
-		case bytes.HasPrefix(data, []byte{0x89, 'P', 'N', 'G'}):
-			return "image", "png"
-		case bytes.HasPrefix(data, []byte{0xFF, 0xD8, 0xFF}):
-			return "image", "jpg"
-		case bytes.HasPrefix(data, []byte("GIF87a")) || bytes.HasPrefix(data, []byte("GIF89a")):
-			return "image", "gif"
-		case bytes.Equal(data[:4], []byte("RIFF")):
-			switch {
-			case bytes.Equal(data[8:12], []byte("WEBP")):
-				return "image", "webp"
-			case bytes.Equal(data[8:12], []byte("AVI ")):
-				return "file", "avi"
-			case bytes.Equal(data[8:12], []byte("WAVE")):
-				return "file", "wav"
-			}
-		case bytes.Equal(data[4:8], []byte("ftyp")):
-			switch string(data[8:12]) {
-			case "qt  ":
-				return "file", "mov"
-			case "M4A ", "M4B ":
-				return "file", "m4a"
-			case "M4V ":
-				return "file", "m4v"
-			default:
-				return "file", "mp4"
-			}
-		case bytes.Equal(data[:4], []byte{0x1A, 0x45, 0xDF, 0xA3}):
-			return "file", "mkv"
-		case bytes.HasPrefix(data, []byte{0x00, 0x00, 0x01, 0xBA}) || bytes.HasPrefix(data, []byte{0x00, 0x00, 0x01, 0xB3}):
-			return "file", "mpg"
-		case bytes.HasPrefix(data, []byte("%PDF")):
-			return "file", "pdf"
-		case bytes.HasPrefix(data, []byte{0x1F, 0x8B}):
-			return "file", "gz"
-		case bytes.Equal(data[:2], []byte("PK")):
-			return "file", "zip"
-		case bytes.HasPrefix(data, []byte("ID3")) || (data[0] == 0xFF && data[1]&0xE0 == 0xE0):
-			return "file", "mp3"
-		case bytes.HasPrefix(data, []byte("fLaC")):
-			return "file", "flac"
-		case bytes.HasPrefix(data, []byte("OggS")):
-			return "file", "ogg"
-		}
-	}
-	if bytes.IndexByte(data, 0) >= 0 {
-		// 含 NUL 且在上方未能解码为 Unicode 文本 → 二进制。
-		// 这里不要再调一次 decodeUnicodeText：data 中间没有任何变化，
-		// 上面的判断已经确认它解不出来，重复调用只会白跑一遍 O(n) 解码。
-		return "file", "bin"
-	}
-	if utf8.Valid(data) {
-		return "text", "txt"
-	}
-	return "file", "bin"
-}
-
-// normalizeText 将文本负载统一为 UTF-8:UTF-16/32 负载解码为 UTF-8，并去掉 UTF-8 BOM。
-func normalizeText(data []byte) string {
-	if decoded, ok := decodeUnicodeText(data); ok {
-		return decoded
-	}
-	return strings.TrimPrefix(string(data), "\xEF\xBB\xBF")
-}
-
-// decodeUnicodeText 尝试将含 NUL 的负载按 UTF-16/UTF-32 解码为正常文本。
-// 仅当整个负载可完整解码且全部为可打印/空白字符时返回解码后的 UTF-8 文本，
-// 否则返回 false，确保真正的二进制仍按文件处理("文件就是文件")。
-func decodeUnicodeText(data []byte) (string, bool) {
-	if len(data) < 4 || bytes.IndexByte(data, 0) < 0 {
-		return "", false
-	}
-	var units []uint16
-	switch {
-	case bytes.HasPrefix(data, []byte{0xFF, 0xFE, 0x00, 0x00}): // UTF-32LE
-		return decodeUTF32Text(data[4:], binary.LittleEndian)
-	case bytes.HasPrefix(data, []byte{0x00, 0x00, 0xFE, 0xFF}): // UTF-32BE
-		return decodeUTF32Text(data[4:], binary.BigEndian)
-	case bytes.HasPrefix(data, []byte{0xFF, 0xFE}): // UTF-16LE (+BOM)
-		units = leUTF16Units(data[2:])
-	case bytes.HasPrefix(data, []byte{0xFE, 0xFF}): // UTF-16BE (+BOM)
-		units = beUTF16Units(data[2:])
-	default: // 无 BOM：按 UTF-16LE 尝试(macOS Shortcuts 剪贴板常见)
-		if len(data)%2 != 0 {
-			return "", false
-		}
-		units = leUTF16Units(data)
-	}
-	return validUnicodeRunes(utf16.Decode(units))
-}
-
-func leUTF16Units(b []byte) []uint16 {
-	units := make([]uint16, len(b)/2)
-	for i := range units {
-		units[i] = uint16(b[2*i]) | uint16(b[2*i+1])<<8
-	}
-	return units
-}
-
-func beUTF16Units(b []byte) []uint16 {
-	units := make([]uint16, len(b)/2)
-	for i := range units {
-		units[i] = uint16(b[2*i])<<8 | uint16(b[2*i+1])
-	}
-	return units
-}
-
-// decodeUTF32Text 按指定字节序解码 UTF-32 负载。
-func decodeUTF32Text(b []byte, order binary.ByteOrder) (string, bool) {
-	if len(b) == 0 || len(b)%4 != 0 {
-		return "", false
-	}
-	runes := make([]rune, 0, len(b)/4)
-	for i := 0; i+4 <= len(b); i += 4 {
-		runes = append(runes, rune(order.Uint32(b[i:])))
-	}
-	return validUnicodeRunes(runes)
-}
-
-// validUnicodeRunes 返回去掉 BOM 后所有字符均为可打印或空白文本的字符串。
-func validUnicodeRunes(rs []rune) (string, bool) {
-	if len(rs) == 0 {
-		return "", false
-	}
-	out := make([]rune, 0, len(rs))
-	for _, r := range rs {
-		if r == 0xFEFF {
-			continue
-		}
-		if r < 0x20 && r != '\t' && r != '\n' && r != '\r' {
-			return "", false
-		}
-		out = append(out, r)
-	}
-	return string(out), true
-}
-
-// storeRawText 将嗅探为文本的负载按文本消息入队、广播并返回统一响应。
-func (s *ClipboardServer) storeRawText(w http.ResponseWriter, r *http.Request, room, text string) bool {
-	text = htmlDocumentToPlainText(text)
-	if s.config.Text.Limit > 0 && len(text) > s.config.Text.Limit {
-		s.logger.Printf("错误: 文本内容超出限制 (%d > %d)", len(text), s.config.Text.Limit)
-		http.Error(w, fmt.Sprintf("文本内容超出限制 (最大 %d 字符)", s.config.Text.Limit), http.StatusRequestEntityTooLarge)
-		return false
-	}
-
-	s.logger.Printf("收到文本消息 (房间: %s): %s", room, text)
-	event := s.addMessageToQueueAndBroadcast("text", text, room, r)
-	s.writeContentJSON(w, r, room, event.Data.ID(), "text")
-	return true
-}
-
-var (
-	htmlDocRe       = regexp.MustCompile(`(?is)^\s*(?:<!doctype\s+html|<html\b|<?xml\b|<head\b|<body\b)`)
-	htmlBlockRe     = regexp.MustCompile(`(?is)<(?:script|style|head|title|noscript|template)[^>]*>.*?</(?:script|style|head|title|noscript|template)>`)
-	tagRe           = regexp.MustCompile(`(?is)<!doctype[^>]*>|<!\[[^\]]*\]>|<!--.*?-->|<\s*/?\s*[a-zA-Z][a-zA-Z0-9]*(?:\s[^>]*)?\s*>`)
-	htmlSpaceRe     = regexp.MustCompile(`[ \t\f\v]+`)
-	htmlBlankLineRe = regexp.MustCompile(`\r?\n\s*\r?\n+`)
-)
-
-// htmlDocumentToPlainText 仅在文本形如完整 HTML 文档时剥离标签与常见实体，
-// 普通文本（含 < 或 > 的代码等）原样保留。
-func htmlDocumentToPlainText(text string) string {
-	if !htmlDocRe.MatchString(text) {
-		return text
-	}
-	s := htmlBlockRe.ReplaceAllString(text, " ")
-	s = tagRe.ReplaceAllString(s, " ")
-	s = strings.ReplaceAll(s, "&nbsp;", " ")
-	s = strings.ReplaceAll(s, "&amp;", "&")
-	s = strings.ReplaceAll(s, "&lt;", "<")
-	s = strings.ReplaceAll(s, "&gt;", ">")
-	s = strings.ReplaceAll(s, "&quot;", "\"")
-	s = strings.ReplaceAll(s, "&apos;", "'")
-	s = strings.ReplaceAll(s, "&#39;", "'")
-	s = htmlSpaceRe.ReplaceAllString(s, " ")
-	s = htmlBlankLineRe.ReplaceAllString(s, "\n")
-	return strings.TrimSpace(s)
-}
-
-// handle_raw_upload 请求体即为原始文件字节，服务器按内容嗅探自动分流文本/文件。
-// handle_raw_upload 请求体即原始字节，服务端按内容嗅探自动分流文本/文件。
-//
-// 这是「剪贴板路径」专用：剪贴板里可能是文字也可能是图片，客户端分不出
-// （Shortcuts 的 typeOf 返回本地化字符串，非中英文系统会静默失效），
-// 所以交给服务端按内容魔数判断。富文本也在这里降级成纯文本。
-//
-// 分享路径不走这里 —— 文件走 /upload（multipart，part 自带真实文件名，扩展名不用猜），
-// 分享的字符串走 /upload/raw 但由客户端判型。
-func (s *ClipboardServer) handle_raw_upload(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "仅允许 POST 请求", http.StatusMethodNotAllowed)
-		return
-	}
-
-	room := normalizeRoomName(r.URL.Query().Get("room"))
-
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		s.logger.Printf("错误: 读取 raw 上传请求体失败: %v", err)
-		http.Error(w, "无法读取请求体", http.StatusBadRequest)
-		return
-	}
-	defer r.Body.Close()
-
-	kind, ext := sniffPayload(body)
-	if kind == "text" {
-		size := len(body)
-		if s.config.Text.Limit <= 0 || size <= s.config.Text.Limit {
-			s.storeRawText(w, r, room, normalizeText(body))
-			return
-		}
-		s.logger.Printf("按文件处理: 文本超出文本消息限制 (%d 字节), 转为文件存储", size)
-	}
-
-	// 名字只能用嗅探出来的扩展名 —— 客户端给不出完整文件名
-	// （Shortcuts 的 getName 会把扩展名剥掉），所以这个端点没有 ?name=。
-	// 要保留真实文件名请走 /upload（multipart）。
-	fileName := "clipboard." + ext
-	s.persistAndRespond(w, r, room, fileName, int64(len(body)), bytes.NewReader(body))
-}
 
 func (s *ClipboardServer) handle_chunk(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {

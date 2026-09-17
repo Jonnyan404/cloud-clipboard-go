@@ -4,12 +4,17 @@
 
 | 捷径 | 作用 | 怎么唤起 |
 | :--- | :--- | :--- |
-| **Cloud-Clipboard-Send** | 发送：剪贴板内容 / 分享的文件 | iOS 分享菜单、macOS Finder 右键 →「快速操作」、菜单栏 |
+| **Cloud-Clipboard-Send-Text** | 发送**文本** | iOS 分享菜单、macOS Finder 右键 →「快速操作」、菜单栏 |
+| **Cloud-Clipboard-Send-File** | 发送**文件 / 图片** | 同上 |
 | **Cloud-Clipboard-Receive** | 拉取：把最新一条放进剪贴板（是文件则保存） | macOS 菜单栏、Spotlight 搜索、Apple Watch |
+
+> **发送为什么要分成两个？** 因为剪贴板条目的「类型」在客户端判不准——它的名字反映的是
+> **剪贴板格式**（带 HTML 味就变 `Clipboard <日期>.html`、图片变 `.png`、纯文本没后缀），
+> 不是内容。让用户自己选发什么，比让程序猜可靠。
 
 ## 安装
 
-1. 下载本目录下的 `Cloud-Clipboard-Send.shortcut` 与 `Cloud-Clipboard-Receive.shortcut`
+1. 下载本目录下的 `Cloud-Clipboard-Send-Text.shortcut`、`Cloud-Clipboard-Send-File.shortcut` 与 `Cloud-Clipboard-Receive.shortcut`
 2. 双击导入「快捷指令」App
 3. 导入时会让你填三项：
    - **服务器地址** —— 如 `https://clip.example.com`，或局域网 `http://192.168.1.10:9501`
@@ -23,9 +28,9 @@
 
 **发送**
 
-- iOS —— 任意 App 里分享 → 选「Cloud-Clipboard-Send」
-- macOS —— Finder 里右键文件 →「快速操作」→ Cloud-Clipboard-Send
-- 只想发剪贴板 —— 先复制，再运行捷径（菜单栏或 Spotlight 都行）
+- 发**文件/图片** —— iOS 分享菜单选「发送文件」；macOS Finder 右键 →「快速操作」→ 发送文件
+- 发**文字** —— 复制好，运行「发送文本」（菜单栏或 Spotlight 都行）
+- 从浏览器/编辑器里分享选中的文字 —— 选「发送文本」
 
 **拉取** —— 运行 Cloud-Clipboard-Receive。最新一条会进剪贴板；如果是文件，会弹出保存对话框。
 
@@ -46,12 +51,15 @@
 
 | 接口 | 用途 | Go 服务端 | Cloudflare Worker |
 | :--- | :--- | :--- | :--- |
-| `POST /upload/raw` | 剪贴板路径（服务端读内容并分流文字 / 图片） | ✅ | ✅ |
-| `POST /upload` | 分享文件（multipart，part 自带真实文件名） | ✅ | ✅ |
+| `POST /text` | 发文本 | ✅ | ✅ |
+| `POST /upload` | 发文件（multipart，part 自带真实文件名） | ✅ | ✅ |
 | `GET /content/latest?json=1` | 拉取最新内容 | ✅ | ✅ |
 | `GET /file/:uuid/:filename` | 下载文件 | ✅ | ✅ |
 
-两种部署都支持，不需要额外配置。
+**只需要这四个接口，两种部署都支持，不需要额外配置。**
+
+> 服务端不再需要「按内容猜类型」那套逻辑（`/upload/raw` 已于 2026-09-17 删除）——
+> 判型交给用户之后，那些代码就没有存在理由了。
 
 ## 已知限制
 

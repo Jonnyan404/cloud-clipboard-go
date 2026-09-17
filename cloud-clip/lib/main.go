@@ -326,7 +326,6 @@ func (s *ClipboardServer) setupRoutes() {
 	mux.HandleFunc(prefix+"/file/", s.authMiddleware(s.handle_file))
 	mux.HandleFunc(prefix+"/text", s.authMiddleware(s.handle_text))
 	mux.HandleFunc(prefix+"/upload", s.authMiddleware(s.handle_upload))
-	mux.HandleFunc(prefix+"/upload/raw", s.authMiddleware(s.handle_raw_upload))
 	mux.HandleFunc(prefix+"/upload/chunk", s.authMiddleware(s.handle_upload))
 	mux.HandleFunc(prefix+"/upload/chunk/", s.authMiddleware(s.handle_chunk))
 	mux.HandleFunc(prefix+"/upload/finish/", s.authMiddleware(s.handle_finish))

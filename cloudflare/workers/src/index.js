@@ -3,7 +3,6 @@ import { corsHeaders, handleCors } from './cors';
 import { canAccessRoom, canAccessRoomAsync, hasRoomAuthEntry, resolveRoomAuth, issueRoomSessionToken, validateRoomSessionToken, parseRoomSessionToken, extractAuthToken } from './auth';
 import { TextHandler } from './handlers/text';
 import { FileHandler } from './handlers/file';
-import { RawUploadHandler } from './handlers/raw-upload';
 import { ContentHandler } from './handlers/content';
 import { RoomsHandler } from './handlers/rooms';
 import { WebSocketHandler } from './handlers/websocket';
@@ -40,9 +39,6 @@ router.put('/upload/multipart/:partNumber', FileHandler.uploadMultipartPart);
 router.post('/upload/multipart/complete', FileHandler.completeMultipart);
 router.delete('/upload/multipart', FileHandler.abortMultipart);
 router.post('/upload', FileHandler.upload);
-// 与自托管 Go 后端路径对齐：客户端（Apple 快捷指令）只发原始字节，由服务端按内容嗅探分流。
-// 缺了这两个端点，Send 在 Worker 部署上会 404。
-router.post('/upload/raw', RawUploadHandler.upload);
 router.get('/file/:uuid/:filename?', FileHandler.download);
 router.delete('/file/:uuid', FileHandler.delete);
 
