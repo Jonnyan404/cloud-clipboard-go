@@ -18,19 +18,25 @@
 
 | 接口 | 用途 | Go 服务端 | Cloudflare Worker |
 | :--- | :--- | :--- | :--- |
-| `POST /upload/raw` | Send 上传（body 即原始字节） | ✅ | ❌ **缺失** |
-| `POST /upload/base64` | Send 上传的 base64 变体 | ✅ | ❌ **缺失** |
+| `POST /upload/raw` | Send 上传（body 即原始字节） | ✅ | ✅ 2026-09-17 补齐 |
+| `POST /upload/base64` | Send 上传的 base64 变体 | ✅ | ✅ 2026-09-17 补齐 |
 | `GET /content/latest?json=1` | Receive 拉取最新内容 | ✅ | ✅ |
 | `GET /file/:uuid/:filename` | Receive 下载文件 | ✅ | ✅ |
 
-**结论：Send 在 Cloudflare Worker 部署上不可用（会 404）；Receive 可用。**
+**两端现在都可用。**
 
-Worker 的路由注释写着「无 /api 前缀，与自托管 Go 后端路径对齐」，新增的这两个端点打破了这个约定。
-要在 Worker 上支持 Send，需在 `cloudflare/workers/src/index.js` 补上这两个路由，
-并把内容嗅探、UTF-16/32 解码、HTML 降级这套逻辑用 JS 重写一遍。
+Worker 侧的实现（2026-09-17）：
 
-> 说明：上表由**阅读路由定义**得出，未实际对 Worker 部署发起请求。若要确认，可对 Worker 的
-> `/upload/raw` 发一次 POST，观察是否 404。
+- `src/sniff.js` —— 内容嗅探与文本规范化，**与 Go 版逐条对齐**；刻意零依赖，因此可被 Node 直接单测
+- `src/handlers/raw-upload.js` —— 只做「嗅探 + 请求包装」，存储逻辑**委托**给既有的
+  `TextHandler.create` / `FileHandler.upload`，不复制 D1/R2 写入、清理与广播
+- 路由加在 `src/index.js`
+- 测试：`cd cloudflare/workers && npm test` —— 25 项单测（用例与 Go 的 `unicode_text_test.go` 逐条对应）
+  + 28 项端到端（HTTP → 嗅探 → 委托 → D1/R2 → 响应 JSON），用 `node:sqlite` 充当 D1、Map 充当 R2，
+  **不需要 wrangler、不联网**
+
+> 说明：端到端测试跑的是处理器的真实调用路径，但没有经过 wrangler 的完整运行时
+> （本地 wrangler 因网络限制未能启动）。若要验证线上行为，需实际部署后请求一次。
 
 ## 行为说明：上传什么会变成什么
 
