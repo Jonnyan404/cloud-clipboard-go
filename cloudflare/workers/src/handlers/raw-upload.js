@@ -5,10 +5,12 @@ import { ensureRoomAccess, normalizeRoomName } from '../auth';
 import { sniffPayload, normalizeText, htmlDocumentToPlainText } from '../sniff';
 
 // ─────────────────────────────────────────────────────────────
-// /upload/raw 与 /upload/base64 —— 与 Go 版 cloud-clip/lib/handler.go 行为对齐。
+// POST /upload/raw —— 与 Go 版 cloud-clip/lib/handler.go 行为对齐。
 //
-// 客户端（Apple 快捷指令）不判断类型，只发原始字节，由这里按内容魔数分流。
-// 缺了这两个端点，Send 在 Cloudflare Worker 部署上会 404。
+// 快捷指令的「剪贴板路径」用它：剪贴板里可能是文字也可能是图片，客户端分不出
+// （只能靠本地化的 typeOf），所以把原始字节发过来、由服务端按内容魔数分流。
+// 分享路径不走这里 —— 文本走文本消息分支，文件走 /upload（multipart，part 自带真实文件名）。
+// 缺了这个端点，Send 在 Cloudflare Worker 部署上会 404。
 //
 // 设计：**不复制存储逻辑**。嗅探出类型后把请求重新包装，委托给既有处理器：
 //   · 文本 → TextHandler.create（复用长度限制、D1 写入、清理、广播、响应格式）
@@ -54,24 +56,14 @@ async function dispatchAsFile(request, env, bytes, fileName) {
   return FileHandler.upload(synth, env);
 }
 
-function badRequest(error, message) {
-  return new Response(JSON.stringify({ error, message }), {
-    status: 400,
-    headers: { 'Content-Type': 'application/json', ...corsHeaders },
-  });
-}
-
-// 决定文件的存储名。与 Go 版 resolveFileName 行为一致：
-// 客户端只能给出「不含扩展名」的名字——Shortcuts 的 getName 会把扩展名剥掉
-// （rightclick.txt → rightclick），所以按内容嗅探到的扩展名补回去，
-// 让接收端拿到 requirements.txt 而不是一个没有后缀的 requirements。
-// 判断依据与 Go 的 filepath.Ext 对齐：名字里只要有「.」就认为已有扩展名。
+// 决定文件的存储名：客户端没给名字时退回默认名。
+// 曾经在这里按嗅探结果补扩展名，但快捷指令的文件分支改走 multipart
+// （part 自带真实文件名，含扩展名）后，?name= 不再有人传，那段成了死代码。
 function resolveFileName(name, ext) {
-  if (!name) return `clipboard.${ext}`;
-  return name.includes('.') ? name : `${name}.${ext}`;
+  return name || `clipboard.${ext}`;
 }
 
-async function handle(request, env, { base64 }) {
+async function handle(request, env) {
   try {
     const url = new URL(request.url);
     const room = normalizeRoomName(url.searchParams.get('room'));
@@ -81,24 +73,7 @@ async function handle(request, env, { base64 }) {
     const authResult = await ensureRoomAccess(request, env, room);
     if (!authResult.ok) return authResult.response;
 
-    const raw = new Uint8Array(await request.arrayBuffer());
-
-    let bytes = raw;
-    if (base64) {
-      let encoded = new TextDecoder('utf-8').decode(raw).trim();
-      const comma = encoded.indexOf(',');
-      if (comma >= 0) {
-        const prefix = encoded.slice(0, comma);
-        if (prefix.startsWith('data:') && prefix.endsWith(';base64')) encoded = encoded.slice(comma + 1);
-      }
-      try {
-        const binary = atob(encoded);
-        bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      } catch {
-        return badRequest('Invalid base64', '无效的 base64 数据');
-      }
-    }
+    const bytes = new Uint8Array(await request.arrayBuffer());
 
     const { kind, ext } = sniffPayload(bytes);
 
@@ -126,13 +101,10 @@ async function handle(request, env, { base64 }) {
 }
 
 export class RawUploadHandler {
-  // POST /upload/raw —— 请求体即原始字节，按内容嗅探自动分流文本/文件
+  // POST /upload/raw —— 请求体即原始字节，按内容嗅探自动分流文本/文件。
+  // 快捷指令的剪贴板路径靠它：剪贴板里可能是文字也可能是图片，客户端分不出
+  // （只能靠本地化的 typeOf），所以把分流交给服务端。
   static async upload(request, env) {
-    return handle(request, env, { base64: false });
-  }
-
-  // POST /upload/base64 —— 请求体为 base64 文本（可带 data:*;base64, 前缀），解码后同样分流
-  static async uploadBase64(request, env) {
-    return handle(request, env, { base64: true });
+    return handle(request, env);
   }
 }

@@ -2,7 +2,6 @@ package lib
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -977,22 +976,6 @@ func htmlDocumentToPlainText(text string) string {
 	return strings.TrimSpace(s)
 }
 
-// resolveFileName 决定文件的存储名。
-//
-// 客户端只能给出「不含扩展名」的名字——Shortcuts 的 getName 会把扩展名剥掉
-// （rightclick.txt → rightclick），所以这里按内容嗅探到的扩展名补回去，
-// 让接收端拿到 requirements.txt 而不是一个没有后缀的 requirements。
-// 名字本身为空时才退回 clipboard.<ext>。
-func resolveFileName(fileName, ext string) string {
-	if fileName == "" {
-		return "clipboard." + ext
-	}
-	if filepath.Ext(fileName) == "" {
-		return fileName + "." + ext
-	}
-	return fileName
-}
-
 // handle_raw_upload 请求体即为原始文件字节，服务器按内容嗅探自动分流文本/文件。
 func (s *ClipboardServer) handle_raw_upload(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -1022,56 +1005,12 @@ func (s *ClipboardServer) handle_raw_upload(w http.ResponseWriter, r *http.Reque
 		s.logger.Printf("按文件处理: 文本超出文本消息限制 (%d 字节), 转为文件存储", size)
 	}
 
-	fileName = resolveFileName(fileName, ext)
+	// 客户端没给名字时退回默认名。曾经在这里按嗅探结果补扩展名，但快捷指令的
+	// 文件分支改走 multipart（part 自带真实文件名）后 ?name= 不再有人传，那段成了死代码。
+	if fileName == "" {
+		fileName = "clipboard." + ext
+	}
 	s.persistAndRespond(w, r, room, fileName, int64(len(body)), bytes.NewReader(body))
-}
-
-// handle_base64_upload 请求体为 base64 文本（可带 data:*;base64, 前缀），服务器解码后按内容嗅探自动分流。
-func (s *ClipboardServer) handle_base64_upload(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "仅允许 POST 请求", http.StatusMethodNotAllowed)
-		return
-	}
-
-	room := normalizeRoomName(r.URL.Query().Get("room"))
-	fileName := r.URL.Query().Get("name")
-	asFile := r.URL.Query().Get("as") == "file"
-
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		s.logger.Printf("错误: 读取 base64 上传请求体失败: %v", err)
-		http.Error(w, "无法读取请求体", http.StatusBadRequest)
-		return
-	}
-	defer r.Body.Close()
-
-	encoded := strings.TrimSpace(string(body))
-	if idx := strings.IndexByte(encoded, ','); idx >= 0 {
-		prefix := encoded[:idx]
-		if strings.HasPrefix(prefix, "data:") && strings.HasSuffix(prefix, ";base64") {
-			encoded = encoded[idx+1:]
-		}
-	}
-
-	data, err := base64.StdEncoding.DecodeString(encoded)
-	if err != nil {
-		s.logger.Printf("错误: base64 解码失败: %v", err)
-		http.Error(w, "无效的 base64 数据", http.StatusBadRequest)
-		return
-	}
-
-	kind, ext := sniffPayload(data)
-	if !asFile && kind == "text" && fileName == "" {
-		size := len(data)
-		if s.config.Text.Limit <= 0 || size <= s.config.Text.Limit {
-			s.storeRawText(w, r, room, normalizeText(data))
-			return
-		}
-		s.logger.Printf("按文件处理: base64 解码后文本超出文本消息限制 (%d 字节), 转为文件存储", size)
-	}
-
-	fileName = resolveFileName(fileName, ext)
-	s.persistAndRespond(w, r, room, fileName, int64(len(data)), bytes.NewReader(data))
 }
 
 func (s *ClipboardServer) handle_chunk(w http.ResponseWriter, r *http.Request) {

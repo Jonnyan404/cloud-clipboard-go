@@ -18,10 +18,20 @@
 
 | 接口 | 用途 | Go 服务端 | Cloudflare Worker |
 | :--- | :--- | :--- | :--- |
-| `POST /upload/raw` | Send 上传（body 即原始字节） | ✅ | ✅ 2026-09-17 补齐 |
-| `POST /upload/base64` | Send 上传的 base64 变体 | ✅ | ✅ 2026-09-17 补齐 |
+| `POST /upload/raw` | 剪贴板路径上传（body 即原始字节，服务端按内容分流） | ✅ | ✅ 2026-09-17 补齐 |
+| `POST /upload` | 文件上传（multipart，part 自带真实文件名） | ✅ | ✅ |
 | `GET /content/latest?json=1` | Receive 拉取最新内容 | ✅ | ✅ |
 | `GET /file/:uuid/:filename` | Receive 下载文件 | ✅ | ✅ |
+
+**两个上传端点的分工**（2026-09-17 定）：
+
+- **`/upload/raw`** —— 给**剪贴板路径**用。剪贴板里可能是文字也可能是图片，客户端分不出
+  （只能靠本地化的 `typeOf`），所以把原始字节交给服务端按内容魔数分流。
+- **`/upload`** —— 给**分享路径的文件**用。multipart 的 part 自带真实文件名（含扩展名），
+  服务端直接用它 —— **扩展名不需要猜**。这是唯一能保住 `.md` / `.sh` 这类扩展名的方式
+  （`getName` 会把扩展名剥掉，服务端按内容嗅探也只能给 `txt`）。
+
+> `POST /upload/base64` 已于 2026-09-17 删除：零调用方。`/upload/raw` 已覆盖它的用途。
 
 **两端现在都可用。**
 

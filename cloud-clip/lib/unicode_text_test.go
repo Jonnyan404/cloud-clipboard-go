@@ -113,21 +113,3 @@ func TestHTMLDocumentStripsScriptAndStyle(t *testing.T) {
 		t.Fatalf("htmlDocumentToPlainText = %q, want 可见文本", got)
 	}
 }
-
-func TestResolveFileName(t *testing.T) {
-	cases := []struct {
-		fileName, ext, want string
-	}{
-		{"", "txt", "clipboard.txt"},                // 客户端没给名字 → 退回默认名
-		{"requirements", "txt", "requirements.txt"}, // Shortcuts 的 getName 剥掉了扩展名，补回来
-		{"photo", "jpg", "photo.jpg"},
-		{"notes.txt", "txt", "notes.txt"},     // 已有扩展名 → 不动
-		{"archive.tar.gz", "gz", "archive.tar.gz"},
-		{"my.notes", "txt", "my.notes"}, // filepath.Ext 认得 .notes，视为已有扩展名
-	}
-	for _, c := range cases {
-		if got := resolveFileName(c.fileName, c.ext); got != c.want {
-			t.Errorf("resolveFileName(%q, %q) = %q, want %q", c.fileName, c.ext, got, c.want)
-		}
-	}
-}

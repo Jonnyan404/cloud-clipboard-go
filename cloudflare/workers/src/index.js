@@ -43,7 +43,6 @@ router.post('/upload', FileHandler.upload);
 // 与自托管 Go 后端路径对齐：客户端（Apple 快捷指令）只发原始字节，由服务端按内容嗅探分流。
 // 缺了这两个端点，Send 在 Worker 部署上会 404。
 router.post('/upload/raw', RawUploadHandler.upload);
-router.post('/upload/base64', RawUploadHandler.uploadBase64);
 router.get('/file/:uuid/:filename?', FileHandler.download);
 router.delete('/file/:uuid', FileHandler.delete);
 

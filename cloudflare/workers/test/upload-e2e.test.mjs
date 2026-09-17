@@ -1,7 +1,8 @@
-// 端到端验证 Cloudflare Worker 的 /upload/raw 与 /upload/base64 胶水层：
+// 端到端验证 Cloudflare Worker 的 /upload/raw 胶水层：
 // 请求包装 → 嗅探 → 委托给 TextHandler/FileHandler → D1/R2 落库 → 响应 JSON。
 // 用 esbuild 打包后的处理器 + mock env（D1 用 node:sqlite，R2 用 Map）。
 import { RawUploadHandler } from './.build/raw-upload.mjs';
+import { FileHandler } from './.build/file.mjs';
 import { makeEnv, makeChecker, postJson } from './harness.mjs';
 
 const { check, summary } = makeChecker();
@@ -9,10 +10,9 @@ const { check, summary } = makeChecker();
 // PNG 头（够长以命中魔数表）
 const PNG_BYTES = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52]);
 
-// 适配：e2e 测试既测 raw 也测 base64，所以保留一个可切换 handler 的包装
-async function call(env, path, body, { base64 = false, auth = 'Bearer 123' } = {}) {
-  const handler = base64 ? RawUploadHandler.uploadBase64 : RawUploadHandler.upload;
-  return postJson(handler, env, path, body, { auth });
+// 适配：统一走 RawUploadHandler.upload
+async function call(env, path, body, { auth = 'Bearer 123' } = {}) {
+  return postJson(RawUploadHandler.upload, env, path, body, { auth });
 }
 
 const lastMessage = (db) => db.prepare('SELECT * FROM messages ORDER BY id DESC LIMIT 1').get();
@@ -77,23 +77,16 @@ console.log('\n── 6. name 参数被保留 ──');
   check('D1 name 用传入的名字', lastMessage(db).name, 'my notes.txt');
 }
 
-console.log('\n── 6b. 名字缺扩展名时补上嗅探到的扩展名（用例对照 Go 版 TestResolveFileName）──');
+console.log('\n── 6b. 名字原样使用（补扩展名那段已随 multipart 改造移除）──');
 {
-  // Shortcuts 的 getName 会把扩展名剥掉（rightclick.txt → rightclick），
-  // 所以客户端只能给不含扩展名的名字，由服务端按嗅探结果补回。
   const { env, db } = makeEnv();
   await call(env, '/upload/raw?room=default&as=file&name=requirements', 'django==4.2.*');
-  check('requirements + txt 内容 → requirements.txt', lastMessage(db).name, 'requirements.txt');
-}
-{
-  const { env, db } = makeEnv();
-  await call(env, '/upload/raw?room=default&as=file&name=photo', PNG_BYTES);
-  check('photo + PNG 内容 → photo.png', lastMessage(db).name, 'photo.png');
+  check('给了名字就原样用（不再猜扩展名）', lastMessage(db).name, 'requirements');
 }
 {
   const { env, db } = makeEnv();
   await call(env, '/upload/raw?room=default&as=file&name=notes.txt', 'body');
-  check('已有扩展名 → 不动', lastMessage(db).name, 'notes.txt');
+  check('带扩展名的名字原样保留', lastMessage(db).name, 'notes.txt');
 }
 {
   const { env, db } = makeEnv();
@@ -101,26 +94,7 @@ console.log('\n── 6b. 名字缺扩展名时补上嗅探到的扩展名（用
   check('没给名字 → clipboard.txt', lastMessage(db).name, 'clipboard.txt');
 }
 
-console.log('\n── 7. base64 端点 ──');
-{
-  const { env, db } = makeEnv();
-  const r = await call(env, '/upload/base64?room=default', Buffer.from('base64 payload').toString('base64'), { base64: true });
-  check('HTTP 200', r.status, 200);
-  check('D1 content 解码正确', lastMessage(db).content, 'base64 payload');
-}
-{
-  const { env, db } = makeEnv();
-  await call(env, '/upload/base64?room=default', 'data:text/plain;base64,' + Buffer.from('with prefix').toString('base64'), { base64: true });
-  check('data: 前缀被剥离', lastMessage(db).content, 'with prefix');
-}
-{
-  const { env } = makeEnv();
-  const r = await call(env, '/upload/base64?room=default', '!!!not-base64!!!', { base64: true });
-  check('非法 base64 → 400', r.status, 400);
-  check('错误码', r.json.error, 'Invalid base64');
-}
-
-console.log('\n── 8. 认证失败被拦下 ──');
+console.log('\n── 7. 认证失败被拦下 ──');
 {
   const { env, db } = makeEnv();
   const r = await call(env, '/upload/raw?room=default', 'should not be stored', { auth: 'Bearer wrong-password' });
@@ -128,7 +102,7 @@ console.log('\n── 8. 认证失败被拦下 ──');
   check('D1 未写入', db.prepare('SELECT COUNT(*) AS c FROM messages').get().c, 0);
 }
 
-console.log('\n── 9. 空文本与超限文本 ──');
+console.log('\n── 8. 空文本与超限文本 ──');
 {
   const { env, db } = makeEnv();
   await call(env, '/upload/raw?room=default', '');
@@ -142,6 +116,37 @@ console.log('\n── 9. 空文本与超限文本 ──');
   const m = lastMessage(db);
   check('超限文本转为文件', m.type, 'file');
   check('文件名为 clipboard.txt', m.name, 'clipboard.txt');
+}
+
+console.log('\n── 9. multipart 上传保留真实文件名（快捷指令文件分支走的就是这条）──');
+{
+  // 为什么重要：getName 拿不到扩展名、服务端按内容嗅探也只能给 txt，
+  // 所以「文件名保真」只能靠 multipart 的 part 自带名字。
+  const { env, db } = makeEnv();
+  const form = new FormData();
+  form.append('file', new Blob([Buffer.from('django==4.2.*')], { type: 'text/plain' }), 'requirements.md');
+  const req = new Request('http://worker.local/upload?room=default&client=ios-shortcuts', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer 123' },
+    body: form,
+  });
+  const res = await FileHandler.upload(req, env);
+  check('HTTP 200', res.status, 200);
+  check('真实文件名保留（含扩展名）', lastMessage(db).name, 'requirements.md');
+  check('存成文件', lastMessage(db).type, 'file');
+}
+{
+  // 中文名与 .sh 也要保真 —— 这两个正是当初被嗅探成 txt 的场景
+  const { env, db } = makeEnv();
+  const form = new FormData();
+  form.append('file', new Blob([Buffer.from('#!/bin/bash\n')], { type: 'text/plain' }), 'build.sh');
+  const req = new Request('http://worker.local/upload?room=default', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer 123' },
+    body: form,
+  });
+  await FileHandler.upload(req, env);
+  check('.sh 扩展名保留', lastMessage(db).name, 'build.sh');
 }
 
 summary('端到端全绿');
