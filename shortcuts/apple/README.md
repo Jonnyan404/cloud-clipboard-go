@@ -291,6 +291,20 @@ cherri 的动作名是 **`showNotification(body, title, playSound, attachment)`*
 - **重复拉取会累积文件**：`overwrite` 传 `false`，所以第二次存成 `clipboard-2.bin`、第三次 `clipboard-3.bin`…… 不会覆盖。
 - **文件名会退化**：客户端不传 `?name=`，服务端只能按嗅探到的扩展名命名，原名（如 `u.bin`）会变成 `clipboard.bin`。
 
+### 拉取成功的反馈（各平台）
+
+`vibrate()` 是 **iOS 专属**动作，macOS 上不可用，所以源码里它一直包在 `if @model != "Mac"` 里。
+**但此前没人给 macOS 补等价反馈**，导致文本与图片两条分支在 Mac 上静默完成——拉取成功与否完全看不出来。
+2026-09-17 补上通知：
+
+| 分支 | macOS | iOS |
+| :--- | :--- | :--- |
+| 文字 | `showNotification("已接收文字，已复制到剪贴板")` | `vibrate()` |
+| 图片 | `showNotification("已接收图片，已复制到剪贴板")` | `vibrate()` |
+| 文件 | 保存对话框 + `reveal()` 打开 Finder（本身即反馈，未再加通知） | `saveFilePrompt` + `vibrate()` |
+
+> 通知需要系统授权。若 macOS 上看不到，检查 **系统设置 → 通知 → 快捷指令**。
+
 ### 保存位置：只能每次询问（结论）
 
 **「静默保存到指定目录」做不到**，所以 Receive 只保留「询问保存位置」一种行为，不提供保存目录配置项。

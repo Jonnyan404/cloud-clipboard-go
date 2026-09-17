@@ -56,6 +56,11 @@ if @uuid {
         if @msgType == "image" {
             @picture = getFirstItem(@download)
             setClipboard(@picture, true)
+            // vibrate() 是 iOS 专属动作，macOS 上不可用。此前只写了 iOS 分支，
+            // 导致 macOS 拉取图片时毫无反馈。补一条通知作为等价提示。
+            if @model == "Mac" {
+                showNotification("已接收图片，已复制到剪贴板", "Cloud Clipboard", false)
+            }
             if @model != "Mac" {
                 vibrate()
             }
@@ -82,6 +87,10 @@ if !@content {
     stop()
 }
 setClipboard(@content, true)
+// 同上：macOS 没有 vibrate()，补一条通知，否则这条分支在 Mac 上完全静默。
+if @model == "Mac" {
+    showNotification("已接收文字，已复制到剪贴板", "Cloud Clipboard", false)
+}
 if @model != "Mac" {
     vibrate()
 }
