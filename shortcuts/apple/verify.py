@@ -111,6 +111,36 @@ def main():
         )
     print(f"   条件比较: 共 {len(groups)} 处条件含比较，单处最多 {max((len(g) for g in groups), default=0)} 个字符串")
 
+    # 2.5 multipart 表单字段（Send 发「真文件」时用）
+    # 源码里用字面量 "PLACEHOLDER" 占位，构建后必须由 source/patch_form_field.py 改成
+    # 「文件」类型（WFItemType=5）并指向文件变量。跳过 patcher 会产出坏产物：
+    # 字段被当成文本 → 请求体不是合法 multipart → 服务端报「无法解析表单数据」。
+    form_fields = []
+    for a in actions:
+        params = a.get("WFWorkflowActionParameters") or {}
+        if params.get("WFHTTPBodyType") != "Form":
+            continue
+        items = ((params.get("WFFormValues") or {}).get("Value") or {}).get(
+            "WFDictionaryFieldValueItems"
+        ) or []
+        form_fields.extend(items)
+
+    if form_fields:
+        field_names = [((it.get("WFKey") or {}).get("Value") or {}).get("string") for it in form_fields]
+        if any(((it.get("WFValue") or {}).get("Value") or {}).get("string") == "PLACEHOLDER" for it in form_fields):
+            failures.append(
+                "表单里还有 PLACEHOLDER 占位符 —— patch_form_field.py 没跑，"
+                "字段会被当成文本，服务端会报「无法解析表单数据」"
+            )
+        if any(it.get("WFItemType") != 5 for it in form_fields):
+            failures.append(
+                "表单字段的 WFItemType 不是 5（文件）—— 字段会被当成文本，服务端报「无法解析表单数据」"
+            )
+        if any((it.get("WFValue") or {}).get("WFSerializationType") != "WFTokenAttachmentParameterState"
+               for it in form_fields):
+            failures.append("表单文件字段的 WFValue 序列化类型不是 WFTokenAttachmentParameterState")
+        print(f"   表单字段: {len(form_fields)} 个，名称={field_names}")
+
     # 3. 已知会出问题的动作
     ids = collections.Counter(a.get("WFWorkflowActionIdentifier") for a in actions)
     if ids.get("is.workflow.actions.getitemtype"):

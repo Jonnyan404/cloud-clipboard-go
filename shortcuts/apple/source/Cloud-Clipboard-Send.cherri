@@ -75,20 +75,27 @@ if !@source {
     @nm = text(@nmRaw)
     if @nm contains "Clipboard " {
         @uploadURL = "{@endpoint}/upload/raw?room={@encodedRoom}&client=ios-shortcuts"
+        @response = rawUpload(@uploadURL, @item, {"Authorization":"Bearer {@password}"})
     } else {
         @tRaw = getText(@item)
         @t = text(@tRaw)
         if @t beginsWith @nm {
             @uploadURL = "{@endpoint}/upload/raw?room={@encodedRoom}&client=ios-shortcuts"
+            @response = rawUpload(@uploadURL, @item, {"Authorization":"Bearer {@password}"})
         } else {
-            // 带上名字。getName 会剥掉扩展名（rightclick.txt → rightclick），
-            // 服务端会用按内容嗅探到的扩展名补回去，接收端就能拿到 requirements.txt
-            // 而不是没有后缀的 requirements。
-            @encodedName = urlEncode(@nm)
-            @uploadURL = "{@endpoint}/upload/raw?as=file&name={@encodedName}&room={@encodedRoom}&client=ios-shortcuts"
+            // ── 真文件：走 multipart 表单上传 ──
+            // 为什么不用 /upload/raw?as=file：getName 会把扩展名剥掉（notes.md → notes），
+            // 而客户端没有任何动作能读到扩展名（查过 cherri 动作表、已装捷径的 68 种动作、
+            // 系统二进制）。服务端按内容嗅探也只能给 txt —— .md/.sh/.txt 内容都是合法 UTF-8，
+            // 再大的扩展名表都分不出来。
+            // multipart 的 part 自带真实文件名（含扩展名），服务端 /upload 直接用 handler.Filename，
+            // 所以扩展名根本不需要"猜"。实测：测试笔记.md / build.sh / notes.txt 全部原样保留。
+            // 表单字段必须是「文件」类型（WFItemType=5）——cherri 表达不了，
+            // 所以这里用字面量占位，由 source/patch_form_field.py 在构建后改造成文件字段并指向 @item。
+            @uploadURL = "{@endpoint}/upload?room={@encodedRoom}&client=ios-shortcuts"
+            @response = formRequest(@uploadURL, "POST", {"file": "PLACEHOLDER"}, {"Authorization":"Bearer {@password}"})
         }
     }
-    @response = rawUpload(@uploadURL, @item, {"Authorization":"Bearer {@password}"})
 }
 // cherri 的条件不能内联函数调用（会 panic），必须先落到变量
 
