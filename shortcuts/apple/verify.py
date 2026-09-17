@@ -7,6 +7,9 @@
   - 产物无法解析 / 没有 WFWorkflowActions
   - 导入问答缺失、数量与 #question 不符、或缺 ActionIndex
   - 条件里出现本地化类型名比较（原版 29 处那种写法，非中英文系统会静默走错分支）
+  - 平台专属动作（vibrate / file.reveal）没有被条件守卫
+  - multipart 表单里的「文件」字段没被 patch 成 WFItemType=5
+  - 扩展名动作缺显式 WFInput
 
 提示（不失败）：
   - 用了 typeOf(getitemtype) / setName(setitemname)
@@ -28,6 +31,35 @@ LOCALIZED_TYPE_NAMES = [
 TYPE_LIST_THRESHOLD = 3
 
 MAC_ENTRY_TYPES = {"QuickActions", "MenuBar"}
+
+# 只在某一个平台存在的动作。不加 @model 守卫就调用，另一个平台跑到这里会直接失败——
+# Shortcuts 没有 try/catch，整条捷径会中断在最后一步，且**看起来像"什么都没发生"**。
+PLATFORM_ONLY_ACTIONS = {
+    "is.workflow.actions.vibrate": "仅 iOS/iPadOS",
+    "is.workflow.actions.file.reveal": "仅 macOS",
+}
+
+
+def unguarded_platform_actions(actions):
+    """找出没被条件包住的平台专属动作。
+
+    用 WFControlFlowMode 跟踪嵌套深度：conditional 的 mode 0 进入、mode 2 退出
+    （cherri 的 if 生成这两个动作，中间可能还夹一个 nothing 作为空分支）。
+    """
+    found = []
+    depth = 0
+    for a in actions:
+        aid = a.get("WFWorkflowActionIdentifier")
+        if aid == "is.workflow.actions.conditional":
+            mode = (a.get("WFWorkflowActionParameters") or {}).get("WFControlFlowMode")
+            if mode == 0:
+                depth += 1
+            elif mode == 2:
+                depth = max(0, depth - 1)
+            continue
+        if aid in PLATFORM_ONLY_ACTIONS and depth == 0:
+            found.append((aid, PLATFORM_ONLY_ACTIONS[aid]))
+    return found
 
 
 def collect_compared_strings(obj, out):
@@ -139,19 +171,22 @@ def main():
         ok_input = all("WFInput" in (a.get("WFWorkflowActionParameters") or {}) for a in ext_actions)
         print(f"   扩展名动作: {len(ext_actions)} 个" + ("，均已带显式输入" if ok_input else ""))
 
-    # 2.6 扩展名动作必须有显式输入
-    # 该动作没有输入参数、吃「上一个动作的输出」，实测紧跟条目之后仍拿不到扩展名（恒为空），
-    # 必须由 patch_shortcut.py 补上 WFInput。缺了它判型会整体退化成「都当文件」。
-    ext_actions = [a for a in actions
-                   if a.get("WFWorkflowActionIdentifier") == "is.workflow.actions.properties.files"]
-    if ext_actions:
-        if any("WFInput" not in (a.get("WFWorkflowActionParameters") or {}) for a in ext_actions):
+    # 2.7 平台专属动作必须被条件守卫
+    # 2026-09-17：Send 的反馈此前是裸的 showNotification，于是 iOS 拿不到它最自然的那个信号。
+    # 改成与 Receive 对齐的「macOS 通知 / iOS 振动」后，vibrate() 必须待在 if @model != "Mac" 里。
+    platform_actions = [a for a in actions
+                        if a.get("WFWorkflowActionIdentifier") in PLATFORM_ONLY_ACTIONS]
+    if platform_actions:
+        unguarded = unguarded_platform_actions(actions)
+        if unguarded:
+            detail = "、".join(f"{a}（{w}）" for a, w in unguarded)
             failures.append(
-                "扩展名动作缺显式 WFInput —— patch_shortcut.py 没跑，扩展名会恒为空，"
-                "判型退化成「都当文件」"
+                f"平台专属动作没有被条件守卫：{detail} —— 另一个平台跑到这里会中断整条捷径，"
+                "而且表现为「什么都没发生」，极难排查"
             )
-        ok_input = all("WFInput" in (a.get("WFWorkflowActionParameters") or {}) for a in ext_actions)
-        print(f"   扩展名动作: {len(ext_actions)} 个" + ("，均已带显式输入" if ok_input else ""))
+            print(f"   平台专属动作: {len(platform_actions)} 个，其中 {len(unguarded)} 个**未守卫**")
+        else:
+            print(f"   平台专属动作: {len(platform_actions)} 个，均已条件守卫")
 
     if form_fields:
         field_names = [((it.get("WFKey") or {}).get("Value") or {}).get("string") for it in form_fields]

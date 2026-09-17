@@ -311,6 +311,36 @@ myAction(@step)                 // ✓
 > **教训**：平台专属动作被条件守卫时，一定要问一句"另一个平台的等价反馈是什么"。
 > `if @model != "Mac" { vibrate() }` 只处理了"iOS 有"，没处理"macOS 没有"——**静默失败比报错更难查**。
 
+#### 但"二选一"只适用于 Receive，不适用于 Send
+
+2026-09-17 给 Send 补振动时，第一版照抄了 Receive 的写法（macOS 通知 / iOS 振动）。
+**这是错的**，因为两类捷径的"通知"承担的角色不同：
+
+| | 通知里有什么 | 能否按平台省掉 |
+| :--- | :--- | :--- |
+| **Receive** | 只有"成功了"这个事实 | **能**——iOS 用振动替代，信息量等价 |
+| **Send** | `已发送 <ID>`，**ID 本身** | **不能**——省掉就等于让人拿不到 ID，「按 ID 接收」直接失效 |
+
+所以 Send 的最终形态是「**通知照发（两平台）+ iOS 追加振动**」：
+
+```cherri
+@modelName = getDeviceDetail('Device Model')
+@model = getText(@modelName)
+if @model != "Mac" {
+    vibrate()
+}
+showNotification("已发送 {@savedID}", "Cloud Clipboard", false)
+```
+
+产物里可验证：`vibrate` 在 depth=1（被条件包住），`notification` 在 depth=0（裸的）。
+
+> **教训**：判断"某平台的信号能否被另一个平台的信号替代"时，先问**这个信号里有没有信息**。
+> 纯反馈（成功/失败）可以互相替代；**携带数据的通知不行**。
+> 这次是读 README 里"ID 从哪来：发送成功的通知里就有"才发现第一版写错了——
+> **改之前先读一遍自己写的用户文档**。
+
+`verify.py` 会把"平台专属动作必须被条件守卫"作为硬失败项检查（见下）。
+
 ---
 
 ## 构建与产物比对
@@ -489,9 +519,15 @@ showNotification("已发送 {@savedID}", "Cloud Clipboard", false)
 cherri 的动作名是 **`showNotification(body, title, playSound, attachment)`**，不是 `notification`。
 `playSound` 传 `false`，连续发送时不会反复响铃。
 
+2026-09-17 在其前面加了 iOS 专属的振动（见[平台的反馈差异](#平台的反馈差异)），
+通知本身保持不变、两个平台都发。
+
 > 自查记录：这一步最初只能验到"流程没被破坏"，通知是否真显示无法自证——
 > 系统日志被沙箱挡住（`log: Cannot run while sandboxed`），通知数据库需要全盘访问权限。
 > 最后是人工目视确认的。**无法自证时如实标注为未验证，比含糊过去强。**
+>
+> 振动的**效果**同样无法自证（需要真机手感）。能自证的只有"动作存在且被条件守卫"，
+> 这一点已由 `verify.py` 断言。**别把"结构正确"说成"功能已验证"。**
 
 ---
 

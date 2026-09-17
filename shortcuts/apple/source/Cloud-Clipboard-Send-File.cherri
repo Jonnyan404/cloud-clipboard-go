@@ -16,6 +16,8 @@
 #include 'actions/web'
 #include 'actions/text'
 #include 'actions/sharing'
+// getDeviceDetail 在 actions/device 里，用来判断当前平台（决定给通知还是给振动）
+#include 'actions/device'
 
 #question qServerURL "服务器地址，例如 https://clip.example.com 或 http://127.0.0.1:9501" "http://127.0.0.1:9501"
 #question qRoomName "房间名，多设备接收同一内容时使用相同房间；默认填 default" "default"
@@ -61,5 +63,18 @@ if @error {
 if !@savedID {
     alert("服务器未确认保存，请检查部署地址及服务器状态。")
     stop()
+}
+// 反馈：通知 + 振动。
+//
+// **通知两个平台都要发**，不能像 Receive 那样按平台二选一 —— 通知里带的是 ID，
+// 而 ID 是「按 ID 接收」唯一的信息来源（见 README「怎么用」）。iOS 上省掉通知
+// 就等于让人拿不到 ID。
+//
+// 振动是 **iOS 专属**动作（cherri 文档明写），macOS 上根本不存在，必须用 @model 守卫。
+// 顺带说明为何用通知而不是 show()：show() 会在屏幕中央弹结果卡片打断视线。
+@modelName = getDeviceDetail('Device Model')
+@model = getText(@modelName)
+if @model != "Mac" {
+    vibrate()
 }
 showNotification("已发送 {@savedID}", "Cloud Clipboard", false)

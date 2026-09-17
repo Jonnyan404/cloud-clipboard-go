@@ -42,7 +42,11 @@
 
 如果是文件，会弹出保存对话框（见下方「已知限制」）。
 
-发送成功会弹通知；拉取成功也有通知（iOS 上是振动）。
+发送/拉取完成后的反馈：
+
+- **发送成功** —— 两个平台都弹通知（内容 `已发送 <ID>`），iOS 上**再振一下**。
+  通知不能省：**ID 只在这里出现**，「按 ID 接收」要靠它。
+- **拉取成功** —— macOS 弹通知，iOS 振动。这里两边各给一个等价信号就够了。
 
 ## 发什么会变成什么
 
@@ -94,7 +98,7 @@
 | `verify.py` | 构建后断言，把踩过的坑变成检查项 |
 | `*.shortcut` | 签名产物（`--mode anyone`，iOS / macOS 均可导入） |
 
-当前产物规模：Receive **123** 动作 / Receive-By-ID **141** / Send-Text **70** / Send-File **68**。
+当前产物规模：Receive **123** 动作 / Receive-By-ID **141** / Send-Text **79** / Send-File **77**。
 `build.sh` 每次都会打印动作数、导入问答的 ActionIndex 与校验结果。
 
 依赖 [Cherri](https://github.com/electrikmilk/cherri)（**Go 写的，不是 Swift**）。
