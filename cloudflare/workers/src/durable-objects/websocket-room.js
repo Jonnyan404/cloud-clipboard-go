@@ -234,12 +234,12 @@ export class WebSocketRoom {
         if (row.type === 'text') {
           historyMessage.data.content = row.content;
         } else if (row.type === 'file') {
-          // 为历史文件消息添加图标
-          const FileHandler = await import('../handlers/file.js');
-          const fileIcon = FileHandler.FileHandler.getFileTypeIcon(row.name);
-          const displayName = `${fileIcon} ${row.name}`;
-          
-          historyMessage.data.name = displayName;
+          // name 必须是原始文件名：图标由前端按扩展名自己渲染，服务端不要代劳。
+          // 这里曾经把图标拼进 name（`${icon} ${row.name}`），前端再渲染一次，
+          // 于是每个文件名前面都多出一个图标；而且前端下载时 anchor.download 会拿这个名字当文件名。
+          // 实时消息（file.js 的 receive 广播）和 HTTP 的 /content/latest 都是原始文件名，
+          // 只有历史这条路径拼过图标，所以症状是「刷新后才多出来、新收到的正常」。
+          historyMessage.data.name = row.name;
           historyMessage.data.size = row.size;
           historyMessage.data.uuid = row.uuid;
           historyMessage.data.url = row.url;

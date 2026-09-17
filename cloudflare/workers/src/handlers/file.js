@@ -934,18 +934,6 @@ export class FileHandler {
     return 'file';
   }
 
-  // 添加获取文件类型图标的方法
-  static getFileTypeIcon(filename) {
-    const type = FileHandler.determineFileType(filename);
-    const iconMap = {
-      'image': '🖼️',
-      'video': '🎬',
-      'audio': '🎵',
-      'file': '📄'
-    };
-    return iconMap[type] || '📄';
-  }
-
   // 添加获取文件大小格式化的方法
   static formatFileSize(bytes) {
     if (bytes === 0) return '0 B';
