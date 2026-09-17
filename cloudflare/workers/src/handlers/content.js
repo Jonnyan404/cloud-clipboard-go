@@ -164,6 +164,17 @@ export class ContentHandler {
       }
 
       // 处理文本内容
+      // 文件过期检查必须放在返回记录之前：否则客户端会拿着一条已过期的记录去下载，
+      // 拿到 R2 缺失/404 的错误文本，然后存成一个顶着原文件名的假文件。
+      // （Apple 快捷指令的「获取URL内容」不暴露 HTTP 状态码，只能靠响应体里的 error 字段。）
+      const expireAt = result.type === 'file' ? normalizeExpire(result.expireTime) : 0;
+      if (expireAt > 0 && expireAt < Math.floor(Date.now() / 1000)) {
+        return new Response(JSON.stringify({ error: '文件已过期' }), {
+          status: 404,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        });
+      }
+
       if (result.type === 'text') {
         if (isJSON) {
           return new Response(JSON.stringify(buildJsonContentPayload(result)), {
@@ -265,6 +276,17 @@ export class ContentHandler {
       });
       if (!authResult.ok) {
         return authResult.response;
+      }
+
+      // 文件过期检查必须放在返回记录之前：否则客户端会拿着一条已过期的记录去下载，
+      // 拿到 R2 缺失/404 的错误文本，然后存成一个顶着原文件名的假文件。
+      // （Apple 快捷指令的「获取URL内容」不暴露 HTTP 状态码，只能靠响应体里的 error 字段。）
+      const expireAt = result.type === 'file' ? normalizeExpire(result.expireTime) : 0;
+      if (expireAt > 0 && expireAt < Math.floor(Date.now() / 1000)) {
+        return new Response(JSON.stringify({ error: '文件已过期' }), {
+          status: 404,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        });
       }
 
       if (result.type === 'text') {

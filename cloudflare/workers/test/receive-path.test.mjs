@@ -113,4 +113,30 @@ console.log('\n── F. 未认证时拿不到内容 ──');
   check('非 200', r.status !== 200, true);
 }
 
+console.log('\n── G. 过期的文件：必须给 JSON 错误，不能让客户端下载到错误文本 ──');
+{
+  // 为什么重要：Apple 快捷指令的「获取URL内容」不暴露 HTTP 状态码，只能读响应体。
+  // 如果这里返回纯文本或正常记录，客户端会拿错误文本去 saveFilePrompt，
+  // **存出一个顶着原文件名的假文件**。
+  const { env, db } = makeEnv();
+  const now = Math.floor(Date.now() / 1000);
+  db.prepare(`INSERT INTO messages (type, name, size, room, timestamp, uuid, expireTime, url)
+              VALUES ('file', 'old.txt', 3, 'default', ?, 'uuid-old', ?, '')`)
+    .run(now - 100, now - 10);
+  const r = await getJson(ContentHandler.getLatest, env, '/content/latest?room=default&json=1');
+  check('HTTP 404', r.status, 404);
+  check('返回 JSON 错误', r.json.error, '文件已过期');
+}
+{
+  // 未过期的文件仍应正常返回，且带上 expire
+  const { env, db } = makeEnv();
+  const now = Math.floor(Date.now() / 1000);
+  db.prepare(`INSERT INTO messages (type, name, size, room, timestamp, uuid, expireTime, url)
+              VALUES ('file', 'fresh.txt', 3, 'default', ?, 'uuid-fresh', ?, '')`)
+    .run(now, now + 3600);
+  const r = await getJson(ContentHandler.getLatest, env, '/content/latest?room=default&json=1');
+  check('未过期仍返回记录', r.json.name, 'fresh.txt');
+  check('带 expire 字段', r.json.expire, now + 3600);
+}
+
 summary('Receive 链路在 Worker 上可用');
