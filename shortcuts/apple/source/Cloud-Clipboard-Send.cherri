@@ -54,46 +54,62 @@ if !@source {
     @uploadURL = "{@endpoint}/upload/raw?room={@encodedRoom}&client=ios-shortcuts"
     @response = rawUpload(@uploadURL, @item, {"Authorization":"Bearer {@password}"})
 } else {
-    // ── 分享路径：getName 判型 ──
+    // ── 分享路径：先用扩展名判型，再用名字启发式兜底 ──
     @amount = count(@source)
     if @amount != 1 {
         alert("从分享菜单每次发送一项。")
         stop()
     }
     @item = getFirstItem(@source)
-    // 判据（2026-09-17 实测，4th road）：
-    //   · 系统字符串（剪贴板/URL scheme）的名字 = "Clipboard <日期>" → 当文本；
-    //   · 右键选中文字等分享字符串的名字 = 内容首行 → beginsWith 命中 → 当文本；
-    //   · 真文件保留自己的名字（getName 会把扩展名剥掉，如 rightclick.txt → rightclick）
-    //     ，内容不以名为前缀 → as=file 保持文件。
-    //   · 误判安全：图片/二进制即使被判成文本，服务端仍按魔数嗅探重新分流为文件。
-    // getText/getName 只在本分支使用。注意：2026-09-17 用固定标记实测过，getText
-    // 并不会抛异常 —— 此前"剪贴板条目上 getText 会抛无法将文本转换为NSString"的说法不成立，
-    // 真正的失败发生在把文本值当 File body 上传的上报环节。这里保守起见仍不调用，
-    // 但没有"必须避开"的硬约束。
+
+    // 读扩展名（"获取文件详情 → 扩展名"）。这个动作没有显式输入参数、吃「上一个动作的输出」，
+    // 所以必须紧跟在取条目之后 —— 放在上报动作后面会拿到文本报告，扩展名恒为空。
+    // 另外它的显式 WFInput 由 source/patch_form_field.py 在构建后补上（cherri 的字典
+    // 只能生成 text token，表达不了指向变量的输入）。
+    @extRaw = rawAction("is.workflow.actions.properties.files", {"WFContentItemPropertyName": "File Extension"})
+    @ext = text(@extRaw)
+
     @nmRaw = getName(@item)
     @nm = text(@nmRaw)
-    if @nm contains "Clipboard " {
-        @uploadURL = "{@endpoint}/upload/raw?room={@encodedRoom}&client=ios-shortcuts"
-        @response = rawUpload(@uploadURL, @item, {"Authorization":"Bearer {@password}"})
+    @tRaw = getText(@item)
+    @t = text(@tRaw)
+
+    // 判据（2026-09-17 实测，五种输入 + 三种字符串各跑一遍）：
+    //   · 真文件的扩展名是自己的真扩展名（.md → md、.sh → sh、.png → png）；
+    //   · 分享字符串被物化成 <首行>.txt，扩展名恒为 txt；
+    //   · 所以「扩展名不是 txt」= 一定是文件，与系统语言无关。
+    //   · 扩展名是 txt 时才需要名字启发式：名字=内容首行 → 文本，否则是真的 .txt 文件。
+    //   · 取不到扩展名（动作异常/未打补丁）→ 落回名字启发式，不会更糟。
+    //
+    // 为什么需要这一层：原来的纯名字启发式（名字=内容首行 → 文本）会被 markdown 骗过 ——
+    // getText 把 "# 测试笔记" 渲染成 "测试笔记"，于是「内容以名字开头」成立，.md 被误判成文本。
+    @isFile = "n"
+    if @ext {
+        if @ext != "txt" {
+            @isFile = "y"
+        }
+    }
+    if @isFile == "y" {
+        // ── 真文件：走 multipart 表单上传 ──
+        // 为什么不用 /upload/raw?as=file：getName 会把扩展名剥掉（notes.md → notes），
+        // 而 multipart 的 part 自带真实文件名（含扩展名），服务端 /upload 直接用
+        // handler.Filename —— 扩展名根本不需要"猜"。
+        // 表单字段必须是「文件」类型（WFItemType=5），cherri 表达不了，
+        // 所以这里用字面量占位，由 source/patch_form_field.py 构建后改造并指向 @item。
+        @uploadURL = "{@endpoint}/upload?room={@encodedRoom}&client=ios-shortcuts"
+        @response = formRequest(@uploadURL, "POST", {"file": "PLACEHOLDER"}, {"Authorization":"Bearer {@password}"})
     } else {
-        @tRaw = getText(@item)
-        @t = text(@tRaw)
-        if @t beginsWith @nm {
+        if @nm contains "Clipboard " {
             @uploadURL = "{@endpoint}/upload/raw?room={@encodedRoom}&client=ios-shortcuts"
             @response = rawUpload(@uploadURL, @item, {"Authorization":"Bearer {@password}"})
         } else {
-            // ── 真文件：走 multipart 表单上传 ──
-            // 为什么不用 /upload/raw?as=file：getName 会把扩展名剥掉（notes.md → notes），
-            // 而客户端没有任何动作能读到扩展名（查过 cherri 动作表、已装捷径的 68 种动作、
-            // 系统二进制）。服务端按内容嗅探也只能给 txt —— .md/.sh/.txt 内容都是合法 UTF-8，
-            // 再大的扩展名表都分不出来。
-            // multipart 的 part 自带真实文件名（含扩展名），服务端 /upload 直接用 handler.Filename，
-            // 所以扩展名根本不需要"猜"。实测：测试笔记.md / build.sh / notes.txt 全部原样保留。
-            // 表单字段必须是「文件」类型（WFItemType=5）——cherri 表达不了，
-            // 所以这里用字面量占位，由 source/patch_form_field.py 在构建后改造成文件字段并指向 @item。
-            @uploadURL = "{@endpoint}/upload?room={@encodedRoom}&client=ios-shortcuts"
-            @response = formRequest(@uploadURL, "POST", {"file": "PLACEHOLDER"}, {"Authorization":"Bearer {@password}"})
+            if @t beginsWith @nm {
+                @uploadURL = "{@endpoint}/upload/raw?room={@encodedRoom}&client=ios-shortcuts"
+                @response = rawUpload(@uploadURL, @item, {"Authorization":"Bearer {@password}"})
+            } else {
+                @uploadURL = "{@endpoint}/upload?room={@encodedRoom}&client=ios-shortcuts"
+                @response = formRequest(@uploadURL, "POST", {"file": "PLACEHOLDER"}, {"Authorization":"Bearer {@password}"})
+            }
         }
     }
 }

@@ -99,10 +99,9 @@ build_one() {
     # 但全代码没有任何赋值点，恒为 0 并被 omitempty 省略 → 导入面板接不上。
     "$PY" "$SRC/inject_import_questions.py" "$src" "$unsigned"
 
-    # 表单字段改造：Send 发「真文件」时走 multipart 表单上传（让真实文件名随请求走），
-    # 而 cherri 表达不了「文件」类型的表单字段，所以源码用字面量占位、构建后改造。
-    # 没有占位符时脚本静默跳过，对所有源码安全。
-    "$PY" "$SRC/patch_form_field.py" "$unsigned"
+    # 补齐 cherri 表达不了的 plist 结构（扩展名动作的显式输入 + 表单里的「文件」字段）。
+    # 没有可补的结构时脚本静默跳过，对所有源码安全。
+    "$PY" "$SRC/patch_shortcut.py" "$unsigned"
 
     if [ "$DO_SIGN" = "1" ]; then
         # 直接签名即可，不需要先重启 Shortcuts。

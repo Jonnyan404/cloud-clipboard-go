@@ -112,7 +112,7 @@ def main():
     print(f"   条件比较: 共 {len(groups)} 处条件含比较，单处最多 {max((len(g) for g in groups), default=0)} 个字符串")
 
     # 2.5 multipart 表单字段（Send 发「真文件」时用）
-    # 源码里用字面量 "PLACEHOLDER" 占位，构建后必须由 source/patch_form_field.py 改成
+    # 源码里用字面量 "PLACEHOLDER" 占位，构建后必须由 source/patch_shortcut.py 改成
     # 「文件」类型（WFItemType=5）并指向文件变量。跳过 patcher 会产出坏产物：
     # 字段被当成文本 → 请求体不是合法 multipart → 服务端报「无法解析表单数据」。
     form_fields = []
@@ -125,11 +125,39 @@ def main():
         ) or []
         form_fields.extend(items)
 
+    # 2.6 扩展名动作必须有显式输入
+    # 该动作没有输入参数、吃「上一个动作的输出」，实测紧跟条目之后仍拿不到扩展名（恒为空），
+    # 必须由 patch_shortcut.py 补上 WFInput。缺了它判型会整体退化成「都当文件」。
+    ext_actions = [a for a in actions
+                   if a.get("WFWorkflowActionIdentifier") == "is.workflow.actions.properties.files"]
+    if ext_actions:
+        if any("WFInput" not in (a.get("WFWorkflowActionParameters") or {}) for a in ext_actions):
+            failures.append(
+                "扩展名动作缺显式 WFInput —— patch_shortcut.py 没跑，扩展名会恒为空，"
+                "判型退化成「都当文件」"
+            )
+        ok_input = all("WFInput" in (a.get("WFWorkflowActionParameters") or {}) for a in ext_actions)
+        print(f"   扩展名动作: {len(ext_actions)} 个" + ("，均已带显式输入" if ok_input else ""))
+
+    # 2.6 扩展名动作必须有显式输入
+    # 该动作没有输入参数、吃「上一个动作的输出」，实测紧跟条目之后仍拿不到扩展名（恒为空），
+    # 必须由 patch_shortcut.py 补上 WFInput。缺了它判型会整体退化成「都当文件」。
+    ext_actions = [a for a in actions
+                   if a.get("WFWorkflowActionIdentifier") == "is.workflow.actions.properties.files"]
+    if ext_actions:
+        if any("WFInput" not in (a.get("WFWorkflowActionParameters") or {}) for a in ext_actions):
+            failures.append(
+                "扩展名动作缺显式 WFInput —— patch_shortcut.py 没跑，扩展名会恒为空，"
+                "判型退化成「都当文件」"
+            )
+        ok_input = all("WFInput" in (a.get("WFWorkflowActionParameters") or {}) for a in ext_actions)
+        print(f"   扩展名动作: {len(ext_actions)} 个" + ("，均已带显式输入" if ok_input else ""))
+
     if form_fields:
         field_names = [((it.get("WFKey") or {}).get("Value") or {}).get("string") for it in form_fields]
         if any(((it.get("WFValue") or {}).get("Value") or {}).get("string") == "PLACEHOLDER" for it in form_fields):
             failures.append(
-                "表单里还有 PLACEHOLDER 占位符 —— patch_form_field.py 没跑，"
+                "表单里还有 PLACEHOLDER 占位符 —— patch_shortcut.py 没跑，"
                 "字段会被当成文本，服务端会报「无法解析表单数据」"
             )
         if any(it.get("WFItemType") != 5 for it in form_fields):
