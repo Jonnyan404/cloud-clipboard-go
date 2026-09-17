@@ -75,7 +75,7 @@ docker run -d \
   --name cloud-clipboard-go \
   -p 9501:9501 \
   -v /path/to/data:/app/server-node/data \
-  jonnyan404/cloud-clipboard-go:latest
+  ghcr.io/jonnyan404/cloud-clipboard-go:latest
 ```
 
 #### Docker Compose
@@ -221,7 +221,7 @@ go run -tags embed .
 | 工具 / 形式 | 支持平台 | 说明 |
 | :--- | :--- | :--- |
 | **Web 前端** | 全平台浏览器 | 内置开箱即用，响应式 UI，支持 PWA 安装至桌面 |
-| **HTTP Shortcuts 快捷指令** | Android / iOS | 配合 [快捷指令包](./shortcuts/) 实现系统分享与快速发送 |
+| **Android 快捷指令** | Android | 配合 [快捷指令包](./shortcuts/android) 实现系统分享与快速发送（需安装 [HTTP Shortcuts](https://http-shortcuts.rmy.ch/) 客户端：[Google Play](https://play.google.com/store/apps/details?id=ch.rmy.android.http_shortcuts) / [F-Droid](https://f-droid.org/packages/ch.rmy.android.http_shortcuts)） |
 | **Apple 快捷指令** | iOS / macOS | 原生快捷指令，支持分享文本/文件与拉取最新内容 — [在此获取](./shortcuts/apple/) |
 | **Clipboard Sync** | Win / Mac / Linux | 桌面双向静默剪贴板同步工具（捐赠用户专享） |
 | **Cloud Clipboard Go Launcher** | Win / Mac / Linux | [图形化启动器](https://github.com/jonnyan404/cloud-clipboard-go-launcher)，无需接触命令行 |

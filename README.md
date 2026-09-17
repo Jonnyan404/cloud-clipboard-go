@@ -75,7 +75,7 @@ docker run -d \
   --name cloud-clipboard-go \
   -p 9501:9501 \
   -v /path/to/data:/app/server-node/data \
-  jonnyan404/cloud-clipboard-go:latest
+  ghcr.io/jonnyan404/cloud-clipboard-go:latest
 ```
 
 #### Docker Compose
@@ -222,7 +222,7 @@ go run -tags embed .
 | Tool / Type | Supported Platforms | Description |
 | :--- | :--- | :--- |
 | **Web UI** | Modern Browsers | Built-in responsive web app with PWA desktop installation support |
-| **HTTP Shortcuts** | Android / iOS | Send & receive clipboard content via system share sheet with [shortcuts package](./shortcuts/) |
+| **Android Shortcuts** | Android | Send & receive clipboard content via system share sheet with [shortcuts package](./shortcuts/android) (requires the [HTTP Shortcuts](https://http-shortcuts.rmy.ch/) app: [Google Play](https://play.google.com/store/apps/details?id=ch.rmy.android.http_shortcuts) / [F-Droid](https://f-droid.org/packages/ch.rmy.android.http_shortcuts)) |
 | **Apple Shortcuts** | iOS / macOS | Native shortcuts for sharing text/files and pulling latest content — [get them here](./shortcuts/apple/) |
 | **Clipboard Sync** | Win / Mac / Linux | Silent bidirectional clipboard synchronization desktop app (donors only) |
 | **Cloud Clipboard Go Launcher** | Win / Mac / Linux | [Desktop GUI launcher](https://github.com/jonnyan404/cloud-clipboard-go-launcher) without terminal |
