@@ -152,8 +152,6 @@ func DetermineResponseType(filename string) string {
 	if mimeType != "" {
 		if strings.HasPrefix(mimeType, "image/") {
 			responseType = "image"
-		} else if strings.HasPrefix(mimeType, "text/") {
-			responseType = "text" // e.g., text/plain, text/html, text/css
 		} else if strings.HasPrefix(mimeType, "audio/") {
 			responseType = "audio"
 		} else if strings.HasPrefix(mimeType, "video/") {

@@ -1045,10 +1045,26 @@ func (s *ClipboardServer) handleClearAll(w http.ResponseWriter, r *http.Request)
 	fmt.Fprintln(w, "所有消息已清除")
 }
 
+// writeContentError 按请求格式输出错误：JSON 请求给 JSON，其余保持纯文本。
+//
+// 为什么需要它：Apple 快捷指令的「获取URL内容」**不暴露 HTTP 状态码**，只能读响应体，
+// 而它用 getDictionary 解析。纯文本错误会让它解析不出 error 字段，
+// 走到"服务器没有返回文字内容"那条误导性的分支；更糟的是文件分支会拿错误文本
+// 去 setName + saveFilePrompt，**保存出一个顶着原文件名的假文件**。
+func writeContentError(w http.ResponseWriter, r *http.Request, isJSON bool, msg string, status int) {
+	if isJSON || strings.Contains(r.Header.Get("Accept"), "application/json") {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(status)
+		json.NewEncoder(w).Encode(map[string]string{"error": msg})
+		return
+	}
+	http.Error(w, msg, status)
+}
+
 func (s *ClipboardServer) handleContent(w http.ResponseWriter, r *http.Request) {
 	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
 	if len(parts) < 2 { // 至少需要 "content" 和 id
-		http.Error(w, "无效的内容路径", http.StatusBadRequest)
+		writeContentError(w, r, false, "无效的内容路径", http.StatusBadRequest)
 		return
 	}
 
@@ -1076,7 +1092,7 @@ func (s *ClipboardServer) handleContent(w http.ResponseWriter, r *http.Request) 
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		s.logger.Printf("无效的内容 ID: %s, 错误: %v", idStr, err)
-		http.Error(w, "无效的内容 ID", http.StatusBadRequest)
+		writeContentError(w, r, isJSONRequest, "无效的内容 ID", http.StatusBadRequest)
 		return
 	}
 	_, hasRequestedRoom := r.URL.Query()["room"]
@@ -1108,6 +1124,15 @@ func (s *ClipboardServer) handleContent(w http.ResponseWriter, r *http.Request) 
 					if isJSONRequest {
 						// 返回JSON格式的文件信息
 						fileReceive := msg.Data.FileReceive
+
+						// 过期检查必须放在返回之前：否则客户端会拿着一条已过期的记录去下载，
+						// 拿到 404 的错误文本，然后**存成一个顶着原文件名的假文件**。
+						if fileReceive.Expire > 0 && fileReceive.Expire < time.Now().Unix() {
+							s.logger.Printf("尝试访问已过期的文件: %s (ID: %d)", fileReceive.Name, id)
+							writeContentError(w, r, true, "文件已过期", http.StatusNotFound)
+							return
+						}
+
 						responseType := DetermineResponseType(fileReceive.Name)
 
 						responseData := map[string]interface{}{
@@ -1118,6 +1143,7 @@ func (s *ClipboardServer) handleContent(w http.ResponseWriter, r *http.Request) 
 							"url":       fileReceive.URL,
 							"id":        strconv.Itoa(msg.Data.ID()),
 							"timestamp": fileReceive.Timestamp,
+							"expire":    fileReceive.Expire,
 						}
 
 						w.Header().Set("Content-Type", "application/json")
@@ -1126,11 +1152,19 @@ func (s *ClipboardServer) handleContent(w http.ResponseWriter, r *http.Request) 
 						return
 					}
 
+					// 非 JSON 分支同样要拦过期：记录已声明过期，却还能把字节吐出去，
+					// 浏览器直连 /content/<id> 就能绕过上面的检查拿到已过期文件。
+					if msg.Data.FileReceive.Expire > 0 && msg.Data.FileReceive.Expire < time.Now().Unix() {
+						s.logger.Printf("尝试访问已过期的文件: %s (ID: %d)", msg.Data.FileReceive.Name, id)
+						writeContentError(w, r, isJSONRequest, "文件已过期", http.StatusNotFound)
+						return
+					}
+
 					filePath := filepath.Join(s.storageFolder, msg.Data.FileReceive.Cache)
 					file, openErr := os.Open(filePath)
 					if openErr != nil {
 						s.logger.Printf("错误: 打开文件失败: %v", openErr)
-						http.Error(w, "文件在磁盘上未找到", http.StatusNotFound)
+						writeContentError(w, r, isJSONRequest, "文件已过期或已被清理", http.StatusNotFound)
 						return
 					}
 					defer file.Close()
@@ -1138,7 +1172,7 @@ func (s *ClipboardServer) handleContent(w http.ResponseWriter, r *http.Request) 
 					stat, statErr := file.Stat()
 					if statErr != nil {
 						s.logger.Printf("错误: 获取文件状态失败: %v", statErr)
-						http.Error(w, "无法获取文件状态", http.StatusInternalServerError)
+						writeContentError(w, r, isJSONRequest, "无法读取文件状态", http.StatusInternalServerError)
 						return
 					}
 
@@ -1255,6 +1289,15 @@ func (s *ClipboardServer) handleLatestContent(w http.ResponseWriter, r *http.Req
 			if msg.Data.Type() == "file" && msg.Data.FileReceive != nil {
 				// 确定文件类型
 				fileReceive := msg.Data.FileReceive
+
+				// 过期检查必须放在返回之前：否则客户端会拿着一条已过期的记录去下载，
+				// 拿到 404 的错误文本，然后**存成一个顶着原文件名的假文件**。
+				if fileReceive.Expire > 0 && fileReceive.Expire < time.Now().Unix() {
+					s.logger.Printf("尝试访问已过期的文件: %s (ID: %d)", fileReceive.Name, msg.Data.ID())
+					writeContentError(w, r, true, "文件已过期", http.StatusNotFound)
+					return
+				}
+
 				responseType = DetermineResponseType(fileReceive.Name)
 
 				// 构建JSON响应
@@ -1266,6 +1309,7 @@ func (s *ClipboardServer) handleLatestContent(w http.ResponseWriter, r *http.Req
 					"url":       filepath.Join(fileReceive.URL, fileReceive.Name),
 					"id":        strconv.Itoa(msg.Data.ID()),
 					"timestamp": fileReceive.Timestamp,
+					"expire":    fileReceive.Expire,
 				}
 			} else if msg.Data.Type() == "text" && msg.Data.TextReceive != nil {
 				responseType = "text"
@@ -1293,6 +1337,13 @@ func (s *ClipboardServer) handleLatestContent(w http.ResponseWriter, r *http.Req
 		// 非JSON请求，按原有逻辑处理
 		if msg.Data.Type() == "file" && msg.Data.FileReceive != nil {
 			// 文件类型，直接提供文件内容而不是重定向
+			// 与 JSON 分支保持一致：过期记录不能再吐出字节（浏览器直连走的就是这条路）。
+			if msg.Data.FileReceive.Expire > 0 && msg.Data.FileReceive.Expire < time.Now().Unix() {
+				s.logger.Printf("尝试访问已过期的文件: %s (ID: %d)", msg.Data.FileReceive.Name, msg.Data.ID())
+				http.Error(w, "文件已过期", http.StatusNotFound)
+				return
+			}
+
 			cacheUUID := msg.Data.FileReceive.Cache
 			filename := msg.Data.FileReceive.Name
 
