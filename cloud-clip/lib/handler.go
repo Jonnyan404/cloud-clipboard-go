@@ -690,37 +690,27 @@ func (s *ClipboardServer) handle_upload(w http.ResponseWriter, r *http.Request) 
 	fileSize := handler.Size
 	s.logger.Printf("收到文件上传: %s, 大小: %d, 房间: %s", fileName, fileSize, room)
 
-	if !s.persistAndRespond(w, r, room, fileName, fileSize, file) {
-		return
-	}
-}
-
-// persistAndRespond 校验大小限制、落盘、登记、生成缩略图、广播并返回统一 JSON 响应。
-func (s *ClipboardServer) persistAndRespond(w http.ResponseWriter, r *http.Request, room, fileName string, fileSize int64, content io.Reader) bool {
-	if s.config.File.Limit > 0 && fileSize > int64(s.config.File.Limit) {
-		s.logger.Printf("错误: 文件大小 (%d) 超出限制 (%d)", fileSize, s.config.File.Limit)
-		http.Error(w, fmt.Sprintf("文件大小超出限制 (最大 %d 字节)", s.config.File.Limit), http.StatusRequestEntityTooLarge)
-		return false
-	}
-
+	// 生成唯一文件名 (UUID)
 	uuid := gen_UUID()
 	filePath := filepath.Join(s.storageFolder, uuid)
 
+	// 保存文件
 	dst, err := os.Create(filePath)
 	if err != nil {
 		s.logger.Printf("错误: 创建文件 %s 失败: %v", filePath, err)
 		http.Error(w, "无法保存文件", http.StatusInternalServerError)
-		return false
+		return
 	}
 	defer dst.Close()
 
-	if _, err := io.Copy(dst, content); err != nil {
+	if _, err := io.Copy(dst, file); err != nil {
 		s.logger.Printf("错误: 写入文件 %s 失败: %v", filePath, err)
 		http.Error(w, "无法写入文件", http.StatusInternalServerError)
-		return false
+		return
 	}
 
 	timestamp := time.Now().Unix()
+	// 房间级 fileExpire 覆盖全局 file.expire（0=永不过期）
 	var expireTime int64
 	if expireSeconds := s.resolveFileExpireSeconds(room); expireSeconds > 0 {
 		expireTime = timestamp + expireSeconds
@@ -728,6 +718,7 @@ func (s *ClipboardServer) persistAndRespond(w http.ResponseWriter, r *http.Reque
 		expireTime = 0
 	}
 
+	// 创建文件信息
 	fileInfo := File{
 		Name:       fileName,
 		UUID:       uuid,
@@ -737,7 +728,7 @@ func (s *ClipboardServer) persistAndRespond(w http.ResponseWriter, r *http.Reque
 		Room:       room,
 	}
 
-	s.runMutex.Lock()
+	s.runMutex.Lock() // 保护 uploadFileMap
 	s.uploadFileMap[uuid] = fileInfo
 	s.runMutex.Unlock()
 
@@ -749,7 +740,8 @@ func (s *ClipboardServer) persistAndRespond(w http.ResponseWriter, r *http.Reque
 		URL:    fmt.Sprintf("%s://%s%s/file/%s", getScheme(r), r.Host, s.config.Server.Prefix, uuid),
 	}
 
-	if fileSize <= 32*1024*1024 {
+	// 如果文件不太大，创建缩略图
+	if fileSize <= 32*1024*1024 { // 32MB
 		thumbnail, err := gen_thumbnail(filePath)
 		if err == nil {
 			s.logger.Printf("已为文件 %s 生成缩略图", fileName)
@@ -760,26 +752,21 @@ func (s *ClipboardServer) persistAndRespond(w http.ResponseWriter, r *http.Reque
 	}
 
 	event := s.addMessageToQueueAndBroadcast("file", fileReceiveData, room, r)
-	s.writeContentJSON(w, r, room, event.Data.ID(), DetermineResponseType(fileInfo.Name))
-	return true
-}
 
-// writeContentJSON 构造内容的绝对 URL 并输出统一的 JSON 响应。
-// （含 room != "default" 时才拼 ?room= 这个容易漏掉的细节）。
-func (s *ClipboardServer) writeContentJSON(w http.ResponseWriter, r *http.Request, room string, id int, respType string) {
+	// 响应
 	scheme := getScheme(r)
-	contentURL := fmt.Sprintf("%s://%s%s/content/%d", scheme, r.Host, s.config.Server.Prefix, id)
+	contentURL := fmt.Sprintf("%s://%s%s/content/%d", scheme, r.Host, s.config.Server.Prefix, event.Data.ID())
 	if room != "default" {
 		contentURL += fmt.Sprintf("?room=%s", room)
 	}
+	responseType := DetermineResponseType(fileInfo.Name)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
 		"url":  contentURL,
-		"id":   strconv.Itoa(id),
-		"type": respType,
+		"id":   strconv.Itoa(event.Data.ID()),
+		"type": responseType,
 	})
 }
-
 
 func (s *ClipboardServer) handle_chunk(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -1296,7 +1283,7 @@ func (s *ClipboardServer) handleLatestContent(w http.ResponseWriter, r *http.Req
 				fileReceive := msg.Data.FileReceive
 
 				// 过期检查必须放在返回之前：否则客户端会拿着一条已过期的记录去下载，
-				// 拿到 404 的错误文本，然后存成一个顶着原文件名的假文件。
+				// 拿到 404 的错误文本，然后**存成一个顶着原文件名的假文件**。
 				if fileReceive.Expire > 0 && fileReceive.Expire < time.Now().Unix() {
 					s.logger.Printf("尝试访问已过期的文件: %s (ID: %d)", fileReceive.Name, msg.Data.ID())
 					writeContentError(w, r, true, "文件已过期", http.StatusNotFound)
