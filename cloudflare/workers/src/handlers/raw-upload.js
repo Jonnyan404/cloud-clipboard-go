@@ -56,19 +56,10 @@ async function dispatchAsFile(request, env, bytes, fileName) {
   return FileHandler.upload(synth, env);
 }
 
-// 决定文件的存储名：客户端没给名字时退回默认名。
-// 曾经在这里按嗅探结果补扩展名，但快捷指令的文件分支改走 multipart
-// （part 自带真实文件名，含扩展名）后，?name= 不再有人传，那段成了死代码。
-function resolveFileName(name, ext) {
-  return name || `clipboard.${ext}`;
-}
-
 async function handle(request, env) {
   try {
     const url = new URL(request.url);
     const room = normalizeRoomName(url.searchParams.get('room'));
-    const requestedName = url.searchParams.get('name') || '';
-    const asFile = url.searchParams.get('as') === 'file';
 
     const authResult = await ensureRoomAccess(request, env, room);
     if (!authResult.ok) return authResult.response;
@@ -77,7 +68,7 @@ async function handle(request, env) {
 
     const { kind, ext } = sniffPayload(bytes);
 
-    if (!asFile && kind === 'text' && !requestedName) {
+    if (kind === 'text') {
       const textLimit = env.TEXT_LIMIT ? parseInt(env.TEXT_LIMIT) : 4096;
       if (textLimit <= 0 || bytes.length <= textLimit) {
         return await dispatchAsText(request, env, normalizeText(bytes));
@@ -85,8 +76,9 @@ async function handle(request, env) {
       console.log(`按文件处理: 文本超出文本消息限制 (${bytes.length} 字节), 转为文件存储`);
     }
 
-    const fileName = resolveFileName(requestedName, ext);
-    return await dispatchAsFile(request, env, bytes, fileName);
+    // 名字只能用嗅探出来的扩展名 —— 客户端给不出完整文件名（Shortcuts 的 getName
+    // 会把扩展名剥掉），所以这个端点没有 ?name=。要保留真实文件名请走 /upload。
+    return await dispatchAsFile(request, env, bytes, `clipboard.${ext}`);
   } catch (error) {
     console.error('[raw-upload] error:', error);
     const reason = String(error?.message || error || 'unknown');

@@ -7,6 +7,7 @@
 //   uuid 存在 → 走文件分支（type=image 则进剪贴板，否则弹保存对话框）
 //   否则取 content → 进剪贴板
 import { RawUploadHandler } from './.build/raw-upload.mjs';
+import { FileHandler } from './.build/file.mjs';
 import { ContentHandler } from './.build/content.mjs';
 import { makeEnv, makeChecker, postJson, getJson } from './harness.mjs';
 
@@ -55,13 +56,19 @@ console.log('\n── B. 上传 PNG → Receive 应当把图片放进剪贴板 �
   check('Receive 会做什么', whatReceiveWouldDo(r.json), '下载并放入剪贴板(图片)');
 }
 
-console.log('\n── C. 上传 .txt 且 as=file → Receive 应当弹保存对话框 ──');
+console.log('\n── C. 上传 .txt 文件（multipart）→ Receive 应当弹保存对话框 ──');
 {
   const { env } = makeEnv();
-  await postJson(RawUploadHandler.upload, env, '/upload/raw?room=default&as=file&client=ios-shortcuts', 'django==4.2.*');
+  // 走 multipart —— 快捷指令的文件分支就是这样，part 自带真实文件名
+  const form = new FormData();
+  form.append('file', new Blob([Buffer.from('django==4.2.*')], { type: 'text/plain' }), 'requirements.txt');
+  await FileHandler.upload(new Request('http://worker.local/upload?room=default&client=ios-shortcuts', {
+    method: 'POST', headers: { Authorization: 'Bearer 123' }, body: form,
+  }), env);
   const r = await getJson(ContentHandler.getLatest, env, '/content/latest?room=default&json=1');
   check('type=file', r.json.type, 'file');
-  check('name=clipboard.txt', r.json.name, 'clipboard.txt');
+  // multipart 的 part 自带真实文件名，所以不再是 clipboard.txt
+  check('文件名保真', r.json.name, 'requirements.txt');
   check('Receive 会做什么', whatReceiveWouldDo(r.json), '下载并弹出保存对话框(文件)');
 }
 

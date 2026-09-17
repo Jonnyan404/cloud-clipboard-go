@@ -977,6 +977,14 @@ func htmlDocumentToPlainText(text string) string {
 }
 
 // handle_raw_upload 请求体即为原始文件字节，服务器按内容嗅探自动分流文本/文件。
+// handle_raw_upload 请求体即原始字节，服务端按内容嗅探自动分流文本/文件。
+//
+// 这是「剪贴板路径」专用：剪贴板里可能是文字也可能是图片，客户端分不出
+// （Shortcuts 的 typeOf 返回本地化字符串，非中英文系统会静默失效），
+// 所以交给服务端按内容魔数判断。富文本也在这里降级成纯文本。
+//
+// 分享路径不走这里 —— 文件走 /upload（multipart，part 自带真实文件名，扩展名不用猜），
+// 分享的字符串走 /upload/raw 但由客户端判型。
 func (s *ClipboardServer) handle_raw_upload(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "仅允许 POST 请求", http.StatusMethodNotAllowed)
@@ -984,8 +992,6 @@ func (s *ClipboardServer) handle_raw_upload(w http.ResponseWriter, r *http.Reque
 	}
 
 	room := normalizeRoomName(r.URL.Query().Get("room"))
-	fileName := r.URL.Query().Get("name")
-	asFile := r.URL.Query().Get("as") == "file"
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -996,7 +1002,7 @@ func (s *ClipboardServer) handle_raw_upload(w http.ResponseWriter, r *http.Reque
 	defer r.Body.Close()
 
 	kind, ext := sniffPayload(body)
-	if !asFile && kind == "text" && fileName == "" {
+	if kind == "text" {
 		size := len(body)
 		if s.config.Text.Limit <= 0 || size <= s.config.Text.Limit {
 			s.storeRawText(w, r, room, normalizeText(body))
@@ -1005,11 +1011,10 @@ func (s *ClipboardServer) handle_raw_upload(w http.ResponseWriter, r *http.Reque
 		s.logger.Printf("按文件处理: 文本超出文本消息限制 (%d 字节), 转为文件存储", size)
 	}
 
-	// 客户端没给名字时退回默认名。曾经在这里按嗅探结果补扩展名，但快捷指令的
-	// 文件分支改走 multipart（part 自带真实文件名）后 ?name= 不再有人传，那段成了死代码。
-	if fileName == "" {
-		fileName = "clipboard." + ext
-	}
+	// 名字只能用嗅探出来的扩展名 —— 客户端给不出完整文件名
+	// （Shortcuts 的 getName 会把扩展名剥掉），所以这个端点没有 ?name=。
+	// 要保留真实文件名请走 /upload（multipart）。
+	fileName := "clipboard." + ext
 	s.persistAndRespond(w, r, room, fileName, int64(len(body)), bytes.NewReader(body))
 }
 

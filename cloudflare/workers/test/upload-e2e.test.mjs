@@ -1,4 +1,4 @@
-// 端到端验证 Cloudflare Worker 的 /upload/raw 胶水层：
+// 端到端验证 Cloudflare Worker 的 /upload/raw 与 /upload（multipart）胶水层：
 // 请求包装 → 嗅探 → 委托给 TextHandler/FileHandler → D1/R2 落库 → 响应 JSON。
 // 用 esbuild 打包后的处理器 + mock env（D1 用 node:sqlite，R2 用 Map）。
 import { RawUploadHandler } from './.build/raw-upload.mjs';
@@ -46,20 +46,7 @@ console.log('\n── 3. HTML 文档被降级为纯文本 ──');
   check('D1 content 已剥标签', lastMessage(db).content, '标题 Hello & 你好');
 }
 
-console.log('\n── 4. as=file 强制存成文件 ──');
-{
-  const { env, db, r2 } = makeEnv();
-  const r = await call(env, '/upload/raw?room=default&as=file', 'this is a text file');
-  check('HTTP 200', r.status, 200);
-  const m = lastMessage(db);
-  check('D1 type=file', m.type, 'file');
-  check('D1 name=clipboard.txt', m.name, 'clipboard.txt');
-  check('D1 带 uuid', typeof m.uuid, 'string');
-  check('R2 有一个对象', r2.size, 1);
-  check('R2 对象名含 uuid', [...r2.keys()][0], `files/${m.uuid}`);
-}
-
-console.log('\n── 5. PNG 被嗅探为图片 ──');
+console.log('\n── 4. PNG 被嗅探为图片 ──');
 {
   const { env, db } = makeEnv();
   const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52]);
@@ -70,31 +57,7 @@ console.log('\n── 5. PNG 被嗅探为图片 ──');
   check('响应 type=image', r.json.type, 'image');
 }
 
-console.log('\n── 6. name 参数被保留 ──');
-{
-  const { env, db } = makeEnv();
-  await call(env, '/upload/raw?room=default&name=my%20notes.txt', 'note body');
-  check('D1 name 用传入的名字', lastMessage(db).name, 'my notes.txt');
-}
-
-console.log('\n── 6b. 名字原样使用（补扩展名那段已随 multipart 改造移除）──');
-{
-  const { env, db } = makeEnv();
-  await call(env, '/upload/raw?room=default&as=file&name=requirements', 'django==4.2.*');
-  check('给了名字就原样用（不再猜扩展名）', lastMessage(db).name, 'requirements');
-}
-{
-  const { env, db } = makeEnv();
-  await call(env, '/upload/raw?room=default&as=file&name=notes.txt', 'body');
-  check('带扩展名的名字原样保留', lastMessage(db).name, 'notes.txt');
-}
-{
-  const { env, db } = makeEnv();
-  await call(env, '/upload/raw?room=default&as=file', 'no name given');
-  check('没给名字 → clipboard.txt', lastMessage(db).name, 'clipboard.txt');
-}
-
-console.log('\n── 7. 认证失败被拦下 ──');
+console.log('\n── 5. 认证失败被拦下 ──');
 {
   const { env, db } = makeEnv();
   const r = await call(env, '/upload/raw?room=default', 'should not be stored', { auth: 'Bearer wrong-password' });
@@ -102,7 +65,7 @@ console.log('\n── 7. 认证失败被拦下 ──');
   check('D1 未写入', db.prepare('SELECT COUNT(*) AS c FROM messages').get().c, 0);
 }
 
-console.log('\n── 8. 空文本与超限文本 ──');
+console.log('\n── 6. 空文本与超限文本 ──');
 {
   const { env, db } = makeEnv();
   await call(env, '/upload/raw?room=default', '');
@@ -118,7 +81,7 @@ console.log('\n── 8. 空文本与超限文本 ──');
   check('文件名为 clipboard.txt', m.name, 'clipboard.txt');
 }
 
-console.log('\n── 9. multipart 上传保留真实文件名（快捷指令文件分支走的就是这条）──');
+console.log('\n── 7. multipart 上传保留真实文件名（快捷指令文件分支走的就是这条）──');
 {
   // 为什么重要：getName 拿不到扩展名、服务端按内容嗅探也只能给 txt，
   // 所以「文件名保真」只能靠 multipart 的 part 自带名字。
