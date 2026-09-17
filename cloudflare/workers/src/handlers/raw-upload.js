@@ -61,6 +61,16 @@ function badRequest(error, message) {
   });
 }
 
+// 决定文件的存储名。与 Go 版 resolveFileName 行为一致：
+// 客户端只能给出「不含扩展名」的名字——Shortcuts 的 getName 会把扩展名剥掉
+// （rightclick.txt → rightclick），所以按内容嗅探到的扩展名补回去，
+// 让接收端拿到 requirements.txt 而不是一个没有后缀的 requirements。
+// 判断依据与 Go 的 filepath.Ext 对齐：名字里只要有「.」就认为已有扩展名。
+function resolveFileName(name, ext) {
+  if (!name) return `clipboard.${ext}`;
+  return name.includes('.') ? name : `${name}.${ext}`;
+}
+
 async function handle(request, env, { base64 }) {
   try {
     const url = new URL(request.url);
@@ -100,7 +110,7 @@ async function handle(request, env, { base64 }) {
       console.log(`按文件处理: 文本超出文本消息限制 (${bytes.length} 字节), 转为文件存储`);
     }
 
-    const fileName = requestedName || `clipboard.${ext}`;
+    const fileName = resolveFileName(requestedName, ext);
     return await dispatchAsFile(request, env, bytes, fileName);
   } catch (error) {
     console.error('[raw-upload] error:', error);

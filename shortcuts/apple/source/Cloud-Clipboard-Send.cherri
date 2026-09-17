@@ -67,7 +67,10 @@ if !@source {
     //   · 真文件保留自己的名字（getName 会把扩展名剥掉，如 rightclick.txt → rightclick）
     //     ，内容不以名为前缀 → as=file 保持文件。
     //   · 误判安全：图片/二进制即使被判成文本，服务端仍按魔数嗅探重新分流为文件。
-    // getText/getName 只准在本分支使用——剪贴板条目上 getText 会抛"无法将文本转换为NSString"。
+    // getText/getName 只在本分支使用。注意：2026-09-17 用固定标记实测过，getText
+    // 并不会抛异常 —— 此前"剪贴板条目上 getText 会抛无法将文本转换为NSString"的说法不成立，
+    // 真正的失败发生在把文本值当 File body 上传的上报环节。这里保守起见仍不调用，
+    // 但没有"必须避开"的硬约束。
     @nmRaw = getName(@item)
     @nm = text(@nmRaw)
     if @nm contains "Clipboard " {
@@ -78,7 +81,11 @@ if !@source {
         if @t beginsWith @nm {
             @uploadURL = "{@endpoint}/upload/raw?room={@encodedRoom}&client=ios-shortcuts"
         } else {
-            @uploadURL = "{@endpoint}/upload/raw?as=file&room={@encodedRoom}&client=ios-shortcuts"
+            // 带上名字。getName 会剥掉扩展名（rightclick.txt → rightclick），
+            // 服务端会用按内容嗅探到的扩展名补回去，接收端就能拿到 requirements.txt
+            // 而不是没有后缀的 requirements。
+            @encodedName = urlEncode(@nm)
+            @uploadURL = "{@endpoint}/upload/raw?as=file&name={@encodedName}&room={@encodedRoom}&client=ios-shortcuts"
         }
     }
     @response = rawUpload(@uploadURL, @item, {"Authorization":"Bearer {@password}"})

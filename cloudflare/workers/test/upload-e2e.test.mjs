@@ -6,6 +6,9 @@ import { makeEnv, makeChecker, postJson } from './harness.mjs';
 
 const { check, summary } = makeChecker();
 
+// PNG 头（够长以命中魔数表）
+const PNG_BYTES = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52]);
+
 // 适配：e2e 测试既测 raw 也测 base64，所以保留一个可切换 handler 的包装
 async function call(env, path, body, { base64 = false, auth = 'Bearer 123' } = {}) {
   const handler = base64 ? RawUploadHandler.uploadBase64 : RawUploadHandler.upload;
@@ -72,6 +75,30 @@ console.log('\n── 6. name 参数被保留 ──');
   const { env, db } = makeEnv();
   await call(env, '/upload/raw?room=default&name=my%20notes.txt', 'note body');
   check('D1 name 用传入的名字', lastMessage(db).name, 'my notes.txt');
+}
+
+console.log('\n── 6b. 名字缺扩展名时补上嗅探到的扩展名（用例对照 Go 版 TestResolveFileName）──');
+{
+  // Shortcuts 的 getName 会把扩展名剥掉（rightclick.txt → rightclick），
+  // 所以客户端只能给不含扩展名的名字，由服务端按嗅探结果补回。
+  const { env, db } = makeEnv();
+  await call(env, '/upload/raw?room=default&as=file&name=requirements', 'django==4.2.*');
+  check('requirements + txt 内容 → requirements.txt', lastMessage(db).name, 'requirements.txt');
+}
+{
+  const { env, db } = makeEnv();
+  await call(env, '/upload/raw?room=default&as=file&name=photo', PNG_BYTES);
+  check('photo + PNG 内容 → photo.png', lastMessage(db).name, 'photo.png');
+}
+{
+  const { env, db } = makeEnv();
+  await call(env, '/upload/raw?room=default&as=file&name=notes.txt', 'body');
+  check('已有扩展名 → 不动', lastMessage(db).name, 'notes.txt');
+}
+{
+  const { env, db } = makeEnv();
+  await call(env, '/upload/raw?room=default&as=file', 'no name given');
+  check('没给名字 → clipboard.txt', lastMessage(db).name, 'clipboard.txt');
 }
 
 console.log('\n── 7. base64 端点 ──');

@@ -977,6 +977,22 @@ func htmlDocumentToPlainText(text string) string {
 	return strings.TrimSpace(s)
 }
 
+// resolveFileName 决定文件的存储名。
+//
+// 客户端只能给出「不含扩展名」的名字——Shortcuts 的 getName 会把扩展名剥掉
+// （rightclick.txt → rightclick），所以这里按内容嗅探到的扩展名补回去，
+// 让接收端拿到 requirements.txt 而不是一个没有后缀的 requirements。
+// 名字本身为空时才退回 clipboard.<ext>。
+func resolveFileName(fileName, ext string) string {
+	if fileName == "" {
+		return "clipboard." + ext
+	}
+	if filepath.Ext(fileName) == "" {
+		return fileName + "." + ext
+	}
+	return fileName
+}
+
 // handle_raw_upload 请求体即为原始文件字节，服务器按内容嗅探自动分流文本/文件。
 func (s *ClipboardServer) handle_raw_upload(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -1006,9 +1022,7 @@ func (s *ClipboardServer) handle_raw_upload(w http.ResponseWriter, r *http.Reque
 		s.logger.Printf("按文件处理: 文本超出文本消息限制 (%d 字节), 转为文件存储", size)
 	}
 
-	if fileName == "" {
-		fileName = "clipboard." + ext
-	}
+	fileName = resolveFileName(fileName, ext)
 	s.persistAndRespond(w, r, room, fileName, int64(len(body)), bytes.NewReader(body))
 }
 
@@ -1056,9 +1070,7 @@ func (s *ClipboardServer) handle_base64_upload(w http.ResponseWriter, r *http.Re
 		s.logger.Printf("按文件处理: base64 解码后文本超出文本消息限制 (%d 字节), 转为文件存储", size)
 	}
 
-	if fileName == "" {
-		fileName = "clipboard." + ext
-	}
+	fileName = resolveFileName(fileName, ext)
 	s.persistAndRespond(w, r, room, fileName, int64(len(data)), bytes.NewReader(data))
 }
 
