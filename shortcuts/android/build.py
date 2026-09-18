@@ -17,7 +17,6 @@ import re
 import shutil
 import subprocess
 import sys
-import tempfile
 import zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -117,15 +116,14 @@ def main() -> int:
     if not changed:
         print("· auth 的 value 本来就是空的，无需抹除")
 
-    # 4) 打包。临时文件写系统临时目录，别在工作区里留东西。
-    fd, tmp = tempfile.mkstemp(suffix=".json")
-    os.close(fd)
-    try:
-        io.open(tmp, "w", encoding="utf-8").write(portable)
-        with zipfile.ZipFile(ZIP_PATH, "w", zipfile.ZIP_DEFLATED) as zf:
-            zf.write(tmp, "shortcuts.json")
-    finally:
-        os.remove(tmp)
+    # 4) 打包。
+    # 时间戳定死：zip 会把每个条目的 mtime 写进头部，默认取文件时间 → 同样的内容
+    # 每次跑出来的字节都不同，git 里就是一个「每次都变」的二进制 diff，看不出到底改没改。
+    info = zipfile.ZipInfo("shortcuts.json", date_time=(1980, 1, 1, 0, 0, 0))
+    info.compress_type = zipfile.ZIP_DEFLATED
+    info.external_attr = 0o644 << 16
+    with zipfile.ZipFile(ZIP_PATH, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr(info, portable.encode("utf-8"))
 
     names = [sc["name"] for cat in json.loads(raw)["categories"] for sc in cat["shortcuts"]]
     print(f"✓ 已生成 {os.path.basename(ZIP_PATH)}（{len(names)} 条捷径，auth 的 value 已抹空）")
