@@ -4,6 +4,7 @@
 #   receive-path.test.mjs  —— 上传（/upload multipart 与 /text）→ /content/latest?json=1 → Receive 决策树
 #   device-name.test.mjs   —— 设备名（?name=）落库与回读，含自愈加列路径
 #   asset-routing.test.mjs —— 静态资源路由契约：/file 与 /content 不能被资源层回成 index.html
+#   shortcut-contract.test.mjs —— Android 快捷指令真正发出的请求形状（?auth= 查询串等）
 #
 # 端到端测试需要先打包处理器（Worker 源码用打包器风格的无后缀导入，Node 直接加载不了），
 # 并用 node:sqlite 充当 D1、Map 充当 R2，因此不需要 wrangler、不联网。
@@ -36,3 +37,7 @@ node --no-warnings test/history-name.test.mjs
 echo
 echo "── 房间鉴权（/file/ 的房间不可被客户端 ?room= 伪造；会话令牌密钥含房间密码）"
 node --no-warnings test/auth-room.test.mjs
+
+echo
+echo "── Android 快捷指令的请求形状（?auth= 查询串 / latest.json 后缀 / 下载不带 room）"
+node --no-warnings test/shortcut-contract.test.mjs
