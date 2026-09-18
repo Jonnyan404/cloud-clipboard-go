@@ -6,6 +6,7 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -1307,7 +1308,9 @@ func (s *ClipboardServer) handleLatestContent(w http.ResponseWriter, r *http.Req
 					"name":      fileReceive.Name,
 					"size":      fileReceive.Size,
 					"uuid":      fileReceive.Cache,
-					"url":       filepath.Join(fileReceive.URL, fileReceive.Name),
+					// 不能用 filepath.Join：它内部会 Clean，把 "http://host" 里的双斜杠
+					// 收成 "http:/host"，客户端拿到的 url 直接是坏的。
+					"url":       fileReceive.URL + "/" + url.PathEscape(fileReceive.Name),
 					"id":        strconv.Itoa(msg.Data.ID()),
 					"timestamp": fileReceive.Timestamp,
 					"expire":    fileReceive.Expire,

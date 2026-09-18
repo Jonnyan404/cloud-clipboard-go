@@ -239,10 +239,6 @@ func (s *ClipboardServer) getUploadedFileRoom(uuid string) (string, bool) {
 }
 
 func (s *ClipboardServer) inferRequestRoom(r *http.Request) string {
-	if _, hasRoom := r.URL.Query()["room"]; hasRoom {
-		return normalizeRoomName(r.URL.Query().Get("room"))
-	}
-
 	filePrefix := s.config.Server.Prefix + "/file/"
 	chunkPrefix := s.config.Server.Prefix + "/upload/chunk/"
 	finishPrefix := s.config.Server.Prefix + "/upload/finish/"
@@ -258,10 +254,19 @@ func (s *ClipboardServer) inferRequestRoom(r *http.Request) string {
 		uuid = strings.TrimPrefix(r.URL.Path, finishPrefix)
 	}
 
+	// 文件已经登记过就以它自己记录的房间为准，**不能信客户端传的 ?room=**。
+	// 否则 `GET /file/<uuid>/<name>?room=default` 就能把受保护房间的文件读出来：
+	// 鉴权会去查 default 房间的策略，而 default 往往没设密码，直接放行。
+	// ?room= 只留给「文件还没登记」的情况（例如刚创建、尚未落 map 的上传），
+	// 那种情况下 handle_file 自己也找不到文件，会 404，不会泄字节。
 	if uuid != "" {
 		if room, ok := s.getUploadedFileRoom(uuid); ok {
 			return room
 		}
+	}
+
+	if _, hasRoom := r.URL.Query()["room"]; hasRoom {
+		return normalizeRoomName(r.URL.Query().Get("room"))
 	}
 
 	return "default"

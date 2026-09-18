@@ -154,6 +154,21 @@ foobar
 
 > 推荐 API / 脚本使用 `Authorization: Bearer`。`?auth=` 仅为兼容保留，不建议把房间密码写进可分享 URL。
 
+**文件/图片是两次请求，两次都要带凭据。** `/content/*` 返回的 `url` 只是一个地址，不含凭据；
+客户端必须自己把凭据加在这一次请求上。文本没有这一步（内容内联在 JSON 里），
+所以漏带凭据的表现非常像「文本正常、文件/图片 401」。
+
+```console
+# 第一次：拿元数据（带凭据）
+$ curl -H "Authorization: Bearer xxxx" "http://localhost:9501/content/latest?room=default&json=1"
+{"type":"image","name":"m.png","uuid":"<uuid>","url":"http://localhost:9501/file/<uuid>/m.png",...}
+
+# 第二次：按 url 取字节（同样要带凭据，否则 401）
+$ curl -H "Authorization: Bearer xxxx" "http://localhost:9501/file/<uuid>/m.png"
+```
+
+`/file/<uuid>/<name>` 按**文件自己记录的房间**鉴权，不看你传的 `?room=` —— 传了也不作数。
+
 #### 房间会话令牌
 
 Web 前端会用密码换取短期会话令牌，只缓存令牌而非密码，到期前自动续签。
