@@ -45,5 +45,11 @@ __pycache__/
 /shortcuts/apple/source/*.shortcut
 /shortcuts/apple/source/*.plist
 
+# Android 快捷指令：shortcuts.json 是 HTTP Shortcuts 的**原始导出**，也是唯一源。
+# 改捷径在应用里改、再导出丢回来，build.py 只负责自检 + 抹凭据 + 打包。
+# 它带着导出者的服务器地址和明文密码（auth 变量的 value）—— 只作本地中间产物，
+# 入库的是抹掉凭据的 shortcuts.zip。
+/shortcuts/android/shortcuts.json
+
 # 本地 AI 工作数据（项目记忆，不入库）
 /.workbuddy-ai/
