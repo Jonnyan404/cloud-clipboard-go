@@ -120,6 +120,12 @@ jobs:
               "FILE_EXPIRE",
           ]
 
+          # 这两个是安全相关的：secret 没设时**不能**退回模板默认值。
+          # 模板里的 AUTH_PASSWORD 是公开仓库里写着的占位串，ROOM_AUTH_JSON 里那三个
+          # 房间的密码同样在仓库里 —— 退回等于把线上配置降级成公开值，而原来只在日志里
+          # 打一行 warning，太容易漏掉。其余几项（上限、开关）退回默认值是无害的。
+          required = {"AUTH_PASSWORD", "ROOM_AUTH_JSON"}
+
           toml_path = "wrangler.toml"
           with open(toml_path, "r", encoding="utf-8") as f:
               toml = f.read()
@@ -127,6 +133,10 @@ jobs:
           for k in keys:
               v = os.environ.get(k, "")
               if not v:
+                  if k in required:
+                      print(f"::error::secret {k} 未设置。它退回模板默认值会把线上配置降级成公开值，已中止部署。")
+                      print(f"::error::请先设置仓库 secret {k}（Settings -> Secrets and variables -> Actions）。")
+                      sys.exit(1)
                   print(f"::warning::env {k} 未设置，保留模板中的默认值")
                   continue
               pattern = re.compile(r'(?P<key>' + re.escape(k) + r'\s*=\s*)"(?:\\.|[^"\\])*"')
