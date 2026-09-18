@@ -45,6 +45,28 @@ function displayName(room) {
     return room && room.name ? room.name : t('publicRoom');
 }
 
+// 行内的「N 设备 · 消息 M」。
+// 这两个数一度被塞进 title 里省行高 —— 那是错的：触屏没有 hover，手机上等于彻底消失，
+// 不是"藏起来"而是"没了"。现在放回行内，但仍保持一行（不回到 82px 的两行副标题）。
+//
+// 两处留白，都是为了省下宽度给房间名（实测这两个数占 40~90px，是行里最贵的一段）：
+// - 设备数为 0 时不写。活跃绿点已经编码了「有没有设备」（服务端 isActive = deviceCount > 0），
+//   再写一遍「0 设备」等于把绿点的缺席说第二次。
+// - 消息数为 0 时不写。同「不写非活跃」。
+// 两个都是 0 时整段不渲染。
+function countsLabel(room) {
+    const parts = [];
+    const devices = room.deviceCount || 0;
+    const messages = room.messageCount || 0;
+    if (devices > 0) {
+        parts.push(`${devices} ${t('devices')}`);
+    }
+    if (messages > 0) {
+        parts.push(`${t('messages')} ${messages}`);
+    }
+    return parts.join(' · ');
+}
+
 // 相对时间。原来每行挂两行副标题（`N 设备 · 消息 N` 和 `最后活跃 · 时间`），
 // 一行 82px、移动端 103px，八个房间一屏放不下。现在只留相对时间，
 // 设备数/消息数挪进 title —— 鼠标停在行上还能看到，视觉上不再占两行。
@@ -137,12 +159,24 @@ function isCurrent(room) {
                         @keydown.enter.prevent="emit('select', currentRoom.name)"
                     >
                         <span class="rl-row__mark" aria-hidden="true"></span>
-                        <span class="rl-row__name">{{ displayName(currentRoom) }}</span>
-                        <span v-if="currentRoom.isProtected" class="rl-row__lock">
-                            <v-icon size="x-small">{{ mdiLock }}</v-icon>
+                        <!-- 两行：第一行名字（+ 活跃点 + 锁），第二行元信息（计数 + 时间）。
+                             挤成一行的话，332px 的 dock 里「名字 + 计数 + 时间 + 点 + 收藏」
+                             装不下 —— 实测名字只剩 93~117px，14 字的名字被砍到 7 个字。
+                             分两行后名字拿回整宽，行高由 min-height 兜底，八个房间照样一屏放得下。 -->
+                        <span class="rl-row__text">
+                            <span class="rl-row__title">
+                                <span class="rl-row__name">{{ displayName(currentRoom) }}</span>
+                                <span v-if="currentRoom.isActive" class="rl-row__dot" aria-hidden="true"></span>
+                                <span v-if="currentRoom.isProtected" class="rl-row__lock">
+                                    <v-icon size="x-small">{{ mdiLock }}</v-icon>
+                                </span>
+                            </span>
+                            <span class="rl-row__meta">
+                                <span v-if="countsLabel(currentRoom)" class="rl-row__counts">{{ countsLabel(currentRoom) }}</span>
+                                <span v-if="countsLabel(currentRoom)" class="rl-row__sep" aria-hidden="true">·</span>
+                                <span class="rl-row__time">{{ relativeTime(currentRoom.lastActive) }}</span>
+                            </span>
                         </span>
-                        <span class="rl-row__time">{{ relativeTime(currentRoom.lastActive) }}</span>
-                        <span v-if="currentRoom.isActive" class="rl-row__dot" aria-hidden="true"></span>
                         <button
                             type="button"
                             class="rl-row__fav"
@@ -168,12 +202,20 @@ function isCurrent(room) {
                         @keydown.enter.prevent="emit('select', room.name)"
                     >
                         <span class="rl-row__mark" aria-hidden="true"></span>
-                        <span class="rl-row__name">{{ displayName(room) }}</span>
-                        <span v-if="room.isProtected" class="rl-row__lock">
-                            <v-icon size="x-small">{{ mdiLock }}</v-icon>
+                        <span class="rl-row__text">
+                            <span class="rl-row__title">
+                                <span class="rl-row__name">{{ displayName(room) }}</span>
+                                <span v-if="room.isActive" class="rl-row__dot" aria-hidden="true"></span>
+                                <span v-if="room.isProtected" class="rl-row__lock">
+                                    <v-icon size="x-small">{{ mdiLock }}</v-icon>
+                                </span>
+                            </span>
+                            <span class="rl-row__meta">
+                                <span v-if="countsLabel(room)" class="rl-row__counts">{{ countsLabel(room) }}</span>
+                                <span v-if="countsLabel(room)" class="rl-row__sep" aria-hidden="true">·</span>
+                                <span class="rl-row__time">{{ relativeTime(room.lastActive) }}</span>
+                            </span>
                         </span>
-                        <span class="rl-row__time">{{ relativeTime(room.lastActive) }}</span>
-                        <span v-if="room.isActive" class="rl-row__dot" aria-hidden="true"></span>
                         <button
                             type="button"
                             class="rl-row__fav"
@@ -404,14 +446,22 @@ function isCurrent(room) {
     color: var(--rl-muted);
 }
 
+/* minmax(0, 1fr) 不是可选的：单列 auto 轨道取 max-content，
+   行内容一超过容器宽度轨道就跟着撑出去，整行横向溢出（右端的时间和收藏按钮被裁掉）。
+   加行内计数时正是这样暴露的 —— 改前内容恰好没超，所以没显形。
+   轨道能收缩还不够，grid 子项默认 min-width: auto 会继续顶着，所以 .rl-row 也要写 min-width: 0。 */
 .rl__sections {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 16px;
+    min-width: 0;
 }
 
 .rl-group {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 4px;
+    min-width: 0;
 }
 
 .rl-group__label {
@@ -427,6 +477,7 @@ function isCurrent(room) {
     display: flex;
     align-items: center;
     gap: 8px;
+    min-width: 0;
     min-height: var(--rl-row-h);
     padding: var(--rl-row-pad);
     border-radius: var(--rl-radius);
@@ -463,14 +514,17 @@ function isCurrent(room) {
     background: var(--rl-current-accent);
 }
 
-/* terminal 的当前房间标记是一个 > 前缀，跟等宽终端的语感一致 */
+/* terminal 的当前房间标记是一个 > 前缀，跟等宽终端的语感一致。
+   两行布局之后要 align-self: flex-start 顶到名字那一行 ——
+   默认的垂直居中会让它落在名字和元信息之间，像第三行的东西。 */
 .rl--terminal .rl-row__mark {
     width: 10px;
     height: auto;
+    align-self: flex-start;
     background: transparent;
     border-radius: 0;
     font-size: var(--rl-name-size);
-    line-height: 1;
+    line-height: 1.2;
 }
 
 .rl--terminal .rl-row--current .rl-row__mark::before {
@@ -483,16 +537,55 @@ function isCurrent(room) {
     display: none;
 }
 
-/* 名字必须能省略 —— 之前被 Vuetify 的 .v-list-item-title(nowrap) 顶掉
-   word-break，长名字直接被外层 overflow:hidden 硬裁，两个房间看起来一模一样 */
-.rl-row__name {
+/* 名字 + 元信息两行。名字那一行有活跃点/锁，元信息那一行是计数 + 时间。 */
+.rl-row__text {
     flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.rl-row__title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+/* 名字必须能省略 —— 之前被 Vuetify 的 .v-list-item-title(nowrap) 顶掉
+   word-break，长名字直接被外层 overflow:hidden 硬裁，两个房间看起来一模一样。
+   现在它独占一行的宽度，不再和计数/时间抢。 */
+.rl-row__name {
+    flex: 0 1 auto;
     min-width: 0;
     font-size: var(--rl-name-size);
     font-weight: 500;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+/* 元信息行：计数 · 时间。整行 muted，子元素不再各写一遍字号和颜色。
+   挤不下时优先截断的是计数（它可以少一段），时间永远留到最后 —— 它是这一行里最该看到的。
+   gap 留 0：间距由 .rl-row__sep 自己带（两侧各 8px），否则「计数 / 点 / 时间」三个元素
+   之间的两个间距会不一样宽。 */
+.rl-row__meta {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    min-width: 0;
+    font-size: var(--rl-time-size);
+    color: var(--rl-muted);
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+/* 「计数 · 时间」中间那个点。只在计数真的渲染出来时才有 —— 
+   两个数都是 0 的时候，这一行只剩时间，不该顶着一个孤零零的分隔符。 */
+.rl-row__sep {
+    flex: none;
+    margin: 0 8px;
 }
 
 .rl-row__lock {
@@ -505,10 +598,17 @@ function isCurrent(room) {
     color: #fbbf24;
 }
 
+/* 设备数 / 消息数。曾经被塞进 title 里省行高 —— 触屏没有 hover，
+   在手机上等于彻底消失，所以放回行内。两个都是 0 时不渲染。 */
+.rl-row__counts {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 字号和颜色都由 .rl-row__meta 给，这里只管「别被压缩」 */
 .rl-row__time {
     flex: none;
-    font-size: var(--rl-time-size);
-    color: var(--rl-muted);
 }
 
 /* 只有活跃才有点。原来每个房间都写「非活跃」，八个里写七个，纯噪音 */
