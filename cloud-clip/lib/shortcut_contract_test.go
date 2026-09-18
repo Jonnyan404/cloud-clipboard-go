@@ -196,6 +196,28 @@ func shortcutFileFlow(t *testing.T, base, auth string) {
 	}
 }
 
+// 「接收最新」的语义：**后插入的那条**。
+//
+// timestamp 是秒级，所以「同一秒里先发文本、再发文件」是真实场景。Go 侧是倒着遍历消息队列，
+// 天然取最后插入的；这条测试是给**将来有人把它改成按时间排序**准备的 —— Worker 侧就踩了
+// 这个坑（只按秒级 timestamp 排序，并列时实测给的是先插入的那条），修在 content.js，
+// 回归测试见 test/receive-path.test.mjs 的 H 段。
+func TestShortcutLatestPrefersNewestInserted(t *testing.T) {
+	srv := newShortcutServer(t, "", RoomAuthConfig{})
+	base := srv.URL
+
+	status, _ := shortcutDo(t, http.MethodPost,
+		base+"/text?room=default&auth=&name="+shortcutDevice, "先发的文本", "text/plain")
+	shortcutWant(t, "先发文本", status, http.StatusOK)
+
+	shortcutSendFile(t, base, "") // 后发文件（同秒或下一秒，两种都该取它）
+
+	latest := shortcutLatest(t, base, "")
+	if latest["type"] != "image" {
+		t.Errorf("应当取后插入的文件，实际拿到 type=%v name=%v", latest["type"], latest["name"])
+	}
+}
+
 func TestShortcutContractEncryptedRoom(t *testing.T) {
 	srv := newShortcutServer(t, "global-pw", nil)
 

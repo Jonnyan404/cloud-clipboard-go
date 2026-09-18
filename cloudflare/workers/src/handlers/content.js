@@ -140,9 +140,14 @@ export class ContentHandler {
       }
 
       // 从 D1 获取最新消息
+      //
+      // 二级排序键 id DESC 不是装饰：timestamp 是**秒级**，同一秒里发两条（先文本后文件）
+      // 时 timestamp 完全相等，SQLite 在并列中返回哪一条是未定义的 —— 实测会返回**先插入**的
+      // 那条，于是「接收最新」拿到的是上一条消息。加上 id DESC 后与 Go 侧一致
+      // （Go 是倒着遍历队列，天然取最后插入的）。回归测试见 test/receive-path.test.mjs 的 H 段。
       let query = 'SELECT * FROM messages WHERE room = ?';
       const params = [room];
-      query += ' ORDER BY timestamp DESC LIMIT 1';
+      query += ' ORDER BY timestamp DESC, id DESC LIMIT 1';
 
       console.log(`最新内容查询: ${query}, 参数:`, params);
 

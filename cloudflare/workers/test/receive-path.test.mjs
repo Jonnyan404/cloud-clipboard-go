@@ -139,4 +139,22 @@ console.log('\n── G. 过期的文件：必须给 JSON 错误，不能让客�
   check('带 expire 字段', r.json.expire, now + 3600);
 }
 
+console.log('\n── H. 同一秒里的两条：必须取后插入的那条（与 Go 一致）──');
+{
+  // timestamp 是秒级，所以「同一秒里先发文本、再发文件」是真实场景。
+  // 只按 timestamp 排序时并列的取谁未定义 —— 实测 SQLite 会给**先插入**的那条，
+  // 于是「接收最新」拿到的是上一条消息。这里直接插两行同一 timestamp 的行来钉住它。
+  const { env, db } = makeEnv();
+  const now = Math.floor(Date.now() / 1000);
+  db.prepare(`INSERT INTO messages (type, content, room, timestamp, senderIP, senderClientID, userAgent)
+              VALUES ('text', '先发的文本', 'default', ?, '', '', '')`).run(now);
+  db.prepare(`INSERT INTO messages (type, name, size, room, timestamp, uuid, expireTime, url)
+              VALUES ('file', '后发的.png', 3, 'default', ?, 'uuid-tie', ?, '')`)
+    .run(now, now + 3600);
+
+  const r = await getJson(ContentHandler.getLatest, env, '/content/latest?room=default&json=1');
+  check('同秒内取后插入的那条', r.json.name, '后发的.png');
+  check('（不是先插入的那条）', r.json.content, undefined);
+}
+
 summary('Receive 链路在 Worker 上可用');
