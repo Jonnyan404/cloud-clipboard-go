@@ -46,10 +46,10 @@ __pycache__/
 /shortcuts/apple/source/*.plist
 
 # Android 快捷指令：shortcuts.json 是 HTTP Shortcuts 的**原始导出**，也是唯一源。
-# 改捷径在应用里改、再导出丢回来，build.py 负责自检 + 导出可读镜像 + 抹凭据 + 打包。
+# 改捷径在应用里改、再导出丢回来，build.py 负责自检 + 换掉你自己的值 + 打包。
 # 它带着导出者的服务器地址和明文密码（auth 变量的 value）—— 只作本地中间产物；
-# 入库的是抹掉凭据的 shortcuts.zip，以及 build.py 从它生成、**只写不读**的 shortcuts.js
-# （那段 JS 在 JSON 里是压成一行且转义过的，不留镜像的话 git 里读不了也 diff 不了）。
+# 入库的是把这两项换成占位的 shortcuts.zip。
+# ⚠️ 不要再往这个目录加第二份「同内容的东西」（shortcuts.js 那条路试过两次，都否了）。
 /shortcuts/android/shortcuts.json
 
 # 本地 AI 工作数据（项目记忆，不入库）
