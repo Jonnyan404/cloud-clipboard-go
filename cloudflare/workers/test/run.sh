@@ -11,7 +11,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 echo "── 打包处理器（供端到端测试导入）"
-for entry in handlers/content handlers/file handlers/text durable-objects/websocket-room; do
+for entry in handlers/content handlers/file handlers/text durable-objects/websocket-room auth; do
   ./node_modules/.bin/esbuild "src/${entry}.js" \
     --bundle --format=esm --platform=neutral \
     --outfile="test/.build/$(basename "${entry}").mjs" --log-level=warning
@@ -32,3 +32,7 @@ node --no-warnings test/asset-routing.test.mjs
 echo
 echo "── 历史消息文件名（不能被拼上图标）"
 node --no-warnings test/history-name.test.mjs
+
+echo
+echo "── 房间鉴权（/file/ 的房间不可被客户端 ?room= 伪造；会话令牌密钥含房间密码）"
+node --no-warnings test/auth-room.test.mjs

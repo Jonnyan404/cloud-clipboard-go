@@ -29,7 +29,30 @@ export function makeEnv() {
   const R2_BUCKET = {
     async put(key, body, opts) { r2.set(key, { body, opts }); },
     async delete(key) { r2.delete(key); },
-    async get(key) { return r2.has(key) ? { body: r2.get(key) } : null; },
+    // 真 R2 的 get() 带 customMetadata / httpMetadata / size，这三样都被下载链路读：
+    //   - customMetadata.room 决定 /file/ 按哪个房间鉴权（写侧 put 时就写进去了）
+    //   - customMetadata.expireTime 决定过期拦截
+    //   - size 进 Content-Length
+    // 早先这里只回 { body }，于是「按文件所属房间鉴权」这条路径在测试里根本走不到。
+    async get(key) {
+      const rec = r2.get(key);
+      if (!rec) return null;
+      const body = rec.body;
+      const size = typeof body?.size === 'number'
+        ? body.size
+        : (body?.byteLength ?? body?.length ?? 0);
+      return {
+        body,
+        size,
+        httpMetadata: rec.opts?.httpMetadata,
+        customMetadata: rec.opts?.customMetadata,
+      };
+    },
+    async head(key) {
+      const rec = r2.get(key);
+      if (!rec) return null;
+      return { size: rec.body?.size ?? 0, customMetadata: rec.opts?.customMetadata };
+    },
   };
 
   // Durable Object 桩：链式调用不断，且必须让 then 为 undefined ——

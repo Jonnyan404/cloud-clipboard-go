@@ -292,7 +292,11 @@ async function getRoomSessionSigningKey(env) {
   const rooms = Object.keys(roomAuth).sort();
   for (const room of rooms) {
     material.push(room);
-    material.push(normalizeAuthValue(roomAuth[room]));
+    // parseRoomAuth 给的是 {password, fileExpire} 对象，不是字符串。
+    // 直接 normalizeAuthValue(roomAuth[room]) 会 String() 成 '[object Object]'，
+    // 房间密码等于没进密钥材料 —— 只设房间密码（没设 AUTH_PASSWORD / ROOM_SESSION_SECRET）时
+    // 密钥就完全可预测，任何人都能自己签一个 scope=global 的会话令牌绕过所有房间密码。
+    material.push(normalizeAuthValue(roomAuth[room].password));
   }
 
   if (env.ROOM_SESSION_SECRET) {
