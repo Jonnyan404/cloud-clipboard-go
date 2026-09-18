@@ -9,6 +9,7 @@ import { useI18n } from 'vue-i18n';
 import axios from 'axios';
 import { toast, toastState } from '@/plugins/toast';
 import TraditionalColorDialog from '@/components/TraditionalColorDialog.vue';
+import RoomList from '@/components/RoomList.vue';
 import QrcodeVue from 'qrcode.vue';
 
 const mdiBrightness4 = 'mdi-brightness-4';
@@ -20,13 +21,8 @@ const mdiContentPaste = 'mdi-content-paste';
 const mdiDevices = 'mdi-devices';
 const mdiDiceMultiple = 'mdi-dice-multiple';
 const mdiGithub = 'mdi-github';
-const mdiHeart = 'mdi-heart';
 const mdiHeartOutline = 'mdi-heart-outline';
-const mdiHome = 'mdi-home';
-const mdiHomeOutline = 'mdi-home-outline';
 const mdiIpNetworkOutline = 'mdi-ip-network-outline';
-const mdiLock = 'mdi-lock';
-const mdiMagnify = 'mdi-magnify';
 const mdiOpenInNew = 'mdi-open-in-new';
 const mdiPalette = 'mdi-palette';
 const mdiPaletteSwatch = 'mdi-palette-swatch';
@@ -183,18 +179,6 @@ const roomGroups = computed(() => [
         key: 'other',
         title: t('otherRoomsLabel'),
         rooms: otherRooms.value,
-    },
-].filter(group => group.rooms.length > 0));
-const sidebarRoomGroups = computed(() => [
-    {
-        key: 'favorites',
-        title: t('favoriteRoomsLabel'),
-        rooms: favoriteRooms.value,
-    },
-    {
-        key: 'other',
-        title: t('otherRoomsLabel'),
-        rooms: otherRooms.value.concat(activeRooms.value),
     },
 ].filter(group => group.rooms.length > 0));
 
@@ -413,24 +397,6 @@ function toggleFavoriteRoom(roomName) {
 function getRoomDisplayName(room) {
     return room && room.name ? room.name : t('publicRoom');
 }
-function formatTime(timestamp) {
-    if (!timestamp || timestamp === 0) return t('never');
-    const now = Math.floor(Date.now() / 1000);
-    const messageTime = timestamp;
-    const diff = now - messageTime;
-    if (diff < 0) {
-        return t('justNow');
-    }
-    if (diff < 60) {
-        return t('justNow');
-    } else if (diff < 3600) {
-        return t('minutesAgo', { minutes: Math.floor(diff / 60) });
-    } else if (diff < 86400) {
-        return t('hoursAgo', { hours: Math.floor(diff / 3600) });
-    } else {
-        return t('daysAgo', { days: Math.floor(diff / 86400) });
-    }
-}
 function randomRoomName() {
     const names = ['reimu', 'marisa', 'rumia', 'cirno', 'meiling', 'patchouli', 'sakuya', 'remilia', 'flandre', 'letty', 'chen', 'lyrica', 'lunasa', 'merlin', 'youmu', 'yuyuko', 'ran', 'yukari', 'suika', 'mystia', 'keine', 'tewi', 'reisen', 'eirin', 'kaguya', 'mokou'];
     return names[Math.floor(Math.random() * names.length)] + '-' + Math.random().toString(16).substring(2, 6);
@@ -556,13 +522,23 @@ watch(() => route.fullPath, () => {
                         roomDockSide === 'left' ? 'room-browser--dock-left' : 'room-browser--dock-right'
                     ]"
                 >
-                    <div class="room-browser__header room-browser__header--dock d-flex align-center">
-                        <div class="d-flex align-center room-browser__title-wrap">
-                            <v-icon start>{{ mdiViewList }}</v-icon>
-                            <span>{{ t('roomList') }}</span>
-                            <v-chip class="ml-2" size="small" :variant="'outlined'">{{ availableRooms.length }} {{ t('rooms') }}</v-chip>
-                        </div>
-                        <div class="d-flex align-center">
+                    <RoomList
+                        v-model:search="roomSearch"
+                        :groups="roomGroups"
+                        :current-room="currentRoomEntry"
+                        :current-room-name="getRoomDisplayName({ name: ws.room })"
+                        :current-room-label="t('currentRoomLabel')"
+                        :title="t('roomList')"
+                        :count="availableRooms.length"
+                        :favorite-count="favoriteRoomCount"
+                        :active-count="activeRoomCount"
+                        :loading="roomsLoading"
+                        :has-rooms="filteredRooms.length > 0"
+                        @select="switchRoom"
+                        @favorite="toggleFavoriteRoom"
+                        variant="dock"
+                    >
+                        <template #actions>
                             <v-tooltip left>
                                 <template v-slot:activator="{ props }">
                                     <v-btn icon density="comfortable" variant="text" v-bind="props" @click="toggleRoomDockSide()">
@@ -579,161 +555,8 @@ watch(() => route.fullPath, () => {
                                 </template>
                                 <span>{{ t('hideRoomBrowser') }}</span>
                             </v-tooltip>
-                        </div>
-                    </div>
-
-                    <div class="room-browser__body room-browser__body--dock">
-                        <div class="room-browser__toolbar">
-                            <v-text-field
-                                v-model="roomSearch"
-                                :placeholder="t('searchRooms')"
-                                :prepend-inner-icon="mdiMagnify"
-                                variant="outlined"
-                                density="compact"
-                                clearable
-                                hide-details
-                                class="room-browser__search"
-                            ></v-text-field>
-                        </div>
-
-                        <div class="room-browser__summary">
-                            <v-chip size="small" :variant="'outlined'" color="primary">{{ getRoomDisplayName({ name: ws.room }) }}</v-chip>
-                            <v-chip size="small" :variant="'outlined'">{{ favoriteRoomCount }} {{ t('favoriteRoomsLabel') }}</v-chip>
-                            <v-chip size="small" :variant="'outlined'">{{ activeRoomCount }} {{ t('activeRoomsLabel') }}</v-chip>
-                        </div>
-
-                        <div v-if="roomsLoading && availableRooms.length === 0" class="text-center py-4">
-                            <v-progress-circular indeterminate color="primary"></v-progress-circular>
-                            <div class="mt-2">{{ t('loadingRooms') }}</div>
-                        </div>
-
-                        <div v-else-if="filteredRooms.length === 0" class="text-center py-8">
-                            <v-icon size="64" color="grey-lighten-1">{{ mdiHomeOutline }}</v-icon>
-                            <div class="mt-2 text-grey">{{ t('noRoomsFound') }}</div>
-                        </div>
-
-                        <div v-else class="room-browser__sections">
-                            <section v-if="currentRoomEntry" class="room-group">
-                                <div class="room-group__label">{{ t('currentRoomLabel') }}</div>
-                                <v-list class="room-list" density="compact">
-                                    <v-list-item
-                                        class="room-entry room-entry--current"
-                                        @click="switchRoom(currentRoomEntry.name)"
-                                    >
-                                        <template v-slot:prepend>
-                                            <v-avatar size="42" class="room-entry__avatar room-entry__avatar--current">
-                                                <v-icon color="primary">{{ currentRoomEntry.name === '' ? mdiHomeOutline : mdiHome }}</v-icon>
-                                            </v-avatar>
-                                        </template>
-                                        <v-list-item-title>
-                                            <div class="room-entry__title-row">
-                                                <div class="room-entry__name">{{ getRoomDisplayName(currentRoomEntry) }}</div>
-                                                <div class="room-entry__badges">
-                                                    <v-chip
-                                                        v-if="currentRoomEntry.isProtected"
-                                                        size="x-small"
-                                                        :variant="'outlined'"
-                                                        class="room-entry__security-chip"
-                                                    >
-                                                        <v-icon size="x-small" start>{{ mdiLock }}</v-icon>
-                                                        {{ t('protectedRoom') }}
-                                                    </v-chip>
-                                                    <v-chip size="x-small" variant="flat" color="primary">{{ t('currentRoomShortLabel') }}</v-chip>
-                                                </div>
-                                            </div>
-                                        </v-list-item-title>
-                                        <v-list-item-subtitle class="room-entry__meta">
-                                            {{ currentRoomEntry.deviceCount || 0 }} {{ t('devices') }} · {{ t('messages') }} {{ currentRoomEntry.messageCount || 0 }}
-                                        </v-list-item-subtitle>
-                                        <v-list-item-subtitle class="room-entry__activity">
-                                            {{ t('lastActive') }} · {{ formatTime(currentRoomEntry.lastActive) }}
-                                        </v-list-item-subtitle>
-                                        <template v-slot:append>
-                                            <v-btn
-                                                icon
-                                                density="compact"
-                                                variant="text"
-                                                class="room-entry__favorite-btn"
-                                                :class="{ 'room-entry__favorite-btn--active': currentRoomEntry.isFavorite }"
-                                                :color="currentRoomEntry.isFavorite ? 'error' : undefined"
-                                                @click.stop="toggleFavoriteRoom(currentRoomEntry.name)"
-                                            >
-                                                <v-icon size="small">
-                                                    {{ currentRoomEntry.isFavorite ? mdiHeart : mdiHeartOutline }}
-                                                </v-icon>
-                                            </v-btn>
-                                        </template>
-                                    </v-list-item>
-                                </v-list>
-                            </section>
-
-                            <section
-                                v-for="group in sidebarRoomGroups"
-                                :key="`dock-${group.key}`"
-                                class="room-group"
-                            >
-                                <div class="room-group__label">{{ group.title }}</div>
-                                <v-list class="room-list" density="compact">
-                                    <v-list-item
-                                        v-for="room in group.rooms"
-                                        :key="room.name"
-                                        class="room-entry"
-                                        :class="{ 'room-entry--active': room.isActive }"
-                                        @click="switchRoom(room.name)"
-                                    >
-                                        <template v-slot:prepend>
-                                            <v-avatar size="42" class="room-entry__avatar">
-                                                <v-icon :color="room.isActive ? 'success' : 'primary'">
-                                                    {{ room.name === '' ? mdiHomeOutline : mdiHome }}
-                                                </v-icon>
-                                            </v-avatar>
-                                        </template>
-                                        <v-list-item-title>
-                                            <div class="room-entry__title-row">
-                                                <div class="room-entry__name">{{ getRoomDisplayName(room) }}</div>
-                                                <div class="room-entry__badges">
-                                                    <v-chip
-                                                        v-if="room.isProtected"
-                                                        size="x-small"
-                                                        :variant="'outlined'"
-                                                        class="room-entry__security-chip"
-                                                    >
-                                                        <v-icon size="x-small" start>{{ mdiLock }}</v-icon>
-                                                        {{ t('protectedRoom') }}
-                                                    </v-chip>
-                                                    <div class="room-entry__state" :class="room.isActive ? 'room-entry__state--active' : 'room-entry__state--idle'">
-                                                        <span class="room-entry__state-dot"></span>
-                                                        {{ room.isActive ? t('active') : t('inactive') }}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </v-list-item-title>
-                                        <v-list-item-subtitle class="room-entry__meta">
-                                            {{ room.deviceCount || 0 }} {{ t('devices') }} · {{ t('messages') }} {{ room.messageCount || 0 }}
-                                        </v-list-item-subtitle>
-                                        <v-list-item-subtitle class="room-entry__activity">
-                                            {{ t('lastActive') }} · {{ formatTime(room.lastActive) }}
-                                        </v-list-item-subtitle>
-                                        <template v-slot:append>
-                                            <v-btn
-                                                icon
-                                                density="compact"
-                                                variant="text"
-                                                class="room-entry__favorite-btn"
-                                                :class="{ 'room-entry__favorite-btn--active': room.isFavorite }"
-                                                :color="room.isFavorite ? 'error' : undefined"
-                                                @click.stop="toggleFavoriteRoom(room.name)"
-                                            >
-                                                <v-icon size="small">
-                                                    {{ room.isFavorite ? mdiHeart : mdiHeartOutline }}
-                                                </v-icon>
-                                            </v-btn>
-                                        </template>
-                                    </v-list-item>
-                                </v-list>
-                            </section>
-                        </div>
-                    </div>
+                        </template>
+                    </RoomList>
                 </aside>
             </div>
         </v-main>
@@ -1089,173 +912,28 @@ watch(() => route.fullPath, () => {
 
         <v-bottom-sheet v-model="roomSheet" scrollable max-width="820">
             <v-card class="room-browser" :class="{ 'room-browser--dark': isDark }">
-                <v-card-title class="d-flex align-center room-browser__header">
-                    <v-icon start>{{ mdiViewList }}</v-icon>
-                    {{ t('roomList') }}
-                    <v-chip class="ml-2" size="small" :variant="'outlined'">{{ availableRooms.length }} {{ t('rooms') }}</v-chip>
-                    <v-spacer></v-spacer>
-                    <v-btn icon density="comfortable" variant="text" @click="roomSheet = false">
-                        <v-icon>{{ mdiClose }}</v-icon>
-                    </v-btn>
-                </v-card-title>
-
-                <v-divider></v-divider>
-
-                <v-card-text class="room-browser__body">
-                    <div class="room-browser__toolbar">
-                        <v-text-field
-                            v-model="roomSearch"
-                            :placeholder="t('searchRooms')"
-                            :prepend-inner-icon="mdiMagnify"
-                            variant="outlined"
-                            density="compact"
-                            clearable
-                            hide-details
-                            class="room-browser__search"
-                        ></v-text-field>
-                    </div>
-
-                    <div class="room-browser__summary">
-                        <v-chip size="small" :variant="'outlined'" color="primary">{{ getRoomDisplayName({ name: ws.room }) }}</v-chip>
-                        <v-chip size="small" :variant="'outlined'">{{ favoriteRoomCount }} {{ t('favoriteRoomsLabel') }}</v-chip>
-                        <v-chip size="small" :variant="'outlined'">{{ activeRoomCount }} {{ t('activeRoomsLabel') }}</v-chip>
-                    </div>
-
-                    <div v-if="roomsLoading && availableRooms.length === 0" class="text-center py-4">
-                        <v-progress-circular indeterminate color="primary"></v-progress-circular>
-                        <div class="mt-2">{{ t('loadingRooms') }}</div>
-                    </div>
-
-                    <div v-else-if="filteredRooms.length === 0" class="text-center py-8">
-                        <v-icon size="64" color="grey-lighten-1">{{ mdiHomeOutline }}</v-icon>
-                        <div class="mt-2 text-grey">{{ t('noRoomsFound') }}</div>
-                    </div>
-
-                    <div v-else class="room-browser__sections">
-                        <section v-if="currentRoomEntry" class="room-group">
-                            <div class="room-group__label">{{ t('currentRoomLabel') }}</div>
-                            <v-list class="room-list" density="compact">
-                                <v-list-item
-                                    class="room-entry room-entry--current"
-                                    @click="switchRoom(currentRoomEntry.name)"
-                                >
-                                    <template v-slot:prepend>
-                                        <v-avatar size="42" class="room-entry__avatar room-entry__avatar--current">
-                                            <v-icon color="primary">{{ currentRoomEntry.name === '' ? mdiHomeOutline : mdiHome }}</v-icon>
-                                        </v-avatar>
-                                    </template>
-                                    <v-list-item-title>
-                                        <div class="room-entry__title-row">
-                                            <div class="room-entry__name">{{ getRoomDisplayName(currentRoomEntry) }}</div>
-                                            <div class="room-entry__badges">
-                                                <v-chip
-                                                    v-if="currentRoomEntry.isProtected"
-                                                    size="x-small"
-                                                    :variant="'outlined'"
-                                                    class="room-entry__security-chip"
-                                                >
-                                                    <v-icon size="x-small" start>{{ mdiLock }}</v-icon>
-                                                    {{ t('protectedRoom') }}
-                                                </v-chip>
-                                                <div class="room-entry__state" :class="currentRoomEntry.isActive ? 'room-entry__state--active' : 'room-entry__state--idle'">
-                                                    <span class="room-entry__state-dot"></span>
-                                                    {{ currentRoomEntry.isActive ? t('active') : t('inactive') }}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </v-list-item-title>
-                                    <v-list-item-subtitle class="room-entry__meta">
-                                        {{ currentRoomEntry.deviceCount || 0 }} {{ t('devices') }} · {{ t('messages') }} {{ currentRoomEntry.messageCount || 0 }}
-                                    </v-list-item-subtitle>
-                                    <v-list-item-subtitle class="room-entry__activity">
-                                        {{ t('lastActive') }} · {{ formatTime(currentRoomEntry.lastActive) }}
-                                    </v-list-item-subtitle>
-                                    <template v-slot:append>
-                                        <v-btn
-                                            icon
-                                            density="compact"
-                                            variant="text"
-                                            class="room-entry__favorite-btn"
-                                            :class="{ 'room-entry__favorite-btn--active': currentRoomEntry.isFavorite }"
-                                            :color="currentRoomEntry.isFavorite ? 'error' : undefined"
-                                            @click.stop="toggleFavoriteRoom(currentRoomEntry.name)"
-                                        >
-                                            <v-icon size="small">
-                                                {{ currentRoomEntry.isFavorite ? mdiHeart : mdiHeartOutline }}
-                                            </v-icon>
-                                        </v-btn>
-                                    </template>
-                                </v-list-item>
-                            </v-list>
-                        </section>
-
-                        <section
-                            v-for="group in roomGroups"
-                            :key="group.key"
-                            class="room-group"
-                        >
-                            <div class="room-group__label">{{ group.title }}</div>
-                            <v-list class="room-list" density="compact">
-                                <v-list-item
-                                    v-for="room in group.rooms"
-                                    :key="room.name"
-                                    class="room-entry"
-                                    :class="{ 'room-entry--active': room.isActive }"
-                                    @click="switchRoom(room.name)"
-                                >
-                                    <template v-slot:prepend>
-                                        <v-avatar size="42" class="room-entry__avatar">
-                                            <v-icon :color="room.isActive ? 'success' : 'primary'">
-                                                {{ room.name === '' ? mdiHomeOutline : mdiHome }}
-                                            </v-icon>
-                                        </v-avatar>
-                                    </template>
-                                    <v-list-item-title>
-                                        <div class="room-entry__title-row">
-                                            <div class="room-entry__name">{{ getRoomDisplayName(room) }}</div>
-                                            <div class="room-entry__badges">
-                                                <v-chip
-                                                    v-if="room.isProtected"
-                                                    size="x-small"
-                                                    :variant="'outlined'"
-                                                    class="room-entry__security-chip"
-                                                >
-                                                    <v-icon size="x-small" start>{{ mdiLock }}</v-icon>
-                                                    {{ t('protectedRoom') }}
-                                                </v-chip>
-                                                <div class="room-entry__state" :class="room.isActive ? 'room-entry__state--active' : 'room-entry__state--idle'">
-                                                    <span class="room-entry__state-dot"></span>
-                                                    {{ room.isActive ? t('active') : t('inactive') }}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </v-list-item-title>
-                                    <v-list-item-subtitle class="room-entry__meta">
-                                        {{ room.deviceCount || 0 }} {{ t('devices') }} · {{ t('messages') }} {{ room.messageCount || 0 }}
-                                    </v-list-item-subtitle>
-                                    <v-list-item-subtitle class="room-entry__activity">
-                                        {{ t('lastActive') }} · {{ formatTime(room.lastActive) }}
-                                    </v-list-item-subtitle>
-                                    <template v-slot:append>
-                                        <v-btn
-                                            icon
-                                            density="compact"
-                                            variant="text"
-                                            class="room-entry__favorite-btn"
-                                            :class="{ 'room-entry__favorite-btn--active': room.isFavorite }"
-                                            :color="room.isFavorite ? 'error' : undefined"
-                                            @click.stop="toggleFavoriteRoom(room.name)"
-                                        >
-                                            <v-icon size="small">
-                                                {{ room.isFavorite ? mdiHeart : mdiHeartOutline }}
-                                            </v-icon>
-                                        </v-btn>
-                                    </template>
-                                </v-list-item>
-                            </v-list>
-                        </section>
-                    </div>
-                </v-card-text>
+                <RoomList
+                    v-model:search="roomSearch"
+                    :groups="roomGroups"
+                    :current-room="currentRoomEntry"
+                    :current-room-name="getRoomDisplayName({ name: ws.room })"
+                    :current-room-label="t('currentRoomLabel')"
+                    :title="t('roomList')"
+                    :count="availableRooms.length"
+                    :favorite-count="favoriteRoomCount"
+                    :active-count="activeRoomCount"
+                    :loading="roomsLoading"
+                    :has-rooms="filteredRooms.length > 0"
+                    @select="switchRoom"
+                    @favorite="toggleFavoriteRoom"
+                    variant="sheet"
+                >
+                    <template #actions>
+                        <v-btn icon density="comfortable" variant="text" @click="roomSheet = false">
+                            <v-icon>{{ mdiClose }}</v-icon>
+                        </v-btn>
+                    </template>
+                </RoomList>
             </v-card>
         </v-bottom-sheet>
 
@@ -1453,34 +1131,8 @@ watch(() => route.fullPath, () => {
     background: rgba(15, 23, 42, 0.96);
 }
 
-.room-browser__header {
-    padding-bottom: 12px;
-}
-
-.room-browser__header--dock {
-    padding: 16px 18px 12px;
-    border-bottom: 1px solid rgba(148, 163, 184, 0.18);
-}
-
-.room-browser__title-wrap {
-    min-width: 0;
-}
-
-.room-browser__body {
-    max-height: 68vh;
-    padding-top: 20px;
-}
-
-.room-browser__body--dock {
-    max-height: calc(100vh - 148px);
-    overflow: auto;
-    padding: 16px 18px 20px;
-}
-
-.room-browser__sections {
-    display: grid;
-    gap: 18px;
-}
+/* 头部和列表内部样式都在 RoomList.vue 里 —— 它们必须跟着当前模式走，
+   而模式皮肤是那组 --rl-* 变量。留在这里的只有「容器」这一层。 */
 
 .room-browser--dock {
     position: sticky;
@@ -1494,207 +1146,10 @@ watch(() => route.fullPath, () => {
     overflow: hidden;
 }
 
-.room-browser__toolbar {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 12px;
-}
-
-.room-browser__search {
-    flex: 1;
-}
-
-.room-browser__summary {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-}
-
-.room-group {
-    display: grid;
-    gap: 10px;
-}
-
-.room-group__label {
-    font-size: 0.8rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: rgba(100, 116, 139, 0.95);
-}
-
-.app-shell--dark .room-group__label {
-    color: rgba(148, 163, 184, 0.9);
-}
-
-.room-list {
-    padding: 0;
-    background: transparent !important;
-}
-
-.room-entry {
-    border: 1px solid rgba(148, 163, 184, 0.22);
-    border-radius: 18px;
-    margin-bottom: 10px;
-    padding: 10px 8px;
-    background: rgba(248, 250, 252, 0.72);
-    transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
-}
-
-.room-entry:hover {
-    transform: translateY(-1px);
-    border-color: rgba(59, 130, 246, 0.3);
-    box-shadow: 0 12px 24px rgba(15, 23, 42, 0.06);
-}
-
-.room-entry--current {
-    border-color: rgba(59, 130, 246, 0.38);
-    background: rgba(239, 246, 255, 0.92);
-}
-
-.app-shell--dark .room-entry {
-    border-color: rgba(71, 85, 105, 0.78);
-    background: rgba(15, 23, 42, 0.7);
-}
-
-.app-shell--dark .room-entry--current {
-    border-color: rgba(96, 165, 250, 0.52);
-    background: rgba(30, 41, 59, 0.92);
-}
-
-.room-entry__avatar {
-    border-radius: 14px;
-    background: rgba(255, 255, 255, 0.7);
-}
-
-.app-shell--dark .room-entry__avatar {
-    background: rgba(30, 41, 59, 0.8);
-}
-
-.room-entry--current .room-entry__avatar--current {
-    background: rgba(219, 234, 254, 0.9);
-}
-
-.app-shell--dark .room-entry--current .room-entry__avatar--current {
-    background: rgba(30, 64, 175, 0.24);
-}
-
-.room-entry__title-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 4px;
-}
-
-.room-entry__badges {
-    display: inline-flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 8px;
-    flex-wrap: wrap;
-}
-
-.room-entry__name {
-    font-size: 0.98rem;
-    font-weight: 700;
-    color: rgba(15, 23, 42, 0.96);
-    word-break: break-word;
-}
-
-.app-shell--dark .room-entry__name {
-    color: rgba(226, 232, 240, 0.96);
-}
-
-.room-entry__security-chip {
-    color: #b45309 !important;
-    border-color: rgba(217, 119, 6, 0.32) !important;
-    background: rgba(245, 158, 11, 0.08) !important;
-}
-
-.app-shell--dark .room-entry__security-chip {
-    color: #fbbf24 !important;
-    border-color: rgba(251, 191, 36, 0.35) !important;
-    background: rgba(245, 158, 11, 0.14) !important;
-}
-
-.room-entry__meta,
-.room-entry__activity {
-    color: rgba(100, 116, 139, 0.95) !important;
-    font-size: 0.75rem;
-}
-
-.app-shell--dark .room-entry__meta,
-.app-shell--dark .room-entry__activity {
-    color: rgba(148, 163, 184, 0.9) !important;
-}
-
-.room-entry__state {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    white-space: nowrap;
-    font-size: 0.74rem;
-    font-weight: 600;
-}
-
-.room-entry__state--active {
-    color: #15803d;
-}
-
-.room-entry__state--idle {
-    color: #64748b;
-}
-
-.app-shell--dark .room-entry__state--active {
-    color: #86efac;
-}
-
-.app-shell--dark .room-entry__state--idle {
-    color: #94a3b8;
-}
-
-.room-entry__state-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 999px;
-    background: currentColor;
-    opacity: 0.9;
-}
-
-.room-entry__favorite-btn {
-    opacity: 0.7;
-    transition: opacity 0.18s ease, transform 0.18s ease;
-}
-
-.room-entry:hover .room-entry__favorite-btn {
-    opacity: 1;
-}
-
-.room-entry__favorite-btn--active {
-    opacity: 1 !important;
-    color: #ff5252 !important;
-}
-
 @media (max-width: 1263px) {
     .app-shell__workspace {
         display: block;
         padding: 0;
-    }
-}
-
-@media (max-width: 600px) {
-    .room-browser__toolbar {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-    .room-entry__title-row {
-        align-items: flex-start;
-        flex-direction: column;
-        gap: 4px;
     }
 }
 
