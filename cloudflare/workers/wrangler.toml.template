@@ -23,6 +23,18 @@ not_found_handling = "none"
 binding = "ASSETS"
 
 # 环境变量
+#
+# ⚠️ `wrangler deploy` 会**用这里的值覆盖线上的绑定** —— 在 Cloudflare 控制台里
+# 改过的 AUTH_PASSWORD / ROOM_AUTH_JSON，下次部署就被打回下面这些默认值。
+#
+# 而且真正被部署的是**本地的 wrangler.toml**（gitignore 的），不是这个模板。
+# 所以：控制台里设过密码的，一定要把同样的值填进本地那份；否则部署一次，
+# 全局密码就降级成下面这个公开仓库里写着的东西。
+#
+# 想彻底免疫：把 AUTH_PASSWORD 和 ROOM_AUTH_JSON 改用 `wrangler secret put` 设置。
+# secret 不会被 deploy 覆盖，代码不用改（env.X 读法一样），此后部署对配置就是 no-op。
+# 注意顺序：**先 put 再删 [vars]**，因为 AUTH_PASSWORD 为空 + 房间也没密码 = 完全无鉴权
+# （见 src/auth.js 的 resolveRoomAuth，两者都空时 required: false）。
 [vars]
 AUTH_PASSWORD = "123"
 # 房间认证配置。值支持两种形式：
