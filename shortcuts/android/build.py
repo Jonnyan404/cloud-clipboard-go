@@ -123,7 +123,11 @@ def main() -> int:
     )
     print(f"  源导出时间: {export_time}")   # 「zip 是不是跟着最新导出走的」看这一行
     print("  内含:", ", ".join(names))
-    print("  导入后在应用里把 auth（房间密码）和 url（服务器地址）填上。")
+    # 下面这三行是踩过的坑：导入后只填了 url，忘了 auth 和 room，症状是「接收最新」404/401，
+    # 而网页访问正常 —— 网页走 WebSocket，根本不碰这些接口，所以证明不了什么。
+    print("  导入后要填 3 个变量：url（服务器地址）、room（房间名）、auth（密码）")
+    print("    · url 与 auth 在打包时被清空（auth 是你自己的密码，不能入库）")
+    print("    · room 留空 = default 房间，**不是**「不限房间」；要和网页上用同一个房间就得填")
     return 0
 
 

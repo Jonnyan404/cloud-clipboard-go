@@ -39,6 +39,55 @@ if (variants.size !== 1) {
   process.exit(1);
 }
 
+// ── 请求形状自检：断言**导出里真实写着的 URL** ──
+//
+// 为什么要有这一段：跨后端那两个契约测试
+//   cloud-clip/lib/shortcut_contract_test.go
+//   cloudflare/workers/test/shortcut-contract.test.mjs
+// 把请求形状**抄成了常量**。抄的那份会漂 —— 在应用里改了捷径的 URL，那两个测试照样绿，
+// 因为它们测的是自己抄的那份，跟真实捷径没关系。
+// 这个脚本本来就必须读 shortcuts.json，所以「抄的和真的对不对得上」放在这里最省事。
+//
+// URL 里的变量是 {{uuid}} 形式，先按 variables 映射回 key 再比对，这样期望值可读。
+const EXPECTED_URLS = {
+  '发送文本':   '{url}/text?room={room}&auth={auth}&name={name}',
+  '发送文件':   '{url}/upload?room={room}&auth={auth}&name={name}',
+  '接收最新':   '{url}/content/latest.json?room={room}&auth={auth}',
+  '接收指定ID': '{url}/content/{ID}?room={room}&json=true&auth={auth}',
+  '展示文件':   '{downloadUrl}',
+};
+
+const idToKey = new Map((data.variables || []).map(v => [v.id, v.key]));
+const allShortcuts = data.categories.flatMap(cat => cat.shortcuts);
+const shapeFailures = [];
+
+for (const s of allShortcuts) {
+  const want = EXPECTED_URLS[s.name];
+  if (!want) {
+    shapeFailures.push(`出现了未登记的捷径「${s.name}」—— 新增捷径要在这里补一行期望形状`);
+    continue;
+  }
+  const got = String(s.url || '').replace(/\{\{([^}]+)\}\}/g,
+    (m, id) => (idToKey.has(id) ? `{${idToKey.get(id)}}` : m));
+  if (got !== want) {
+    shapeFailures.push(`[${s.name}]\n      实际: ${got}\n      期望: ${want}`);
+  }
+}
+
+for (const name of Object.keys(EXPECTED_URLS)) {
+  if (!allShortcuts.some(s => s.name === name)) {
+    shapeFailures.push(`期望里有「${name}」，但导出里没有 —— 捷径被删了？`);
+  }
+}
+
+if (shapeFailures.length) {
+  console.error('!! 请求形状自检失败（导出与契约不一致）：');
+  for (const f of shapeFailures) console.error('  ✗ ' + f);
+  console.error('   → 改完捷径记得同步改那两个跨后端的契约测试。');
+  process.exit(1);
+}
+console.log(`✓ 请求形状自检通过（${allShortcuts.length} 条捷径与契约逐字一致）`);
+
 const NAME = '图片 1.png';   // 非 ASCII + 空格，顺带验编码
 const UUID = 'U-1';
 const BASE = `http://host:9501/file/${UUID}/${encodeURIComponent(NAME)}`;
