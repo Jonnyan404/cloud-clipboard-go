@@ -450,6 +450,10 @@ watch(detailItem, (item) => {
                             v-for="item in textsPane"
                             :key="item.id"
                             class="workbench-wall__row workbench-wall__row--text"
+                            role="button"
+                            tabindex="0"
+                            @click="detailItem = item"
+                            @keydown.enter.prevent="detailItem = item"
                         >
                             <span class="workbench-wall__row-icon">📝</span>
                             <span class="workbench-wall__row-title">{{ decodedContent(item) }}</span>
@@ -457,10 +461,10 @@ watch(detailItem, (item) => {
                             <span v-if="app.showTimestamp" class="workbench-wall__row-time workbench-wall__row-time--full">{{ timeLabel(item) }}</span>
                             <span v-if="app.showTimestamp" class="workbench-wall__row-time workbench-wall__row-time--compact">{{ relativeTimeLabel(item) }}</span>
                             <span class="workbench-wall__row-ops">
-                                <button type="button" class="workbench-wall__op" :title="t('copyText')" @click="copyContent(item)">
+                                <button type="button" class="workbench-wall__op" :title="t('copyText')" @click.stop="copyContent(item)">
                                     <v-icon size="large">mdi-content-copy</v-icon>
                                 </button>
-                                <button type="button" class="workbench-wall__op workbench-wall__op--danger" :title="t('delete')" @click="deleteItem(item)">
+                                <button type="button" class="workbench-wall__op workbench-wall__op--danger" :title="t('delete')" @click.stop="deleteItem(item)">
                                     <v-icon size="large">mdi-delete-outline</v-icon>
                                 </button>
                             </span>
@@ -480,10 +484,10 @@ watch(detailItem, (item) => {
                             :key="'all-' + item.id"
                             class="workbench-wall__row"
                             :class="`workbench-wall__row--${item.type}`"
-                            :role="item.type === 'file' ? 'button' : undefined"
-                            :tabindex="item.type === 'file' ? 0 : undefined"
-                            @click="item.type === 'file' && (detailItem = item)"
-                            @keydown.enter.prevent="item.type === 'file' && (detailItem = item)"
+                            role="button"
+                            tabindex="0"
+                            @click="detailItem = item"
+                            @keydown.enter.prevent="detailItem = item"
                         >
                             <span class="workbench-wall__row-icon">{{ item.type === 'file' ? fileIcon(item) : '📝' }}</span>
                             <span class="workbench-wall__row-title">{{ item.type === 'file' ? (item.name || 'file') : decodedContent(item) }}</span>
@@ -549,6 +553,10 @@ watch(detailItem, (item) => {
                     <span class="workbench-wall__reader-name">{{ detailItem.name }}</span>
                     <span class="workbench-wall__reader-meta">{{ prettyFileSize(detailItem.size || 0) }}</span>
                 </div>
+                <!-- 文字条目也有详情。IP 这个 reader 是它唯一的落点（行里塞不下），
+                     而以前弹窗只对文件开 —— 开着「显示发送者IP」的文字条目哪儿都看不到 IP。
+                     顺带解决了另一件事：列表行里的正文只有十来个字，这里能读全。 -->
+                <div v-if="detailItem.type === 'text'" class="workbench-wall__reader-text">{{ decodedContent(detailItem) }}</div>
                 <div v-if="detailItem.type === 'file' && isExpirable" class="workbench-wall__reader-expire" :class="{ 'workbench-wall__reader-expire--past': expired }">
                     <v-icon size="x-small">mdi-clock-outline</v-icon>
                     {{ expireLabel }}
@@ -605,6 +613,17 @@ watch(detailItem, (item) => {
                     </v-btn>
                     <v-btn variant="text" size="small" @click="copyFileLink(detailItem)">
                         <v-icon start size="small">mdi-link-variant</v-icon>{{ t('copyLink') }}
+                    </v-btn>
+                </div>
+                <!-- 文字条目的操作跟它在列表行里那套对齐：复制 / 删除。
+                     删除后必须顺手关掉弹窗 —— 条目在 store 里已经没了，
+                     留着会显示一条不存在的记录（sticky 没这问题：那边弹窗挂在便签自己身上，便签跟着条目一起卸载）。 -->
+                <div v-if="detailItem.type === 'text'" class="workbench-wall__reader-actions">
+                    <v-btn color="primary" variant="flat" size="small" @click="copyContent(detailItem)">
+                        <v-icon start size="small">mdi-content-copy</v-icon>{{ t('copyText') }}
+                    </v-btn>
+                    <v-btn variant="text" size="small" color="error" @click="deleteItem(detailItem); detailItem = null">
+                        <v-icon start size="small">mdi-delete-outline</v-icon>{{ t('delete') }}
                     </v-btn>
                 </div>
             </div>
@@ -804,6 +823,8 @@ watch(detailItem, (item) => {
     padding: 7px 12px;
     border-bottom: 1px solid #f6f7f9;
     min-width: 0;
+    /* 三种面板的行现在都能点开详情（文字和文件一样），所以指针不再是 --file 专属 */
+    cursor: pointer;
 }
 
 .workbench-wall--dark .workbench-wall__row {
@@ -814,15 +835,11 @@ watch(detailItem, (item) => {
     border-bottom: none;
 }
 
-.workbench-wall__row--file {
-    cursor: pointer;
-}
-
-.workbench-wall__row--file:hover {
+.workbench-wall__row:hover {
     background: #f4f7fb;
 }
 
-.workbench-wall--dark .workbench-wall__row--file:hover {
+.workbench-wall--dark .workbench-wall__row:hover {
     background: #232932;
 }
 
@@ -1083,6 +1100,18 @@ watch(detailItem, (item) => {
     display: flex;
     align-items: center;
     gap: 12px;
+    margin-bottom: 12px;
+}
+
+/* 文字条目的正文。颜色继承 .workbench-wall__reader（浅底深字 / 深底浅字各一套），
+   所以这里只写排版 —— 不需要再配一组色。 */
+.workbench-wall__reader-text {
+    font-size: 14px;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 55vh;
+    overflow-y: auto;
     margin-bottom: 12px;
 }
 
