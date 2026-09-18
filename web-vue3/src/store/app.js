@@ -51,6 +51,22 @@ export const useAppStore = defineStore('app', {
             this.uiMode = mode;
             localStorage.setItem('uiMode', mode);
         },
+        // 三个显示设置以前是模板里直接 v-model 到 state 的 —— 只改了内存，没有写回
+        // localStorage，所以拨动只活到刷新为止；上面 state 里那段 getItem(...) !== null
+        // 的判断因此成了死代码。走 action 而不是加个全局 $subscribe，是为了跟
+        // composerPrimary / uiMode 这些已有的写入点保持同一个写法，别让持久化分散在两处。
+        setShowTimestamp(value) {
+            this.showTimestamp = value;
+            localStorage.setItem('showTimestamp', String(value));
+        },
+        setShowDeviceInfo(value) {
+            this.showDeviceInfo = value;
+            localStorage.setItem('showDeviceInfo', String(value));
+        },
+        setShowSenderIP(value) {
+            this.showSenderIP = value;
+            localStorage.setItem('showSenderIP', String(value));
+        },
     },
     getters: {
         useDark() {

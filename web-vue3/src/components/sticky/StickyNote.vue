@@ -101,6 +101,17 @@ const timestampLabel = computed(() => {
     }
     return parts.join(' ');
 });
+// 详情弹窗那一行 = 卡片页脚那行 + IP。便签卡片太小，塞不下 IP；而「显示发送者IP」
+// 这个开关之前在 sticky 里完全没有生效点（mega / terminal / workbench 也一样）。
+// 放不下的元信息落到详情里，开关的含义就在所有模式下一致了：
+// 它管的是看不看得见，不是在哪看得见。
+const readerTimeLabel = computed(() => {
+    const parts = [timestampLabel.value];
+    if (app.showSenderIP && props.meta.senderIP) {
+        parts.push(props.meta.senderIP);
+    }
+    return parts.filter(Boolean).join(' · ');
+});
 const fileIcon = computed(() => {
     if (!props.meta.name) {
         return '📄';
@@ -329,7 +340,7 @@ async function deleteItem() {
             <div class="sticky-note__reader" :class="[`sticky-note__reader--c${colorIndex}`]">
                 <div class="sticky-note__reader-head">
                     <div class="sticky-note__label">{{ noteLabel }}</div>
-                    <span v-if="timestampLabel" class="sticky-note__reader-time">{{ timestampLabel }}</span>
+                    <span v-if="readerTimeLabel" class="sticky-note__reader-time">{{ readerTimeLabel }}</span>
                     <v-btn icon density="compact" size="x-small" variant="text" class="sticky-note__op" @click="expanded = false">
                         <v-icon size="small">mdi-close</v-icon>
                     </v-btn>
@@ -595,7 +606,9 @@ async function deleteItem() {
 .sticky-note__reader-head {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 8px;
+    row-gap: 4px;
     margin-bottom: 10px;
 }
 

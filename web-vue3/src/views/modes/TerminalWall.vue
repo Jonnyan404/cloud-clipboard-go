@@ -97,6 +97,28 @@ function deviceTag(item) {
     return deviceLabel(item?.senderDevice);
 }
 
+// 详情弹窗里的「设备 · IP」。行内那行元信息放不下 IP，而「显示发送者IP」这个开关
+// 之前在 mega / terminal / workbench / sticky 四个紧凑模式里完全没有生效点 ——
+// 打开开关四个模式毫无变化，等于开关在说谎。放不下的元信息落到详情里，
+// 开关的含义就在所有模式下一致了：它管的是看不看得见，不是在哪看得见。
+const readerOrigin = computed(() => {
+    const item = detailItem.value;
+    if (!item) {
+        return '';
+    }
+    const parts = [];
+    if (app.showDeviceInfo) {
+        const device = deviceLabel(item.senderDevice);
+        if (device) {
+            parts.push(device);
+        }
+    }
+    if (app.showSenderIP && item.senderIP) {
+        parts.push(item.senderIP);
+    }
+    return parts.join(' · ');
+});
+
 const needsShareProtection = computed(() => Boolean(app.config?.auth));
 
 async function ensureFileShareUrl(item) {
@@ -266,6 +288,9 @@ watch(detailItem, (item) => {
                     <span v-if="item.type === 'file'" class="terminal-wall__tag terminal-wall__tag--file">[FILE]</span>
                     <span v-else class="terminal-wall__tag terminal-wall__tag--text">[TEXT]</span>
                     <span v-if="app.showDeviceInfo && deviceTag(item)" class="terminal-wall__device">{{ deviceTag(item) }}</span>
+                    <!-- 复用 __device 的样式：IP 在这一行里扮演的角色和设备名一样，
+                         都是正文前的来源前缀。这一行右边空间足够，不必挪进详情。 -->
+                    <span v-if="app.showSenderIP && item.senderIP" class="terminal-wall__device">{{ item.senderIP }}</span>
                     <template v-if="item.type === 'text'">
                         <span class="terminal-wall__val">{{ decodedContent(item) }}</span>
                         <span class="terminal-wall__ops">
@@ -312,13 +337,14 @@ watch(detailItem, (item) => {
         </div>
 
         <v-dialog v-model="detailItem" max-width="560">
-            <div v-if="detailItem" class="terminal-wall__reader">
+            <div v-if="detailItem" class="terminal-wall__reader" :class="{ 'terminal-wall__reader--dark': isDark }">
                 <div class="terminal-wall__reader-head">
                     <span class="terminal-wall__tag" :class="detailItem.type === 'file' ? 'terminal-wall__tag--file' : 'terminal-wall__tag--text'">[{{ detailItem.type.toUpperCase() }}]</span>
                     <span class="terminal-wall__ts">{{ timeLabel(detailItem) }}</span>
                     <v-btn icon density="compact" size="x-small" variant="text" class="terminal-wall__op" @click="detailItem = null">
                         <v-icon size="small">mdi-close</v-icon>
                     </v-btn>
+                    <span v-if="readerOrigin" class="terminal-wall__reader-origin">{{ readerOrigin }}</span>
                 </div>
                 <div v-if="detailItem.type === 'file'" class="terminal-wall__reader-file">
                     <span class="terminal-wall__reader-glyph">{{ fileGlyph(detailItem) }}</span>
@@ -692,7 +718,25 @@ watch(detailItem, (item) => {
     color: var(--tw-accent);
 }
 
+/* v-dialog 会被 teleport 到 body 下的 overlay 容器，跑出了 .terminal-wall 的子树，
+   而上面那一整套 --tw-* 是定义在 .terminal-wall 上的 —— 弹窗里一个都取不到。
+   后果：reader 的 background / border / color 三条全部落空（弹窗没有卡片、没有边框，
+   文字色回落成默认），reader 内部所有 var(--tw-*) 也一起失效。深色主题下因为恰好
+   继承了浅色文字才没被看出来。
+   所以在 reader 元素上把整套变量重新声明一遍 —— 变量跟着元素走，teleport 到哪都成立。
+   ⚠️ 值必须和上面的 .terminal-wall / .terminal-wall--dark 保持同步。 */
 .terminal-wall__reader {
+    --tw-bg: #ffffff;
+    --tw-surface: #f6f8fa;
+    --tw-border: #d0d7de;
+    --tw-border-strong: #afb8c1;
+    --tw-text: #1f2328;
+    --tw-muted: #57606a;
+    --tw-subtle: #6e7781;
+    --tw-tag-text: #0969da;
+    --tw-tag-file: #cf222e;
+    --tw-danger: #d1242f;
+    --tw-reader-expire-bg: #f6f8fa;
     border-radius: 10px;
     background: var(--tw-surface);
     border: 1px solid var(--tw-border);
@@ -701,11 +745,34 @@ watch(detailItem, (item) => {
     font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
 }
 
+.terminal-wall__reader--dark {
+    --tw-bg: #0d1117;
+    --tw-surface: #161b22;
+    --tw-border: #30363d;
+    --tw-border-strong: #484f58;
+    --tw-text: #c9d1d9;
+    --tw-muted: #8b949e;
+    --tw-subtle: #6e7681;
+    --tw-tag-text: #79c0ff;
+    --tw-tag-file: #ffa657;
+    --tw-danger: #f85149;
+    --tw-reader-expire-bg: #21262d;
+}
+
 .terminal-wall__reader-head {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 8px;
+    row-gap: 6px;
     margin-bottom: 14px;
+}
+
+/* flex-basis:100% 让它独占一行；颜色走 reader 自己声明的 --tw-muted，深浅由 --dark 变体切 */
+.terminal-wall__reader-origin {
+    flex-basis: 100%;
+    font-size: 11px;
+    color: var(--tw-muted);
 }
 
 .terminal-wall__reader-file {

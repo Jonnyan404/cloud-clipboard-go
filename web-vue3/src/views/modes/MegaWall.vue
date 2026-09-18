@@ -88,7 +88,7 @@ function fileIcon(item) {
 
 const timeLabel = (item) => formatTimestamp(item.timestamp);
 
-// 元信息行：时间与设备各由对应设置控制，与默认/气泡/便签模式保持一致。
+// 元信息行：时间 / 设备 / IP 各由对应设置控制，与默认/气泡/便签模式保持一致。
 // 类型（TEXT/FILE）不归设置管 —— 它标的是这条记录是文字还是文件，属结构信息。
 const metaLabel = (item) => {
     const parts = [];
@@ -102,8 +102,35 @@ const metaLabel = (item) => {
             parts.push(device);
         }
     }
+    // 这一行本来就短（截图里右边全是空的），IP 塞得下，所以就地显示。
+    // workbench 那种已经被挤到只剩十来个字的行就没这待遇 —— 它把 IP 放到详情里。
+    if (app.showSenderIP && item.senderIP) {
+        parts.push(item.senderIP);
+    }
     return parts.join(' · ');
 };
+
+// 详情弹窗里的「设备 · IP」。行内元信息行放不下 IP，而「显示发送者IP」这个开关
+// 之前在 mega / terminal / workbench / sticky 四个紧凑模式里完全没有生效点 ——
+// 打开开关四个模式毫无变化，等于开关在说谎。现在把放不下的元信息落到详情里，
+// 开关的含义就在所有模式下一致了：它管的是看不看得见，不是在哪看得见。
+const readerOrigin = computed(() => {
+    const item = detailItem.value;
+    if (!item) {
+        return '';
+    }
+    const parts = [];
+    if (app.showDeviceInfo) {
+        const device = deviceLabel(item.senderDevice);
+        if (device) {
+            parts.push(device);
+        }
+    }
+    if (app.showSenderIP && item.senderIP) {
+        parts.push(item.senderIP);
+    }
+    return parts.join(' · ');
+});
 
 const needsShareProtection = computed(() => Boolean(app.config?.auth));
 
@@ -337,6 +364,7 @@ watch(detailItem, (item) => {
                     <v-btn icon density="compact" size="x-small" variant="text" class="mega-wall__op" @click="detailItem = null">
                         <v-icon size="small">mdi-close</v-icon>
                     </v-btn>
+                    <span v-if="readerOrigin" class="mega-wall__reader-origin">{{ readerOrigin }}</span>
                 </div>
                 <div v-if="detailItem.type === 'file'" class="mega-wall__reader-file">
                     <span class="mega-wall__reader-glyph">{{ fileIcon(detailItem) }}</span>
@@ -672,8 +700,22 @@ watch(detailItem, (item) => {
 .mega-wall__reader-head {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 8px;
+    row-gap: 6px;
     margin-bottom: 14px;
+}
+
+/* flex-basis:100% 让它永远独占一行，跟在 type/time/关闭按钮那一行下面 */
+.mega-wall__reader-origin {
+    flex-basis: 100%;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    color: rgba(17, 24, 39, 0.5);
+}
+
+.mega-wall--dark .mega-wall__reader-origin {
+    color: rgba(243, 244, 246, 0.5);
 }
 
 .mega-wall__reader-type {

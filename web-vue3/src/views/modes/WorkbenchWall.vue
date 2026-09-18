@@ -168,6 +168,28 @@ const timeLabel = (item) => formatTimestamp(item.timestamp);
 // 三个列表（文件 / 文字 / 全部）共用同一个函数，避免三处各判一次判漏。
 const deviceTag = (item) => (app.showDeviceInfo ? deviceLabel(item?.senderDevice) : '');
 
+// 详情弹窗里的「设备 · IP」。行内那行元信息放不下 IP，而「显示发送者IP」这个开关
+// 之前在 mega / terminal / workbench / sticky 四个紧凑模式里完全没有生效点 ——
+// 打开开关四个模式毫无变化，等于开关在说谎。放不下的元信息落到详情里，
+// 开关的含义就在所有模式下一致了：它管的是看不看得见，不是在哪看得见。
+const readerOrigin = computed(() => {
+    const item = detailItem.value;
+    if (!item) {
+        return '';
+    }
+    const parts = [];
+    if (app.showDeviceInfo) {
+        const device = deviceLabel(item.senderDevice);
+        if (device) {
+            parts.push(device);
+        }
+    }
+    if (app.showSenderIP && item.senderIP) {
+        parts.push(item.senderIP);
+    }
+    return parts.join(' · ');
+});
+
 // 移动端紧凑时间：1分钟内"刚刚"，再依次"分钟前/小时前/天前"，超过一周回退为"MM-DD"
 function relativeTimeLabel(item) {
     if (!item?.timestamp) return '';
@@ -520,6 +542,7 @@ watch(detailItem, (item) => {
                     <v-btn icon density="compact" size="x-small" variant="text" class="workbench-wall__op" @click="detailItem = null">
                         <v-icon size="small">mdi-close</v-icon>
                     </v-btn>
+                    <span v-if="readerOrigin" class="workbench-wall__reader-origin">{{ readerOrigin }}</span>
                 </div>
                 <div v-if="detailItem.type === 'file'" class="workbench-wall__reader-file">
                     <span class="workbench-wall__reader-glyph">{{ fileIcon(detailItem) }}</span>
@@ -1024,10 +1047,19 @@ watch(detailItem, (item) => {
 .workbench-wall__reader-head {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 8px;
+    row-gap: 6px;
     margin-bottom: 12px;
     font-size: 12px;
     color: #8896a7;
+}
+
+/* flex-basis:100% 让它独占一行；颜色继承 head 的 #8896a7，
+   在浅底和深底上都能读（这个 reader 的底色由 --dark 变体换，不需要另配一套色） */
+.workbench-wall__reader-origin {
+    flex-basis: 100%;
+    font-size: 11px;
 }
 
 .workbench-wall__reader-type {

@@ -839,7 +839,7 @@ watch(() => route.fullPath, () => {
                                 </template>
                                 <v-list-item-title>{{ t('showTimestamp') }}</v-list-item-title>
                                 <template v-slot:append>
-                                    <v-switch v-model="app.showTimestamp" color="primary" hide-details inset></v-switch>
+                                    <v-switch :model-value="app.showTimestamp" @update:model-value="app.setShowTimestamp" color="primary" hide-details inset></v-switch>
                                 </template>
                             </v-list-item>
                             <v-list-item class="cc-settings__item">
@@ -848,7 +848,7 @@ watch(() => route.fullPath, () => {
                                 </template>
                                 <v-list-item-title>{{ t('showDeviceInfo') }}</v-list-item-title>
                                 <template v-slot:append>
-                                    <v-switch v-model="app.showDeviceInfo" color="primary" hide-details inset></v-switch>
+                                    <v-switch :model-value="app.showDeviceInfo" @update:model-value="app.setShowDeviceInfo" color="primary" hide-details inset></v-switch>
                                 </template>
                             </v-list-item>
                             <v-list-item class="cc-settings__item">
@@ -857,7 +857,7 @@ watch(() => route.fullPath, () => {
                                 </template>
                                 <v-list-item-title>{{ t('showSenderIP') }}</v-list-item-title>
                                 <template v-slot:append>
-                                    <v-switch v-model="app.showSenderIP" color="primary" hide-details inset></v-switch>
+                                    <v-switch :model-value="app.showSenderIP" @update:model-value="app.setShowSenderIP" color="primary" hide-details inset></v-switch>
                                 </template>
                             </v-list-item>
                         </v-list>
