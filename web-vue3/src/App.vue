@@ -455,6 +455,15 @@ watch(() => theme.themes.value.dark.colors.primary, (newVal) => {
 watch(() => theme.themes.value.light.colors.primary, (newVal) => {
     localStorage.setItem('lightPrimary', newVal);
 });
+watch(() => app.showTimestamp, (newVal) => {
+    localStorage.setItem('showTimestamp', String(newVal));
+});
+watch(() => app.showDeviceInfo, (newVal) => {
+    localStorage.setItem('showDeviceInfo', String(newVal));
+});
+watch(() => app.showSenderIP, (newVal) => {
+    localStorage.setItem('showSenderIP', String(newVal));
+});
 const useDark = computed(() => app.useDark);
 watch(useDark, (value) => {
     theme.change(value ? 'dark' : 'light');
