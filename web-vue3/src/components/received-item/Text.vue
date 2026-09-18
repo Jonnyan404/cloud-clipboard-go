@@ -377,7 +377,7 @@ async function deleteItem() {
 
 .timeline-card__id-float {
     position: absolute;
-    top: 0.85rem;
+    top: 0.4rem;
     right: 1.5rem;
     z-index: 1;
     pointer-events: none;
