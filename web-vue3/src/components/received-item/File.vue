@@ -7,9 +7,14 @@ import { useI18n } from 'vue-i18n';
 import axios from 'axios';
 import { toast } from '@/plugins/toast';
 import QrcodeVue from 'qrcode.vue';
+import { useMarkdown } from '@/composables/useMarkdown.js';
+import MarkdownBody from '@/components/MarkdownBody.vue';
+import MarkdownToggle from '@/components/MarkdownToggle.vue';
 import { SHARE_DEFAULT_TTL, SHARE_DEFAULT_TTL_MINUTES, SHARE_MAX_TTL_MINUTES, SHARE_MIN_TTL_MINUTES, buildCleanAbsoluteRouteUrl, copyTextToClipboard, createShareLink, deviceLabel, errorMessage, formatShareDuration, formatTimestamp, minutesToShareTTL, normalizeShareMaxUses, normalizeShareTTL, percentage, prettyFileSize } from '@/util.js';
 
 const mdiCellphone = 'mdi-cellphone';
+const mdiCodeTags = 'mdi-code-tags';
+const mdiLanguageMarkdown = 'mdi-language-markdown';
 const mdiClockOutline = 'mdi-clock-outline';
 const mdiClose = 'mdi-close';
 const mdiContentCopy = 'mdi-content-copy';
@@ -38,6 +43,7 @@ const isDark = computed(() => theme.current.value?.dark ?? false);
 const display = useDisplay();
 const { t } = useI18n();
 const textPreviewDisplayLimit = 16 * 1024;
+
 const loadingPreview = ref(false);
 const loadedPreview = ref(0);
 const expand = ref(false);
@@ -71,6 +77,12 @@ const displayedTextPreview = computed(() => {
     }
     return `${textPreview.value.slice(0, textPreviewDisplayLimit)}\n\n...`;
 });
+// markdown 预览：文件场景用扩展名当可靠信号（一份只有一句话的 README，靠内容启发式
+// 判不出来），默认行为跟个性化里的开关走，右上角的按钮可以单独覆盖这一条。
+const md = useMarkdown(
+    () => displayedTextPreview.value,
+    () => /\.(md|markdown|mdown|mkd)$/i.test(props.meta.name || ''),
+);
 const previewIcon = computed(() => {
     if (isPreviewableVideo.value || isPreviewableAudio.value) {
         return mdiMovieSearchOutline;
@@ -443,7 +455,11 @@ function deviceIcon(type) {
                             preload="metadata"
                         ></audio>
                         <template v-else-if="isPreviewableText">
-                            <pre class="timeline-card__text-preview pa-4">{{ displayedTextPreview }}</pre>
+                                                        <div class="md-preview">
+                                <markdown-toggle v-if="md.available" v-model:mode="md.mode"></markdown-toggle>
+                                <markdown-body v-if="md.html" :html="md.html"></markdown-body>
+                                <pre v-else class="timeline-card__text-preview pa-4">{{ displayedTextPreview }}</pre>
+                            </div>
                             <div v-if="hasTruncatedTextPreview" class="d-flex justify-space-between align-center mt-2">
                                 <div class="text-caption text-medium-emphasis">
                                     {{ t('textPreviewTruncated', { limit: prettyFileSize(textPreviewDisplayLimit) }) }}
@@ -730,4 +746,9 @@ function deviceIcon(type) {
     cursor: pointer;
 }
 
+
+/* 浮动图标的定位基准 —— MarkdownToggle 内部是 absolute */
+.md-preview {
+    position: relative;
+}
 </style>

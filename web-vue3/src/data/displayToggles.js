@@ -18,7 +18,7 @@ export const DISPLAY_TOGGLES = [
     { key: 'timestamp', group: 'meta', labelKey: 'showTimestamp', icon: 'mdi-clock-outline' },
     { key: 'device', group: 'meta', labelKey: 'showDeviceInfo', icon: 'mdi-devices' },
     { key: 'ip', group: 'meta', labelKey: 'showSenderIP', icon: 'mdi-ip-network-outline' },
-    { key: 'markdown', group: 'content', labelKey: 'renderMarkdown', icon: 'mdi-language-markdown-outline' },
+    { key: 'markdown', group: 'content', labelKey: 'markdownToggle', icon: 'mdi-language-markdown-outline' },
 ];
 
 // 某个分组下有哪些开关。加开关不用动这里。
@@ -33,8 +33,8 @@ export const DEFAULT_DISPLAY = {
     // UA 认不出来的来源。想关的人可以在设置里按模式关掉。
     device: true,
     ip: false,
-    // 默认关：markdown 标记跟日常符号高度重合，先按原文看更稳妥，
-    // 想要排版的人自己去个性化里打开。
+    // 默认关：这个开关只决定「内容旁边要不要出现原文/md 两个切换图标」，
+    // 不想要的人界面上不会多出任何东西。
     markdown: false,
 };
 
