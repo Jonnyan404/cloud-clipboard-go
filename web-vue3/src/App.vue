@@ -1156,8 +1156,8 @@ watch(() => route.fullPath, () => {
 .room-browser--dock {
     position: sticky;
     top: 64px;
-    flex: 0 0 332px;
-    width: 332px;
+    flex: 0 0 380px;
+    width: 380px;
     max-height: calc(100vh - 84px);
     border-radius: 24px;
     border: 1px solid rgba(148, 163, 184, 0.18);
