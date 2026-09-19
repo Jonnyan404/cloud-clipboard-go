@@ -87,18 +87,18 @@ func defaultConfig() *Config {
 
 	return &Config{
 		Server: struct {
-			Host        interface{}       `json:"host"`
-			Port        int               `json:"port"`
-			Prefix      string            `json:"prefix"`
-			History     int               `json:"history"`
-			HistoryFile string            `json:"historyFile"`
-			StorageDir  string            `json:"storageDir"`
+			Host        interface{}    `json:"host"`
+			Port        int            `json:"port"`
+			Prefix      string         `json:"prefix"`
+			History     int            `json:"history"`
+			HistoryFile string         `json:"historyFile"`
+			StorageDir  string         `json:"storageDir"`
 			Auth        interface{}    `json:"auth"`
 			RoomAuth    RoomAuthConfig `json:"roomAuth"`
 			Cert        string         `json:"cert"`
 			Key         string         `json:"key"`
-			RoomList    bool              `json:"roomList"`
-			RoomCleanup int               `json:"roomCleanup"`
+			RoomList    bool           `json:"roomList"`
+			RoomCleanup int            `json:"roomCleanup"`
 		}{
 			Host:        []string{"0.0.0.0"},
 			Port:        9501,
