@@ -145,7 +145,7 @@
   "scReceiveById": "依 ID 接收",
   "scReceiveByIdDesc": "依訊息 ID 精確取一筆",
   "scAppleSteps": "下載後點開，用「捷徑」App 匯入。首次執行會詢問伺服器位址、房間名與密碼，之後就能從分享選單直接傳送。",
-  "scAppleQrHint": "在 iPhone 上建議用「QR Code」：用相機掃一下，檔案直接下到手機，點開即可匯入。",
+  "scScanToImport": "用 iPhone 的「相機」掃碼匯入",
   "scAndroidAppHint": "還沒裝 App？先裝 HTTP Shortcuts（匯入包需要它）：",
   "scAndroidSteps": "方法①: 下載zip,在 HTTP Shortcuts App 裡用「匯入/匯出-->從檔案匯入」選中它，再填上 url / room / auth 三個變數。\n方法②: 複製連結,在 HTTP Shortcuts App 裡用「匯入/匯出-->從URL匯入」貼上它，再填上 url / room / auth 三個變數。",
   "scAndroidPackage": "Android 匯入包（含 5 條捷徑）",

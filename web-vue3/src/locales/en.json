@@ -145,7 +145,7 @@
   "scReceiveById": "Receive by ID",
   "scReceiveByIdDesc": "Pull one exact message by its ID",
   "scAppleSteps": "Open the downloaded file to import it into the Shortcuts app. The first run asks for your server address, room and password; after that you can send straight from the share sheet.",
-  "scAppleQrHint": "On an iPhone, the QR code is the easier path: scan it with the camera, the file lands on the phone, tap it to import.",
+  "scScanToImport": "Scan with the iPhone Camera app",
   "scAndroidAppHint": "No app yet? Install HTTP Shortcuts first — the package needs it:",
   "scAndroidSteps": "Method ①: download the zip, then pick it in the HTTP Shortcuts app via “Import/Export --> Import from file”, and fill in the url / room / auth variables.\nMethod ②: copy the link, then paste it in the HTTP Shortcuts app via “Import/Export --> Import from URL”, and fill in the url / room / auth variables.",
   "scAndroidPackage": "Android package (5 shortcuts)",
