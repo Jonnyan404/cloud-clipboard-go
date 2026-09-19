@@ -27,6 +27,9 @@ const props = defineProps({
     search: { type: String, default: '' },
     // dock 和 bottom sheet 只有外层容器不同，内部结构一致；差异只在 body 的高度上限
     variant: { type: String, default: 'dock' },
+    // 侧栏停在哪一侧。只有 dock 变体用得上：内侧那条发丝线得画在朝向内容的那一边，
+    // 而且要用模式的 --rl-border（画在 App.vue 的容器上就只能写死一个灰，接缝一眼看得出来）。
+    dockSide: { type: String, default: 'right' },
 });
 
 const emit = defineEmits(['update:search', 'select', 'favorite']);
@@ -101,7 +104,14 @@ function isCurrent(room) {
 </script>
 
 <template>
-    <div class="rl" :class="[skinClass, { 'rl--dark': isDark }]">
+    <div
+        class="rl"
+        :class="[
+            skinClass,
+            `rl--${variant}`,
+            { 'rl--dark': isDark, [`rl--dock-${dockSide}`]: variant === 'dock' },
+        ]"
+    >
         <!-- 头部放在组件里而不是留在 App.vue：它也得跟着模式走。
              之前头部留在外面，terminal 模式下头部是圆润的 Vuetify 样式、
              下面是等宽方角，接缝一眼就能看出来。 -->
@@ -254,8 +264,38 @@ function isCurrent(room) {
     --rl-muted: #64748b;
     --rl-border: rgba(148, 163, 184, 0.24);
     --rl-sep: 0;
+    /* 侧栏自己的底色。默认跟应用背景走；下面每个模式再覆盖成它的页面底色 ——
+       侧栏要看起来是「那一栏」，而不是浮在页面上的一块卡片。 */
+    --rl-panel-bg: rgb(var(--v-theme-background));
     font-family: var(--rl-font);
     color: var(--rl-text);
+}
+
+/* dock 变体 = 真·侧栏：自己撑满父容器，列表区吃掉剩余高度自己滚。
+   （之前是「100vh 减一个常量」的算法，既算不准也跟容器高度无关。） */
+.rl--dock {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    background: var(--rl-panel-bg);
+}
+
+.rl--dock .rl__body--dock {
+    flex: 1;
+    min-height: 0;
+    max-height: none;
+    overflow: auto;
+}
+
+/* 内侧发丝线：画在朝向内容的那一边，颜色用模式的 --rl-border，
+   所以便签模式是暖色线、终端模式是等宽深色线，接缝不会突然变成一条冷灰。 */
+.rl--dock-left {
+    border-right: 1px solid var(--rl-border);
+}
+
+.rl--dock-right {
+    border-left: 1px solid var(--rl-border);
 }
 
 .rl--dark {
@@ -267,10 +307,13 @@ function isCurrent(room) {
     --rl-border: rgba(71, 85, 105, 0.7);
 }
 
-/* ── 六套模式皮肤：只改 token，不动行结构 ───────────────────────── */
+/* ── 六套模式皮肤：只改 token，不动行结构 ─────────────────────────
+   每个模式给一个 --rl-panel-bg = 该模式的页面底色（取各 *Wall.vue 的根 background），
+   侧栏才跟内容连成一片。 */
 
 /* terminal：等宽、直角、行距紧，当前房间用 > 前缀而不是色块 */
 .rl--terminal {
+    --rl-panel-bg: #ffffff;
     --rl-font: 'SF Mono', 'Menlo', 'Consolas', monospace;
     --rl-radius: 0;
     --rl-row-h: 28px;
@@ -286,6 +329,7 @@ function isCurrent(room) {
 }
 
 .rl--dark.rl--terminal {
+    --rl-panel-bg: #0d1117;
     --rl-current-accent: #79c0ff;
     --rl-surface-hover: rgba(121, 192, 255, 0.1);
     --rl-border: #30363d;
@@ -293,13 +337,19 @@ function isCurrent(room) {
 
 /* workbench：系统字、类表格、行高 40，当前房间靠左侧色条 */
 .rl--workbench {
+    --rl-panel-bg: #eef0f4;
     --rl-radius: 8px;
     --rl-row-h: 40px;
     --rl-name-size: 13px;
 }
 
+.rl--dark.rl--workbench {
+    --rl-panel-bg: #13161c;
+}
+
 /* sticky：手写体、行高 52，当前房间整行马卡龙底，不用色条 */
 .rl--sticky {
+    --rl-panel-bg: #fdf7e4;
     --rl-font: 'Comic Sans MS', 'Kaiti', 'PingFang SC', sans-serif;
     --rl-radius: 4px;
     --rl-row-h: 52px;
@@ -312,23 +362,34 @@ function isCurrent(room) {
 }
 
 .rl--dark.rl--sticky {
+    --rl-panel-bg: #211d12;
     --rl-current-bg: #6b5a2a;
     --rl-muted: #b9a97f;
 }
 
 /* chat：圆角大、行高 48，当前房间像一条气泡 */
 .rl--chat {
+    --rl-panel-bg: #f6f7fa;
     --rl-radius: 14px;
     --rl-row-h: 48px;
     --rl-current-bg: rgba(59, 130, 246, 0.12);
 }
 
+.rl--dark.rl--chat {
+    --rl-panel-bg: #15171c;
+}
+
 /* mega：大字号、行高 56 */
 .rl--mega {
+    --rl-panel-bg: #fdfdfb;
     --rl-radius: 14px;
     --rl-row-h: 56px;
     --rl-name-size: 16px;
     --rl-time-size: 12px;
+}
+
+.rl--dark.rl--mega {
+    --rl-panel-bg: #101318;
 }
 
 /* ── 头部（同样吃 token，不然和下面的行接不上） ─────────────────── */

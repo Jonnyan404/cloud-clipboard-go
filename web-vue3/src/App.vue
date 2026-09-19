@@ -544,6 +544,7 @@ watch(() => route.fullPath, () => {
                         @select="switchRoom"
                         @favorite="toggleFavoriteRoom"
                         variant="dock"
+                        :dock-side="roomDockSide"
                     >
                         <template #actions>
                             <v-tooltip left>
@@ -991,11 +992,20 @@ watch(() => route.fullPath, () => {
 }
 
 .app-shell__workspace--dock-left {
-    flex-direction: row;
+    /* 侧栏在右：DOM 顺序是 [内容, 侧栏]，row 把侧栏排在后面（右边）。
+       之前这里写反了 —— `--dock-right` 用 row-reverse 把侧栏甩到了左边，
+       于是「切到右侧」实际切到左侧，跟按钮上的箭头正好相反。 */
+    flex-direction: row-reverse;
 }
 
 .app-shell__workspace--dock-right {
-    flex-direction: row-reverse;
+    flex-direction: row;
+}
+
+/* 停靠时不留缝：20px 的间隙一出现，侧栏立刻又变回「浮在页面上的卡片」。 */
+.app-shell__workspace--dock-left,
+.app-shell__workspace--dock-right {
+    gap: 0;
 }
 
 .app-shell__content {
@@ -1153,16 +1163,19 @@ watch(() => route.fullPath, () => {
 /* 头部和列表内部样式都在 RoomList.vue 里 —— 它们必须跟着当前模式走，
    而模式皮肤是那组 --rl-* 变量。留在这里的只有「容器」这一层。 */
 
+/* 桌面侧栏：贴边、通高、无圆角无投影 —— 它得是「那一栏」本身，不是浮在上面的卡片。
+   底色与内侧发丝线交给 RoomList 的 --rl-* token（只有它认识六种模式皮肤）；
+   这里只负责占位与停靠。 */
 .room-browser--dock {
     position: sticky;
-    top: 64px;
+    top: 0;
     flex: 0 0 380px;
     width: 380px;
-    max-height: calc(100vh - 84px);
-    border-radius: 24px;
-    border: 1px solid rgba(148, 163, 184, 0.18);
-    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.14);
-    overflow: hidden;
+    height: 100vh;
+    height: 100dvh;
+    border-radius: 0;
+    box-shadow: none;
+    background: transparent;
 }
 
 @media (max-width: 1263px) {
