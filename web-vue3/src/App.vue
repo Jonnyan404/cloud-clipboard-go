@@ -13,7 +13,7 @@ import RoomList from '@/components/RoomList.vue';
 import QrcodeVue from 'qrcode.vue';
 import { errorMessage } from '@/util.js';
 import { MODES } from '@/views/modes/registry.js';
-import { DISPLAY_GROUPS, DISPLAY_TOGGLES, togglesInGroup } from '@/data/displayToggles.js';
+import { DISPLAY_GROUPS, togglesForMode } from '@/data/displayToggles.js';
 
 const mdiBrightness4 = 'mdi-brightness-4';
 const mdiChevronLeft = 'mdi-chevron-left';
@@ -47,6 +47,9 @@ const pageQrDialogVisible = ref(false);
 // 设置面板的页签：通用 / 个性化。个性化里是「每个界面模式一组显示开关」，
 // 开关会长到几十项，所以必须单独占一页，不能平铺在通用页里。
 const settingsTab = ref('general');
+
+// 个性化面板只显示「当前模式真的能用」的开关（见 displayToggles.js 的 modes 声明）
+const togglesInGroup = (groupKey) => togglesForMode(app.uiMode, groupKey);
 const pageQrMode = ref('page');
 const currentPrimary = computed(() => isDark.value ? theme.themes.value.dark.colors.primary : theme.themes.value.light.colors.primary);
 const clearAllDialog = ref(false);
