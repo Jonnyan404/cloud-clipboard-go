@@ -6,7 +6,7 @@
     "scripts": {
         "dev": "node scripts/sync-shortcuts.mjs && vite",
         "build": "node scripts/sync-shortcuts.mjs && vite build && node after-build.js",
-        "deploy": "node scripts/sync-shortcuts.mjs && DEPLOY_STATIC=1 vite build && node after-build.js",
+        "deploy": "node scripts/sync-shortcuts.mjs && DEPLOY_STATIC=1 vite build && DEPLOY_STATIC=1 node after-build.js",
         "preview": "vite preview"
     },
     "dependencies": {
