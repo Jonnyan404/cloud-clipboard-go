@@ -20,6 +20,14 @@ const APPLE_SHORTCUTS = [
     { file: 'Cloud-Clipboard-Receive-By-ID.shortcut', nameKey: 'scReceiveById', descKey: 'scReceiveByIdDesc' },
 ];
 
+// HTTP Shortcuts 是第三方 App（本仓库只提供导入包）。三个官方渠道都在，任选其一 ——
+// 改地址时记得三个一起看，别只留一个能用的。
+const ANDROID_APP_LINKS = [
+    { icon: 'mdi-google-play', label: 'Google Play', url: 'https://play.google.com/store/apps/details?id=ch.rmy.android.http_shortcuts' },
+    { icon: 'mdi-android', label: 'F-Droid', url: 'https://f-droid.org/packages/ch.rmy.android.http_shortcuts/' },
+    { icon: 'mdi-github', label: 'GitHub', url: 'https://github.com/Waboodoo/HTTP-Shortcuts/releases' },
+];
+
 const prefix = computed(() => app?.config?.server?.prefix || '');
 const appleUrl = (file) => buildCleanAbsoluteRouteUrl(`shortcuts/apple/${file}`, prefix.value);
 const androidUrl = () => buildCleanAbsoluteRouteUrl('shortcuts/android/shortcuts.zip', prefix.value);
@@ -74,6 +82,10 @@ function showQr(url) {
                         </v-card>
                         <v-alert type="info" variant="tonal" density="comfortable" class="mt-2">
                             <div class="text-caption">{{ t('scAppleSteps') }}</div>
+                            <div class="text-caption mt-2 d-flex align-start">
+                                <v-icon size="14" class="mr-1 mt-1">mdi-qrcode-scan</v-icon>
+                                <span>{{ t('scAppleQrHint') }}</span>
+                            </div>
                         </v-alert>
                     </v-card-text>
                 </v-tabs-window-item>
@@ -98,7 +110,23 @@ function showQr(url) {
                                 </v-btn>
                             </div>
                         </v-card>
-                        <v-alert type="info" variant="tonal" density="comfortable" class="mt-2">
+                        <v-card variant="outlined" class="shortcuts-dialog__item pa-3">
+                            <div class="text-caption text-medium-emphasis mb-2">{{ t('scAndroidAppHint') }}</div>
+                            <div class="d-flex flex-wrap" style="gap: 6px;">
+                                <v-btn
+                                    v-for="link in ANDROID_APP_LINKS"
+                                    :key="link.url"
+                                    size="small"
+                                    variant="text"
+                                    :href="link.url"
+                                    target="_blank"
+                                    rel="noopener"
+                                >
+                                    <v-icon start size="16">{{ link.icon }}</v-icon>{{ link.label }}
+                                </v-btn>
+                            </div>
+                        </v-card>
+                        <v-alert type="info" variant="tonal" density="comfortable" class="mt-3">
                             <div class="text-caption">{{ t('scAndroidSteps') }}</div>
                         </v-alert>
                     </v-card-text>

@@ -144,6 +144,8 @@
   "scReceiveById": "ID を指定して受信",
   "scReceiveByIdDesc": "メッセージ ID で 1 件だけ取り込む",
   "scAppleSteps": "ダウンロードしたファイルを開いて「ショートカット」App に読み込みます。初回はサーバーアドレス・ルーム名・パスワードを聞かれ、以降は共有メニューから直接送れます。",
+  "scAppleQrHint": "iPhone では「QR コード」が手軽です。カメラで読み取るとファイルが端末に落ちるので、タップして読み込むだけです。",
+  "scAndroidAppHint": "アプリがまだない場合は、先に HTTP Shortcuts を入れてください（読み込みに必要です）：",
   "scAndroidSteps": "zip を展開し、HTTP Shortcuts App の「読み込み」で取り込んでから url / room / auth の 3 変数を入力します。",
   "scAndroidPackage": "Android 読み込み用パッケージ（5 件）",
   "scQrHint": "スマホでこのコードを読み取るとダウンロードできます",
