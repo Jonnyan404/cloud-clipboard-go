@@ -1052,6 +1052,53 @@ func writeError(w http.ResponseWriter, status int, code, errText, message string
 	})
 }
 
+// resolveContentFormat 读**显式**的格式信号：?format= > .json 后缀 > ?json=1。
+//
+// 为什么要有这个函数：同一件事以前有三种表达，谁优先、哪个算数只能靠读代码。
+// 现在统一成 ?format= 优先，其余两个保留为兼容信号 —— 已发布的捷径走
+// /content/latest.json、Android 端同样用后缀，一个字都不能改。
+//
+// 返回 "" 表示调用方没显式要格式，由分支自己决定（文本分支会再看 Accept 头，
+// 文件分支不看 —— 见 wantsJSON 的注释）。
+//
+// 第二个返回值 false 表示 format 给了不认识的值（比如 ?format=html）：必须报错、
+// 不能回落，否则客户端以为拿到 HTML、实际拿到原文。
+func resolveContentFormat(r *http.Request, hasJSONSuffix bool) (string, bool) {
+	if explicit := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("format"))); explicit != "" {
+		switch explicit {
+		case "json":
+			return "json", true
+		case "raw", "text", "plain":
+			return "raw", true
+		default:
+			return "", false
+		}
+	}
+	if hasJSONSuffix {
+		return "json", true
+	}
+	if v := r.URL.Query().Get("json"); v == "true" || v == "1" {
+		return "json", true
+	}
+	return "", true
+}
+
+// wantsJSON 决定**文本**响应给不给 JSON：显式格式优先，没显式时才看 Accept 头。
+//
+// 文件分支不走这里。下载链路上的 Accept 头太不可靠（浏览器、下载器、脚本五花八门），
+// 所以文件分支历来只认显式信号 —— 这是既有设计，别为了「统一」合并掉：
+// 合并的后果是「浏览器直接点开文件链接」会突然收到一坨 JSON。
+func wantsJSON(explicitFormat string, r *http.Request) bool {
+	switch explicitFormat {
+	case "json":
+		return true
+	case "raw":
+		return false
+	default:
+		return strings.Contains(r.Header.Get("Accept"), "application/json")
+	}
+}
+
 func (s *ClipboardServer) handleContent(w http.ResponseWriter, r *http.Request) {
 	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
 	if len(parts) < 2 { // 至少需要 "content" 和 id
@@ -1066,19 +1113,18 @@ func (s *ClipboardServer) handleContent(w http.ResponseWriter, r *http.Request) 
 		s.handleLatestContent(w, r)
 		return
 	}
-	// 检查是否请求 JSON 格式的响应
-	// 1. 通过 URL 后缀判断
-	isJSONRequest := strings.HasSuffix(idStr, ".json")
-	// 如果 idStr 带有 .json 后缀，需要去除后缀再转换为整数
-	if isJSONRequest {
-		idStr = strings.TrimSuffix(idStr, ".json")
+	// 后缀无论格式如何都要剥掉：/content/999.json 的 id 就是 999，哪怕调用方
+	// 用 ?format=raw 显式要原文。
+	hasJSONSuffix := strings.HasSuffix(idStr, ".json")
+	idStr = strings.TrimSuffix(idStr, ".json")
+
+	explicitFormat, formatOK := resolveContentFormat(r, hasJSONSuffix)
+	if !formatOK {
+		writeError(w, http.StatusBadRequest, "unsupported_format", "Unsupported format", "不支持的格式（只支持 raw / json）")
+		return
 	}
-	// 2. 通过查询参数判断 (json=true 或 json=1)
-	jsonParam := r.URL.Query().Get("json")
-	if jsonParam == "true" || jsonParam == "1" {
-		isJSONRequest = true
-	}
-	// 3. 通过 Accept 头判断 (会在特定情况下检查)
+	// 文件分支只看显式信号；文本分支还会看 Accept（见下方 wantsJSON）
+	isJSONRequest := explicitFormat == "json"
 
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
@@ -1177,8 +1223,8 @@ func (s *ClipboardServer) handleContent(w http.ResponseWriter, r *http.Request) 
 				}
 			case "text":
 				if msg.Data.TextReceive != nil {
-					// 返回格式判断优先级：1. isJSONRequest参数 2. Accept头
-					if isJSONRequest || strings.Contains(r.Header.Get("Accept"), "application/json") {
+					// 文本分支：显式格式优先，没显式时才看 Accept（文件分支不看，见 wantsJSON）
+					if wantsJSON(explicitFormat, r) {
 						// JSON格式响应
 						responseData := map[string]interface{}{
 							"type":      "text",
@@ -1221,12 +1267,12 @@ func (s *ClipboardServer) handleLatestContent(w http.ResponseWriter, r *http.Req
 	_, hasRequestedRoom := r.URL.Query()["room"]
 	requestedRoom := normalizeRoomName(r.URL.Query().Get("room"))
 
-	// // 检查是否是 latest.json 请求
-	isJSONRequest := strings.HasSuffix(r.URL.Path, "latest.json")
-	jsonParam := r.URL.Query().Get("json")
-	if jsonParam == "true" || jsonParam == "1" {
-		isJSONRequest = true
+	explicitFormat, formatOK := resolveContentFormat(r, strings.HasSuffix(r.URL.Path, "latest.json"))
+	if !formatOK {
+		writeError(w, http.StatusBadRequest, "unsupported_format", "Unsupported format", "不支持的格式（只支持 raw / json）")
+		return
 	}
+	isJSONRequest := explicitFormat == "json"
 
 	s.logger.Printf("处理最新内容请求 (房间参数存在: %t, JSON请求: %t)", hasRequestedRoom, isJSONRequest)
 
@@ -1365,9 +1411,8 @@ func (s *ClipboardServer) handleLatestContent(w http.ResponseWriter, r *http.Req
 			return
 
 		} else if msg.Data.Type() == "text" && msg.Data.TextReceive != nil {
-			// 文本类型，检查Accept头决定是否返回JSON
-			acceptHeader := r.Header.Get("Accept")
-			if strings.Contains(acceptHeader, "application/json") {
+			// 同上：文本分支显式优先，没显式才看 Accept
+			if wantsJSON(explicitFormat, r) {
 				// 客户端请求JSON格式
 				w.Header().Set("Content-Type", "application/json")
 				json.NewEncoder(w).Encode(msg)

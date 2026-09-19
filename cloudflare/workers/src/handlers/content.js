@@ -13,16 +13,51 @@ function normalizeExpire(expireTime) {
   return String(numericExpire).length === 10 ? numericExpire : Math.floor(numericExpire / 1000);
 }
 
-function prefersJSON(request, url) {
+// 读**显式**的格式信号：?format= > .json 后缀 > ?json=1。
+//
+// 与 Go 侧的 resolveContentFormat 是同一份契约 —— 改一边必须改另一边。
+// 已发布的 Android 捷径走的是 .json 后缀，一个字都不能改。
+//
+// 返回 '' 表示调用方没显式要格式，由分支自己决定（文本分支会再看 Accept 头，
+// 文件分支不看 —— 见 wantsJSON）。返回 null 表示 format 给了不认识的值
+// （比如 ?format=html）：调用方必须报错、不能回落，否则客户端以为拿到 HTML、
+// 实际拿到原文。
+function resolveContentFormat(request, url) {
+  const explicit = String(url.searchParams.get('format') || '').trim().toLowerCase();
+  if (explicit) {
+    if (explicit === 'json') {
+      return 'json';
+    }
+    if (explicit === 'raw' || explicit === 'text' || explicit === 'plain') {
+      return 'raw';
+    }
+    return null;
+  }
+
   if (url.pathname.endsWith('.json')) {
-    return true;
+    return 'json';
   }
 
   const jsonParam = String(url.searchParams.get('json') || '').toLowerCase();
   if (jsonParam === 'true' || jsonParam === '1') {
-    return true;
+    return 'json';
   }
 
+  return '';
+}
+
+// 决定**文本**响应给不给 JSON：显式格式优先，没显式时才看 Accept 头。
+//
+// 文件分支不走这里。下载链路上的 Accept 头太不可靠（浏览器、下载器、脚本五花八门），
+// 所以文件分支历来只认显式信号 —— 别为了「统一」合并掉：合并的后果是
+// 「浏览器直接点开文件链接」会突然收到一坨 JSON。
+function wantsJSON(explicitFormat, request) {
+  if (explicitFormat === 'json') {
+    return true;
+  }
+  if (explicitFormat === 'raw') {
+    return false;
+  }
   return request.headers.get('Accept')?.includes('application/json') === true;
 }
 
@@ -118,7 +153,12 @@ export class ContentHandler {
     try {
       const url = new URL(request.url);
       const room = normalizeRoomName(url.searchParams.get('room'));
-      const isJSON = prefersJSON(request, url);
+      const explicitFormat = resolveContentFormat(request, url);
+      if (explicitFormat === null) {
+        return errorResponse(400, 'unsupported_format', 'Unsupported format', '不支持的格式（只支持 raw / json）');
+      }
+      // 文件分支只看显式信号；文本分支还会看 Accept（见下方 wantsJSON）
+      const isJSON = explicitFormat === 'json';
       const forceDownload = url.searchParams.get('download') === 'true';
       const authResult = await ensureRoomAccess(request, env, room);
       if (!authResult.ok) {
@@ -161,7 +201,7 @@ export class ContentHandler {
       }
 
       if (result.type === 'text') {
-        if (isJSON) {
+        if (wantsJSON(explicitFormat, request)) {
           return new Response(JSON.stringify(buildJsonContentPayload(result)), {
             headers: { 'Content-Type': 'application/json', ...corsHeaders }
           });
@@ -202,7 +242,12 @@ export class ContentHandler {
       const url = new URL(request.url);
       const hasRequestedRoom = url.searchParams.has('room');
       const room = normalizeRoomName(url.searchParams.get('room'));
-      const isJSON = prefersJSON(request, url);
+      const explicitFormat = resolveContentFormat(request, url);
+      if (explicitFormat === null) {
+        return errorResponse(400, 'unsupported_format', 'Unsupported format', '不支持的格式（只支持 raw / json）');
+      }
+      // 文件分支只看显式信号；文本分支还会看 Accept（见下方 wantsJSON）
+      const isJSON = explicitFormat === 'json';
       const forceDownload = url.searchParams.get('download') === 'true';
 
       console.log(`获取内容: ID ${id}, room: ${room}, isJSON: ${isJSON}`);
@@ -247,7 +292,7 @@ export class ContentHandler {
       }
 
       if (result.type === 'text') {
-        if (isJSON) {
+        if (wantsJSON(explicitFormat, request)) {
           return new Response(JSON.stringify(buildJsonContentPayload(result)), {
             headers: { 'Content-Type': 'application/json', ...corsHeaders }
           });

@@ -288,6 +288,94 @@ func TestShortcutContractRoomPassword(t *testing.T) {
 	shortcutWant(t, "default（没设密码）+ 空 auth", status, http.StatusOK)
 }
 
+// /content/* 的格式选择：?format= 优先，旧的三种信号保留为兼容。
+//
+// 为什么要锁：同一件事以前有三种表达（.json 后缀、?json=1、Accept 头），谁优先全靠读代码；
+// 现在多了一个显式的 ?format=，优先级必须写死在这里。已发布的捷径走 .json 后缀 ——
+// 那条路一旦断了，用户手机上装好的捷径就全废。
+func TestContentFormatSelection(t *testing.T) {
+	srv := newShortcutServer(t, "global-pw", nil)
+	base := srv.URL
+	auth := "global-pw"
+	const body = "格式化测试内容"
+
+	status, _ := shortcutDo(t, http.MethodPost, base+"/text?room=default&auth="+auth, body, "text/plain")
+	shortcutWant(t, "先放一条文本", status, http.StatusOK)
+
+	latest := shortcutLatest(t, base, auth)
+	id, _ := latest["id"].(string) // 服务端把它序列化成字符串，不是数字
+	if id == "" {
+		t.Fatalf("没拿到 id: %v", latest)
+	}
+
+	cases := []struct {
+		name     string
+		path     string
+		accept   string
+		wantJSON bool
+	}{
+		{"不带任何信号 → raw", "/content/" + id + "?room=default&auth=" + auth, "", false},
+		{"?format=json", "/content/" + id + "?room=default&auth=" + auth + "&format=json", "", true},
+		{"?format=raw 压过 Accept 头", "/content/" + id + "?room=default&auth=" + auth + "&format=raw", "application/json", false},
+		{"?format=raw 压过 .json 后缀", "/content/" + id + ".json?room=default&auth=" + auth + "&format=raw", "", false},
+		{".json 后缀（已发布捷径在用）", "/content/" + id + ".json?room=default&auth=" + auth, "", true},
+		{"?json=1（旧信号）", "/content/" + id + "?room=default&auth=" + auth + "&json=1", "", true},
+		{"Accept 头", "/content/" + id + "?room=default&auth=" + auth, "application/json", true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			req, err := http.NewRequest(http.MethodGet, base+tc.path, nil)
+			if err != nil {
+				t.Fatalf("构造请求失败: %v", err)
+			}
+			if tc.accept != "" {
+				req.Header.Set("Accept", tc.accept)
+			}
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatalf("请求失败: %v", err)
+			}
+			defer resp.Body.Close()
+			raw, _ := io.ReadAll(resp.Body)
+			if resp.StatusCode != http.StatusOK {
+				t.Fatalf("期望 200，实际 %d，响应体=%q", resp.StatusCode, string(raw))
+			}
+
+			if tc.wantJSON {
+				var payload map[string]interface{}
+				if err := json.Unmarshal(raw, &payload); err != nil {
+					t.Fatalf("期望 JSON，实际不是: %v（%q）", err, string(raw))
+				}
+				if payload["content"] != body {
+					t.Fatalf("content 字段不对: %v", payload["content"])
+				}
+				return
+			}
+			if strings.TrimSpace(string(raw)) != body {
+				t.Fatalf("期望原文 %q，实际 %q", body, strings.TrimSpace(string(raw)))
+			}
+		})
+	}
+
+	// 不认识的 format 必须报错，不能静默回落成 raw —— 客户端以为拿到 HTML、
+	// 实际拿到原文，是会出事的。
+	t.Run("?format=html 报 400 而不是回落", func(t *testing.T) {
+		status, raw := shortcutDo(t, http.MethodGet,
+			base+"/content/"+id+"?room=default&auth="+auth+"&format=html", "", "")
+		if status != http.StatusBadRequest {
+			t.Fatalf("期望 400，实际 %d，响应体=%q", status, string(raw))
+		}
+		var payload map[string]string
+		if err := json.Unmarshal(raw, &payload); err != nil {
+			t.Fatalf("错误体不是 JSON: %v", err)
+		}
+		if payload["code"] != "unsupported_format" {
+			t.Fatalf("code 期望 unsupported_format，实际 %q", payload["code"])
+		}
+	})
+}
+
 // 错误响应的形状是所有客户端共用的契约，必须锁死。
 //
 // 为什么单独一条：Apple 快捷指令的「获取URL内容」**不暴露 HTTP 状态码**，只能读响应体，

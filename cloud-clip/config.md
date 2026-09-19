@@ -154,6 +154,33 @@ foobar
 
 > 推荐 API / 脚本使用 `Authorization: Bearer`。`?auth=` 仅为兼容保留，不建议把房间密码写进可分享 URL。
 
+#### 内容格式（`/content/*`）
+
+`/content/<id>` 和 `/content/latest` 用 `?format=raw|json` 决定返回什么：
+
+```console
+$ curl "http://localhost:9501/content/7?format=json"
+{"id":"7","type":"text","content":"foobar","timestamp":1758000000}
+
+$ curl "http://localhost:9501/content/7?format=raw"
+foobar
+```
+
+判定优先级（高到低）：
+
+1. **`?format=raw|json`** —— 显式指定，压过其他一切信号
+2. `.json` 路径后缀 —— `/content/latest.json`（Android 捷径在用，**不能动**）
+3. `?json=1` / `?json=true` —— 旧信号，保留兼容
+4. `Accept` 头含 `application/json` —— **只对文本生效**
+5. 默认 —— `raw`（纯文本或文件字节）
+
+两点要注意：
+
+- **`Accept` 头对文件不生效**。下载链路上的 Accept 太不可靠（浏览器、下载器、脚本五花八门），
+  所以文件分支只认显式信号。否则「浏览器直接点开文件链接」会突然收到一坨 JSON。
+- **不认识的 `format` 值返回 400**（`code: unsupported_format`），不会静默回落成 raw ——
+  客户端以为拿到 HTML、实际拿到原文，是要出事的。
+
 #### 错误响应
 
 **所有**错误路径都返回同一种形状，`Content-Type: application/json; charset=utf-8`，状态码保持常规语义：

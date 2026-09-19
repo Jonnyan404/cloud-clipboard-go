@@ -157,6 +157,19 @@ console.log('\n── D. 房间级密码：只认本房间的密码 ──');
   check('default（没设密码）+ 空 auth → 200', open.status, 200);
 }
 
+// 带 Accept 头的 getById（?format= 的优先级要连 Accept 一起验）
+async function getByIdRaw(env, id, query, accept, suffix = '') {
+  const headers = {};
+  if (accept) headers.Accept = accept;
+  const req = new Request(`http://worker.local/content/${id}${suffix}?${query}`, { headers });
+  req.params = { id: String(id) };
+  const res = await ContentHandler.getById(req, env);
+  const text = await res.text();
+  let json = null;
+  try { json = JSON.parse(text); } catch {}
+  return { status: res.status, json, text };
+}
+
 console.log('\n── E. 错误响应形状：code / error / message 三字段，且恒为 JSON ──');
 {
   // 锁死的是所有客户端共用的契约：Apple 快捷指令不暴露 HTTP 状态码、只能读响应体，
@@ -184,6 +197,43 @@ console.log('\n── E. 错误响应形状：code / error / message 三字段�
   check('内容不存在 → 404', missing.status, 404);
   check('  · code', missing.json?.code, 'content_not_found');
   check('  · message', missing.json?.message, '内容未找到');
+}
+
+console.log('\n── F. /content/* 的格式选择（?format= 优先，旧的三种信号保留）──');
+{
+  // 同一件事以前有三种表达（.json 后缀 / ?json=1 / Accept 头），谁优先全靠读代码。
+  // 现在多了显式的 ?format=，优先级必须锁在这里。已发布的 Android 捷径走 .json 后缀，
+  // 那条路断了用户手机上装好的捷径就全废。
+  const { env } = makeEnv();
+  const BODY = '格式化测试内容';
+
+  const sent = await postJson(TextHandler.create, env, `/text?room=default&name=${DEVICE}`, BODY);
+  check('先放一条文本', sent.status, 200);
+  const id = sent.json?.id;
+
+  const cases = [
+    { name: '不带任何信号 → raw', query: 'room=default&auth=123', accept: null, suffix: '', json: false },
+    { name: '?format=json', query: 'room=default&auth=123&format=json', accept: null, suffix: '', json: true },
+    { name: '?format=raw 压过 Accept 头', query: 'room=default&auth=123&format=raw', accept: 'application/json', suffix: '', json: false },
+    { name: '?format=raw 压过 .json 后缀', query: 'room=default&auth=123&format=raw', accept: null, suffix: '.json', json: false },
+    { name: '.json 后缀（已发布捷径在用）', query: 'room=default&auth=123', accept: null, suffix: '.json', json: true },
+    { name: '?json=1（旧信号）', query: 'room=default&auth=123&json=1', accept: null, suffix: '', json: true },
+    { name: 'Accept 头', query: 'room=default&auth=123', accept: 'application/json', suffix: '', json: true },
+  ];
+
+  for (const tc of cases) {
+    const res = await getByIdRaw(env, id, tc.query, tc.accept, tc.suffix);
+    if (tc.json) {
+      check(`${tc.name} → JSON`, res.json?.content, BODY);
+    } else {
+      check(`${tc.name} → 原文`, res.text.trim(), BODY);
+    }
+  }
+
+  // 不认识的 format 必须报错，不能静默回落成 raw
+  const bad = await getByIdRaw(env, id, 'room=default&auth=123&format=html', null, '');
+  check('?format=html → 400', bad.status, 400);
+  check('  · code', bad.json?.code, 'unsupported_format');
 }
 
 summary('Android 快捷指令的请求形状在 Worker 上成立');
