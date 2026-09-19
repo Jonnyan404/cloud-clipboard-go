@@ -316,7 +316,7 @@
             </v-card-title>
             <v-divider></v-divider>
             <v-card-text class="text-center pa-4">
-                <div class="text-body-2 font-weight-medium unified-composer__roadmap-title mb-2">{{ t('supportSectionTitle') }}</div>
+                <div class="text-body-2 font-weight-medium unified-composer__reward-section-title mb-2">{{ t('supportSectionTitle') }}</div>
                 <v-row class="unified-composer__reward-row" dense>
                     <v-col class="text-center">
                         <div class="unified-composer__reward-label">微信</div>
@@ -355,20 +355,6 @@
                     </v-btn>
                     </div>
                 </div>
-                <v-divider class="my-4"></v-divider>
-                <div class="unified-composer__roadmap text-left">
-                    <div class="text-body-2 font-weight-medium unified-composer__roadmap-title">
-                        {{ t('nextVersionPreview') }}
-                    </div>
-                    <div class="d-flex align-center mt-2">
-                        <v-icon size="small" class="mr-2 unified-composer__roadmap-icon">{{ mdiTagMultiple }}</v-icon>
-                        <span class="text-body-2">{{ t('multiRoomMode') }}</span>
-                    </div>
-                    <div class="d-flex align-center mt-2">
-                        <v-icon size="small" class="mr-2 unified-composer__roadmap-icon">{{ mdiViewDashboardOutline }}</v-icon>
-                        <span class="text-body-2">{{ t('minimalMode') }}</span>
-                    </div>
-                </div>
             </v-card-text>
         </v-card>
     </v-dialog>
@@ -401,8 +387,6 @@ const mdiCoffee = 'mdi-coffee';
 const mdiOpenInNew = 'mdi-open-in-new';
 const mdiWhiteBalanceSunny = 'mdi-white-balance-sunny';
 const mdiWeatherNight = 'mdi-weather-night';
-const mdiTagMultiple = 'mdi-tag-multiple';
-const mdiViewDashboardOutline = 'mdi-view-dashboard-outline';
 const mdiClose = 'mdi-close';
 const mdiAndroid = 'mdi-android';
 const mdiApple = 'mdi-apple';
@@ -963,28 +947,8 @@ onBeforeUnmount(() => {
     padding: 0.75rem 1rem;
 }
 
-.unified-composer__roadmap {
-    background: rgba(99, 102, 241, 0.06);
-    border: 1px solid rgba(148, 163, 184, 0.25);
-    border-radius: 10px;
-    padding: 0.75rem 1rem;
-}
-
-.unified-composer--dark .unified-composer__roadmap {
-    background: rgba(99, 102, 241, 0.1);
-    border-color: rgba(71, 85, 105, 0.65);
-}
-
-.unified-composer__roadmap-title {
+.unified-composer__reward-section-title {
     color: #f5b301;
-}
-
-.unified-composer__roadmap-icon {
-    color: rgba(100, 116, 139, 0.9);
-}
-
-.unified-composer--dark .unified-composer__roadmap-icon {
-    color: rgba(203, 213, 225, 0.8);
 }
 
 .unified-composer__send {

@@ -127,7 +127,7 @@ function showQr(url) {
                             </div>
                         </v-card>
                         <v-alert type="info" variant="tonal" density="comfortable" class="mt-3">
-                            <div class="text-caption">{{ t('scAndroidSteps') }}</div>
+                            <div class="text-caption" style="white-space: pre-line;">{{ t('scAndroidSteps') }}</div>
                         </v-alert>
                     </v-card-text>
                 </v-tabs-window-item>
