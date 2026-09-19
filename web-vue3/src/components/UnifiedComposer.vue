@@ -445,6 +445,20 @@ const deviceStats = computed(() => {
 const deviceTotal = computed(() => deviceStats.value.desktop + deviceStats.value.mobile + deviceStats.value.other);
 const desktopDeviceCount = computed(() => app.device.filter(e => e.type === 'desktop').length);
 const mobileDeviceCount = computed(() => app.device.filter(e => (e.type === 'smartphone' || e.type === 'tablet')).length);
+// 设备没自报名字时的兜底标题（服务端对未声明的名字会 omitempty 掉，所以这条路径真的会走到）。
+//
+// ⚠️ 这个函数在模板里被调用，但一直**没有定义**。JS 的 || 短路让它只在
+// 「有设备、且至少一台没名字」时才被求值 —— 那时整块列表渲染抛 TypeError，
+// 弹窗直接挂不上，表现就是「点了没反应」，而控制台之外看不出任何异常。
+function deviceTypeLabel(item) {
+    if (item.type === 'desktop') {
+        return t('desktopDevice');
+    }
+    if (item.type === 'smartphone' || item.type === 'mobile' || item.type === 'tablet') {
+        return t('mobileDevice');
+    }
+    return t('otherDevice');
+}
 function goDeviceList() {
     deviceDialog.value = true;
 }
