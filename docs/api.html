@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>REST API · Cloud Clipboard</title>
+    <meta name="description" content="Cloud Clipboard 的 REST API 接口文档：端点、参数、鉴权、内容格式与错误码。">
+    <link rel="stylesheet" href="assets/style.css">
+    <link rel="icon" href="https://cdn.jsdelivr.net/gh/Jonnyan404/cloud-clipboard-go@main/web-vue3/public/favicon.svg">
+</head>
+<body>
+    <header class="site">
+        <div class="wrap">
+            <a class="brand" href="./">
+                <img src="https://cdn.jsdelivr.net/gh/Jonnyan404/cloud-clipboard-go@main/web-vue3/public/favicon.svg" width="22" height="22" alt="">
+                Cloud Clipboard
+            </a>
+            <nav class="site">
+                <a href="./" data-i18n="navHome">首页</a>
+                <a href="api.html" class="active" data-i18n="navApi">API 文档</a>
+                <a href="https://github.com/Jonnyan404/cloud-clipboard-go" target="_blank" rel="noopener">GitHub</a>
+                <span class="lang-switch">
+                    <button type="button" data-lang="zh" aria-pressed="true">中文</button>
+                    <button type="button" data-lang="en" aria-pressed="false">EN</button>
+                </span>
+            </nav>
+        </div>
+    </header>
+
+    <main class="doc wrap" id="content">
+        <p class="loading" data-i18n="loading">正在加载文档…</p>
+    </main>
+
+    <footer class="site">
+        <div class="wrap">
+            <span>© <span id="year"></span> Jonnyan404</span>
+            <a href="./" data-i18n="navHome">首页</a>
+            <a href="https://github.com/Jonnyan404/cloud-clipboard-go/blob/main/docs/api.zh-CN.md" id="mdLink" target="_blank" rel="noopener" data-i18n="viewSource">查看 Markdown 原文</a>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script>
+        // 文档正文放在 Markdown 里（便于 PR 和维护），这里只负责渲染 + 双语切换。
+        const DOCS = {
+            zh: { file: 'api.zh-CN.md', loading: '正在加载文档…', failed: '文档加载失败。', source: '查看 Markdown 原文' },
+            en: { file: 'api.md', loading: 'Loading the docs…', failed: 'Failed to load the document.', source: 'View Markdown source' },
+        };
+        const STORAGE_KEY = 'cc-pages-lang';
+
+        function detectLang() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved === 'zh' || saved === 'en') {
+                return saved;
+            }
+            return (navigator.language || '').toLowerCase().startsWith('zh') ? 'zh' : 'en';
+        }
+
+        // marked 不会给标题加 id（v12 起移除），但文档里有 #锚点 链接 —— 自己补上
+        function addHeadingIds(root) {
+            root.querySelectorAll('h2, h3').forEach((h) => {
+                if (h.id) {
+                    return;
+                }
+                const slug = h.textContent
+                    .trim()
+                    .toLowerCase()
+                    .replace(/[^\w\u4e00-\u9fa5]+/g, '-')
+                    .replace(/^-+|-+$/g, '');
+                if (slug) {
+                    h.id = slug;
+                }
+            });
+        }
+
+        async function renderDoc(lang) {
+            const dict = DOCS[lang] || DOCS.zh;
+            const content = document.getElementById('content');
+            document.documentElement.lang = lang === 'zh' ? 'zh' : 'en';
+            content.innerHTML = `<p class="loading">${dict.loading}</p>`;
+
+            document.querySelectorAll('.lang-switch button').forEach((btn) => {
+                btn.setAttribute('aria-pressed', String(btn.dataset.lang === lang));
+            });
+            localStorage.setItem(STORAGE_KEY, lang);
+
+            try {
+                const res = await fetch(dict.file, { cache: 'no-cache' });
+                if (!res.ok) {
+                    throw new Error(`HTTP ${res.status}`);
+                }
+                const md = await res.text();
+                if (typeof marked === 'undefined') {
+                    // CDN 没拉到时别白屏：直接把 Markdown 原样铺出来，还能读
+                    content.innerHTML = `<pre>${md.replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]))}</pre>`;
+                    return;
+                }
+                content.innerHTML = marked.parse(md);
+                addHeadingIds(content);
+            } catch (err) {
+                content.innerHTML = `<p class="loading">${dict.failed} (${err.message})</p>`;
+            }
+        }
+
+        document.querySelectorAll('.lang-switch button').forEach((btn) => {
+            btn.addEventListener('click', () => renderDoc(btn.dataset.lang));
+        });
+        document.getElementById('year').textContent = new Date().getFullYear();
+
+        const initial = detectLang();
+        // 页脚那个「查看原文」跟着语言走
+        document.getElementById('mdLink').href =
+            'https://github.com/Jonnyan404/cloud-clipboard-go/blob/main/docs/' + DOCS[initial].file;
+        renderDoc(initial);
+    </script>
+</body>
+</html>

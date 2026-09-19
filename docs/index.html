@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Cloud Clipboard · 自托管剪贴板</title>
+    <meta name="description" content="自托管的跨设备剪贴板与文件中转：Go 单二进制 / Docker / Cloudflare Workers，iOS 快捷指令、Android、OpenWrt 全支持。">
+    <link rel="stylesheet" href="assets/style.css">
+    <link rel="icon" href="https://cdn.jsdelivr.net/gh/Jonnyan404/cloud-clipboard-go@main/web-vue3/public/favicon.svg">
+</head>
+<body>
+    <header class="site">
+        <div class="wrap">
+            <a class="brand" href="./">
+                <img src="https://cdn.jsdelivr.net/gh/Jonnyan404/cloud-clipboard-go@main/web-vue3/public/favicon.svg" width="22" height="22" alt="">
+                Cloud Clipboard
+            </a>
+            <nav class="site">
+                <a href="#features" data-i18n="navFeatures">特性</a>
+                <a href="#start" data-i18n="navStart">快速开始</a>
+                <a href="api.html" data-i18n="navApi">API 文档</a>
+                <a href="https://github.com/Jonnyan404/cloud-clipboard-go" target="_blank" rel="noopener">GitHub</a>
+                <span class="lang-switch">
+                    <button type="button" data-lang="zh" aria-pressed="true">中文</button>
+                    <button type="button" data-lang="en" aria-pressed="false">EN</button>
+                </span>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <section class="hero wrap">
+            <h1 data-i18n="heroTitle">手机复制，电脑粘贴</h1>
+            <p class="lead" data-i18n="heroLead">
+                自托管的跨设备剪贴板与文件中转。数据留在你自己的服务器上，
+                iOS 快捷指令、Android、浏览器、路由器都能用。
+            </p>
+            <div class="cta">
+                <a class="btn primary" href="https://github.com/Jonnyan404/cloud-clipboard-go" target="_blank" rel="noopener" data-i18n="ctaStar">去 GitHub 看看</a>
+                <a class="btn" href="#start" data-i18n="ctaStart">怎么部署</a>
+                <a class="btn" href="api.html" data-i18n="ctaApi">REST API</a>
+            </div>
+        </section>
+
+        <div class="wrap">
+            <div class="shot">
+                <img loading="lazy" src="https://cdn.jsdelivr.net/gh/Jonnyan404/cloud-clipboard-go@main/desktop2.png" alt="Cloud Clipboard 桌面端">
+            </div>
+        </div>
+
+        <section class="feature wrap" id="features">
+            <h2 data-i18n="featuresTitle">它有什么</h2>
+            <div class="grid">
+                <div class="card">
+                    <h3 data-i18n="f1Title">真·自托管</h3>
+                    <p data-i18n="f1Desc">Go 单二进制，内嵌前端，跑起来就一个进程；也可以丢到 Cloudflare Workers 上白嫖。</p>
+                </div>
+                <div class="card">
+                    <h3 data-i18n="f2Title">多端接入</h3>
+                    <p data-i18n="f2Desc">网页、iOS 快捷指令（分享菜单直接发）、Android、OpenWrt，还有实时推送。</p>
+                </div>
+                <div class="card">
+                    <h3 data-i18n="f3Title">房间与密码</h3>
+                    <p data-i18n="f3Desc">按房间隔离，可设全局密码或每个房间单独的密码；还有短期分享链接。</p>
+                </div>
+                <div class="card">
+                    <h3 data-i18n="f4Title">文件也能传</h3>
+                    <p data-i18n="f4Desc">文本、图片、文件都能发，带过期时间；大文件走分块上传。</p>
+                </div>
+                <div class="card">
+                    <h3 data-i18n="f5Title">界面能换皮肤</h3>
+                    <p data-i18n="f5Desc">六种界面模式（时间流 / 聊天气泡 / 便签 / 终端…），内置中华传统色。</p>
+                </div>
+                <div class="card">
+                    <h3 data-i18n="f6Title">Markdown 预览</h3>
+                    <p data-i18n="f6Desc">发过来的 .md 文件可以直接渲染看排版，也能一键切回原文。</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="feature wrap" id="start">
+            <h2 data-i18n="startTitle">快速开始</h2>
+
+            <h3 data-i18n="startDocker">Docker（推荐）</h3>
+            <pre><code>docker run -d --name cloud-clipboard \
+  -p 9501:9501 \
+  -v /your/data:/app/server-node/data \
+  ghcr.io/jonnyan404/cloud-clipboard-go:latest</code></pre>
+
+            <h3 data-i18n="startBinary">或者单二进制</h3>
+            <p data-i18n="startBinaryDesc">从 Releases 下载对应平台的包，解压后直接跑，前端已经嵌在里面了。</p>
+
+            <h3 data-i18n="startShortcuts">配上快捷指令</h3>
+            <p data-i18n="startShortcutsDesc">
+                打开部署好的网页，点输入框旁边的 ⚡ 图标，里面有 iOS 和 Android 的导入包
+                （含下载、链接和二维码），导入后填上服务器地址即可。
+            </p>
+
+            <h3 data-i18n="startApi">自己写客户端</h3>
+            <p data-i18n="startApiDesc">
+                接口是普通的 REST + WebSocket，两个后端共用一份契约：
+                <a href="api.html">REST API 文档</a>。
+            </p>
+        </section>
+
+        <section class="feature wrap">
+            <h2 data-i18n="shotsTitle">界面</h2>
+            <div class="grid">
+                <div class="shot"><img loading="lazy" src="https://cdn.jsdelivr.net/gh/Jonnyan404/cloud-clipboard-go@main/mobile2.png" alt="移动端"></div>
+                <div class="shot"><img loading="lazy" src="https://cdn.jsdelivr.net/gh/Jonnyan404/cloud-clipboard-go@main/mobile3.png" alt="移动端 · 便签模式"></div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site">
+        <div class="wrap">
+            <span>© <span id="year"></span> Jonnyan404</span>
+            <a href="https://github.com/Jonnyan404/cloud-clipboard-go" target="_blank" rel="noopener">GitHub</a>
+            <a href="api.html" data-i18n="navApi">API 文档</a>
+            <a href="https://github.com/Jonnyan404/cloud-clipboard-go/blob/main/README.zh-CN.md" data-i18n="navReadme">README</a>
+        </div>
+    </footer>
+
+    <script>
+        // 双语：只切文案，不重新加载页面。语言记在 localStorage，首次按浏览器语言猜。
+        const I18N = {
+            zh: {
+                navFeatures: '特性',
+                navStart: '快速开始',
+                navApi: 'API 文档',
+                navReadme: 'README',
+                heroTitle: '手机复制，电脑粘贴',
+                heroLead: '自托管的跨设备剪贴板与文件中转。数据留在你自己的服务器上，iOS 快捷指令、Android、浏览器、路由器都能用。',
+                ctaStar: '去 GitHub 看看',
+                ctaStart: '怎么部署',
+                ctaApi: 'REST API',
+                featuresTitle: '它有什么',
+                f1Title: '真·自托管',
+                f1Desc: 'Go 单二进制，内嵌前端，跑起来就一个进程；也可以丢到 Cloudflare Workers 上白嫖。',
+                f2Title: '多端接入',
+                f2Desc: '网页、iOS 快捷指令（分享菜单直接发）、Android、OpenWrt，还有实时推送。',
+                f3Title: '房间与密码',
+                f3Desc: '按房间隔离，可设全局密码或每个房间单独的密码；还有短期分享链接。',
+                f4Title: '文件也能传',
+                f4Desc: '文本、图片、文件都能发，带过期时间；大文件走分块上传。',
+                f5Title: '界面能换皮肤',
+                f5Desc: '六种界面模式（时间流 / 聊天气泡 / 便签 / 终端…），内置中华传统色。',
+                f6Title: 'Markdown 预览',
+                f6Desc: '发过来的 .md 文件可以直接渲染看排版，也能一键切回原文。',
+                startTitle: '快速开始',
+                startDocker: 'Docker（推荐）',
+                startBinary: '或者单二进制',
+                startBinaryDesc: '从 Releases 下载对应平台的包，解压后直接跑，前端已经嵌在里面了。',
+                startShortcuts: '配上快捷指令',
+                startShortcutsDesc: '打开部署好的网页，点输入框旁边的 ⚡ 图标，里面有 iOS 和 Android 的导入包（含下载、链接和二维码），导入后填上服务器地址即可。',
+                startApi: '自己写客户端',
+                startApiDesc: '接口是普通的 REST + WebSocket，两个后端共用一份契约：',
+                shotsTitle: '界面',
+            },
+            en: {
+                navFeatures: 'Features',
+                navStart: 'Get started',
+                navApi: 'API docs',
+                navReadme: 'README',
+                heroTitle: 'Copy on your phone, paste on your laptop',
+                heroLead: 'A self-hosted clipboard and file relay. Your data stays on your own server, and iOS Shortcuts, Android, browsers and routers can all use it.',
+                ctaStar: 'View on GitHub',
+                ctaStart: 'How to deploy',
+                ctaApi: 'REST API',
+                featuresTitle: 'What it does',
+                f1Title: 'Actually self-hosted',
+                f1Desc: 'A single Go binary with the frontend embedded — one process to run. Or drop it on Cloudflare Workers for free.',
+                f2Title: 'Many clients',
+                f2Desc: 'Web, iOS Shortcuts (send straight from the share sheet), Android, OpenWrt, plus real-time push.',
+                f3Title: 'Rooms and passwords',
+                f3Desc: 'Per-room isolation, a global password or one per room, and short-lived share links.',
+                f4Title: 'Files too',
+                f4Desc: 'Text, images and files, with expiry; large files go through chunked uploads.',
+                f5Title: 'Six UI modes',
+                f5Desc: 'Timeline, chat bubbles, sticky notes, terminal and more — with traditional Chinese colors built in.',
+                f6Title: 'Markdown preview',
+                f6Desc: 'Incoming .md files can be rendered to see the layout, and switched back to raw with one tap.',
+                startTitle: 'Get started',
+                startDocker: 'Docker (recommended)',
+                startBinary: 'Or a single binary',
+                startBinaryDesc: 'Grab the archive for your platform from Releases, unpack and run — the frontend is already inside.',
+                startShortcuts: 'Add the shortcuts',
+                startShortcutsDesc: 'Open your deployed instance and tap the ⚡ icon next to the input box: it has the iOS and Android packages (download, link and QR code). Import, fill in your server address, done.',
+                startApi: 'Write your own client',
+                startApiDesc: 'The API is plain REST + WebSocket, and both backends share one contract:',
+                shotsTitle: 'Screenshots',
+            },
+        };
+
+        const STORAGE_KEY = 'cc-pages-lang';
+
+        function detectLang() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved === 'zh' || saved === 'en') {
+                return saved;
+            }
+            return (navigator.language || '').toLowerCase().startsWith('zh') ? 'zh' : 'en';
+        }
+
+        function applyLang(lang) {
+            const dict = I18N[lang] || I18N.zh;
+            document.documentElement.lang = lang === 'zh' ? 'zh' : 'en';
+            document.querySelectorAll('[data-i18n]').forEach((el) => {
+                const text = dict[el.dataset.i18n];
+                if (text) {
+                    el.textContent = text;
+                }
+            });
+            document.querySelectorAll('.lang-switch button').forEach((btn) => {
+                btn.setAttribute('aria-pressed', String(btn.dataset.lang === lang));
+            });
+            localStorage.setItem(STORAGE_KEY, lang);
+        }
+
+        document.querySelectorAll('.lang-switch button').forEach((btn) => {
+            btn.addEventListener('click', () => applyLang(btn.dataset.lang));
+        });
+        document.getElementById('year').textContent = new Date().getFullYear();
+        applyLang(detectLang());
+    </script>
+</body>
+</html>
