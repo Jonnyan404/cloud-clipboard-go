@@ -35,15 +35,14 @@ function copyDir(src, dest) {
 
 compress(distDir);
 
-// 迁移期间默认不覆盖后端已部署的 Vue2 static。
-// 仅在显式设置 DEPLOY_STATIC=1 时，才拷贝到 server / server-node / cloud-clip。
+// 默认只压缩 dist，不动后端产物。
+// 显式设置 DEPLOY_STATIC=1 时才拷进 cloud-clip/lib/static —— 那是 Go 版唯一的内嵌静态目录
+// （Vue2 时代的 server/ 与 server-node/ 两个产物目录已删，它们当年是被这套脚本覆盖的）。
 if (process.env.DEPLOY_STATIC === '1') {
-    for (const dest of ['../server/static', '../server-node/static', '../cloud-clip/lib/static']) {
-        const target = fileURLToPath(new URL(dest, import.meta.url));
-        rmSync(target, { recursive: true, force: true });
-        copyDir(distDir, target);
-    }
-    console.log('after-build: gz/br generated and copied to server/node/cloud-clip statics.');
+    const target = fileURLToPath(new URL('../cloud-clip/lib/static', import.meta.url));
+    rmSync(target, { recursive: true, force: true });
+    copyDir(distDir, target);
+    console.log('after-build: gz/br generated and copied to cloud-clip/lib/static.');
 } else {
-    console.log('after-build: gz/br generated in dist/. Set DEPLOY_STATIC=1 to copy into backend statics.');
+    console.log('after-build: gz/br generated in dist/. Set DEPLOY_STATIC=1 to copy into cloud-clip/lib/static.');
 }
