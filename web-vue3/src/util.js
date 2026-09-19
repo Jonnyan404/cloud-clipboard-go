@@ -1,4 +1,6 @@
 import axios from 'axios';
+import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 
 export function prettyFileSize(size) {
     let units = ['TB', 'GB', 'MB', 'KB'];
@@ -200,4 +202,33 @@ export function errorMessage(error) {
     if (!data) return '';
     if (typeof data === 'string') return data.trim().slice(0, 200);
     return data.message || data.error || '';
+}
+
+/**
+ * 内容像不像 markdown。
+ *
+ * 为什么要判断而不是无脑渲染：剪贴板里绝大多数是普通文本，而 markdown 的标记跟日常
+ * 符号高度重合 —— `5 * 3 = 15` 会被渲染成斜体、`1. 打开设置` 会被当成有序列表。
+ * 所以宁可漏判：漏判的代价是用户看到原文，误判的代价是内容被改形。
+ */
+export function looksLikeMarkdown(text) {
+    const s = String(text || '');
+    // 太长不渲染：一个几万字的条目渲染一次就够列表卡一下了
+    if (!s.trim() || s.length > 20000) return false;
+    return /(^|\n)\s{0,3}(#{1,6}\s|>\s|[-*+]\s|\d+\.\s|```)/.test(s)
+        || /\[[^\]]+\]\([^)\s]+\)/.test(s)                    // [文字](链接)
+        || /\*\*[^\s][^*]*\*\*|__[^\s][^_]*__/.test(s)         // 粗体
+        || /`[^`\n]+`/.test(s);                                  // 行内代码
+}
+
+/**
+ * 把 markdown 渲染成可以安全插进 DOM 的 HTML。
+ *
+ * **必须清洗**：内容可能是别人发过来的，`<img src=x onerror=...>` 这类注入是真实风险
+ * —— 剪贴板本身就是个「别人能往你这里塞字符串」的通道。DOMPurify 默认配置会去掉
+ * script、事件属性、javascript: 这类 URL。
+ */
+export function renderMarkdownHtml(text) {
+    const html = marked.parse(String(text || ''), { breaks: true, gfm: true });
+    return DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
 }

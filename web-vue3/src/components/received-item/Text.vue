@@ -6,7 +6,7 @@ import { useI18n } from 'vue-i18n';
 import axios from 'axios';
 import { toast } from '@/plugins/toast';
 import QrcodeVue from 'qrcode.vue';
-import { SHARE_DEFAULT_TTL_MINUTES, SHARE_MAX_TTL_MINUTES, SHARE_MIN_TTL_MINUTES, buildCleanAbsoluteRouteUrl, copyTextToClipboard, createShareLink, deviceLabel, errorMessage, formatShareDuration, formatTimestamp, minutesToShareTTL, normalizeShareMaxUses, normalizeShareTTL } from '@/util.js';
+import { SHARE_DEFAULT_TTL_MINUTES, SHARE_MAX_TTL_MINUTES, SHARE_MIN_TTL_MINUTES, buildCleanAbsoluteRouteUrl, copyTextToClipboard, createShareLink, deviceLabel, errorMessage, formatShareDuration, formatTimestamp, looksLikeMarkdown, minutesToShareTTL, normalizeShareMaxUses, normalizeShareTTL, renderMarkdownHtml } from '@/util.js';
 
 const mdiCellphone = 'mdi-cellphone';
 const mdiChevronRight = 'mdi-chevron-right';
@@ -45,6 +45,16 @@ function decodeHtmlEntities(text) {
     return textArea.value;
 }
 const decodedContent = computed(() => decodeHtmlEntities(props.meta.content || ''));
+
+// md 渲染：开关打开 + 内容确实像 markdown 才渲染，否则保持原文。
+// v-html 的内容在 renderMarkdownHtml 里已经过了一遍 DOMPurify（内容是别人发的）。
+const markdownHtml = computed(() => {
+    if (!app.display.markdown) {
+        return '';
+    }
+    const text = decodedContent.value;
+    return looksLikeMarkdown(text) ? renderMarkdownHtml(text) : '';
+});
 const decodedContentPreview = computed(() => decodeHtmlEntities(props.meta.content || ''));
 const contentUrl = computed(() => {
     const roomQuery = ws.room ? `?room=${encodeURIComponent(ws.room)}` : '';
@@ -217,7 +227,12 @@ async function deleteItem() {
                 <v-expand-transition>
                     <div v-show="expand">
                         <v-divider class="my-2"></v-divider>
-                        <div style="white-space: pre-wrap; word-break: break-all;">{{ decodedContent }}</div>
+                        <div
+                            v-if="markdownHtml"
+                            class="timeline-card__markdown"
+                            v-html="markdownHtml"
+                        ></div>
+                        <div v-else style="white-space: pre-wrap; word-break: break-all;">{{ decodedContent }}</div>
                     </div>
                 </v-expand-transition>
             </v-card-text>
@@ -476,5 +491,93 @@ async function deleteItem() {
 
 .share-ttl-chip {
     cursor: pointer;
+}
+
+/* ── markdown 渲染区 ──
+   用 --v-theme-on-surface 的透明度做底色，明暗主题都自动适配（暗色下它是白色）。 */
+.timeline-card__markdown {
+    font-size: 0.875rem;
+    line-height: 1.65;
+    word-break: break-word;
+}
+.timeline-card__markdown > :deep(:first-child) {
+    margin-top: 0;
+}
+.timeline-card__markdown > :deep(:last-child) {
+    margin-bottom: 0;
+}
+.timeline-card__markdown :deep(p) {
+    margin: 0 0 8px;
+}
+.timeline-card__markdown :deep(h1),
+.timeline-card__markdown :deep(h2),
+.timeline-card__markdown :deep(h3),
+.timeline-card__markdown :deep(h4),
+.timeline-card__markdown :deep(h5),
+.timeline-card__markdown :deep(h6) {
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.4;
+    margin: 14px 0 6px;
+}
+.timeline-card__markdown :deep(h1) {
+    font-size: 1.2rem;
+}
+.timeline-card__markdown :deep(h2) {
+    font-size: 1.1rem;
+}
+.timeline-card__markdown :deep(ul),
+.timeline-card__markdown :deep(ol) {
+    margin: 0 0 8px;
+    padding-left: 22px;
+}
+.timeline-card__markdown :deep(li) {
+    margin: 2px 0;
+}
+.timeline-card__markdown :deep(code) {
+    background: rgba(var(--v-theme-on-surface), 0.08);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 0.85em;
+}
+.timeline-card__markdown :deep(pre) {
+    background: rgba(var(--v-theme-on-surface), 0.08);
+    padding: 10px 12px;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 0 0 8px;
+}
+.timeline-card__markdown :deep(pre code) {
+    background: none;
+    padding: 0;
+}
+.timeline-card__markdown :deep(blockquote) {
+    border-left: 3px solid rgba(var(--v-theme-on-surface), 0.25);
+    padding-left: 10px;
+    margin: 0 0 8px;
+    opacity: 0.85;
+}
+.timeline-card__markdown :deep(table) {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 0 0 8px;
+}
+.timeline-card__markdown :deep(th),
+.timeline-card__markdown :deep(td) {
+    border: 1px solid rgba(var(--v-theme-on-surface), 0.2);
+    padding: 4px 8px;
+    text-align: left;
+}
+.timeline-card__markdown :deep(a) {
+    color: rgb(var(--v-theme-primary));
+}
+.timeline-card__markdown :deep(img) {
+    max-width: 100%;
+    border-radius: 8px;
+}
+.timeline-card__markdown :deep(hr) {
+    border: none;
+    border-top: 1px solid rgba(var(--v-theme-on-surface), 0.2);
+    margin: 12px 0;
 }
 </style>

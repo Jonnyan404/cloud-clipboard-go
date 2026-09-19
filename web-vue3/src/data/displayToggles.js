@@ -11,12 +11,14 @@
 // 设置面板按组渲染小节，否则一屏几十个开关没法看。
 export const DISPLAY_GROUPS = [
     { key: 'meta', labelKey: 'displayGroupMeta' },
+    { key: 'content', labelKey: 'displayGroupContent' },
 ];
 
 export const DISPLAY_TOGGLES = [
     { key: 'timestamp', group: 'meta', labelKey: 'showTimestamp', icon: 'mdi-clock-outline' },
     { key: 'device', group: 'meta', labelKey: 'showDeviceInfo', icon: 'mdi-devices' },
     { key: 'ip', group: 'meta', labelKey: 'showSenderIP', icon: 'mdi-ip-network-outline' },
+    { key: 'markdown', group: 'content', labelKey: 'renderMarkdown', icon: 'mdi-language-markdown-outline' },
 ];
 
 // 某个分组下有哪些开关。加开关不用动这里。
@@ -31,6 +33,9 @@ export const DEFAULT_DISPLAY = {
     // UA 认不出来的来源。想关的人可以在设置里按模式关掉。
     device: true,
     ip: false,
+    // 默认关：markdown 标记跟日常符号高度重合，先按原文看更稳妥，
+    // 想要排版的人自己去个性化里打开。
+    markdown: false,
 };
 
 // 老版本把三个开关存成三个全局 key，新结构是「每个模式一组」。
