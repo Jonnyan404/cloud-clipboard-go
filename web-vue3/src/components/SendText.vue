@@ -32,6 +32,7 @@ import { useDisplay } from 'vuetify';
 import { useI18n } from 'vue-i18n';
 import axios from 'axios';
 import { toast } from '@/plugins/toast';
+import { errorMessage } from '@/util.js';
 
 defineProps({
     hideTitle: {
@@ -74,8 +75,9 @@ function send() {
         app.send.text = '';
         focus();
     }).catch(error => {
-        if (error.response && error.response.data.msg) {
-            toast(t('sendFailedMsg', { msg: error.response.data.msg }));
+        const errMsg = errorMessage(error);
+        if (errMsg) {
+            toast(t('sendFailedMsg', { msg: errMsg }));
         } else {
             toast(t('sendFailed'));
         }

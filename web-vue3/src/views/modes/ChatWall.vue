@@ -5,16 +5,7 @@ import { useWebSocketStore } from '@/store/websocket';
 import { useTheme } from 'vuetify';
 import { useI18n } from 'vue-i18n';
 import { toast } from '@/plugins/toast';
-import {
-    formatTimestamp,
-    prettyFileSize,
-    buildCleanAbsoluteRouteUrl,
-    createShareLink,
-    copyTextToClipboard,
-    getClientId,
-    SHARE_DEFAULT_TTL,
-    deviceLabel,
-} from '@/util.js';
+import { SHARE_DEFAULT_TTL, buildCleanAbsoluteRouteUrl, copyTextToClipboard, createShareLink, deviceLabel, errorMessage, formatTimestamp, getClientId, prettyFileSize } from '@/util.js';
 import PageToolbar from '@/components/PageToolbar.vue';
 import StickyComposer from '@/components/sticky/StickyComposer.vue';
 import { useStickyAutoscroll } from '@/composables/useStickyAutoscroll';
@@ -241,8 +232,9 @@ async function deleteItem(item) {
         });
         toast(t('deleteSuccessText', { name: item.name }));
     } catch (error) {
-        if (error.response && error.response.data.msg) {
-            toast(t('deleteFailedMessageMsg', { msg: error.response.data.msg }));
+        const errMsg = errorMessage(error);
+        if (errMsg) {
+            toast(t('deleteFailedMessageMsg', { msg: errMsg }));
         } else {
             toast(t('deleteFailedMessage'));
         }
@@ -281,8 +273,9 @@ async function loadPreview() {
             });
             textPreview.value = typeof response.data === 'string' ? response.data : String(response.data || '');
         } catch (error) {
-            if (error.response && error.response.data.msg) {
-                toast(t('fileFetchFailedMsg', { msg: error.response.data.msg }));
+            const errMsg = errorMessage(error);
+            if (errMsg) {
+                toast(t('fileFetchFailedMsg', { msg: errMsg }));
             } else {
                 toast(t('fileFetchFailed'));
             }
@@ -297,8 +290,9 @@ async function loadPreview() {
             });
             srcPreview.value = URL.createObjectURL(new Blob([response.data]));
         } catch (error) {
-            if (error.response && error.response.data.msg) {
-                toast(t('fileFetchFailedMsg', { msg: error.response.data.msg }));
+            const errMsg = errorMessage(error);
+            if (errMsg) {
+                toast(t('fileFetchFailedMsg', { msg: errMsg }));
             } else {
                 toast(t('fileFetchFailed'));
             }

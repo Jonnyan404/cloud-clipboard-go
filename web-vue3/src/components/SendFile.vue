@@ -84,7 +84,7 @@ import { useDisplay } from 'vuetify';
 import { useI18n } from 'vue-i18n';
 import axios from 'axios';
 import { toast } from '@/plugins/toast';
-import { prettyFileSize, percentage } from '@/util.js';
+import { errorMessage, percentage, prettyFileSize } from '@/util.js';
 
 const mdiClose = 'mdi-close';
 
@@ -178,8 +178,9 @@ async function send() {
         toast(t('sendSuccess'));
         app.send.files.splice(0);
     } catch (error) {
-        if (error.response && error.response.data.msg) {
-            toast(t('sendFailedMsg', { msg: error.response.data.msg }));
+        const errMsg = errorMessage(error);
+        if (errMsg) {
+            toast(t('sendFailedMsg', { msg: errMsg }));
         } else {
             toast(t('sendFailed'));
         }

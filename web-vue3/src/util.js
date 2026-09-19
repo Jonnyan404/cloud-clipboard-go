@@ -184,3 +184,20 @@ export function deviceLabel(senderDevice, fallback = '') {
     }
     return senderDevice.name || senderDevice.os || senderDevice.type || fallback;
 }
+
+/**
+ * 从 axios 错误里取出「给人看」的文案。
+ *
+ * 服务端统一返回 { code, error, message }：message 是中文人话，error 是英文人话。
+ * 优先用 message，退回 error。老服务端或反向代理（Cloudflare 502 之类）返回的可能是
+ * 纯文本甚至 HTML，那就截断后原样兜出来 —— 总比只显示一句泛化的「失败」强。
+ *
+ * 之前的写法是直接读 data.msg，而服务端从来不返回 msg 字段，所以这段逻辑一直是死的，
+ * 前端永远只显示泛化提示。
+ */
+export function errorMessage(error) {
+    const data = error?.response?.data;
+    if (!data) return '';
+    if (typeof data === 'string') return data.trim().slice(0, 200);
+    return data.message || data.error || '';
+}

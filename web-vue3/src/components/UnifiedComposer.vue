@@ -368,7 +368,7 @@ import { useTheme } from 'vuetify';
 import { useI18n } from 'vue-i18n';
 import axios from 'axios';
 import { toast } from '@/plugins/toast';
-import { prettyFileSize } from '@/util.js';
+import { errorMessage, prettyFileSize } from '@/util.js';
 import TraditionalColorDialog from '@/components/TraditionalColorDialog.vue';
 
 const mdiPalette = 'mdi-palette';
@@ -562,8 +562,9 @@ async function sendAll() {
         }
         focus();
     } catch (error) {
-        if (error.response && error.response.data.msg) {
-            toast(t('sendFailedMsg', { msg: error.response.data.msg }));
+        const errMsg = errorMessage(error);
+        if (errMsg) {
+            toast(t('sendFailedMsg', { msg: errMsg }));
         } else {
             toast(t('sendFailed'));
         }

@@ -4,15 +4,7 @@ import { useAppStore } from '@/store/app';
 import { useWebSocketStore } from '@/store/websocket';
 import { useI18n } from 'vue-i18n';
 import { toast } from '@/plugins/toast';
-import {
-    formatTimestamp,
-    prettyFileSize,
-    buildCleanAbsoluteRouteUrl,
-    createShareLink,
-    copyTextToClipboard,
-    SHARE_DEFAULT_TTL,
-    deviceLabel,
-} from '@/util.js';
+import { SHARE_DEFAULT_TTL, buildCleanAbsoluteRouteUrl, copyTextToClipboard, createShareLink, deviceLabel, errorMessage, formatTimestamp, prettyFileSize } from '@/util.js';
 
 const props = defineProps({
     meta: {
@@ -228,8 +220,9 @@ async function loadPreview() {
             });
             textPreview.value = typeof response.data === 'string' ? response.data : String(response.data || '');
         } catch (error) {
-            if (error.response && error.response.data.msg) {
-                toast(t('fileFetchFailedMsg', { msg: error.response.data.msg }));
+            const errMsg = errorMessage(error);
+            if (errMsg) {
+                toast(t('fileFetchFailedMsg', { msg: errMsg }));
             } else {
                 toast(t('fileFetchFailed'));
             }
@@ -244,8 +237,9 @@ async function loadPreview() {
             });
             srcPreview.value = URL.createObjectURL(new Blob([response.data]));
         } catch (error) {
-            if (error.response && error.response.data.msg) {
-                toast(t('fileFetchFailedMsg', { msg: error.response.data.msg }));
+            const errMsg = errorMessage(error);
+            if (errMsg) {
+                toast(t('fileFetchFailedMsg', { msg: errMsg }));
             } else {
                 toast(t('fileFetchFailed'));
             }
@@ -272,8 +266,9 @@ async function deleteItem() {
         });
         toast(t(isFile.value ? 'deleteSuccessFile' : 'deleteSuccessText', { name: props.meta.name }));
     } catch (error) {
-        if (error.response && error.response.data.msg) {
-            toast(t('deleteFailedMessageMsg', { msg: error.response.data.msg }));
+        const errMsg = errorMessage(error);
+        if (errMsg) {
+            toast(t('deleteFailedMessageMsg', { msg: errMsg }));
         } else {
             toast(t('deleteFailedMessage'));
         }

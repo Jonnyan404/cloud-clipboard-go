@@ -6,20 +6,7 @@ import { useI18n } from 'vue-i18n';
 import axios from 'axios';
 import { toast } from '@/plugins/toast';
 import QrcodeVue from 'qrcode.vue';
-import {
-    formatTimestamp,
-    buildCleanAbsoluteRouteUrl,
-    createShareLink,
-    copyTextToClipboard,
-    SHARE_DEFAULT_TTL_MINUTES,
-    SHARE_MIN_TTL_MINUTES,
-    SHARE_MAX_TTL_MINUTES,
-    normalizeShareTTL,
-    normalizeShareMaxUses,
-    minutesToShareTTL,
-    formatShareDuration,
-    deviceLabel,
-} from '@/util.js';
+import { SHARE_DEFAULT_TTL_MINUTES, SHARE_MAX_TTL_MINUTES, SHARE_MIN_TTL_MINUTES, buildCleanAbsoluteRouteUrl, copyTextToClipboard, createShareLink, deviceLabel, errorMessage, formatShareDuration, formatTimestamp, minutesToShareTTL, normalizeShareMaxUses, normalizeShareTTL } from '@/util.js';
 
 const mdiCellphone = 'mdi-cellphone';
 const mdiChevronRight = 'mdi-chevron-right';
@@ -160,8 +147,9 @@ async function deleteItem() {
     }).then(() => {
         toast(t('deleteSuccessText'));
     }).catch(error => {
-        if (error.response && error.response.data.msg) {
-            toast(t('deleteFailedMessageMsg', { msg: error.response.data.msg }));
+        const errMsg = errorMessage(error);
+        if (errMsg) {
+            toast(t('deleteFailedMessageMsg', { msg: errMsg }));
         } else {
             toast(t('deleteFailedMessage'));
         }

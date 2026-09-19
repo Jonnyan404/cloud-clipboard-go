@@ -7,23 +7,7 @@ import { useI18n } from 'vue-i18n';
 import axios from 'axios';
 import { toast } from '@/plugins/toast';
 import QrcodeVue from 'qrcode.vue';
-import {
-    buildCleanAbsoluteRouteUrl,
-    createShareLink,
-    copyTextToClipboard,
-    prettyFileSize,
-    percentage,
-    formatTimestamp,
-    SHARE_DEFAULT_TTL,
-    SHARE_DEFAULT_TTL_MINUTES,
-    SHARE_MIN_TTL_MINUTES,
-    SHARE_MAX_TTL_MINUTES,
-    normalizeShareTTL,
-    normalizeShareMaxUses,
-    minutesToShareTTL,
-    formatShareDuration,
-    deviceLabel,
-} from '@/util.js';
+import { SHARE_DEFAULT_TTL, SHARE_DEFAULT_TTL_MINUTES, SHARE_MAX_TTL_MINUTES, SHARE_MIN_TTL_MINUTES, buildCleanAbsoluteRouteUrl, copyTextToClipboard, createShareLink, deviceLabel, errorMessage, formatShareDuration, formatTimestamp, minutesToShareTTL, normalizeShareMaxUses, normalizeShareTTL, percentage, prettyFileSize } from '@/util.js';
 
 const mdiCellphone = 'mdi-cellphone';
 const mdiClockOutline = 'mdi-clock-outline';
@@ -245,8 +229,9 @@ async function previewFile() {
         }).then(response => {
             textPreview.value = typeof response.data === 'string' ? response.data : String(response.data || '');
         }).catch(error => {
-            if (error.response && error.response.data.msg) {
-                toast(t('fileFetchFailedMsg', { msg: error.response.data.msg }));
+            const errMsg = errorMessage(error);
+            if (errMsg) {
+                toast(t('fileFetchFailedMsg', { msg: errMsg }));
             } else {
                 toast(t('fileFetchFailed'));
             }
@@ -262,8 +247,9 @@ async function previewFile() {
         }).then(response => {
             srcPreview.value = URL.createObjectURL(new Blob([response.data]));
         }).catch(error => {
-            if (error.response && error.response.data.msg) {
-                toast(t('fileFetchFailedMsg', { msg: error.response.data.msg }));
+            const errMsg = errorMessage(error);
+            if (errMsg) {
+                toast(t('fileFetchFailedMsg', { msg: errMsg }));
             } else {
                 toast(t('fileFetchFailed'));
             }
@@ -295,8 +281,9 @@ async function deleteItem() {
                 toast(t('deleteSuccessFile', { name: props.meta.name }));
             } catch (error) {
                 console.error('删除物理文件失败:', error);
-                if (error.response && error.response.data.msg) {
-                    toast(t('deleteFailedFileMsg', { msg: error.response.data.msg }));
+                const errMsg = errorMessage(error);
+                if (errMsg) {
+                    toast(t('deleteFailedFileMsg', { msg: errMsg }));
                 } else {
                     toast(t('deleteFailedFile'));
                 }
@@ -305,8 +292,9 @@ async function deleteItem() {
             toast(t('deleteSuccessFile', { name: props.meta.name }));
         }
     } catch (error) {
-        if (error.response && error.response.data.msg) {
-            toast(t('deleteFailedMessageMsg', { msg: error.response.data.msg }));
+        const errMsg = errorMessage(error);
+        if (errMsg) {
+            toast(t('deleteFailedMessageMsg', { msg: errMsg }));
         } else {
             toast(t('deleteFailedMessage'));
         }

@@ -11,6 +11,7 @@ import { toast, toastState } from '@/plugins/toast';
 import TraditionalColorDialog from '@/components/TraditionalColorDialog.vue';
 import RoomList from '@/components/RoomList.vue';
 import QrcodeVue from 'qrcode.vue';
+import { errorMessage } from '@/util.js';
 
 const mdiBrightness4 = 'mdi-brightness-4';
 const mdiChevronLeft = 'mdi-chevron-left';
@@ -272,8 +273,9 @@ async function clearAll() {
     } catch (error) {
         console.log(error);
         clipboardClearedMessageVisible.value = false;
-        if (error.response && error.response.data.msg) {
-            toast(t('clearClipboardFailedMsg', { msg: error.response.data.msg }));
+        const errMsg = errorMessage(error);
+        if (errMsg) {
+            toast(t('clearClipboardFailedMsg', { msg: errMsg }));
         } else {
             toast(t('clearClipboardFailed'));
         }

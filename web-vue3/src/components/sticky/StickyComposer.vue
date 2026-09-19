@@ -4,7 +4,7 @@ import { useAppStore } from '@/store/app';
 import { useWebSocketStore } from '@/store/websocket';
 import { useI18n } from 'vue-i18n';
 import { toast } from '@/plugins/toast';
-import { prettyFileSize, getClientId } from '@/util.js';
+import { errorMessage, getClientId, prettyFileSize } from '@/util.js';
 
 const props = defineProps({
     variant: { type: String, default: 'sticky' },
@@ -182,8 +182,9 @@ async function sendAll() {
         toast(t('sendSuccess'));
         focus();
     } catch (error) {
-        if (error.response && error.response.data.msg) {
-            toast(t('sendFailedMsg', { msg: error.response.data.msg }));
+        const errMsg = errorMessage(error);
+        if (errMsg) {
+            toast(t('sendFailedMsg', { msg: errMsg }));
         } else {
             toast(t('sendFailed'));
         }
