@@ -46,7 +46,7 @@
                     <div class="unified-composer__divider-line"></div>
                     <span class="unified-composer__limit text-caption text-medium-emphasis">{{ textLimitLabel }}</span>
                     <div class="unified-composer__divider-line unified-composer__divider-line--short"></div>
-                    <v-tooltip location="top">
+                    <v-tooltip v-if="app.display.composerSwap" location="top">
                         <template v-slot:activator="{ props }">
                             <v-btn
                                 icon
@@ -102,7 +102,7 @@
 
         <div class="unified-composer__footer pt-1">
                 <div class="unified-composer__footer-icons">
-                    <v-tooltip location="top">
+                    <v-tooltip v-if="app.display.composerDevice" location="top">
                         <template v-slot:activator="{ props }">
                             <v-btn
                                 variant="text"
@@ -122,7 +122,7 @@
                         </template>
                         <span>{{ t('connectedTotal', { count: deviceTotal }) }}</span>
                     </v-tooltip>
-                    <div class="unified-composer__footer-reward">
+                    <div v-if="app.display.composerReward" class="unified-composer__footer-reward">
                         <v-tooltip location="top">
                             <template v-slot:activator="{ props }">
                                 <v-btn
@@ -140,7 +140,7 @@
                         </v-tooltip>
                     </div>
                     <div class="unified-composer__footer-main">
-                        <v-tooltip location="top">
+                        <v-tooltip v-if="app.display.composerPalette" location="top">
                             <template v-slot:activator="{ props }">
                                 <v-btn
                                     icon
@@ -156,7 +156,7 @@
                             </template>
                             <span>{{ t('traditionalColors') }}</span>
                         </v-tooltip>
-                        <v-tooltip location="top">
+                        <v-tooltip v-if="app.display.composerShortcuts" location="top">
                             <template v-slot:activator="{ props }">
                                 <v-btn
                                     icon
@@ -172,7 +172,7 @@
                             </template>
                             <span>{{ t('shortcuts') }}</span>
                         </v-tooltip>
-                        <v-tooltip location="top">
+                        <v-tooltip v-if="app.display.composerTheme" location="top">
                             <template v-slot:activator="{ props }">
                                 <v-btn
                                     icon

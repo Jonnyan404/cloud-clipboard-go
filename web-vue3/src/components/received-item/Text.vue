@@ -191,28 +191,28 @@ async function deleteItem() {
                             <v-icon size="small" class="me-1 timeline-card__expand-icon flex-shrink-0" :class="{ 'timeline-card__expand-icon--open': expand }">{{ mdiChevronRight }}</v-icon>
                             <span class="text-truncate flex-grow-1">{{ decodedContentPreview }}</span>
                             <div class="d-flex flex-nowrap align-center timeline-card__icon-row timeline-card__preview-actions" @click.stop>
-                                <v-tooltip :text="t('copyText')" location="top">
+                                <v-tooltip v-if="app.display.cardCopy" :text="t('copyText')" location="top">
                                     <template v-slot:activator="{ props }">
                                         <v-btn v-bind="props" icon density="compact" variant="text" color="grey" class="timeline-card__icon-button" @click.stop="copyText">
                                             <v-icon>{{mdiContentCopy}}</v-icon>
                                         </v-btn>
                                     </template>
                                 </v-tooltip>
-                                <v-tooltip :text="t('copyLink')" location="top">
+                                <v-tooltip v-if="app.display.cardCopyLink" :text="t('copyLink')" location="top">
                                     <template v-slot:activator="{ props }">
                                         <v-btn v-bind="props" icon density="compact" variant="text" color="grey" class="timeline-card__icon-button" @click.stop="openShareDialog('copy')">
                                             <v-icon>{{mdiLinkVariant }}</v-icon>
                                         </v-btn>
                                     </template>
                                 </v-tooltip>
-                                <v-tooltip :text="t('showQrCode')" location="top">
+                                <v-tooltip v-if="app.display.cardQr" :text="t('showQrCode')" location="top">
                                     <template v-slot:activator="{ props }">
                                         <v-btn v-bind="props" icon density="compact" variant="text" color="grey" class="timeline-card__icon-button" @click.stop="openShareDialog('qr')">
                                             <v-icon>{{mdiQrcode }}</v-icon>
                                         </v-btn>
                                     </template>
                                 </v-tooltip>
-                                <v-tooltip :text="t('delete')" location="top">
+                                <v-tooltip v-if="app.display.cardDelete" :text="t('delete')" location="top">
                                     <template v-slot:activator="{ props }">
                                         <v-btn v-bind="props" icon density="compact" variant="text" color="grey" class="timeline-card__icon-button" @click.stop="deleteItem">
                                             <v-icon>{{mdiClose}}</v-icon>

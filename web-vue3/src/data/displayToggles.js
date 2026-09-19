@@ -12,7 +12,14 @@
 export const DISPLAY_GROUPS = [
     { key: 'meta', labelKey: 'displayGroupMeta' },
     { key: 'content', labelKey: 'displayGroupContent' },
+    { key: 'composer', labelKey: 'displayGroupComposer' },
+    { key: 'card', labelKey: 'displayGroupCard' },
 ];
+
+// 图标类开关（composer / card 两组）只对标准模式有意义：
+// 输入区是 UnifiedComposer、卡片是 received-item/*，两者都只被 DefaultMode 用。
+// 所以整组都写 modes: ['default']，别的模式的面板里不会冒出拨了没反应的开关。
+const ONLY_DEFAULT = ['default'];
 
 export const DISPLAY_TOGGLES = [
     { key: 'timestamp', group: 'meta', labelKey: 'showTimestamp', icon: 'mdi-clock-outline' },
@@ -22,6 +29,28 @@ export const DISPLAY_TOGGLES = [
     // 必须声明 modes：个性化面板是「每模式一组开关」，不声明的话用户会在聊天/终端模式里
     // 拨到一个完全没反应的开关 —— 显示一个不生效的开关，比不显示它更糟。
     { key: 'markdown', group: 'content', labelKey: 'markdownToggle', icon: 'mdi-language-markdown-outline', modes: ['default', 'sticky'] },
+
+    // ── 输入区（标准模式输入框下方那排小图标）────────────────────────
+    // 文案复用已有的 traditionalColors / shortcuts / toggleDarkMode / reward，
+    // 不另造同义词。
+    // 输入框右上角的「全屏」按钮不在这里 —— 它贴着输入框，属于输入区本身，
+    // 不是那排可收的图标。
+    { key: 'composerDevice', group: 'composer', labelKey: 'showComposerDevice', icon: 'mdi-laptop', modes: ONLY_DEFAULT },
+    { key: 'composerSwap', group: 'composer', labelKey: 'showComposerSwap', icon: 'mdi-swap-vertical', modes: ONLY_DEFAULT },
+    { key: 'composerPalette', group: 'composer', labelKey: 'traditionalColors', icon: 'mdi-palette-swatch', modes: ONLY_DEFAULT },
+    { key: 'composerShortcuts', group: 'composer', labelKey: 'shortcuts', icon: 'mdi-flash', modes: ONLY_DEFAULT },
+    { key: 'composerTheme', group: 'composer', labelKey: 'toggleDarkMode', icon: 'mdi-theme-light-dark', modes: ONLY_DEFAULT },
+    { key: 'composerReward', group: 'composer', labelKey: 'reward', icon: 'mdi-currency-cny', modes: ONLY_DEFAULT },
+
+    // ── 卡片（时间流卡片右上角那排图标）──────────────────────────────
+    // 文本卡片只有「复制」，文件卡片是「下载」；两者都有的（复制链接/二维码/删除）
+    // 共用一个开关 —— 同一件事在两个组件里各有一个开关，用户没法预期。
+    { key: 'cardDownload', group: 'card', labelKey: 'download', icon: 'mdi-download', modes: ONLY_DEFAULT },
+    { key: 'cardPreview', group: 'card', labelKey: 'preview', icon: 'mdi-text-box-search-outline', modes: ONLY_DEFAULT },
+    { key: 'cardCopy', group: 'card', labelKey: 'copyText', icon: 'mdi-content-copy', modes: ONLY_DEFAULT },
+    { key: 'cardCopyLink', group: 'card', labelKey: 'copyLink', icon: 'mdi-link-variant', modes: ONLY_DEFAULT },
+    { key: 'cardQr', group: 'card', labelKey: 'showQrCode', icon: 'mdi-qrcode', modes: ONLY_DEFAULT },
+    { key: 'cardDelete', group: 'card', labelKey: 'delete', icon: 'mdi-close-circle-outline', modes: ONLY_DEFAULT },
 ];
 
 // 某个分组下有哪些开关。加开关不用动这里。
@@ -48,6 +77,21 @@ export const DEFAULT_DISPLAY = {
     // `这是一句普通的话` 不会冒图标，`# hi` / `**hi**` / `- a` 才会。
     // 之前默认关，结果是用户写了 markdown 却以为功能没生效（开关藏在设置里，找不到）。
     markdown: true,
+    // 输入区与卡片上的图标：**默认全开**。
+    // 默认关等于「升级后功能消失」，用户根本不知道是设置里多了个开关；
+    // 默认开则相反 —— 想清静的人自己去设置里关，找不到也不会觉得坏了什么。
+    composerDevice: true,
+    composerSwap: true,
+    composerPalette: true,
+    composerShortcuts: true,
+    composerTheme: true,
+    composerReward: true,
+    cardDownload: true,
+    cardPreview: true,
+    cardCopy: true,
+    cardCopyLink: true,
+    cardQr: true,
+    cardDelete: true,
 };
 
 // 老版本把三个开关存成三个全局 key，新结构是「每个模式一组」。
