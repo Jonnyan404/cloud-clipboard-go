@@ -2,6 +2,9 @@
 
 <p align="center">
   <a href="README.zh-CN.md"><img src="https://img.shields.io/badge/lang-简体中文-blue.svg" alt="Chinese Readme"></a>
+  <a href="https://jonnyan404.github.io/cloud-clipboard-go/">
+    <img src="https://img.shields.io/badge/docs-online-blue.svg" alt="Docs site">
+  </a>
   <a href="https://raw.githubusercontent.com/jonnyan404/cloud-clipboard-go-launcher/main/LICENSE">
     <img src="https://img.shields.io/github/license/jonnyan404/cloud-clipboard-go-launcher?color=brightgreen" alt="license">
   </a>
@@ -242,7 +245,9 @@ curl http://localhost:9501/content/latest
 curl http://localhost:9501/content/latest?room=work
 ```
 
-For full API specifications and configuration schema: 📖 [Configuration & API Reference](./cloud-clip/config.md)
+Full REST API reference: 📖 [API docs](https://jonnyan404.github.io/cloud-clipboard-go/api.html) · [Markdown source](./docs/api.md)
+
+Configuration schema: ⚙️ [Configuration Reference](./cloud-clip/config.md)
 
 ---
 

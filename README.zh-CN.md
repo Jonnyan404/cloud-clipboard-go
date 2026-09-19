@@ -2,6 +2,9 @@
 
 <p align="center">
   <a href="README.md"><img src="https://img.shields.io/badge/lang-English-blue.svg" alt="English Readme"></a>
+  <a href="https://jonnyan404.github.io/cloud-clipboard-go/">
+    <img src="https://img.shields.io/badge/文档-在线-blue.svg" alt="文档站点">
+  </a>
   <a href="https://raw.githubusercontent.com/jonnyan404/cloud-clipboard-go-launcher/main/LICENSE">
     <img src="https://img.shields.io/github/license/jonnyan404/cloud-clipboard-go-launcher?color=brightgreen" alt="license">
   </a>
@@ -241,7 +244,9 @@ curl http://localhost:9501/content/latest
 curl http://localhost:9501/content/latest?room=work
 ```
 
-完整接口规范与配置参数说明请参考：📖 [配置文件与 API 文档](./cloud-clip/config.md)
+完整的 REST API 接口文档：📖 [API 文档](https://jonnyan404.github.io/cloud-clipboard-go/api.html) · [Markdown 原文](./docs/api.zh-CN.md)
+
+配置参数说明：⚙️ [配置文件说明](./cloud-clip/config.md)
 
 ---
 
