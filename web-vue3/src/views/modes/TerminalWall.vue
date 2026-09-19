@@ -84,7 +84,7 @@ function timeLabel(item) {
 // 设备标签：开关关掉、或这条消息没带设备信息时返回空串，模板那边靠 v-if 收起整段。
 // 放在 [TEXT]/[FILE] 标签之后、正文之前，读起来像日志的来源前缀。
 function deviceTag(item) {
-    if (!app.showDeviceInfo) {
+    if (!app.display.device) {
         return '';
     }
     return deviceLabel(item?.senderDevice);
@@ -100,13 +100,13 @@ const readerOrigin = computed(() => {
         return '';
     }
     const parts = [];
-    if (app.showDeviceInfo) {
+    if (app.display.device) {
         const device = deviceLabel(item.senderDevice);
         if (device) {
             parts.push(device);
         }
     }
-    if (app.showSenderIP && item.senderIP) {
+    if (app.display.ip && item.senderIP) {
         parts.push(item.senderIP);
     }
     return parts.join(' · ');
@@ -280,13 +280,13 @@ watch(detailItem, (item) => {
 
             <div v-if="items.length" ref="streamEl" class="terminal-wall__stream">
                 <div v-for="item in streamItems" :key="item.id" class="terminal-wall__log">
-                    <span v-if="app.showTimestamp" class="terminal-wall__ts">{{ timeLabel(item) }}</span>
+                    <span v-if="app.display.timestamp" class="terminal-wall__ts">{{ timeLabel(item) }}</span>
                     <span v-if="item.type === 'file'" class="terminal-wall__tag terminal-wall__tag--file">[FILE]</span>
                     <span v-else class="terminal-wall__tag terminal-wall__tag--text">[TEXT]</span>
-                    <span v-if="app.showDeviceInfo && deviceTag(item)" class="terminal-wall__device">{{ deviceTag(item) }}</span>
+                    <span v-if="app.display.device && deviceTag(item)" class="terminal-wall__device">{{ deviceTag(item) }}</span>
                     <!-- 复用 __device 的样式：IP 在这一行里扮演的角色和设备名一样，
                          都是正文前的来源前缀。这一行右边空间足够，不必挪进详情。 -->
-                    <span v-if="app.showSenderIP && item.senderIP" class="terminal-wall__device">{{ item.senderIP }}</span>
+                    <span v-if="app.display.ip && item.senderIP" class="terminal-wall__device">{{ item.senderIP }}</span>
                     <template v-if="item.type === 'text'">
                         <span class="terminal-wall__val">{{ decodedContent(item) }}</span>
                         <span class="terminal-wall__ops">

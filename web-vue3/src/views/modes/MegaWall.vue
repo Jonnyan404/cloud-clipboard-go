@@ -84,11 +84,11 @@ const timeLabel = (item) => formatTimestamp(item.timestamp);
 // 类型（TEXT/FILE）不归设置管 —— 它标的是这条记录是文字还是文件，属结构信息。
 const metaLabel = (item) => {
     const parts = [];
-    if (app.showTimestamp) {
+    if (app.display.timestamp) {
         parts.push(timeLabel(item));
     }
     parts.push(item.type.toUpperCase());
-    if (app.showDeviceInfo) {
+    if (app.display.device) {
         const device = deviceLabel(item.senderDevice);
         if (device) {
             parts.push(device);
@@ -96,7 +96,7 @@ const metaLabel = (item) => {
     }
     // 这一行本来就短（截图里右边全是空的），IP 塞得下，所以就地显示。
     // workbench 那种已经被挤到只剩十来个字的行就没这待遇 —— 它把 IP 放到详情里。
-    if (app.showSenderIP && item.senderIP) {
+    if (app.display.ip && item.senderIP) {
         parts.push(item.senderIP);
     }
     return parts.join(' · ');
@@ -112,13 +112,13 @@ const readerOrigin = computed(() => {
         return '';
     }
     const parts = [];
-    if (app.showDeviceInfo) {
+    if (app.display.device) {
         const device = deviceLabel(item.senderDevice);
         if (device) {
             parts.push(device);
         }
     }
-    if (app.showSenderIP && item.senderIP) {
+    if (app.display.ip && item.senderIP) {
         parts.push(item.senderIP);
     }
     return parts.join(' · ');

@@ -82,10 +82,10 @@ const expireLabel = computed(() => {
 // 留着空标签会凭空多出 8px 空隙）。
 const timestampLabel = computed(() => {
     const parts = [];
-    if (props.meta.timestamp && app.showTimestamp) {
+    if (props.meta.timestamp && app.display.timestamp) {
         parts.push(formatTimestamp(props.meta.timestamp));
     }
-    if (app.showDeviceInfo) {
+    if (app.display.device) {
         const device = deviceLabel(props.meta.senderDevice);
         if (device) {
             parts.push(t('stickyFromDevice', { device }));
@@ -99,7 +99,7 @@ const timestampLabel = computed(() => {
 // 它管的是看不看得见，不是在哪看得见。
 const readerTimeLabel = computed(() => {
     const parts = [timestampLabel.value];
-    if (app.showSenderIP && props.meta.senderIP) {
+    if (app.display.ip && props.meta.senderIP) {
         parts.push(props.meta.senderIP);
     }
     return parts.filter(Boolean).join(' · ');

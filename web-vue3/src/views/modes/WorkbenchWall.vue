@@ -158,7 +158,7 @@ const timeLabel = (item) => formatTimestamp(item.timestamp);
 
 // 设备标签：开关关掉、或这条记录没带设备信息时返回空串，模板那边靠 v-if 收起整段。
 // 三个列表（文件 / 文字 / 全部）共用同一个函数，避免三处各判一次判漏。
-const deviceTag = (item) => (app.showDeviceInfo ? deviceLabel(item?.senderDevice) : '');
+const deviceTag = (item) => (app.display.device ? deviceLabel(item?.senderDevice) : '');
 
 // 详情弹窗里的「设备 · IP」。行内那行元信息放不下 IP，而「显示发送者IP」这个开关
 // 之前在 mega / terminal / workbench / sticky 四个紧凑模式里完全没有生效点 ——
@@ -170,13 +170,13 @@ const readerOrigin = computed(() => {
         return '';
     }
     const parts = [];
-    if (app.showDeviceInfo) {
+    if (app.display.device) {
         const device = deviceLabel(item.senderDevice);
         if (device) {
             parts.push(device);
         }
     }
-    if (app.showSenderIP && item.senderIP) {
+    if (app.display.ip && item.senderIP) {
         parts.push(item.senderIP);
     }
     return parts.join(' · ');
@@ -428,8 +428,8 @@ watch(detailItem, (item) => {
                             <span class="workbench-wall__row-title">{{ item.name || 'file' }}</span>
                             <span class="workbench-wall__row-meta">{{ prettyFileSize(item.size || 0) }}</span>
                             <span v-if="deviceTag(item)" class="workbench-wall__row-device">{{ deviceTag(item) }}</span>
-                            <span v-if="app.showTimestamp" class="workbench-wall__row-time workbench-wall__row-time--full">{{ timeLabel(item) }}</span>
-                            <span v-if="app.showTimestamp" class="workbench-wall__row-time workbench-wall__row-time--compact">{{ relativeTimeLabel(item) }}</span>
+                            <span v-if="app.display.timestamp" class="workbench-wall__row-time workbench-wall__row-time--full">{{ timeLabel(item) }}</span>
+                            <span v-if="app.display.timestamp" class="workbench-wall__row-time workbench-wall__row-time--compact">{{ relativeTimeLabel(item) }}</span>
                         </div>
                     </div>
                     <div v-else class="workbench-wall__pane-empty">{{ t('workbenchNoFiles') }}</div>
@@ -453,8 +453,8 @@ watch(detailItem, (item) => {
                             <span class="workbench-wall__row-icon">📝</span>
                             <span class="workbench-wall__row-title">{{ decodedContent(item) }}</span>
                             <span v-if="deviceTag(item)" class="workbench-wall__row-device">{{ deviceTag(item) }}</span>
-                            <span v-if="app.showTimestamp" class="workbench-wall__row-time workbench-wall__row-time--full">{{ timeLabel(item) }}</span>
-                            <span v-if="app.showTimestamp" class="workbench-wall__row-time workbench-wall__row-time--compact">{{ relativeTimeLabel(item) }}</span>
+                            <span v-if="app.display.timestamp" class="workbench-wall__row-time workbench-wall__row-time--full">{{ timeLabel(item) }}</span>
+                            <span v-if="app.display.timestamp" class="workbench-wall__row-time workbench-wall__row-time--compact">{{ relativeTimeLabel(item) }}</span>
                             <span class="workbench-wall__row-ops">
                                 <button type="button" class="workbench-wall__op" :title="t('copyText')" @click.stop="copyContent(item)">
                                     <v-icon size="large">mdi-content-copy</v-icon>
@@ -488,8 +488,8 @@ watch(detailItem, (item) => {
                             <span class="workbench-wall__row-title">{{ item.type === 'file' ? (item.name || 'file') : decodedContent(item) }}</span>
                             <span v-if="item.type === 'file'" class="workbench-wall__row-meta">{{ prettyFileSize(item.size || 0) }}</span>
                             <span v-if="deviceTag(item)" class="workbench-wall__row-device">{{ deviceTag(item) }}</span>
-                            <span v-if="app.showTimestamp" class="workbench-wall__row-time workbench-wall__row-time--full">{{ timeLabel(item) }}</span>
-                            <span v-if="app.showTimestamp" class="workbench-wall__row-time workbench-wall__row-time--compact">{{ relativeTimeLabel(item) }}</span>
+                            <span v-if="app.display.timestamp" class="workbench-wall__row-time workbench-wall__row-time--full">{{ timeLabel(item) }}</span>
+                            <span v-if="app.display.timestamp" class="workbench-wall__row-time workbench-wall__row-time--compact">{{ relativeTimeLabel(item) }}</span>
                             <span class="workbench-wall__row-ops">
                                 <button v-if="item.type === 'file'" type="button" class="workbench-wall__op" :title="isItemExpired(item) ? t('expired') : t('download')" @click.stop="item.cache && downloadItem(item)">
                                     <v-icon size="large">mdi-download</v-icon>

@@ -120,17 +120,17 @@ const shortTime = (item) => {
 // 类型标签不归设置管，它标的是这条气泡是文字还是文件，属于结构信息。
 const bubbleFooter = (item) => {
     const parts = [];
-    if (app.showTimestamp) {
+    if (app.display.timestamp) {
         parts.push(shortTime(item));
     }
     parts.push(item.type === 'text' ? t('chatTypeText') : t('chatTypeFile'));
     if (isOwnBubble(item)) {
         parts.push(t('chatSynced'));
     }
-    if (app.showDeviceInfo && item.senderDevice) {
+    if (app.display.device && item.senderDevice) {
         parts.push(deviceLabel(item.senderDevice));
     }
-    if (app.showSenderIP && item.senderIP) {
+    if (app.display.ip && item.senderIP) {
         parts.push(item.senderIP);
     }
     return parts.join(' · ');

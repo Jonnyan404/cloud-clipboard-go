@@ -12,18 +12,17 @@ import TraditionalColorDialog from '@/components/TraditionalColorDialog.vue';
 import RoomList from '@/components/RoomList.vue';
 import QrcodeVue from 'qrcode.vue';
 import { errorMessage } from '@/util.js';
+import { MODES } from '@/views/modes/registry.js';
+import { DISPLAY_GROUPS, DISPLAY_TOGGLES, togglesInGroup } from '@/data/displayToggles.js';
 
 const mdiBrightness4 = 'mdi-brightness-4';
 const mdiChevronLeft = 'mdi-chevron-left';
 const mdiChevronRight = 'mdi-chevron-right';
-const mdiClockOutline = 'mdi-clock-outline';
 const mdiClose = 'mdi-close';
 const mdiContentPaste = 'mdi-content-paste';
-const mdiDevices = 'mdi-devices';
 const mdiDiceMultiple = 'mdi-dice-multiple';
 const mdiGithub = 'mdi-github';
 const mdiHeartOutline = 'mdi-heart-outline';
-const mdiIpNetworkOutline = 'mdi-ip-network-outline';
 const mdiOpenInNew = 'mdi-open-in-new';
 const mdiPalette = 'mdi-palette';
 const mdiPaletteSwatch = 'mdi-palette-swatch';
@@ -45,6 +44,9 @@ const colorDialog = ref(false);
 const pickColorDialog = ref(false);
 const settingsDialog = ref(false);
 const pageQrDialogVisible = ref(false);
+// 设置面板的页签：通用 / 个性化。个性化里是「每个界面模式一组显示开关」，
+// 开关会长到几十项，所以必须单独占一页，不能平铺在通用页里。
+const settingsTab = ref('general');
 const pageQrMode = ref('page');
 const currentPrimary = computed(() => isDark.value ? theme.themes.value.dark.colors.primary : theme.themes.value.light.colors.primary);
 const clearAllDialog = ref(false);
@@ -578,145 +580,157 @@ watch(() => route.fullPath, () => {
                     </v-btn>
                 </v-card-title>
                 <v-divider></v-divider>
-                <v-card-text class="pa-4 pt-0">
-                    <div class="cc-settings__group">
-                        <v-list-subheader class="cc-settings__subheader">{{ t('appearance') }}</v-list-subheader>
-                        <v-list class="cc-settings__list" density="comfortable">
-                            <v-list-item class="cc-settings__item">
+                <v-tabs v-model="settingsTab" density="comfortable" color="primary" class="cc-settings__tabs">
+                    <v-tab value="general">{{ t('settingsGeneral') }}</v-tab>
+                    <v-tab value="personalization">{{ t('personalization') }}</v-tab>
+                </v-tabs>
+                <v-tabs-window v-model="settingsTab">
+                    <v-tabs-window-item value="general">
+                        <v-card-text class="cc-settings__body" style="max-height: 62vh; overflow-y: auto;">
+                            <div class="cc-settings__group">
+                            <v-list-subheader class="cc-settings__subheader">{{ t('appearance') }}</v-list-subheader>
+                            <v-list class="cc-settings__list" density="comfortable">
+                                <v-list-item class="cc-settings__item">
+                                    <template v-slot:prepend>
+                                        <v-icon color="primary">{{ mdiBrightness4 }}</v-icon>
+                                    </template>
+                                    <v-list-item-title>{{ t('darkMode') }}</v-list-item-title>
+                                    <template v-slot:append>
+                                        <v-select
+                                            :model-value="app.dark"
+                                            :items="darkModeOptions"
+                                            item-title="title"
+                                            item-value="value"
+                                            hide-details
+                                            density="compact"
+                                            class="cc-settings-select"
+                                            @update:model-value="v => app.dark = v"
+                                        ></v-select>
+                                    </template>
+                                </v-list-item>
+                                <v-list-item class="cc-settings__item">
+                                    <template v-slot:prepend>
+                                        <v-icon color="primary">{{ mdiPalette }}</v-icon>
+                                    </template>
+                                    <v-list-item-title>{{ t('changeThemeColor') }}</v-list-item-title>
+                                    <template v-slot:append>
+                                        <div class="cc-settings__theme-actions">
+                                            <v-btn
+                                                variant="tonal"
+                                                size="small"
+                                                class="cc-settings__theme-btn"
+                                                @click="pickColorDialog = true"
+                                            >
+                                                <span class="cc-settings__swatch" :style="{ background: currentPrimary }"></span>
+                                                {{ t('colorPicker') }}
+                                            </v-btn>
+                                            <v-btn
+                                                variant="tonal"
+                                                size="small"
+                                                class="cc-settings__theme-btn"
+                                                @click="colorDialog = true"
+                                            >
+                                                <v-icon start size="16">{{ mdiPaletteSwatch }}</v-icon>
+                                                {{ t('traditionalColors') }}
+                                            </v-btn>
+                                        </div>
+                                    </template>
+                                </v-list-item>
+                            </v-list>
+                        </div>
+                            <div class="cc-settings__group">
+                            <v-list-subheader class="cc-settings__subheader">{{ t('language') }}</v-list-subheader>
+                            <v-list class="cc-settings__list" density="comfortable">
+                                <v-list-item class="cc-settings__item">
+                                    <template v-slot:prepend>
+                                        <v-icon color="primary">{{ mdiTranslate }}</v-icon>
+                                    </template>
+                                    <v-list-item-title>{{ t('language') }}</v-list-item-title>
+                                    <template v-slot:append>
+                                        <v-select
+                                            :model-value="currentLocaleCode"
+                                            :items="languageOptions"
+                                            item-title="name"
+                                            item-value="code"
+                                            hide-details
+                                            density="compact"
+                                            class="cc-settings-select"
+                                            @update:model-value="changeLocale"
+                                        ></v-select>
+                                    </template>
+                                </v-list-item>
+                            </v-list>
+                        </div>
+                            <div class="cc-settings__group">
+                            <v-list-subheader class="cc-settings__subheader">{{ t('about') }}</v-list-subheader>
+                            <v-list class="cc-settings__list" density="comfortable">
+                                <v-list-item class="cc-settings__item">
+                                    <template v-slot:prepend>
+                                        <v-icon color="primary">{{ mdiGithub }}</v-icon>
+                                    </template>
+                                    <v-list-item-title>
+                                        <a href="https://github.com/Jonnyan404/cloud-clipboard-go" target="_blank" rel="noopener" class="cc-settings__link">
+                                            {{ t('github') }}
+                                            <v-icon size="16" class="cc-settings__external">{{ mdiOpenInNew }}</v-icon>
+                                        </a>
+                                    </v-list-item-title>
+                                </v-list-item>
+                            </v-list>
+                            <v-divider class="my-2"></v-divider>
+                            <v-btn block color="error" variant="outlined" size="small"
+                                   class="cc-settings__donate-btn"
+                                   @click="donateDialog = true">
                                 <template v-slot:prepend>
-                                    <v-icon color="primary">{{ mdiBrightness4 }}</v-icon>
+                                    <v-icon>{{ mdiHeartOutline }}</v-icon>
                                 </template>
-                                <v-list-item-title>{{ t('darkMode') }}</v-list-item-title>
+                                {{ t('donatePrompt') }}
                                 <template v-slot:append>
-                                    <v-select
-                                        :model-value="app.dark"
-                                        :items="darkModeOptions"
-                                        item-title="title"
-                                        item-value="value"
-                                        hide-details
-                                        density="compact"
-                                        class="cc-settings-select"
-                                        @update:model-value="v => app.dark = v"
-                                    ></v-select>
+                                    <v-icon size="16">{{ mdiChevronRight }}</v-icon>
                                 </template>
-                            </v-list-item>
-                            <v-list-item class="cc-settings__item">
-                                <template v-slot:prepend>
-                                    <v-icon color="primary">{{ mdiPalette }}</v-icon>
-                                </template>
-                                <v-list-item-title>{{ t('changeThemeColor') }}</v-list-item-title>
-                                <template v-slot:append>
-                                    <div class="cc-settings__theme-actions">
-                                        <v-btn
-                                            variant="tonal"
-                                            size="small"
-                                            class="cc-settings__theme-btn"
-                                            @click="pickColorDialog = true"
-                                        >
-                                            <span class="cc-settings__swatch" :style="{ background: currentPrimary }"></span>
-                                            {{ t('colorPicker') }}
-                                        </v-btn>
-                                        <v-btn
-                                            variant="tonal"
-                                            size="small"
-                                            class="cc-settings__theme-btn"
-                                            @click="colorDialog = true"
-                                        >
-                                            <v-icon start size="16">{{ mdiPaletteSwatch }}</v-icon>
-                                            {{ t('traditionalColors') }}
-                                        </v-btn>
-                                    </div>
-                                </template>
-                            </v-list-item>
-                        </v-list>
-                    </div>
-
-                    <div class="cc-settings__group">
-                        <v-list-subheader class="cc-settings__subheader">{{ t('language') }}</v-list-subheader>
-                        <v-list class="cc-settings__list" density="comfortable">
-                            <v-list-item class="cc-settings__item">
-                                <template v-slot:prepend>
-                                    <v-icon color="primary">{{ mdiTranslate }}</v-icon>
-                                </template>
-                                <v-list-item-title>{{ t('language') }}</v-list-item-title>
-                                <template v-slot:append>
-                                    <v-select
-                                        :model-value="currentLocaleCode"
-                                        :items="languageOptions"
-                                        item-title="name"
-                                        item-value="code"
-                                        hide-details
-                                        density="compact"
-                                        class="cc-settings-select"
-                                        @update:model-value="changeLocale"
-                                    ></v-select>
-                                </template>
-                            </v-list-item>
-                        </v-list>
-                    </div>
-
-                    <div class="cc-settings__group">
-                        <v-list-subheader class="cc-settings__subheader">{{ t('displaySettings') }}</v-list-subheader>
-                        <v-list class="cc-settings__list" density="comfortable">
-                            <v-list-item class="cc-settings__item">
-                                <template v-slot:prepend>
-                                    <v-icon color="primary">{{ mdiClockOutline }}</v-icon>
-                                </template>
-                                <v-list-item-title>{{ t('showTimestamp') }}</v-list-item-title>
-                                <template v-slot:append>
-                                    <v-switch :model-value="app.showTimestamp" @update:model-value="app.setShowTimestamp" color="primary" hide-details inset></v-switch>
-                                </template>
-                            </v-list-item>
-                            <v-list-item class="cc-settings__item">
-                                <template v-slot:prepend>
-                                    <v-icon color="primary">{{ mdiDevices }}</v-icon>
-                                </template>
-                                <v-list-item-title>{{ t('showDeviceInfo') }}</v-list-item-title>
-                                <template v-slot:append>
-                                    <v-switch :model-value="app.showDeviceInfo" @update:model-value="app.setShowDeviceInfo" color="primary" hide-details inset></v-switch>
-                                </template>
-                            </v-list-item>
-                            <v-list-item class="cc-settings__item">
-                                <template v-slot:prepend>
-                                    <v-icon color="primary">{{ mdiIpNetworkOutline }}</v-icon>
-                                </template>
-                                <v-list-item-title>{{ t('showSenderIP') }}</v-list-item-title>
-                                <template v-slot:append>
-                                    <v-switch :model-value="app.showSenderIP" @update:model-value="app.setShowSenderIP" color="primary" hide-details inset></v-switch>
-                                </template>
-                            </v-list-item>
-                        </v-list>
-                    </div>
-
-                    <div class="cc-settings__group">
-                        <v-list-subheader class="cc-settings__subheader">{{ t('about') }}</v-list-subheader>
-                        <v-list class="cc-settings__list" density="comfortable">
-                            <v-list-item class="cc-settings__item">
-                                <template v-slot:prepend>
-                                    <v-icon color="primary">{{ mdiGithub }}</v-icon>
-                                </template>
-                                <v-list-item-title>
-                                    <a href="https://github.com/Jonnyan404/cloud-clipboard-go" target="_blank" rel="noopener" class="cc-settings__link">
-                                        {{ t('github') }}
-                                        <v-icon size="16" class="cc-settings__external">{{ mdiOpenInNew }}</v-icon>
-                                    </a>
-                                </v-list-item-title>
-                            </v-list-item>
-                        </v-list>
-                        <v-divider class="my-2"></v-divider>
-                        <v-btn block color="error" variant="outlined" size="small"
-                               class="cc-settings__donate-btn"
-                               @click="donateDialog = true">
-                            <template v-slot:prepend>
-                                <v-icon>{{ mdiHeartOutline }}</v-icon>
-                            </template>
-                            {{ t('donatePrompt') }}
-                            <template v-slot:append>
-                                <v-icon size="16">{{ mdiChevronRight }}</v-icon>
-                            </template>
-                        </v-btn>
-                    </div>
-                </v-card-text>
+                            </v-btn>
+                        </div>
+                        </v-card-text>
+                    </v-tabs-window-item>
+                    <v-tabs-window-item value="personalization">
+                        <v-card-text class="cc-settings__body" style="max-height: 62vh; overflow-y: auto;">
+                            <div class="text-caption text-medium-emphasis mb-3">{{ t('personalizationHint') }}</div>
+                                                    <v-btn-toggle
+                                                        :model-value="app.uiMode"
+                                                        @update:model-value="app.setUiMode"
+                                                        mandatory
+                                                        density="comfortable"
+                                                        class="flex-wrap mb-2"
+                                                        style="height: auto;"
+                                                    >
+                                                        <v-btn v-for="mode in MODES" :key="mode.key" :value="mode.key" size="small" class="text-none">
+                                                            <v-icon start size="18">{{ mode.icon }}</v-icon>{{ t(mode.labelKey) }}
+                                                        </v-btn>
+                                                    </v-btn-toggle>
+                                                    <template v-for="group in DISPLAY_GROUPS" :key="group.key">
+                                                        <template v-if="togglesInGroup(group.key).length">
+                                                            <v-list-subheader class="cc-settings__subheader">{{ t(group.labelKey) }}</v-list-subheader>
+                                                            <v-list class="cc-settings__list cc-settings__toggles" density="comfortable">
+                                                                <v-list-item v-for="toggle in togglesInGroup(group.key)" :key="toggle.key" class="cc-settings__item">
+                                                                    <template v-slot:prepend>
+                                                                        <v-icon color="primary">{{ toggle.icon }}</v-icon>
+                                                                    </template>
+                                                                    <v-list-item-title>{{ t(toggle.labelKey) }}</v-list-item-title>
+                                                                    <template v-slot:append>
+                                                                        <v-switch
+                                                                            :model-value="app.display[toggle.key]"
+                                                                            @update:model-value="value => app.setDisplayToggle(toggle.key, value)"
+                                                                            color="primary"
+                                                                            hide-details
+                                                                            inset
+                                                                        ></v-switch>
+                                                                    </template>
+                                                                </v-list-item>
+                                                            </v-list>
+                                                        </template>
+                                                    </template>
+                        </v-card-text>
+                    </v-tabs-window-item>
+                </v-tabs-window>
             </v-card>
         </v-dialog>
 

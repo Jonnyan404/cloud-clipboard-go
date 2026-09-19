@@ -166,15 +166,15 @@ async function deleteItem() {
             <v-card-text>
                 <div class="d-flex flex-row align-start">
                     <div class="flex-grow-1" style="min-width: 0">
-                        <div class="text-caption d-flex flex-nowrap align-center mb-2 timeline-card__meta" v-if="meta.timestamp && (app.showTimestamp || app.showDeviceInfo || app.showSenderIP)">
+                        <div class="text-caption d-flex flex-nowrap align-center mb-2 timeline-card__meta" v-if="meta.timestamp && (app.display.timestamp || app.display.device || app.display.ip)">
                             <v-chip size="x-small" label variant="flat" color="primary" class="mr-2 flex-shrink-0">{{ t('textMessage') }}</v-chip>
-                            <template v-if="app.showTimestamp">
+                            <template v-if="app.display.timestamp">
                                 <span class="mr-3 text-no-wrap flex-shrink-0"><v-icon size="x-small" class="mr-1">{{ mdiClockOutline }}</v-icon>{{ formatTimestamp(meta.timestamp) }}</span>
                             </template>
-                            <template v-if="app.showDeviceInfo && meta.senderDevice?.type">
+                            <template v-if="app.display.device && meta.senderDevice?.type">
                                 <span class="mr-3 text-no-wrap flex-shrink-0"><v-icon size="x-small" class="mr-1">{{ deviceIcon(meta.senderDevice.type) }}</v-icon>{{ deviceLabel(meta.senderDevice) }}</span>
                             </template>
-                            <template v-if="app.showSenderIP && meta.senderIP">
+                            <template v-if="app.display.ip && meta.senderIP">
                                 <span class="text-no-wrap flex-shrink-0"><v-icon size="x-small" class="mr-1">{{ mdiIpNetworkOutline }}</v-icon>{{ meta.senderIP }}</span>
                             </template>
                         </div>
