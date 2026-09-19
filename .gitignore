@@ -32,6 +32,10 @@ openwrt/build/
 /.vite/
 /cloud-clip/cloud-clipboard-go-embed
 
+# 网页端的捷径下载目录：由 web-vue3/scripts/sync-shortcuts.mjs 从 shortcuts/ 生成，
+# 是派生产物 —— 唯一源仍是 shortcuts/ 下那几份，别把副本入库。
+/web-vue3/public/shortcuts/
+
 # Python
 __pycache__/
 *.py[cod]

@@ -165,6 +165,22 @@
                                     size="small"
                                     color="grey-darken-1"
                                     v-bind="props"
+                                    @click="shortcutsDialog = true"
+                                >
+                                    <v-icon>{{ mdiFlash }}</v-icon>
+                                </v-btn>
+                            </template>
+                            <span>{{ t('shortcuts') }}</span>
+                        </v-tooltip>
+                        <v-tooltip location="top">
+                            <template v-slot:activator="{ props }">
+                                <v-btn
+                                    icon
+                                    density="comfortable"
+                                    variant="text"
+                                    size="small"
+                                    color="grey-darken-1"
+                                    v-bind="props"
                                     @click="toggleDark"
                                 >
                                     <v-icon>{{ isDark ? mdiWhiteBalanceSunny : mdiWeatherNight }}</v-icon>
@@ -358,6 +374,7 @@
     </v-dialog>
 
     <traditional-color-dialog v-model="colorDialog"></traditional-color-dialog>
+    <shortcuts-dialog v-model="shortcutsDialog"></shortcuts-dialog>
 </template>
 
 <script setup>import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
@@ -370,9 +387,11 @@ import axios from 'axios';
 import { toast } from '@/plugins/toast';
 import { errorMessage, prettyFileSize } from '@/util.js';
 import TraditionalColorDialog from '@/components/TraditionalColorDialog.vue';
+import ShortcutsDialog from '@/components/ShortcutsDialog.vue';
 
 const mdiPalette = 'mdi-palette';
 const mdiPaletteSwatch = 'mdi-palette-swatch';
+const mdiFlash = 'mdi-flash';
 const mdiSend = 'mdi-send';
 const mdiLaptop = 'mdi-laptop';
 const mdiCellphone = 'mdi-cellphone';
@@ -411,6 +430,7 @@ const composerRows = computed(() => isFilePrimary.value ? 1 : 3);
 const deviceDialog = ref(false);
 const rewardDialog = ref(false);
 const colorDialog = ref(false);
+const shortcutsDialog = ref(false);
 const textFullscreen = ref(false);
 function toggleTextFullscreen() {
     textFullscreen.value = !textFullscreen.value;
