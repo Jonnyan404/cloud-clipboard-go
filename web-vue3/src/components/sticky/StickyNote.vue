@@ -1,6 +1,9 @@
 <script setup>import { computed, ref, watch } from 'vue';
 import axios from 'axios';
 import { useAppStore } from '@/store/app';
+import { useMarkdown } from '@/composables/useMarkdown.js';
+import MarkdownBody from '@/components/MarkdownBody.vue';
+import MarkdownToggle from '@/components/MarkdownToggle.vue';
 import { useWebSocketStore } from '@/store/websocket';
 import { useI18n } from 'vue-i18n';
 import { toast } from '@/plugins/toast';
@@ -41,6 +44,17 @@ const decodedContent = computed(() => {
     textArea.innerHTML = props.meta.content || '';
     return textArea.value;
 });
+// md 渲染只接在**阅读器**（点开便签后的大视图）—— 便签卡片本身是贴纸风格，
+// 面积也小，渲染排版反而破坏那个感觉。默认跟随个性化开关，阅读器右上角可临时切。
+//
+// 取文源必须分岔：文本便签在 meta.content 里，**文件的 FileReceive 没有 content 字段**
+// （见 Go 侧 type.go），正文只能等 loadPreview 抓回来的 textPreview。
+// 之前两种都接 decodedContent，于是 .md 文件永远拿到空串 —— 图标点得动，但渲染出空白。
+const md = useMarkdown(
+    () => (isFile.value ? displayedTextPreview.value : decodedContent.value),
+    () => /\.(md|markdown|mdown|mkd)$/i.test(props.meta.name || ''),
+);
+
 const isLink = computed(() => !isFile.value && /^https?:\/\/[^\s]+$/i.test(decodedContent.value.trim()));
 const noteLabel = computed(() => {
     if (isFile.value) {
@@ -340,16 +354,36 @@ async function deleteItem() {
                         <v-icon size="small">mdi-close</v-icon>
                     </v-btn>
                 </div>
-                <div v-if="isFile" class="sticky-note__reader-file">
-                    <span class="sticky-note__fic">{{ fileIcon }}</span>
-                    <span class="sticky-note__reader-name">{{ meta.name }}</span>
-                    <span class="sticky-note__meta">{{ fileMetaLabel }}</span>
+                <!-- 文件：名字/大小/过期**永远**显示。之前这几行跟着 `!md.available` 一起被
+                     藏掉，.md 文件就变成「没有名字、没有大小、没有过期」的一张空对话框。 -->
+                <template v-if="isFile">
+                    <div class="sticky-note__reader-file">
+                        <span class="sticky-note__fic">{{ fileIcon }}</span>
+                        <span class="sticky-note__reader-name">{{ meta.name }}</span>
+                        <span class="sticky-note__meta">{{ fileMetaLabel }}</span>
+                    </div>
+                    <div v-if="isExpirable" class="sticky-note__reader-expire" :class="{ 'sticky-note__reader-expire--past': expired }">
+                        <v-icon size="x-small">mdi-clock-outline</v-icon>
+                        {{ expireLabel }}
+                    </div>
+                </template>
+                <!-- 文本便签的正文块。文件不走这里 —— 文件的正文在下面的预览块里，
+                     md 开关也得跟着正文走（与标准模式的 File.vue 一致）。
+                     图标放在**不滚动**的外层、正文放里层：否则内容一长往下滚，图标跟着滚走。 -->
+                <div v-else class="md-preview">
+                    <markdown-toggle v-if="md.available" v-model:mode="md.mode"></markdown-toggle>
+                    <div
+                        class="sticky-note__reader-text"
+                        :class="[
+                            isLink ? 'sticky-note__text--link' : '',
+                            md.available ? 'sticky-note__reader-text--md' : '',
+                            md.html ? 'sticky-note__reader-text--rendered' : '',
+                        ]"
+                    >
+                        <markdown-body v-if="md.html" :html="md.html"></markdown-body>
+                        <template v-else>{{ decodedContent }}</template>
+                    </div>
                 </div>
-                <div v-if="isFile && isExpirable" class="sticky-note__reader-expire" :class="{ 'sticky-note__reader-expire--past': expired }">
-                    <v-icon size="x-small">mdi-clock-outline</v-icon>
-                    {{ expireLabel }}
-                </div>
-                <div v-else class="sticky-note__reader-text" :class="isLink ? 'sticky-note__text--link' : ''">{{ decodedContent }}</div>
 
                 <div v-if="isFile && canPreview" class="sticky-note__reader-preview">
                     <div v-if="previewLoading" class="sticky-note__preview-loading">
@@ -371,7 +405,23 @@ async function deleteItem() {
                             preload="metadata"
                         ></audio>
                         <template v-else-if="isPreviewableText">
-                            <pre class="sticky-note__preview-text">{{ displayedTextPreview }}</pre>
+                            <div class="md-preview">
+                                <markdown-toggle v-if="md.available" v-model:mode="md.mode"></markdown-toggle>
+                                <!-- 渲染态：正文是裸 markdown，自己当滚动盒 -->
+                                <div
+                                    v-if="md.html"
+                                    class="sticky-note__preview-scroll"
+                                    :class="{ 'sticky-note__preview-scroll--md': md.available }"
+                                >
+                                    <markdown-body :html="md.html"></markdown-body>
+                                </div>
+                                <!-- 原文态：pre 自己当滚动盒。两者互斥，别套成两层滚动 -->
+                                <pre
+                                    v-else
+                                    class="sticky-note__preview-text"
+                                    :class="{ 'sticky-note__preview-text--md': md.available }"
+                                >{{ displayedTextPreview }}</pre>
+                            </div>
                             <div v-if="hasTruncatedTextPreview" class="d-flex justify-space-between align-center mt-2">
                                 <div class="text-caption text-medium-emphasis">
                                     {{ t('textPreviewTruncated', { limit: prettyFileSize(textPreviewDisplayLimit) }) }}
@@ -518,7 +568,7 @@ async function deleteItem() {
     line-height: 1.5;
     font-weight: 500;
     word-break: break-word;
-    overflow-wrap: anywhere;
+
     white-space: pre-wrap;
     display: -webkit-box;
     -webkit-line-clamp: 4;
@@ -716,5 +766,66 @@ async function deleteItem() {
     padding: 12px;
     max-height: 40vh;
     overflow-y: auto;
+}
+
+/* 浮动图标的定位基准 —— MarkdownToggle 内部是 absolute。
+   这一层**不滚动**，滚动交给里面的正文盒：图标才不会跟着内容滚走。
+   注意别在这里加 overflow —— 图标是 absolute 且高 24px，容器一旦是 0 高 + overflow:auto
+   （便签裸文本没内容时就是这样），图标会被整个裁掉：DOM 在、visibility 也是 visible，
+   但屏幕上什么都没有。这类「看不见」最难查，因为它不报错。 */
+.md-preview {
+    position: relative;
+}
+
+/* 图标浮在右上角，正文得给它让位 —— 加在**滚动盒**上，因为滚动条永远贴着滚动盒的右沿，
+   加在外层不滚动的盒子上是白加（滚动条不会跟着挪）。
+   数值来自 MarkdownToggle 的 --md-toggle-gutter，改图标尺寸只改那一处。 */
+.sticky-note__reader-text--md,
+.sticky-note__preview-text--md,
+.sticky-note__preview-scroll--md {
+    padding-right: var(--md-toggle-gutter);
+}
+
+/* 渲染 markdown 时收掉 white-space: pre-wrap —— 它是给纯文本保留换行的，
+   套在 HTML 结构上会凭空多出空白。 */
+.sticky-note__reader-text--rendered {
+    white-space: normal;
+}
+
+/* 渲染态的滚动盒。原文态不用它：那边的 pre 自带 max-height + overflow。 */
+.sticky-note__preview-scroll {
+    max-height: 40vh;
+    overflow-y: auto;
+}
+
+/* 滚动条跟着便签配色走：阅读器底色是固定的暖色（#fff8c5 这一套），
+   浏览器默认那条灰白滚动条压在上面很出戏。
+   Chrome / Safari 走 ::-webkit-scrollbar；Firefox 没有对应写法，回落默认样式（可接受）。
+   ⚠️ 不要同时写标准的 scrollbar-color / scrollbar-width —— Chrome 一旦认了那两个，
+   就会忽略下面的 ::-webkit-scrollbar，宽度不再可控，上面那份「让位」就算错了。 */
+.sticky-note__reader-text::-webkit-scrollbar,
+.sticky-note__preview-text::-webkit-scrollbar,
+.sticky-note__preview-scroll::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.sticky-note__reader-text::-webkit-scrollbar-track,
+.sticky-note__preview-text::-webkit-scrollbar-track,
+.sticky-note__preview-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.sticky-note__reader-text::-webkit-scrollbar-thumb,
+.sticky-note__preview-text::-webkit-scrollbar-thumb,
+.sticky-note__preview-scroll::-webkit-scrollbar-thumb {
+    background: rgba(68, 64, 42, 0.45);
+    border-radius: 4px;
+}
+
+.sticky-note__reader-text::-webkit-scrollbar-thumb:hover,
+.sticky-note__preview-text::-webkit-scrollbar-thumb:hover,
+.sticky-note__preview-scroll::-webkit-scrollbar-thumb:hover {
+    background: rgba(68, 64, 42, 0.62);
 }
 </style>

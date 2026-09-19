@@ -19,12 +19,29 @@ const INITIAL_DISPLAY = (() => {
 })();
 
 // 只读回用户显式配置过的模式。坏数据当没有 —— 大不了回落到 INITIAL_DISPLAY。
+// 另带一次性的 markdown 旧值迁移（见内）。
 function loadDisplayByMode() {
     const raw = localStorage.getItem('displayByMode');
     if (!raw) return {};
     try {
         const parsed = JSON.parse(raw);
-        return parsed && typeof parsed === 'object' ? parsed : {};
+        if (!parsed || typeof parsed !== 'object') return {};
+        // markdown 开关曾经只在 default 模式露面（modes:['default']），便签等模式的
+        // 个性化面板里根本没有这个开关 —— 所以那些模式下存的 markdown:false 不可能是
+        // 用户亲手关的，只能是「拨别的开关时把旧默认值(false)顺手存进去」的陈旧值。
+        // 现在默认值已翻成 true，清掉这些陈旧 false 让新默认生效；
+        // 只清一次（打版本戳），之后用户亲手关的 false 原样尊重。
+        // default 模式不动：那里的开关一直可见，存的 false 可能是用户本意。
+        if (localStorage.getItem('displayByModeMigrated') !== '1') {
+            for (const [mode, cfg] of Object.entries(parsed)) {
+                if (mode !== 'default' && cfg && typeof cfg === 'object' && cfg.markdown === false) {
+                    delete cfg.markdown;
+                }
+            }
+            localStorage.setItem('displayByMode', JSON.stringify(parsed));
+            localStorage.setItem('displayByModeMigrated', '1');
+        }
+        return parsed;
     } catch {
         return {};
     }

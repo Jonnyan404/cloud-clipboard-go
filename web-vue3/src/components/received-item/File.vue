@@ -458,7 +458,7 @@ function deviceIcon(type) {
                                                         <div class="md-preview">
                                 <markdown-toggle v-if="md.available" v-model:mode="md.mode"></markdown-toggle>
                                 <markdown-body v-if="md.html" :html="md.html"></markdown-body>
-                                <pre v-else class="timeline-card__text-preview pa-4">{{ displayedTextPreview }}</pre>
+                                <pre v-else class="timeline-card__text-preview" :class="{ 'timeline-card__text-preview--md': md.available }">{{ displayedTextPreview }}</pre>
                             </div>
                             <div v-if="hasTruncatedTextPreview" class="d-flex justify-space-between align-center mt-2">
                                 <div class="text-caption text-medium-emphasis">
@@ -648,6 +648,15 @@ function deviceIcon(type) {
     word-break: break-word;
     font-size: 0.875rem;
     line-height: 1.6;
+    /* 原本是模板上的 Vuetify `pa-4` —— 它带 !important，会压掉下面 --md 那条
+       padding-right，所以挪进这里自己写。 */
+    padding: 16px;
+}
+
+/* 有 md 图标时给图标让位。必须加在 pre 自己身上：它才是滚动盒，滚动条贴着它的右沿；
+   加在外层 .md-preview 上会让这块灰底的右边缘缩进去，看着像断了。 */
+.timeline-card__text-preview--md {
+    padding-right: var(--md-toggle-gutter);
 }
 
 .timeline-card--dark .timeline-card__meta,

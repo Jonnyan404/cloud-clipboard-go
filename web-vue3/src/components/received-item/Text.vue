@@ -226,7 +226,7 @@ async function deleteItem() {
                 <v-expand-transition>
                     <div v-show="expand">
                         <v-divider class="my-2"></v-divider>
-                                                <div class="md-preview">
+                                                <div class="md-preview" :class="{ 'md-preview--md': md.available }">
                             <markdown-toggle v-if="md.available" v-model:mode="md.mode"></markdown-toggle>
                             <markdown-body v-if="md.html" :html="md.html"></markdown-body>
                             <div v-else style="white-space: pre-wrap; word-break: break-all;">{{ decodedContent }}</div>
@@ -495,5 +495,11 @@ async function deleteItem() {
 /* 浮动图标的定位基准 —— MarkdownToggle 内部是 absolute */
 .md-preview {
     position: relative;
+}
+
+/* 有 md 图标时给图标让位。这一层既没底色也不是滚动盒（正文是裸 div），
+   所以直接加在这里最省事 —— 数值见 MarkdownToggle 的 --md-toggle-gutter。 */
+.md-preview--md {
+    padding-right: var(--md-toggle-gutter);
 }
 </style>

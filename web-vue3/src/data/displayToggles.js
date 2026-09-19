@@ -18,10 +18,10 @@ export const DISPLAY_TOGGLES = [
     { key: 'timestamp', group: 'meta', labelKey: 'showTimestamp', icon: 'mdi-clock-outline' },
     { key: 'device', group: 'meta', labelKey: 'showDeviceInfo', icon: 'mdi-devices' },
     { key: 'ip', group: 'meta', labelKey: 'showSenderIP', icon: 'mdi-ip-network-outline' },
-    // markdown 目前只接在标准模式（时间流卡片 + 文件预览都是 DefaultMode 用的那两个组件）。
+    // markdown 接在两个模式：标准（时间流卡片 + 文件预览）和便签（阅读器大视图）。
     // 必须声明 modes：个性化面板是「每模式一组开关」，不声明的话用户会在聊天/终端模式里
     // 拨到一个完全没反应的开关 —— 显示一个不生效的开关，比不显示它更糟。
-    { key: 'markdown', group: 'content', labelKey: 'markdownToggle', icon: 'mdi-language-markdown-outline', modes: ['default'] },
+    { key: 'markdown', group: 'content', labelKey: 'markdownToggle', icon: 'mdi-language-markdown-outline', modes: ['default', 'sticky'] },
 ];
 
 // 某个分组下有哪些开关。加开关不用动这里。
@@ -44,9 +44,10 @@ export const DEFAULT_DISPLAY = {
     // UA 认不出来的来源。想关的人可以在设置里按模式关掉。
     device: true,
     ip: false,
-    // 默认关：这个开关只决定「内容旁边要不要出现原文/md 两个切换图标」，
-    // 不想要的人界面上不会多出任何东西。
-    markdown: false,
+    // 默认开：实测过，启发式（looksLikeMarkdown）能把普通文本挡在外面 ——
+    // `这是一句普通的话` 不会冒图标，`# hi` / `**hi**` / `- a` 才会。
+    // 之前默认关，结果是用户写了 markdown 却以为功能没生效（开关藏在设置里，找不到）。
+    markdown: true,
 };
 
 // 老版本把三个开关存成三个全局 key，新结构是「每个模式一组」。
