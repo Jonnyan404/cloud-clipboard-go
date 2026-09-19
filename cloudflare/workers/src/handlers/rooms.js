@@ -1,5 +1,6 @@
 import { corsHeaders } from '../cors';
 import { canAccessRoomAsync, extractAuthTokens, hasRoomAuthEntry, normalizeRoomName, parseRoomAuth } from '../auth';
+import { errorResponse } from '../errors';
 
 function toDisplayRoom(room) {
   return normalizeRoomName(room) === 'default' ? '' : normalizeRoomName(room);
@@ -23,13 +24,7 @@ export class RoomsHandler {
       }
 
       if (!env.DB) {
-        return new Response(JSON.stringify({
-          error: 'Database not available',
-          message: '数据库服务不可用',
-        }), {
-          status: 503,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders },
-        });
+        return errorResponse(503, 'database_unavailable', 'Database not available', '数据库服务不可用');
       }
 
       const tokens = extractAuthTokens(request);
@@ -115,13 +110,7 @@ export class RoomsHandler {
       });
     } catch (error) {
       console.error('Rooms handler error:', error);
-      return new Response(JSON.stringify({
-        error: 'Internal Server Error',
-        message: '获取房间列表时发生错误',
-      }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
-      });
+      return errorResponse(500, 'internal_error', 'Internal Server Error', '获取房间列表时发生错误');
     }
   }
 }

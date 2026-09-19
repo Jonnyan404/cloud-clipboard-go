@@ -31,6 +31,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -285,4 +286,83 @@ func TestShortcutContractRoomPassword(t *testing.T) {
 	status, _ = shortcutDo(t, http.MethodPost,
 		base+"/text?room=default&auth=&name="+shortcutDevice, "default 房间开着", "text/plain")
 	shortcutWant(t, "default（没设密码）+ 空 auth", status, http.StatusOK)
+}
+
+// 错误响应的形状是所有客户端共用的契约，必须锁死。
+//
+// 为什么单独一条：Apple 快捷指令的「获取URL内容」**不暴露 HTTP 状态码**，只能读响应体，
+// 所以错误体长什么样直接决定它能不能给出正确的提示。这里曾经按 Accept 分叉 ——
+// 带 Accept 给 JSON、不带就给 text/plain —— 而捷径恰恰不发 Accept，
+// 于是「文本超限」被误报成「服务器未确认保存，请检查部署地址及服务器状态」。
+//
+// 三个字段各有用途，缺一不可：code 给程序判断，error 给日志/英文用户，message 给人看。
+func TestErrorResponseShapeIsStable(t *testing.T) {
+	srv := newShortcutServer(t, "global-pw", nil)
+	base := srv.URL
+
+	// newShortcutServer 里 Text.Limit = 40960，超一个字符即可触发
+	tooLong := strings.Repeat("A", 40961)
+
+	cases := []struct {
+		name   string
+		method string
+		path   string
+		body   string
+		ctype  string
+		accept string
+		status int
+		code   string
+	}{
+		{"文本超限 · 捷径实况（不发 Accept）", http.MethodPost, "/text?room=default&auth=global-pw", tooLong, "text/plain", "", http.StatusRequestEntityTooLarge, "text_too_long"},
+		{"文本超限 · Accept: application/json", http.MethodPost, "/text?room=default&auth=global-pw", tooLong, "text/plain", "application/json", http.StatusRequestEntityTooLarge, "text_too_long"},
+		{"文本超限 · Accept: text/html", http.MethodPost, "/text?room=default&auth=global-pw", tooLong, "text/plain", "text/html", http.StatusRequestEntityTooLarge, "text_too_long"},
+		{"方法不允许", http.MethodGet, "/text?room=default&auth=global-pw", "", "", "", http.StatusMethodNotAllowed, "method_not_allowed"},
+		{"内容不存在", http.MethodGet, "/content/999999?room=default&auth=global-pw", "", "", "", http.StatusNotFound, "content_not_found"},
+		// 走 /text 而不是 /content/latest：空房间的 latest 会先回「没有可用的内容」，
+		// 那是业务状态不是鉴权状态，测鉴权得挑一条一定会过鉴权中间件的路径。
+		{"凭据不对", http.MethodPost, "/text?room=default&auth=wrong-pw", "hello", "text/plain", "", http.StatusUnauthorized, "unauthorized_invalid_token"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var rdr io.Reader
+			if tc.body != "" {
+				rdr = strings.NewReader(tc.body)
+			}
+			req, err := http.NewRequest(tc.method, base+tc.path, rdr)
+			if err != nil {
+				t.Fatalf("构造请求失败: %v", err)
+			}
+			if tc.ctype != "" {
+				req.Header.Set("Content-Type", tc.ctype)
+			}
+			if tc.accept != "" {
+				req.Header.Set("Accept", tc.accept)
+			}
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatalf("请求失败: %v", err)
+			}
+			defer resp.Body.Close()
+			raw, _ := io.ReadAll(resp.Body)
+
+			if resp.StatusCode != tc.status {
+				t.Fatalf("期望 HTTP %d，实际 %d，响应体=%q", tc.status, resp.StatusCode, string(raw))
+			}
+			// Content-Type 必须声明 JSON：客户端就是靠它决定怎么解析的
+			if ct := resp.Header.Get("Content-Type"); !strings.Contains(ct, "application/json") {
+				t.Fatalf("Content-Type 应为 JSON，实际 %q", ct)
+			}
+			var payload map[string]string
+			if err := json.Unmarshal(raw, &payload); err != nil {
+				t.Fatalf("错误体不是 JSON: %v，响应体=%q", err, string(raw))
+			}
+			if payload["code"] != tc.code {
+				t.Errorf("code 期望 %q，实际 %q", tc.code, payload["code"])
+			}
+			if payload["error"] == "" || payload["message"] == "" {
+				t.Errorf("error/message 不能为空: %v", payload)
+			}
+		})
+	}
 }

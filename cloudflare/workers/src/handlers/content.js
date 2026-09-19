@@ -2,6 +2,7 @@ import { corsHeaders } from '../cors';
 import { broadcastMessage, buildSenderDevice } from '../utils';
 import { ensureRoomAccess, normalizeRoomName } from '../auth';
 import { ensureRoomOrShareAccess } from '../share';
+import { errorResponse } from '../errors';
 
 function normalizeExpire(expireTime) {
   const numericExpire = Number(expireTime || 0);
@@ -127,16 +128,7 @@ export class ContentHandler {
       console.log(`获取最新内容: room=${room}, isJSON=${isJSON}, forceDownload=${forceDownload}`);
 
       if (!env.DB) {
-        const response = isJSON 
-          ? JSON.stringify({ error: '数据库不可用' })
-          : '数据库不可用';
-        return new Response(response, {
-          status: 503,
-          headers: {
-            'Content-Type': isJSON ? 'application/json' : 'text/plain',
-            ...corsHeaders
-          }
-        });
+        return errorResponse(503, 'database_unavailable', 'Database not available', '数据库不可用');
       }
 
       // 从 D1 获取最新消息
@@ -156,16 +148,7 @@ export class ContentHandler {
       console.log(`最新内容查询结果:`, result);
       
       if (!result) {
-        const response = isJSON 
-          ? JSON.stringify({ error: '内容未找到' })
-          : '没有可用的内容';
-        return new Response(response, {
-          status: 404,
-          headers: {
-            'Content-Type': isJSON ? 'application/json' : 'text/plain',
-            ...corsHeaders
-          }
-        });
+        return errorResponse(404, 'no_content', 'No content available', '没有可用的内容');
       }
 
       // 处理文本内容
@@ -174,10 +157,7 @@ export class ContentHandler {
       // （Apple 快捷指令的「获取URL内容」不暴露 HTTP 状态码，只能靠响应体里的 error 字段。）
       const expireAt = result.type === 'file' ? normalizeExpire(result.expireTime) : 0;
       if (expireAt > 0 && expireAt < Math.floor(Date.now() / 1000)) {
-        return new Response(JSON.stringify({ error: '文件已过期' }), {
-          status: 404,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders },
-        });
+        return errorResponse(404, 'file_expired', 'File expired', '文件已过期');
       }
 
       if (result.type === 'text') {
@@ -212,14 +192,7 @@ export class ContentHandler {
     } catch (error) {
       console.error('Latest content handler error:', error);
       console.error('Error stack:', error.stack);
-      return new Response(JSON.stringify({
-        error: 'Internal Server Error',
-        message: '获取最新内容时发生错误',
-        details: error.message
-      }), { 
-        status: 500,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
+      return errorResponse(500, 'internal_error', 'Internal Server Error', '获取最新内容时发生错误');
     }
   }
 
@@ -235,16 +208,7 @@ export class ContentHandler {
       console.log(`获取内容: ID ${id}, room: ${room}, isJSON: ${isJSON}`);
 
       if (!env.DB) {
-        const response = isJSON 
-          ? JSON.stringify({ error: '数据库不可用' })
-          : '数据库不可用';
-        return new Response(response, {
-          status: 503,
-          headers: {
-            'Content-Type': isJSON ? 'application/json' : 'text/plain',
-            ...corsHeaders
-          }
-        });
+        return errorResponse(503, 'database_unavailable', 'Database not available', '数据库不可用');
       }
 
       // 先取内容，再按内容所在房间做「密码 OR 分享 token」鉴权
@@ -262,16 +226,7 @@ export class ContentHandler {
       console.log(`查询结果:`, result);
       
       if (!result) {
-        const response = isJSON 
-          ? JSON.stringify({ error: '内容未找到' })
-          : '内容未找到';
-        return new Response(response, {
-          status: 404,
-          headers: {
-            'Content-Type': isJSON ? 'application/json' : 'text/plain',
-            ...corsHeaders
-          }
-        });
+        return errorResponse(404, 'content_not_found', 'Content not found', '内容未找到');
       }
 
       const contentRoom = normalizeRoomName(result.room || 'default');
@@ -288,10 +243,7 @@ export class ContentHandler {
       // （Apple 快捷指令的「获取URL内容」不暴露 HTTP 状态码，只能靠响应体里的 error 字段。）
       const expireAt = result.type === 'file' ? normalizeExpire(result.expireTime) : 0;
       if (expireAt > 0 && expireAt < Math.floor(Date.now() / 1000)) {
-        return new Response(JSON.stringify({ error: '文件已过期' }), {
-          status: 404,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders },
-        });
+        return errorResponse(404, 'file_expired', 'File expired', '文件已过期');
       }
 
       if (result.type === 'text') {
@@ -318,14 +270,7 @@ export class ContentHandler {
     } catch (error) {
       console.error('Content handler error:', error);
       console.error('Error stack:', error.stack);
-      return new Response(JSON.stringify({
-        error: 'Internal Server Error',
-        message: '获取内容时发生错误',
-        details: error.message
-      }), { 
-        status: 500,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
+      return errorResponse(500, 'internal_error', 'Internal Server Error', '获取内容时发生错误');
     }
   }
 
@@ -342,13 +287,7 @@ export class ContentHandler {
       console.log(`删除消息请求: ID ${id}, room: ${room}`);
 
       if (!env.DB) {
-        return new Response(JSON.stringify({
-          error: 'Database not available',
-          message: '数据库不可用'
-        }), {
-          status: 503,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders }
-        });
+        return errorResponse(503, 'database_unavailable', 'Database not available', '数据库不可用');
       }
 
       // 查找要删除的消息
@@ -358,13 +297,7 @@ export class ContentHandler {
       const message = await env.DB.prepare(query).bind(...params).first();
 
       if (!message) {
-        return new Response(JSON.stringify({
-          error: 'Message not found',
-          message: '消息未找到'
-        }), {
-          status: 404,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders }
-        });
+        return errorResponse(404, 'message_not_found', 'Message not found', '消息未找到');
       }
 
       // 如果是文件消息，删除文件
@@ -395,13 +328,7 @@ export class ContentHandler {
 
     } catch (error) {
       console.error('Revoke handler error:', error);
-      return new Response(JSON.stringify({
-        error: 'Internal Server Error',
-        message: '删除消息时发生错误'
-      }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
+      return errorResponse(500, 'internal_error', 'Internal Server Error', '删除消息时发生错误');
     }
   }
 
@@ -417,13 +344,7 @@ export class ContentHandler {
       console.log(`清空所有消息请求: room: ${room}`);
 
       if (!env.DB) {
-        return new Response(JSON.stringify({
-          error: 'Database not available',
-          message: '数据库不可用'
-        }), {
-          status: 503,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders }
-        });
+        return errorResponse(503, 'database_unavailable', 'Database not available', '数据库不可用');
       }
 
       // 获取要删除的文件UUID列表
@@ -466,13 +387,7 @@ export class ContentHandler {
 
     } catch (error) {
       console.error('Revoke all handler error:', error);
-      return new Response(JSON.stringify({
-        error: 'Internal Server Error',
-        message: '清空消息时发生错误'
-      }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
+      return errorResponse(500, 'internal_error', 'Internal Server Error', '清空消息时发生错误');
     }
   }
 

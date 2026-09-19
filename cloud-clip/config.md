@@ -137,13 +137,13 @@ $ curl -F file=@image.png "http://localhost:9501/upload?name=RaspberryPi"
 
 ```console
 $ curl -H "Content-Type: text/plain" --data-binary "foobar" http://localhost:9501/text
-{"error":"Unauthorized","message":"需要认证令牌"}
+{"code":"unauthorized","error":"Authentication required","message":"需要认证令牌"}
 
 $ curl -H "Authorization: Bearer xxxx" -H "Content-Type: text/plain" --data-binary "foobar" http://localhost:9501/text
 {"id":"7","type":"text","url":"http://localhost:9501/content/7"}
 
 $ curl http://localhost:9501/content/1
-{"error":"Unauthorized","message":"需要认证令牌"}
+{"code":"unauthorized","error":"Authentication required","message":"需要认证令牌"}
 
 $ curl -H "Authorization: Bearer xxxx" http://localhost:9501/content/1
 foobar
@@ -153,6 +153,24 @@ foobar
 ```
 
 > 推荐 API / 脚本使用 `Authorization: Bearer`。`?auth=` 仅为兼容保留，不建议把房间密码写进可分享 URL。
+
+#### 错误响应
+
+**所有**错误路径都返回同一种形状，`Content-Type: application/json; charset=utf-8`，状态码保持常规语义：
+
+```json
+{"code": "text_too_long", "error": "Text too long", "message": "文本内容超出限制 (最大 4096 字符)"}
+```
+
+| 字段 | 用途 |
+|---|---|
+| `code` | 机器码（snake_case），给程序判断。**发布后不要改** |
+| `error` | 英文人话，给日志和英文用户看 |
+| `message` | 中文人话，给人看 |
+
+Go 与 Cloudflare Worker 两个实现共用这一份契约。**不要按 `Accept` 头分叉成两种响应体**：Apple 快捷指令的「获取URL内容」既不发 `Accept`、也不把 HTTP 状态码暴露给捷径，客户端只能读响应体 —— 同一状态码两种形状等于要求每个客户端各写两套解析逻辑。
+
+常见 `code`：`text_too_long`、`file_too_large`、`content_not_found`、`no_content`、`file_expired`、`unauthorized`、`unauthorized_invalid_token`、`room_forbidden`、`method_not_allowed`、`invalid_request_body`。
 
 **文件/图片是两次请求，两次都要带凭据。** `/content/*` 返回的 `url` 只是一个地址，不含凭据；
 客户端必须自己把凭据加在这一次请求上。文本没有这一步（内容内联在 JSON 里），

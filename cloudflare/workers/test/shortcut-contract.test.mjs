@@ -157,4 +157,33 @@ console.log('\n── D. 房间级密码：只认本房间的密码 ──');
   check('default（没设密码）+ 空 auth → 200', open.status, 200);
 }
 
+console.log('\n── E. 错误响应形状：code / error / message 三字段，且恒为 JSON ──');
+{
+  // 锁死的是所有客户端共用的契约：Apple 快捷指令不暴露 HTTP 状态码、只能读响应体，
+  // 前端则依赖 message 显示具体原因。这里曾经按 Accept 分叉（带 Accept 给 JSON、
+  // 不带就给 text/plain），而捷径根本不发 Accept，于是「文本超限」被误报成
+  // 「服务器未确认保存，请检查部署地址及服务器状态」。
+  const { env } = makeEnv();
+  env.TEXT_LIMIT = '100';
+
+  const tooLong = await postJson(TextHandler.create, env,
+    `/text?room=default&name=${DEVICE}`, 'A'.repeat(101));
+  check('文本超限 → 413', tooLong.status, 413);
+  check('  · code', tooLong.json?.code, 'text_too_long');
+  check('  · error 是英文人话', tooLong.json?.error, 'Text too long');
+  check('  · message 是中文人话', tooLong.json?.message, '文本长度超出限制 (最大 100 字符)');
+
+  const empty = await postJson(TextHandler.create, env,
+    `/text?room=default&name=${DEVICE}`, '   ');
+  check('空内容 → 400', empty.status, 400);
+  check('  · code', empty.json?.code, 'empty_content');
+  check('  · message', empty.json?.message, '内容不能为空');
+
+  // 取不存在的内容：Accept 是 text/html 也必须拿到 JSON（这条以前会回纯文本）
+  const missing = await getById(env, 999999, 'room=default&auth=123', '123');
+  check('内容不存在 → 404', missing.status, 404);
+  check('  · code', missing.json?.code, 'content_not_found');
+  check('  · message', missing.json?.message, '内容未找到');
+}
+
 summary('Android 快捷指令的请求形状在 Worker 上成立');

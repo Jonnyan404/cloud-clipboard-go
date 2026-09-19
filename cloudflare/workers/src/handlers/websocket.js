@@ -1,5 +1,6 @@
 import { corsHeaders } from '../cors';
 import { ensureRoomAccess, extractWebSocketToken, normalizeRoomName } from '../auth';
+import { errorResponse } from '../errors';
 
 export class WebSocketHandler {
   static async connect(request, env) {
@@ -62,17 +63,7 @@ export class WebSocketHandler {
       console.error('WebSocket handler error:', error);
       console.error('Error stack:', error.stack);
       
-      return new Response(JSON.stringify({
-        error: 'Internal Server Error',
-        message: error.message,
-        stack: error.stack
-      }), { 
-        status: 500,
-        headers: {
-          'Content-Type': 'application/json',
-          ...corsHeaders
-        }
-      });
+      return errorResponse(500, 'internal_error', 'Internal Server Error', '服务器内部错误');
     }
   }
 }

@@ -1,6 +1,7 @@
 import { corsHeaders } from '../cors';
 import { buildSenderDevice, saveToD1, broadcastMessage } from '../utils';
 import { ensureRoomAccess, normalizeRoomName } from '../auth';
+import { errorResponse } from '../errors';
 
 export class TextHandler {
   static async create(request, env) {
@@ -22,13 +23,7 @@ export class TextHandler {
       
       if (!content || content.trim() === '') {
         console.log('文本内容为空');
-        return new Response(JSON.stringify({
-          error: 'Empty content',
-          message: '内容不能为空'
-        }), {
-          status: 400,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders }
-        });
+        return errorResponse(400, 'empty_content', 'Empty content', '内容不能为空');
       }
 
       console.log(`接收到文本内容: ${content.substring(0, 100)}...`);
@@ -37,13 +32,7 @@ export class TextHandler {
       const textLimit = env.TEXT_LIMIT ? parseInt(env.TEXT_LIMIT) : 4096;
       if (content.length > textLimit) {
         console.log(`文本长度超限: ${content.length} > ${textLimit}`);
-        return new Response(JSON.stringify({
-          error: 'Text too long',
-          message: `文本长度超出限制 (最大 ${textLimit} 字符)`
-        }), {
-          status: 413,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders }
-        });
+        return errorResponse(413, 'text_too_long', 'Text too long', `文本长度超出限制 (最大 ${textLimit} 字符)`);
       }
 
       if (targetMessageId) {
@@ -75,13 +64,7 @@ export class TextHandler {
       // 检查 DB binding
       if (!env.DB) {
         console.error('DB binding 不存在!');
-        return new Response(JSON.stringify({
-          error: 'Database not available',
-          message: '数据库服务不可用'
-        }), {
-          status: 503,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders }
-        });
+        return errorResponse(503, 'database_unavailable', 'Database not available', '数据库服务不可用');
       }
 
       // 保存到 D1 (会自动清理旧消息)
@@ -129,36 +112,18 @@ export class TextHandler {
       console.error('Text handler stack:', error?.stack || '(no stack)');
       const reason = String(error?.message || error || 'unknown');
       console.error('Text handler reason:', reason);
-      return new Response(JSON.stringify({
-        error: 'Internal Server Error',
-        message: `处理文本时发生错误: ${reason}`
-      }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
+      return errorResponse(500, 'internal_error', 'Internal Server Error', `处理文本时发生错误: ${reason}`);
     }
   }
 
   static async update(request, env, { id, room, content, url }) {
     const numericId = parseInt(id, 10);
     if (!Number.isInteger(numericId) || numericId <= 0) {
-      return new Response(JSON.stringify({
-        error: 'Invalid message id',
-        message: '无效的 ID 参数'
-      }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
+      return errorResponse(400, 'invalid_id', 'Invalid message id', '无效的 ID 参数');
     }
 
     if (!env.DB) {
-      return new Response(JSON.stringify({
-        error: 'Database not available',
-        message: '数据库服务不可用'
-      }), {
-        status: 503,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
+      return errorResponse(503, 'database_unavailable', 'Database not available', '数据库服务不可用');
     }
 
     const existingMessage = await env.DB.prepare(
@@ -166,13 +131,7 @@ export class TextHandler {
     ).bind(numericId, room).first();
 
     if (!existingMessage || existingMessage.type !== 'text') {
-      return new Response(JSON.stringify({
-        error: 'Message not found',
-        message: '消息未找到或无法更新'
-      }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
+      return errorResponse(404, 'message_not_updatable', 'Message not found', '消息未找到或无法更新');
     }
 
     const contentURL = `${url.origin}/content/${numericId}${room !== 'default' ? `?room=${room}` : ''}`;

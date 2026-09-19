@@ -25,10 +25,10 @@ const (
 )
 
 type shareClaims struct {
-	Type    string `json:"typ"`           // content | file | room_session
-	ID      string `json:"id"`            // content id or file uuid or room
-	Room    string `json:"room"`          // 绑定的房间（默认房间为空串）
-	Scope   string `json:"sc,omitempty"`  // room_session 的 scope: ""=房间专属, "global"=全局所有房间
+	Type    string `json:"typ"`          // content | file | room_session
+	ID      string `json:"id"`           // content id or file uuid or room
+	Room    string `json:"room"`         // 绑定的房间（默认房间为空串）
+	Scope   string `json:"sc,omitempty"` // room_session 的 scope: ""=房间专属, "global"=全局所有房间
 	Exp     int64  `json:"exp"`
 	JTI     string `json:"jti,omitempty"` // token id when usage-limited
 	MaxUses int    `json:"mu,omitempty"`  // 0 = unlimited
@@ -466,7 +466,7 @@ func (s *ClipboardServer) handle_share(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method != http.MethodPost {
-		writeAuthJSONError(w, http.StatusMethodNotAllowed, "仅允许 POST 请求")
+		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "Only POST is allowed", "仅允许 POST 请求")
 		return
 	}
 
@@ -474,13 +474,13 @@ func (s *ClipboardServer) handle_share(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&req); err != nil && err.Error() != "EOF" {
-		writeAuthJSONError(w, http.StatusBadRequest, "无效的请求体")
+		writeError(w, http.StatusBadRequest, "invalid_request_body", "Invalid request body", "无效的请求体")
 		return
 	}
 
 	shareType := strings.ToLower(strings.TrimSpace(req.Type))
 	if shareType == "" {
-		writeAuthJSONError(w, http.StatusBadRequest, "缺少 type")
+		writeError(w, http.StatusBadRequest, "missing_type", "Missing type", "缺少 type")
 		return
 	}
 
@@ -494,22 +494,22 @@ func (s *ClipboardServer) handle_share(w http.ResponseWriter, r *http.Request) {
 	case "content":
 		idStr := strings.TrimSpace(req.ID)
 		if idStr == "" {
-			writeAuthJSONError(w, http.StatusBadRequest, "缺少 id")
+			writeError(w, http.StatusBadRequest, "missing_id", "Missing id", "缺少 id")
 			return
 		}
 		contentID, err := strconv.Atoi(idStr)
 		if err != nil || contentID < 0 {
-			writeAuthJSONError(w, http.StatusBadRequest, "无效的 id")
+			writeError(w, http.StatusBadRequest, "invalid_id", "Invalid id", "无效的 id")
 			return
 		}
 
 		room, _, _, found := s.findContentForShare(contentID, requestedRoom, hasRequestedRoom)
 		if !found {
-			writeAuthJSONError(w, http.StatusNotFound, "内容未找到")
+			writeError(w, http.StatusNotFound, "content_not_found", "Content not found", "内容未找到")
 			return
 		}
 		if !s.canAccessRoom(room, authToken) {
-			writeAuthJSONError(w, http.StatusUnauthorized, "无权访问该房间")
+			writeError(w, http.StatusUnauthorized, "room_forbidden", "No access to this room", "无权访问该房间")
 			return
 		}
 
@@ -532,7 +532,7 @@ func (s *ClipboardServer) handle_share(w http.ResponseWriter, r *http.Request) {
 		if requirement.Required {
 			token, exp, err := s.issueShareToken("content", idStr, room, ttl, maxUses)
 			if err != nil {
-				writeAuthJSONError(w, http.StatusInternalServerError, "生成分享令牌失败")
+				writeError(w, http.StatusInternalServerError, "share_token_failed", "Failed to generate share token", "生成分享令牌失败")
 				return
 			}
 			expiresAt = exp
@@ -552,7 +552,7 @@ func (s *ClipboardServer) handle_share(w http.ResponseWriter, r *http.Request) {
 			fileUUID = strings.TrimSpace(req.ID)
 		}
 		if fileUUID == "" {
-			writeAuthJSONError(w, http.StatusBadRequest, "缺少 uuid")
+			writeError(w, http.StatusBadRequest, "missing_uuid", "Missing uuid", "缺少 uuid")
 			return
 		}
 
@@ -560,21 +560,21 @@ func (s *ClipboardServer) handle_share(w http.ResponseWriter, r *http.Request) {
 		fileInfo, exists := s.uploadFileMap[fileUUID]
 		s.runMutex.Unlock()
 		if !exists {
-			writeAuthJSONError(w, http.StatusNotFound, "文件未找到或已过期")
+			writeError(w, http.StatusNotFound, "file_not_found", "File not found or expired", "文件未找到或已过期")
 			return
 		}
 		if fileInfo.ExpireTime > 0 && fileInfo.ExpireTime < time.Now().Unix() {
-			writeAuthJSONError(w, http.StatusNotFound, "文件已过期")
+			writeError(w, http.StatusNotFound, "file_expired", "File expired", "文件已过期")
 			return
 		}
 
 		room := normalizeRoomName(fileInfo.Room)
 		if hasRequestedRoom && room != requestedRoom {
-			writeAuthJSONError(w, http.StatusNotFound, "文件未找到或已过期")
+			writeError(w, http.StatusNotFound, "file_not_found", "File not found or expired", "文件未找到或已过期")
 			return
 		}
 		if !s.canAccessRoom(room, authToken) {
-			writeAuthJSONError(w, http.StatusUnauthorized, "无权访问该房间")
+			writeError(w, http.StatusUnauthorized, "room_forbidden", "No access to this room", "无权访问该房间")
 			return
 		}
 
@@ -597,7 +597,7 @@ func (s *ClipboardServer) handle_share(w http.ResponseWriter, r *http.Request) {
 		if requirement.Required {
 			token, exp, err := s.issueShareToken("file", fileUUID, room, ttl, maxUses)
 			if err != nil {
-				writeAuthJSONError(w, http.StatusInternalServerError, "生成分享令牌失败")
+				writeError(w, http.StatusInternalServerError, "share_token_failed", "Failed to generate share token", "生成分享令牌失败")
 				return
 			}
 			expiresAt = exp
@@ -612,6 +612,6 @@ func (s *ClipboardServer) handle_share(w http.ResponseWriter, r *http.Request) {
 		return
 
 	default:
-		writeAuthJSONError(w, http.StatusBadRequest, "不支持的 type")
+		writeError(w, http.StatusBadRequest, "unsupported_type", "Unsupported type", "不支持的 type")
 	}
 }

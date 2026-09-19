@@ -1,12 +1,13 @@
 import { Router } from 'itty-router';
 import { corsHeaders, handleCors } from './cors';
-import { canAccessRoom, canAccessRoomAsync, hasRoomAuthEntry, resolveRoomAuth, issueRoomSessionToken, validateRoomSessionToken, parseRoomSessionToken, extractAuthToken, jsonError } from './auth';
+import { canAccessRoom, canAccessRoomAsync, hasRoomAuthEntry, resolveRoomAuth, issueRoomSessionToken, validateRoomSessionToken, parseRoomSessionToken, extractAuthToken } from './auth';
 import { TextHandler } from './handlers/text';
 import { FileHandler } from './handlers/file';
 import { ContentHandler } from './handlers/content';
 import { RoomsHandler } from './handlers/rooms';
 import { WebSocketHandler } from './handlers/websocket';
 import { ShareHandler } from './share';
+import { errorResponse } from './errors';
 
 // 导入 Durable Objects
 export { WebSocketRoom } from './durable-objects/websocket-room';
@@ -67,11 +68,11 @@ const ROOM_SESSION_TTL = 3600;
 // 前端用的是 hash 路由，所以只有手输错地址之类的场景会走到这里。
 async function handleFallback(request, env) {
   if (request.method !== 'GET' && request.method !== 'HEAD') {
-    return jsonError(404, '接口不存在', 'Not Found');
+    return errorResponse(404, 'route_not_found', 'Not Found', '接口不存在');
   }
 
   if (!env.ASSETS) {
-    return jsonError(404, '前端资源未部署', 'Not Found');
+    return errorResponse(404, 'assets_missing', 'Not Found', '前端资源未部署');
   }
 
   const indexUrl = new URL('/index.html', request.url);
@@ -81,10 +82,7 @@ async function handleFallback(request, env) {
 // 处理 /auth/token 端点
 async function handleAuthToken(request, env) {
   if (request.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method Not Allowed' }), {
-      status: 405,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
+    return errorResponse(405, 'method_not_allowed', 'Method Not Allowed', '方法不允许');
   }
 
   const url = new URL(request.url);
@@ -95,17 +93,11 @@ async function handleAuthToken(request, env) {
     const password = String(body.password || '').trim();
 
     if (!password) {
-      return new Response(JSON.stringify({ error: '密码不能为空' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
+      return errorResponse(401, 'password_required', 'Password required', '密码不能为空');
     }
 
     if (!canAccessRoom(env, room, password)) {
-      return new Response(JSON.stringify({ error: '密码不正确' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
+      return errorResponse(401, 'wrong_password', 'Wrong password', '密码不正确');
     }
 
     // 使用全局密码登录时，签发对所有房间有效的全局会话令牌
@@ -124,20 +116,14 @@ async function handleAuthToken(request, env) {
     });
   } catch (error) {
     console.error('Error in handleAuthToken:', error);
-    return new Response(JSON.stringify({ error: '令牌签发失败' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
+    return errorResponse(500, 'token_issue_failed', 'Failed to issue token', '令牌签发失败');
   }
 }
 
 // 处理 /auth/token/refresh 端点：使用仍有效的会话令牌续签，无需密码即可静默续期
 async function handleAuthTokenRefresh(request, env) {
   if (request.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method Not Allowed' }), {
-      status: 405,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
+    return errorResponse(405, 'method_not_allowed', 'Method Not Allowed', '方法不允许');
   }
 
   const url = new URL(request.url);
@@ -146,10 +132,7 @@ async function handleAuthTokenRefresh(request, env) {
 
   const claims = await parseRoomSessionToken(env, token);
   if (!claims || !(await validateRoomSessionToken(env, room, token))) {
-    return new Response(JSON.stringify({ error: '会话令牌无效或已过期' }), {
-      status: 401,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
+    return errorResponse(401, 'session_token_invalid', 'Session token invalid or expired', '会话令牌无效或已过期');
   }
 
   try {
@@ -166,10 +149,7 @@ async function handleAuthTokenRefresh(request, env) {
     });
   } catch (error) {
     console.error('Error in handleAuthTokenRefresh:', error);
-    return new Response(JSON.stringify({ error: '令牌续签失败' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
-    });
+    return errorResponse(500, 'token_refresh_failed', 'Failed to refresh token', '令牌续签失败');
   }
 }
 

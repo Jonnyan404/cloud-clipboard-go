@@ -2,12 +2,12 @@ import { corsHeaders } from './cors';
 import {
   canAccessRoomAsync,
   extractAuthToken,
-  jsonError,
   normalizeAuthValue,
   normalizeRoomName,
   parseRoomAuth,
   resolveRoomAuth,
 } from './auth';
+import { errorResponse } from './errors';
 
 export const SHARE_TOKEN_QUERY_KEY = 't';
 export const DEFAULT_SHARE_TTL_SECONDS = 15 * 60;
@@ -331,7 +331,7 @@ export async function ensureRoomOrShareAccess(request, env, room, {
       room: normalizedRoom,
       token,
       requirement,
-      response: jsonError(401, '需要认证令牌', 'Unauthorized'),
+      response: errorResponse(401, 'unauthorized', 'Unauthorized', '需要认证令牌'),
     };
   }
 
@@ -340,7 +340,7 @@ export async function ensureRoomOrShareAccess(request, env, room, {
     room: normalizedRoom,
     token,
     requirement,
-    response: jsonError(401, '无效的认证令牌', 'Unauthorized'),
+    response: errorResponse(401, 'unauthorized_invalid_token', 'Unauthorized', '无效的认证令牌'),
   };
 }
 
@@ -420,23 +420,23 @@ export class ShareHandler {
       let expiresAt = Math.floor(Date.now() / 1000) + ttl;
 
       if (!shareType) {
-        return jsonError(400, '缺少 type', 'Bad Request');
+        return errorResponse(400, 'missing_type', 'Bad Request', '缺少 type');
       }
 
       if (shareType === 'content') {
         const id = String(body?.id || '').trim();
         if (!id) {
-          return jsonError(400, '缺少 id', 'Bad Request');
+          return errorResponse(400, 'missing_id', 'Bad Request', '缺少 id');
         }
 
         const row = await findContentById(env, Number(id), requestedRoom, hasRequestedRoom);
         if (!row) {
-          return jsonError(404, '内容未找到', 'Not Found');
+          return errorResponse(404, 'content_not_found', 'Not Found', '内容未找到');
         }
 
         const room = normalizeRoomName(row.room || 'default');
         if (!await canAccessRoomAsync(env, room, authToken)) {
-          return jsonError(401, '无权访问该房间', 'Unauthorized');
+          return errorResponse(401, 'room_forbidden', 'Unauthorized', '无权访问该房间');
         }
 
         const requirement = resolveRoomAuth(env, room);
@@ -478,25 +478,25 @@ export class ShareHandler {
       if (shareType === 'file') {
         const uuid = String(body?.uuid || body?.id || '').trim();
         if (!uuid) {
-          return jsonError(400, '缺少 uuid', 'Bad Request');
+          return errorResponse(400, 'missing_uuid', 'Bad Request', '缺少 uuid');
         }
 
         const fileMeta = await findFileMeta(env, uuid);
         if (!fileMeta) {
-          return jsonError(404, '文件未找到或已过期', 'Not Found');
+          return errorResponse(404, 'file_not_found', 'Not Found', '文件未找到或已过期');
         }
 
         const now = Math.floor(Date.now() / 1000);
         if (fileMeta.expireTime > 0 && fileMeta.expireTime < now) {
-          return jsonError(404, '文件已过期', 'Not Found');
+          return errorResponse(404, 'file_expired', 'Not Found', '文件已过期');
         }
 
         const room = normalizeRoomName(fileMeta.room);
         if (hasRequestedRoom && room !== requestedRoom) {
-          return jsonError(404, '文件未找到或已过期', 'Not Found');
+          return errorResponse(404, 'file_not_found', 'Not Found', '文件未找到或已过期');
         }
         if (!await canAccessRoomAsync(env, room, authToken)) {
-          return jsonError(401, '无权访问该房间', 'Unauthorized');
+          return errorResponse(401, 'room_forbidden', 'Unauthorized', '无权访问该房间');
         }
 
         const requirement = resolveRoomAuth(env, room);
@@ -532,10 +532,10 @@ export class ShareHandler {
         });
       }
 
-      return jsonError(400, '不支持的 type', 'Bad Request');
+      return errorResponse(400, 'unsupported_type', 'Bad Request', '不支持的 type');
     } catch (error) {
       console.error('Share create error:', error);
-      return jsonError(500, '生成分享链接失败', 'Internal Server Error');
+      return errorResponse(500, 'share_token_failed', 'Internal Server Error', '生成分享链接失败');
     }
   }
 }

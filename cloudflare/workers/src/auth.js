@@ -1,4 +1,4 @@
-import { corsHeaders } from './cors';
+import { errorResponse } from './errors';
 
 function textToBytes(text) {
   return new TextEncoder().encode(text);
@@ -233,16 +233,6 @@ export function hasRoomAuthEntry(env, room) {
   return Object.prototype.hasOwnProperty.call(roomAuth, normalizedRoom);
 }
 
-export function jsonError(status, message, error = null) {
-  return new Response(JSON.stringify({
-    error: error || (status === 401 ? 'Unauthorized' : 'Error'),
-    message,
-  }), {
-    status,
-    headers: { 'Content-Type': 'application/json', ...corsHeaders },
-  });
-}
-
 export async function ensureRoomAccess(request, env, room, tokenOverride) {
   const normalizedRoom = normalizeRoomName(room);
   const requirement = resolveRoomAuth(env, normalizedRoom);
@@ -258,7 +248,7 @@ export async function ensureRoomAccess(request, env, room, tokenOverride) {
       room: normalizedRoom,
       token,
       requirement,
-      response: jsonError(401, '需要认证令牌', 'Unauthorized'),
+      response: errorResponse(401, 'unauthorized', 'Unauthorized', '需要认证令牌'),
     };
   }
 
@@ -275,7 +265,7 @@ export async function ensureRoomAccess(request, env, room, tokenOverride) {
     room: normalizedRoom,
     token,
     requirement,
-    response: jsonError(401, '无效的认证令牌', 'Unauthorized'),
+    response: errorResponse(401, 'unauthorized_invalid_token', 'Unauthorized', '无效的认证令牌'),
   };
 }
 

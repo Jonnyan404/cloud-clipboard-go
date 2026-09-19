@@ -22,7 +22,7 @@ const roomSessionTTLSeconds = 60 * 60
 
 func (s *ClipboardServer) handleAuthToken(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "仅允许 POST 请求", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "Only POST is allowed", "仅允许 POST 请求")
 		return
 	}
 
@@ -35,30 +35,18 @@ func (s *ClipboardServer) handleAuthToken(w http.ResponseWriter, r *http.Request
 		Password string `json:"password"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error": "无效的请求体",
-		})
+		writeError(w, http.StatusBadRequest, "invalid_request_body", "Invalid request body", "无效的请求体")
 		return
 	}
 
 	password := strings.TrimSpace(req.Password)
 	if password == "" {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error": "密码不能为空",
-		})
+		writeError(w, http.StatusUnauthorized, "password_required", "Password required", "密码不能为空")
 		return
 	}
 
 	if !s.tokenMatchesRoom(room, password) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error": "密码不正确",
-		})
+		writeError(w, http.StatusUnauthorized, "wrong_password", "Wrong password", "密码不正确")
 		return
 	}
 
@@ -71,11 +59,7 @@ func (s *ClipboardServer) handleAuthToken(w http.ResponseWriter, r *http.Request
 	token, err := s.issueRoomSessionToken(room, roomSessionTTLSeconds, scope)
 	if err != nil {
 		s.logger.Printf("错误: 签发房间会话令牌失败: %v", err)
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error": "令牌签发失败",
-		})
+		writeError(w, http.StatusInternalServerError, "token_issue_failed", "Failed to issue token", "令牌签发失败")
 		return
 	}
 
@@ -91,7 +75,7 @@ func (s *ClipboardServer) handleAuthToken(w http.ResponseWriter, r *http.Request
 // handleAuthTokenRefresh 使用仍有效的会话令牌签发新令牌，无需密码即可静默续期。
 func (s *ClipboardServer) handleAuthTokenRefresh(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "仅允许 POST 请求", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "Only POST is allowed", "仅允许 POST 请求")
 		return
 	}
 
@@ -103,11 +87,7 @@ func (s *ClipboardServer) handleAuthTokenRefresh(w http.ResponseWriter, r *http.
 	token := extractAuthToken(r)
 	claims, ok := s.parseRoomSessionToken(token)
 	if !ok || !s.validateRoomSessionToken(room, token) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error": "会话令牌无效或已过期",
-		})
+		writeError(w, http.StatusUnauthorized, "session_token_invalid", "Session token invalid or expired", "会话令牌无效或已过期")
 		return
 	}
 
@@ -115,11 +95,7 @@ func (s *ClipboardServer) handleAuthTokenRefresh(w http.ResponseWriter, r *http.
 	newToken, err := s.issueRoomSessionToken(room, roomSessionTTLSeconds, claims.Scope)
 	if err != nil {
 		s.logger.Printf("错误: 续签房间会话令牌失败: %v", err)
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error": "令牌续签失败",
-		})
+		writeError(w, http.StatusInternalServerError, "token_refresh_failed", "Failed to refresh token", "令牌续签失败")
 		return
 	}
 
@@ -174,7 +150,7 @@ func (s *ClipboardServer) handle_server(w http.ResponseWriter, r *http.Request) 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		s.logger.Printf("错误: 编码 /server 响应失败: %v", err)
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "encode_failed", "Failed to encode response", "Failed to encode response")
 	}
 }
 
@@ -189,12 +165,12 @@ func (s *ClipboardServer) handle_push(w http.ResponseWriter, r *http.Request) {
 		token := extractWebSocketToken(r)
 		if token == "" {
 			s.logger.Printf("WebSocket 认证失败: 未提供 token。来自 IP: %s, 房间: %s", ip, room)
-			http.Error(w, "Unauthorized: Missing token", http.StatusUnauthorized)
+			writeError(w, http.StatusUnauthorized, "unauthorized_missing_token", "Missing auth token", "Unauthorized: Missing token")
 			return
 		}
 		if !s.canAccessRoom(room, token) {
 			s.logger.Printf("WebSocket 认证失败: 提供的 token 与房间 '%s' 的认证配置不匹配。来自 IP: %s", room, ip)
-			http.Error(w, "Unauthorized: Invalid token", http.StatusUnauthorized)
+			writeError(w, http.StatusUnauthorized, "unauthorized_invalid_token", "Invalid auth token", "Unauthorized: Invalid token")
 			return
 		}
 		s.logger.Printf("WebSocket 认证成功。来自 IP: %s, 房间: %s", ip, room)
@@ -423,7 +399,7 @@ func (s *ClipboardServer) handle_file(w http.ResponseWriter, r *http.Request) {
 
 	if !ok {
 		s.logger.Printf("文件未找到或已过期: %s", uuid)
-		http.Error(w, "文件未找到或已过期", http.StatusNotFound)
+		writeError(w, http.StatusNotFound, "file_not_found", "File not found or expired", "文件未找到或已过期")
 		return
 	}
 
@@ -436,7 +412,7 @@ func (s *ClipboardServer) handle_file(w http.ResponseWriter, r *http.Request) {
 		delete(s.uploadFileMap, uuid)
 		s.runMutex.Unlock()
 		go os.Remove(filepath.Join(s.storageFolder, uuid)) // 异步删除
-		http.Error(w, "文件已过期", http.StatusNotFound)
+		writeError(w, http.StatusNotFound, "file_expired", "File expired", "文件已过期")
 		return
 	}
 
@@ -449,7 +425,7 @@ func (s *ClipboardServer) handle_file(w http.ResponseWriter, r *http.Request) {
 		file, err := os.Open(filePath) // 打开文件以供 ServeContent 使用
 		if err != nil {
 			s.logger.Printf("错误: 打开文件失败: %v", err)
-			http.Error(w, "文件在磁盘上未找到", http.StatusNotFound)
+			writeError(w, http.StatusNotFound, "file_missing_on_disk", "File missing on disk", "文件在磁盘上未找到")
 			return
 		}
 		defer file.Close()
@@ -457,7 +433,7 @@ func (s *ClipboardServer) handle_file(w http.ResponseWriter, r *http.Request) {
 		stat, err := file.Stat()
 		if err != nil {
 			s.logger.Printf("错误: 获取文件状态失败: %v", err)
-			http.Error(w, "无法获取文件状态", http.StatusInternalServerError)
+			writeError(w, http.StatusInternalServerError, "file_stat_failed", "Cannot read file info", "无法获取文件状态")
 			return
 		}
 
@@ -479,7 +455,7 @@ func (s *ClipboardServer) handle_file(w http.ResponseWriter, r *http.Request) {
 		err := os.Remove(filePath)
 		if err != nil && !os.IsNotExist(err) {
 			s.logger.Printf("错误: 删除文件失败: %v", err)
-			http.Error(w, "删除文件失败", http.StatusInternalServerError)
+			writeError(w, http.StatusInternalServerError, "file_delete_failed", "Failed to delete file", "删除文件失败")
 			return
 		}
 
@@ -493,13 +469,13 @@ func (s *ClipboardServer) handle_file(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]interface{}{"status": "文件删除成功"})
 
 	default:
-		http.Error(w, "方法不允许", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "Method not allowed", "方法不允许")
 	}
 }
 
 func (s *ClipboardServer) handle_text(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "仅允许 POST 请求", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "Only POST is allowed", "仅允许 POST 请求")
 		return
 	}
 
@@ -508,7 +484,7 @@ func (s *ClipboardServer) handle_text(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		s.logger.Printf("错误: 读取 /text 请求体失败: %v", err)
-		http.Error(w, "无法读取请求体", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "body_read_failed", "Cannot read request body", "无法读取请求体")
 		return
 	}
 	defer r.Body.Close()
@@ -516,7 +492,7 @@ func (s *ClipboardServer) handle_text(w http.ResponseWriter, r *http.Request) {
 	text := string(body)
 	if s.config.Text.Limit > 0 && len(text) > s.config.Text.Limit {
 		s.logger.Printf("错误: 文本内容超出限制 (%d > %d)", len(text), s.config.Text.Limit)
-		http.Error(w, fmt.Sprintf("文本内容超出限制 (最大 %d 字符)", s.config.Text.Limit), http.StatusRequestEntityTooLarge)
+		writeError(w, http.StatusRequestEntityTooLarge, "text_too_long", "Text too long", fmt.Sprintf("文本内容超出限制 (最大 %d 字符)", s.config.Text.Limit))
 		return
 	}
 
@@ -527,7 +503,7 @@ func (s *ClipboardServer) handle_text(w http.ResponseWriter, r *http.Request) {
 		id, err := strconv.Atoi(idStr)
 		if err != nil {
 			s.logger.Printf("无效的 ID 参数: %s", idStr)
-			http.Error(w, "无效的 ID 参数", http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, "invalid_id", "Invalid id parameter", "无效的 ID 参数")
 			return
 		}
 
@@ -548,7 +524,7 @@ func (s *ClipboardServer) handle_text(w http.ResponseWriter, r *http.Request) {
 			return
 		} else {
 			s.logger.Printf("未找到可更新的文本消息 ID: %d (房间: %s)", id, room)
-			http.Error(w, "消息未找到或无法更新", http.StatusNotFound)
+			writeError(w, http.StatusNotFound, "message_not_updatable", "Message not found or not updatable", "消息未找到或无法更新")
 			return
 		}
 	}
@@ -613,7 +589,7 @@ func (s *ClipboardServer) updateTextMessage(id int, newContent string, room stri
 
 func (s *ClipboardServer) handle_upload(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "仅允许 POST 请求", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "Only POST is allowed", "仅允许 POST 请求")
 		return
 	}
 
@@ -629,7 +605,7 @@ func (s *ClipboardServer) handle_upload(w http.ResponseWriter, r *http.Request) 
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			s.logger.Printf("错误: 读取文件名失败: %v", err)
-			http.Error(w, "无法读取请求体", http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, "body_read_failed", "Cannot read request body", "无法读取请求体")
 			return
 		}
 		defer r.Body.Close()
@@ -669,21 +645,21 @@ func (s *ClipboardServer) handle_upload(w http.ResponseWriter, r *http.Request) 
 	// 检查文件大小限制
 	if s.config.File.Limit > 0 && r.ContentLength > int64(s.config.File.Limit) {
 		s.logger.Printf("错误: 文件大小 (%d) 超出限制 (%d)", r.ContentLength, s.config.File.Limit)
-		http.Error(w, fmt.Sprintf("文件大小超出限制 (最大 %d 字节)", s.config.File.Limit), http.StatusRequestEntityTooLarge)
+		writeError(w, http.StatusRequestEntityTooLarge, "file_too_large", "File too large", fmt.Sprintf("文件大小超出限制 (最大 %d 字节)", s.config.File.Limit))
 		return
 	}
 
 	err := r.ParseMultipartForm(int64(s.config.File.Limit)) // 使用文件大小限制作为 maxMemory
 	if err != nil {
 		s.logger.Printf("错误: 解析 multipart form 失败: %v", err)
-		http.Error(w, "无法解析表单数据", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "form_parse_failed", "Cannot parse form data", "无法解析表单数据")
 		return
 	}
 
 	file, handler, err := r.FormFile("file") // "file" 是表单字段名
 	if err != nil {
 		s.logger.Printf("错误: 获取上传文件失败: %v", err)
-		http.Error(w, "无法获取文件", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "file_field_missing", "Cannot read uploaded file", "无法获取文件")
 		return
 	}
 	defer file.Close()
@@ -700,14 +676,14 @@ func (s *ClipboardServer) handle_upload(w http.ResponseWriter, r *http.Request) 
 	dst, err := os.Create(filePath)
 	if err != nil {
 		s.logger.Printf("错误: 创建文件 %s 失败: %v", filePath, err)
-		http.Error(w, "无法保存文件", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "file_save_failed", "Cannot save file", "无法保存文件")
 		return
 	}
 	defer dst.Close()
 
 	if _, err := io.Copy(dst, file); err != nil {
 		s.logger.Printf("错误: 写入文件 %s 失败: %v", filePath, err)
-		http.Error(w, "无法写入文件", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "file_write_failed", "Cannot write file", "无法写入文件")
 		return
 	}
 
@@ -772,7 +748,7 @@ func (s *ClipboardServer) handle_upload(w http.ResponseWriter, r *http.Request) 
 
 func (s *ClipboardServer) handle_chunk(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "仅允许 POST 请求", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "Only POST is allowed", "仅允许 POST 请求")
 		return
 	}
 
@@ -786,7 +762,7 @@ func (s *ClipboardServer) handle_chunk(w http.ResponseWriter, r *http.Request) {
 
 	if !ok {
 		s.logger.Printf("错误: 无效的 UUID: %s", uuid)
-		http.Error(w, "无效的 UUID", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "invalid_uuid", "Invalid UUID", "无效的 UUID")
 		return
 	}
 
@@ -794,7 +770,7 @@ func (s *ClipboardServer) handle_chunk(w http.ResponseWriter, r *http.Request) {
 	data, err := io.ReadAll(r.Body)
 	if err != nil {
 		s.logger.Printf("错误: 读取分块数据失败: %v", err)
-		http.Error(w, "无法读取分块数据", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "chunk_read_failed", "Cannot read chunk data", "无法读取分块数据")
 		return
 	}
 	defer r.Body.Close()
@@ -806,7 +782,7 @@ func (s *ClipboardServer) handle_chunk(w http.ResponseWriter, r *http.Request) {
 	// 检查文件大小是否超过限制
 	if s.config.File.Limit > 0 && newSize > int64(s.config.File.Limit) {
 		s.logger.Printf("错误: 文件大小已超过限制 (%d > %d)", newSize, s.config.File.Limit)
-		http.Error(w, fmt.Sprintf("文件大小已超过限制 (最大 %d 字节)", s.config.File.Limit), http.StatusRequestEntityTooLarge)
+		writeError(w, http.StatusRequestEntityTooLarge, "file_too_large", "File too large", fmt.Sprintf("文件大小已超过限制 (最大 %d 字节)", s.config.File.Limit))
 		return
 	}
 
@@ -821,14 +797,14 @@ func (s *ClipboardServer) handle_chunk(w http.ResponseWriter, r *http.Request) {
 	file, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		s.logger.Printf("错误: 打开文件 %s 失败: %v", filePath, err)
-		http.Error(w, "无法打开文件", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "file_open_failed", "Cannot open file", "无法打开文件")
 		return
 	}
 	defer file.Close()
 
 	if _, err := file.Write(data); err != nil {
 		s.logger.Printf("错误: 写入数据到文件 %s 失败: %v", filePath, err)
-		http.Error(w, "无法写入文件", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "file_write_failed", "Cannot write file", "无法写入文件")
 		return
 	}
 
@@ -839,7 +815,7 @@ func (s *ClipboardServer) handle_chunk(w http.ResponseWriter, r *http.Request) {
 
 func (s *ClipboardServer) handle_finish(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "仅允许 POST 请求", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "Only POST is allowed", "仅允许 POST 请求")
 		return
 	}
 
@@ -855,7 +831,7 @@ func (s *ClipboardServer) handle_finish(w http.ResponseWriter, r *http.Request) 
 
 	if !ok {
 		s.logger.Printf("错误: 无效的 UUID: %s", uuid)
-		http.Error(w, "无效的 UUID", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "invalid_uuid", "Invalid UUID", "无效的 UUID")
 		return
 	}
 
@@ -916,13 +892,13 @@ func (s *ClipboardServer) handle_finish(w http.ResponseWriter, r *http.Request) 
 func (s *ClipboardServer) handle_revoke(w http.ResponseWriter, r *http.Request) {
 	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
 	if len(parts) < 1 {
-		http.Error(w, "无效的撤销路径", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "invalid_revoke_path", "Invalid revoke path", "无效的撤销路径")
 		return
 	}
 	idStr := parts[len(parts)-1]
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, "无效的撤销 ID", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "invalid_revoke_id", "Invalid revoke id", "无效的撤销 ID")
 		return
 	}
 
@@ -957,11 +933,11 @@ func (s *ClipboardServer) handle_revoke(w http.ResponseWriter, r *http.Request) 
 	s.messageQueue.Unlock()
 	if foundIndex == -1 {
 		if unauthorized {
-			writeAuthJSONError(w, http.StatusUnauthorized, "无权访问该房间")
+			writeError(w, http.StatusUnauthorized, "room_forbidden", "No access to this room", "无权访问该房间")
 			return
 		}
 		s.logger.Printf("尝试撤销未找到的消息 ID: %d", id)
-		http.Error(w, "消息未找到", http.StatusNotFound)
+		writeError(w, http.StatusNotFound, "message_not_found", "Message not found", "消息未找到")
 		return
 	}
 
@@ -994,7 +970,7 @@ func (s *ClipboardServer) handle_revoke(w http.ResponseWriter, r *http.Request) 
 func (s *ClipboardServer) handleClearAll(w http.ResponseWriter, r *http.Request) {
 	normalizedRoom := normalizeRoomName(r.URL.Query().Get("room"))
 	if !s.canAccessRoom(normalizedRoom, extractAuthToken(r)) {
-		writeAuthJSONError(w, http.StatusUnauthorized, "无权访问该房间")
+		writeError(w, http.StatusUnauthorized, "room_forbidden", "No access to this room", "无权访问该房间")
 		return
 	}
 
@@ -1047,26 +1023,39 @@ func (s *ClipboardServer) handleClearAll(w http.ResponseWriter, r *http.Request)
 	fmt.Fprintln(w, "所有消息已清除")
 }
 
-// writeContentError 按请求格式输出错误：JSON 请求给 JSON，其余保持纯文本。
+// writeError 是所有错误响应的唯一出口：一律返回 JSON。
+//
+// 三个字段各有分工，别混用：
+//
+//	code    机器码，snake_case，给程序判断用（前端据此分支、测试据此断言）。
+//	        一旦发布就不要改，改了等于破坏契约。
+//	error   英文人话，给「会看英文的人」和日志用。与 Worker 侧保持同一风格。
+//	message 中文人话，给人看。已分发的捷径、Android 快捷方式、前端都在展示它。
 //
 // 为什么需要它：Apple 快捷指令的「获取URL内容」**不暴露 HTTP 状态码**，只能读响应体，
-// 而它用 getDictionary 解析。纯文本错误会让它解析不出 error 字段，
-// 走到"服务器没有返回文字内容"那条误导性的分支；更糟的是文件分支会拿错误文本
-// 去 setName + saveFilePrompt，**保存出一个顶着原文件名的假文件**。
-func writeContentError(w http.ResponseWriter, r *http.Request, isJSON bool, msg string, status int) {
-	if isJSON || strings.Contains(r.Header.Get("Accept"), "application/json") {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(status)
-		json.NewEncoder(w).Encode(map[string]string{"error": msg})
-		return
-	}
-	http.Error(w, msg, status)
+// 而它用 getDictionary 解析。纯文本错误会让它解析不出字段，走到兜底分支；
+// 更糟的是文件分支会拿错误文本去 setName + saveFilePrompt，
+// **保存出一个顶着原文件名的假文件**。
+//
+// 为什么不再按 Accept 分叉（曾经的做法，已废弃）：捷径根本不发 Accept 头，
+// 于是「文本超限」这类错误仍然是纯文本 —— 捷径读不到 error，把 413 误报成
+// 「服务器未确认保存，请检查部署地址及服务器状态」，把人往部署/网络方向带。
+// 同一状态码对应两种响应体形状，等于要求每个客户端各写两套解析逻辑。
+// 统一成 JSON 后客户端只需要一套。
+func writeError(w http.ResponseWriter, status int, code, errText, message string) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(map[string]string{
+		"code":    code,
+		"error":   errText,
+		"message": message,
+	})
 }
 
 func (s *ClipboardServer) handleContent(w http.ResponseWriter, r *http.Request) {
 	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
 	if len(parts) < 2 { // 至少需要 "content" 和 id
-		writeContentError(w, r, false, "无效的内容路径", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "invalid_content_path", "Invalid content path", "无效的内容路径")
 		return
 	}
 
@@ -1094,7 +1083,7 @@ func (s *ClipboardServer) handleContent(w http.ResponseWriter, r *http.Request) 
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		s.logger.Printf("无效的内容 ID: %s, 错误: %v", idStr, err)
-		writeContentError(w, r, isJSONRequest, "无效的内容 ID", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "invalid_content_id", "Invalid content id", "无效的内容 ID")
 		return
 	}
 	_, hasRequestedRoom := r.URL.Query()["room"]
@@ -1131,7 +1120,7 @@ func (s *ClipboardServer) handleContent(w http.ResponseWriter, r *http.Request) 
 						// 拿到 404 的错误文本，然后**存成一个顶着原文件名的假文件**。
 						if fileReceive.Expire > 0 && fileReceive.Expire < time.Now().Unix() {
 							s.logger.Printf("尝试访问已过期的文件: %s (ID: %d)", fileReceive.Name, id)
-							writeContentError(w, r, true, "文件已过期", http.StatusNotFound)
+							writeError(w, http.StatusNotFound, "file_expired", "File expired", "文件已过期")
 							return
 						}
 
@@ -1158,7 +1147,7 @@ func (s *ClipboardServer) handleContent(w http.ResponseWriter, r *http.Request) 
 					// 浏览器直连 /content/<id> 就能绕过上面的检查拿到已过期文件。
 					if msg.Data.FileReceive.Expire > 0 && msg.Data.FileReceive.Expire < time.Now().Unix() {
 						s.logger.Printf("尝试访问已过期的文件: %s (ID: %d)", msg.Data.FileReceive.Name, id)
-						writeContentError(w, r, isJSONRequest, "文件已过期", http.StatusNotFound)
+						writeError(w, http.StatusNotFound, "file_expired", "File expired", "文件已过期")
 						return
 					}
 
@@ -1166,7 +1155,7 @@ func (s *ClipboardServer) handleContent(w http.ResponseWriter, r *http.Request) 
 					file, openErr := os.Open(filePath)
 					if openErr != nil {
 						s.logger.Printf("错误: 打开文件失败: %v", openErr)
-						writeContentError(w, r, isJSONRequest, "文件已过期或已被清理", http.StatusNotFound)
+						writeError(w, http.StatusNotFound, "file_expired", "File expired or cleaned up", "文件已过期或已被清理")
 						return
 					}
 					defer file.Close()
@@ -1174,7 +1163,7 @@ func (s *ClipboardServer) handleContent(w http.ResponseWriter, r *http.Request) 
 					stat, statErr := file.Stat()
 					if statErr != nil {
 						s.logger.Printf("错误: 获取文件状态失败: %v", statErr)
-						writeContentError(w, r, isJSONRequest, "无法读取文件状态", http.StatusInternalServerError)
+						writeError(w, http.StatusInternalServerError, "file_stat_failed", "Cannot read file info", "无法读取文件状态")
 						return
 					}
 
@@ -1220,17 +1209,11 @@ func (s *ClipboardServer) handleContent(w http.ResponseWriter, r *http.Request) 
 
 	// 鉴权失败优先于“未找到”，避免把缺密码/过期分享 token 误报成内容不存在
 	if unauthorized {
-		writeAuthJSONError(w, http.StatusUnauthorized, "无权访问该房间")
+		writeError(w, http.StatusUnauthorized, "room_forbidden", "No access to this room", "无权访问该房间")
 		return
 	}
 	s.logger.Printf("未找到内容 ID: %d", id)
-	if isJSONRequest {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{"error": "内容未找到"})
-	} else {
-		http.Error(w, "内容未找到", http.StatusNotFound)
-	}
+	writeError(w, http.StatusNotFound, "content_not_found", "Content not found", "内容未找到")
 }
 
 func (s *ClipboardServer) handleLatestContent(w http.ResponseWriter, r *http.Request) {
@@ -1253,15 +1236,7 @@ func (s *ClipboardServer) handleLatestContent(w http.ResponseWriter, r *http.Req
 	// 检查消息队列是否为空
 	if len(s.messageQueue.List) == 0 {
 		s.logger.Printf("没有可用的内容")
-		if isJSONRequest {
-			// 如果是JSON请求，返回JSON格式的404响应
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusNotFound)
-			json.NewEncoder(w).Encode(map[string]string{"error": "内容未找到"})
-		} else {
-			// 普通请求，返回普通404
-			http.Error(w, "没有可用的内容", http.StatusNotFound)
-		}
+		writeError(w, http.StatusNotFound, "no_content", "No content available", "没有可用的内容")
 		return
 	}
 
@@ -1296,7 +1271,7 @@ func (s *ClipboardServer) handleLatestContent(w http.ResponseWriter, r *http.Req
 				// 拿到 404 的错误文本，然后**存成一个顶着原文件名的假文件**。
 				if fileReceive.Expire > 0 && fileReceive.Expire < time.Now().Unix() {
 					s.logger.Printf("尝试访问已过期的文件: %s (ID: %d)", fileReceive.Name, msg.Data.ID())
-					writeContentError(w, r, true, "文件已过期", http.StatusNotFound)
+					writeError(w, http.StatusNotFound, "file_expired", "File expired", "文件已过期")
 					return
 				}
 
@@ -1304,10 +1279,10 @@ func (s *ClipboardServer) handleLatestContent(w http.ResponseWriter, r *http.Req
 
 				// 构建JSON响应
 				responseData = map[string]interface{}{
-					"type":      responseType,
-					"name":      fileReceive.Name,
-					"size":      fileReceive.Size,
-					"uuid":      fileReceive.Cache,
+					"type": responseType,
+					"name": fileReceive.Name,
+					"size": fileReceive.Size,
+					"uuid": fileReceive.Cache,
 					// 不能用 filepath.Join：它内部会 Clean，把 "http://host" 里的双斜杠
 					// 收成 "http:/host"，客户端拿到的 url 直接是坏的。
 					"url":       fileReceive.URL + "/" + url.PathEscape(fileReceive.Name),
@@ -1344,7 +1319,7 @@ func (s *ClipboardServer) handleLatestContent(w http.ResponseWriter, r *http.Req
 			// 与 JSON 分支保持一致：过期记录不能再吐出字节（浏览器直连走的就是这条路）。
 			if msg.Data.FileReceive.Expire > 0 && msg.Data.FileReceive.Expire < time.Now().Unix() {
 				s.logger.Printf("尝试访问已过期的文件: %s (ID: %d)", msg.Data.FileReceive.Name, msg.Data.ID())
-				http.Error(w, "文件已过期", http.StatusNotFound)
+				writeError(w, http.StatusNotFound, "file_expired", "File expired", "文件已过期")
 				return
 			}
 
@@ -1357,7 +1332,7 @@ func (s *ClipboardServer) handleLatestContent(w http.ResponseWriter, r *http.Req
 			file, err := os.Open(filePath)
 			if err != nil {
 				s.logger.Printf("错误: 打开文件失败: %v", err)
-				http.Error(w, "文件在磁盘上未找到", http.StatusNotFound)
+				writeError(w, http.StatusNotFound, "file_missing_on_disk", "File missing on disk", "文件在磁盘上未找到")
 				return
 			}
 			defer file.Close()
@@ -1365,7 +1340,7 @@ func (s *ClipboardServer) handleLatestContent(w http.ResponseWriter, r *http.Req
 			stat, err := file.Stat()
 			if err != nil {
 				s.logger.Printf("错误: 获取文件状态失败: %v", err)
-				http.Error(w, "无法获取文件状态", http.StatusInternalServerError)
+				writeError(w, http.StatusInternalServerError, "file_stat_failed", "Cannot read file info", "无法获取文件状态")
 				return
 			}
 
@@ -1413,17 +1388,11 @@ func (s *ClipboardServer) handleLatestContent(w http.ResponseWriter, r *http.Req
 	}
 
 	if unauthorized {
-		writeAuthJSONError(w, http.StatusUnauthorized, "无权访问该房间")
+		writeError(w, http.StatusUnauthorized, "room_forbidden", "No access to this room", "无权访问该房间")
 		return
 	}
 	s.logger.Printf("未找到匹配的最新内容")
-	if isJSONRequest {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{"error": "内容未找到"})
-	} else {
-		http.Error(w, "未找到匹配的内容", http.StatusNotFound)
-	}
+	writeError(w, http.StatusNotFound, "content_not_found", "Content not found", "未找到匹配的内容")
 }
 
 // handleRooms 处理房间列表请求
@@ -1440,18 +1409,13 @@ func (s *ClipboardServer) handleRooms(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Method != http.MethodGet {
-		http.Error(w, "仅允许 GET 请求", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "Only GET is allowed", "仅允许 GET 请求")
 		return
 	}
 
 	// 检查是否启用房间列表功能
 	if !s.config.Server.RoomList {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusForbidden)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error":   "Forbidden",
-			"message": "房间列表功能未启用",
-		})
+		writeError(w, http.StatusForbidden, "room_list_disabled", "Room list disabled", "房间列表功能未启用")
 		return
 	}
 
@@ -1466,7 +1430,7 @@ func (s *ClipboardServer) handleRooms(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		s.logger.Printf("错误: 编码房间列表响应失败: %v", err)
-		http.Error(w, "编码响应失败", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "encode_failed", "Failed to encode response", "编码响应失败")
 		return
 	}
 

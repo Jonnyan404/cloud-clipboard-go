@@ -706,12 +706,12 @@ func (s *ClipboardServer) authMiddleware(next http.HandlerFunc) http.HandlerFunc
 
 		if token == "" && extractShareToken(r) == "" {
 			s.logger.Printf("认证失败: 未提供令牌。来自 IP: %s, 路径: %s, 房间: %s", clientIP, r.URL.Path, requirement.Room)
-			writeAuthJSONError(w, http.StatusUnauthorized, "需要认证令牌")
+			writeError(w, http.StatusUnauthorized, "unauthorized", "Authentication required", "需要认证令牌")
 			return
 		}
 
 		s.logger.Printf("认证失败: 无效令牌。来自 IP: %s, 路径: %s, 房间: %s", clientIP, r.URL.Path, requirement.Room)
-		writeAuthJSONError(w, http.StatusUnauthorized, "无效的认证令牌")
+		writeError(w, http.StatusUnauthorized, "unauthorized_invalid_token", "Invalid auth token", "无效的认证令牌")
 	}
 }
 

@@ -272,11 +272,5 @@ func (s *ClipboardServer) inferRequestRoom(r *http.Request) string {
 	return "default"
 }
 
-func writeAuthJSONError(w http.ResponseWriter, status int, message string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(map[string]string{
-		"error":   http.StatusText(status),
-		"message": message,
-	})
-}
+// 错误响应统一走 handler.go 的 writeError —— 这里不再单独实现一份，
+// 免得同一个状态码在两条路径上给出不同的响应体形状。

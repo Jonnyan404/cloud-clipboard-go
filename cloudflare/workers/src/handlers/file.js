@@ -2,6 +2,7 @@ import { corsHeaders } from '../cors';
 import { buildSenderDevice, saveToD1, broadcastMessage, generateUUID } from '../utils';
 import { ensureRoomAccess, normalizeRoomName } from '../auth';
 import { ensureRoomOrShareAccess } from '../share';
+import { errorResponse } from '../errors';
 
 function decodeUploadFilename(value = '') {
   try {
@@ -176,13 +177,7 @@ export class FileHandler {
       }
 
       if (!env.R2_BUCKET) {
-        return new Response(JSON.stringify({
-          error: 'Storage not available',
-          message: '文件存储服务不可用'
-        }), {
-          status: 503,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders }
-        });
+        return errorResponse(503, 'storage_unavailable', 'Storage not available', '文件存储服务不可用');
       }
 
       const rawFileName = request.headers.get('X-File-Name');
@@ -225,25 +220,13 @@ export class FileHandler {
       });
 
       if (!fileBody || !fileName) {
-        return new Response(JSON.stringify({
-          error: 'No file provided',
-          message: '未提供文件'
-        }), {
-          status: 400,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders }
-        });
+        return errorResponse(400, 'no_file', 'No file provided', '未提供文件');
       }
 
       // 检查文件大小限制
       const fileLimit = getFileLimit(env);
       if (fileSize > fileLimit) {
-        return new Response(JSON.stringify({
-          error: 'File too large',
-          message: `文件大小超出限制 (最大 ${Math.floor(fileLimit / 1024 / 1024)}MB)`
-        }), {
-          status: 413,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders }
-        });
+        return errorResponse(413, 'file_too_large', 'File too large', `文件大小超出限制 (最大 ${Math.floor(fileLimit / 1024 / 1024)}MB)`);
       }
 
       const uuid = generateUUID();
@@ -276,13 +259,7 @@ export class FileHandler {
       console.error('File upload stack:', error?.stack || '(no stack)');
       const reason = String(error?.message || error || 'unknown');
       console.error('File upload reason:', reason);
-      return new Response(JSON.stringify({
-        error: 'Internal Server Error',
-        message: `上传文件时发生错误: ${reason}`
-      }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
+      return errorResponse(500, 'internal_error', 'Internal Server Error', `上传文件时发生错误: ${reason}`);
     }
   }
 
@@ -296,24 +273,12 @@ export class FileHandler {
       }
 
       if (!env.R2_BUCKET) {
-        return new Response(JSON.stringify({
-          error: 'Storage not available',
-          message: '文件存储服务不可用'
-        }), {
-          status: 503,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders }
-        });
+        return errorResponse(503, 'storage_unavailable', 'Storage not available', '文件存储服务不可用');
       }
 
       const fileName = String(await request.text() || '').trim();
       if (!fileName) {
-        return new Response(JSON.stringify({
-          error: 'Invalid file name',
-          message: '未提供文件名'
-        }), {
-          status: 400,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders }
-        });
+        return errorResponse(400, 'invalid_file_name', 'Invalid file name', '未提供文件名');
       }
 
       const currentTime = Math.floor(Date.now() / 1000);
@@ -348,13 +313,7 @@ export class FileHandler {
     } catch (error) {
       console.error('Create chunk upload error:', error);
       console.error('Create chunk upload stack:', error?.stack || '(no stack)');
-      return new Response(JSON.stringify({
-        error: 'Internal Server Error',
-        message: '初始化分块上传时发生错误'
-      }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
+      return errorResponse(500, 'internal_error', 'Internal Server Error', '初始化分块上传时发生错误');
     }
   }
 
@@ -363,24 +322,12 @@ export class FileHandler {
       const url = new URL(request.url);
       const uuid = String(request.params.uuid || '').trim();
       if (!uuid || !env.R2_BUCKET) {
-        return new Response(JSON.stringify({
-          error: 'Invalid request',
-          message: '无效的 UUID'
-        }), {
-          status: 400,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders }
-        });
+        return errorResponse(400, 'invalid_uuid', 'Invalid request', '无效的 UUID');
       }
 
       const metaObject = await env.R2_BUCKET.get(createUploadMetaKey(uuid));
       if (!metaObject) {
-        return new Response(JSON.stringify({
-          error: 'Invalid UUID',
-          message: '无效的 UUID'
-        }), {
-          status: 400,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders }
-        });
+        return errorResponse(400, 'invalid_uuid', 'Invalid UUID', '无效的 UUID');
       }
       const meta = JSON.parse(await metaObject.text());
       const room = normalizeRoomName(meta.room);
@@ -391,25 +338,13 @@ export class FileHandler {
       }
 
       if (!request.body) {
-        return new Response(JSON.stringify({
-          error: 'Empty chunk',
-          message: '分块数据为空'
-        }), {
-          status: 400,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders }
-        });
+        return errorResponse(400, 'empty_chunk', 'Empty chunk', '分块数据为空');
       }
 
       const fileLimit = getFileLimit(env);
       const chunkSize = Number(request.headers.get('Content-Length') || 0);
       if (fileLimit > 0 && (Number(meta.totalSize || 0) + chunkSize) > fileLimit) {
-        return new Response(JSON.stringify({
-          error: 'File too large',
-          message: `文件大小超出限制 (最大 ${Math.floor(fileLimit / 1024 / 1024)}MB)`
-        }), {
-          status: 413,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders }
-        });
+        return errorResponse(413, 'file_too_large', 'File too large', `文件大小超出限制 (最大 ${Math.floor(fileLimit / 1024 / 1024)}MB)`);
       }
 
       const upload = env.R2_BUCKET.resumeMultipartUpload(createFileKey(uuid), meta.uploadId);
@@ -428,13 +363,7 @@ export class FileHandler {
     } catch (error) {
       console.error('Upload chunk part error:', error);
       console.error('Upload chunk part stack:', error?.stack || '(no stack)');
-      return new Response(JSON.stringify({
-        error: 'Internal Server Error',
-        message: '上传分块数据时发生错误'
-      }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
+      return errorResponse(500, 'internal_error', 'Internal Server Error', '上传分块数据时发生错误');
     }
   }
 
@@ -450,24 +379,12 @@ export class FileHandler {
       }
 
       if (!env.R2_BUCKET) {
-        return new Response(JSON.stringify({
-          error: 'Storage not available',
-          message: '文件存储服务不可用'
-        }), {
-          status: 503,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders }
-        });
+        return errorResponse(503, 'storage_unavailable', 'Storage not available', '文件存储服务不可用');
       }
 
       const metaObject = await env.R2_BUCKET.get(createUploadMetaKey(uuid));
       if (!metaObject) {
-        return new Response(JSON.stringify({
-          error: 'Invalid UUID',
-          message: '无效的 UUID'
-        }), {
-          status: 400,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders }
-        });
+        return errorResponse(400, 'invalid_uuid', 'Invalid UUID', '无效的 UUID');
       }
       const meta = JSON.parse(await metaObject.text());
       const fileName = meta.name || 'file';
@@ -476,13 +393,7 @@ export class FileHandler {
       const parts = meta.parts || [];
 
       if (!meta.uploadId || !parts.length) {
-        return new Response(JSON.stringify({
-          error: 'No chunks',
-          message: '未找到上传的分块'
-        }), {
-          status: 400,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders }
-        });
+        return errorResponse(400, 'no_chunks', 'No chunks', '未找到上传的分块');
       }
 
       const upload = env.R2_BUCKET.resumeMultipartUpload(createFileKey(uuid), meta.uploadId);
@@ -511,13 +422,7 @@ export class FileHandler {
     } catch (error) {
       console.error('Finish chunk upload error:', error);
       console.error('Finish chunk upload stack:', error?.stack || '(no stack)');
-      return new Response(JSON.stringify({
-        error: 'Internal Server Error',
-        message: '完成分块上传时发生错误'
-      }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
+      return errorResponse(500, 'internal_error', 'Internal Server Error', '完成分块上传时发生错误');
     }
   }
 
@@ -531,13 +436,7 @@ export class FileHandler {
       }
 
       if (!env.R2_BUCKET) {
-        return new Response(JSON.stringify({
-          error: 'Storage not available',
-          message: '文件存储服务不可用'
-        }), {
-          status: 503,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders }
-        });
+        return errorResponse(503, 'storage_unavailable', 'Storage not available', '文件存储服务不可用');
       }
 
       const body = await request.json();
@@ -546,24 +445,12 @@ export class FileHandler {
       const fileType = String(body?.type || 'application/octet-stream');
 
       if (!fileName || !fileSize) {
-        return new Response(JSON.stringify({
-          error: 'Invalid file metadata',
-          message: '文件元数据无效'
-        }), {
-          status: 400,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders }
-        });
+        return errorResponse(400, 'invalid_file_metadata', 'Invalid file metadata', '文件元数据无效');
       }
 
       const fileLimit = getFileLimit(env);
       if (fileSize > fileLimit) {
-        return new Response(JSON.stringify({
-          error: 'File too large',
-          message: `文件大小超出限制 (最大 ${Math.floor(fileLimit / 1024 / 1024)}MB)`
-        }), {
-          status: 413,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders }
-        });
+        return errorResponse(413, 'file_too_large', 'File too large', `文件大小超出限制 (最大 ${Math.floor(fileLimit / 1024 / 1024)}MB)`);
       }
 
       const uuid = generateUUID();
@@ -596,13 +483,7 @@ export class FileHandler {
     } catch (error) {
       console.error('Create multipart upload error:', error);
       console.error('Create multipart upload stack:', error?.stack || '(no stack)');
-      return new Response(JSON.stringify({
-        error: 'Internal Server Error',
-        message: '初始化分片上传时发生错误'
-      }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
+      return errorResponse(500, 'internal_error', 'Internal Server Error', '初始化分片上传时发生错误');
     }
   }
 
@@ -620,13 +501,7 @@ export class FileHandler {
       const partNumber = Number(request.params.partNumber);
 
       if (!uploadId || !key || !partNumber || !request.body) {
-        return new Response(JSON.stringify({
-          error: 'Invalid multipart request',
-          message: '分片上传参数无效'
-        }), {
-          status: 400,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders }
-        });
+        return errorResponse(400, 'invalid_multipart_params', 'Invalid multipart request', '分片上传参数无效');
       }
 
       const upload = env.R2_BUCKET.resumeMultipartUpload(key, uploadId);
@@ -645,13 +520,7 @@ export class FileHandler {
     } catch (error) {
       console.error('Multipart upload part error:', error);
       console.error('Multipart upload part stack:', error?.stack || '(no stack)');
-      return new Response(JSON.stringify({
-        error: 'Internal Server Error',
-        message: '上传文件分片时发生错误'
-      }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
+      return errorResponse(500, 'internal_error', 'Internal Server Error', '上传文件分片时发生错误');
     }
   }
 
@@ -670,13 +539,7 @@ export class FileHandler {
       const parts = Array.isArray(body?.parts) ? [...body.parts] : [];
 
       if (!uploadId || !key || !parts.length) {
-        return new Response(JSON.stringify({
-          error: 'Invalid multipart request',
-          message: '分片完成参数无效'
-        }), {
-          status: 400,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders }
-        });
+        return errorResponse(400, 'invalid_multipart_complete_params', 'Invalid multipart request', '分片完成参数无效');
       }
 
       const upload = env.R2_BUCKET.resumeMultipartUpload(key, uploadId);
@@ -729,13 +592,7 @@ export class FileHandler {
     } catch (error) {
       console.error('Complete multipart upload error:', error);
       console.error('Complete multipart upload stack:', error?.stack || '(no stack)');
-      return new Response(JSON.stringify({
-        error: 'Internal Server Error',
-        message: '完成分片上传时发生错误'
-      }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
+      return errorResponse(500, 'internal_error', 'Internal Server Error', '完成分片上传时发生错误');
     }
   }
 
@@ -751,13 +608,7 @@ export class FileHandler {
       const uploadId = String(url.searchParams.get('uploadId') || '').trim();
       const key = String(url.searchParams.get('key') || '').trim();
       if (!uploadId || !key) {
-        return new Response(JSON.stringify({
-          error: 'Invalid multipart request',
-          message: '缺少 uploadId 或 key'
-        }), {
-          status: 400,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders }
-        });
+        return errorResponse(400, 'missing_upload_params', 'Invalid multipart request', '缺少 uploadId 或 key');
       }
 
       const upload = env.R2_BUCKET.resumeMultipartUpload(key, uploadId);
@@ -777,13 +628,7 @@ export class FileHandler {
     } catch (error) {
       console.error('Abort multipart upload error:', error);
       console.error('Abort multipart upload stack:', error?.stack || '(no stack)');
-      return new Response(JSON.stringify({
-        error: 'Internal Server Error',
-        message: '取消分片上传时发生错误'
-      }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
+      return errorResponse(500, 'internal_error', 'Internal Server Error', '取消分片上传时发生错误');
     }
   }
 
@@ -910,13 +755,7 @@ export class FileHandler {
     } catch (error) {
       console.error('File delete error:', error);
       console.error('Error stack:', error.stack);
-      return new Response(JSON.stringify({
-        error: 'Internal Server Error',
-        message: '删除文件时发生错误'
-      }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
+      return errorResponse(500, 'internal_error', 'Internal Server Error', '删除文件时发生错误');
     }
   }
 

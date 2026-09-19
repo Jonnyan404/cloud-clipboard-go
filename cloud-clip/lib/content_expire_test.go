@@ -99,8 +99,10 @@ func TestContentExpiredFileIsBlockedOnEveryPath(t *testing.T) {
 				if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
 					t.Fatalf("JSON 错误体无法解析: %v，响应体=%q", err, rec.Body.String())
 				}
-				if payload["error"] != "文件已过期" {
-					t.Fatalf("error 字段不对: %v", payload["error"])
+				// 三个字段各司其职：code 给程序判断，error 给日志/英文用户，
+				// message 给中文用户看。任一缺失或走样都算契约破坏。
+				if payload["code"] != "file_expired" || payload["error"] == "" || payload["message"] != "文件已过期" {
+					t.Fatalf("错误体字段不对: %v", payload)
 				}
 			}
 		})

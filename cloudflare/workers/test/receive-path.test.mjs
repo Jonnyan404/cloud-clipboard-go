@@ -125,7 +125,11 @@ console.log('\n── G. 过期的文件：必须给 JSON 错误，不能让客�
     .run(now - 100, now - 10);
   const r = await getJson(ContentHandler.getLatest, env, '/content/latest?room=default&json=1');
   check('HTTP 404', r.status, 404);
-  check('返回 JSON 错误', r.json.error, '文件已过期');
+  // 三个字段各司其职，任一缺失都算契约破坏：code 给程序判断，error 给日志/英文用户，
+  // message 给中文用户看（捷径/Android 端展示的就是它）。
+  check('错误码', r.json.code, 'file_expired');
+  check('英文错误', r.json.error, 'File expired');
+  check('中文说明', r.json.message, '文件已过期');
 }
 {
   // 未过期的文件仍应正常返回，且带上 expire
