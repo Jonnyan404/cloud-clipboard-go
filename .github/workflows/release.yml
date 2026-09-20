@@ -382,8 +382,13 @@ jobs:
           TAG="${{ needs.determine-tag.outputs.tag }}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          # workflow_dispatch 可以对同一个 tag 重跑（补传资产），别因此堆出一串重复记录
-          if git log --format=%s -n 200 | grep -qxF "chore(release): ${TAG}"; then
+          # ⚠️ 判重**不能**写成 `git log … | grep -q "…"`。
+          # `grep -q` 一命中就退出，上游的 git log 如果还在写就会吃到 SIGPIPE；
+          # 脚本开头是 `set -euo pipefail`，于是**明明匹配成功也会把整条管道判成失败**，
+          # 结果每次重跑都多堆一条记录 —— v5.1.0 就因此出现了两条。
+          # 实测：`set -o pipefail; yes | grep -q y` 退出码非 0（Broken pipe），去掉 pipefail 才是 0。
+          # 这里改用 git 自己的 --grep，不走管道，从根上没有这个坑。
+          if [ -n "$(git log --format=%H --fixed-strings --grep="chore(release): ${TAG}" -n 1)" ]; then
             echo "main 上已有 ${TAG} 的记录，跳过"
             exit 0
           fi
