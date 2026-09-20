@@ -437,6 +437,7 @@ function isCurrent(room) {
 /* 头部 ~64px + body 上限 = 容器上限，和拆分前两块的合计高度一致 */
 .rl__body--dock {
     max-height: calc(100vh - 148px);
+    max-height: calc(100dvh - 148px);
     overflow: auto;
     padding: 14px 16px 18px;
 }

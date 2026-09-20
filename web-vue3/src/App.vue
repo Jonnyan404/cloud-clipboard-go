@@ -995,6 +995,7 @@ watch(() => route.fullPath, () => {
     align-items: flex-start;
     gap: 20px;
     min-height: 100vh;
+    min-height: 100dvh;
     padding: 0;
 }
 
@@ -1210,4 +1211,21 @@ watch(() => route.fullPath, () => {
     background-color: transparent !important;
 }
 
+</style>
+
+<style>
+/* 这几条必须写在**非 scoped** 块里：html / body 不在组件模板里，
+   scoped 规则会被加上 [data-v-xxx] 属性选择器，永远匹配不到它们。
+
+   背景：移动端整页能被往上拖几十 px，输入框（在文档流里）跟着脱离底部。
+   两个来源都要堵：
+     1) 页面里任何 `100vh` 都等于「地址栏收起时」的高度，比可视区高一截 ——
+        真机上 `100vh != 100dvh`，于是文档比可视区高，根滚动容器就能被拖。
+        各处的 `100vh` 后面都已补上 `100dvh`（headless 里两者相等，量不出来）。
+     2) 根滚动容器带 overflow-y: scroll，触摸设备上会产生 overscroll 回弹。
+        这里关掉回弹兜底；页面本来就没有溢出，不影响任何正常滚动。 */
+html,
+body {
+    overscroll-behavior: none;
+}
 </style>

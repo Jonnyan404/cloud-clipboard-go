@@ -498,8 +498,15 @@ async function deleteItem() {
 }
 
 /* 有 md 图标时给图标让位。这一层既没底色也不是滚动盒（正文是裸 div），
-   所以直接加在这里最省事 —— 数值见 MarkdownToggle 的 --md-toggle-gutter。 */
-.md-preview--md {
-    padding-right: var(--md-toggle-gutter);
+   所以直接加在这里最省事 —— 数值见 MarkdownToggle 的两个 --md-toggle-* 变量。 */
+/* 只在图标所在的高度内让位（见 MarkdownToggle 的两个 --md-toggle-* 变量）。
+   以前是给整个容器 padding-right，把每一行都压窄 64px。 */
+.md-preview--md::before {
+    content: '';
+    float: right;
+    width: var(--md-toggle-gutter);
+    /* 22px 给不支持 lh 单位的浏览器兜底；下面一行才是准的（正好一个行高） */
+    height: 22px;
+    height: var(--md-toggle-height);
 }
 </style>

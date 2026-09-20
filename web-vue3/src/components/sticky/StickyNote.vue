@@ -779,11 +779,16 @@ async function deleteItem() {
 
 /* 图标浮在右上角，正文得给它让位 —— 加在**滚动盒**上，因为滚动条永远贴着滚动盒的右沿，
    加在外层不滚动的盒子上是白加（滚动条不会跟着挪）。
-   数值来自 MarkdownToggle 的 --md-toggle-gutter，改图标尺寸只改那一处。 */
-.sticky-note__reader-text--md,
-.sticky-note__preview-text--md,
-.sticky-note__preview-scroll--md {
-    padding-right: var(--md-toggle-gutter);
+   数值来自 MarkdownToggle 的两个 --md-toggle-* 变量，改图标尺寸只改那一处。 */
+.sticky-note__reader-text--md::before,
+.sticky-note__preview-text--md::before,
+.sticky-note__preview-scroll--md::before {
+    content: '';
+    float: right;
+    width: var(--md-toggle-gutter);
+    /* 22px 给不支持 lh 单位的浏览器兜底；下面一行才是准的（正好一个行高） */
+    height: 22px;
+    height: var(--md-toggle-height);
 }
 
 /* 渲染 markdown 时收掉 white-space: pre-wrap —— 它是给纯文本保留换行的，

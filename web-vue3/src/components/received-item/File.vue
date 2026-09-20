@@ -654,9 +654,15 @@ function deviceIcon(type) {
 }
 
 /* 有 md 图标时给图标让位。必须加在 pre 自己身上：它才是滚动盒，滚动条贴着它的右沿；
-   加在外层 .md-preview 上会让这块灰底的右边缘缩进去，看着像断了。 */
-.timeline-card__text-preview--md {
-    padding-right: var(--md-toggle-gutter);
+   加在外层 .md-preview 上会让这块灰底的右边缘缩进去，看着像断了。
+   用 ::before 浮动占位而不是 padding-right —— 后者会把每一行都压窄。 */
+.timeline-card__text-preview--md::before {
+    content: '';
+    float: right;
+    width: var(--md-toggle-gutter);
+    /* 22px 给不支持 lh 单位的浏览器兜底；下面一行才是准的（正好一个行高） */
+    height: 22px;
+    height: var(--md-toggle-height);
 }
 
 .timeline-card--dark .timeline-card__meta,

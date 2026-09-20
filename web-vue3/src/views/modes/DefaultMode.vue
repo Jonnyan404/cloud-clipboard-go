@@ -121,6 +121,7 @@ watch(() => ws.room, (room) => {
 .home-minimal {
     background: transparent;
     min-height: 100vh;
+    min-height: 100dvh;
 }
 
 .home-minimal__body {
@@ -221,6 +222,7 @@ watch(() => ws.room, (room) => {
 @media (max-width: 960px) {
     .home-minimal {
         min-height: calc(100vh - 56px);
+        min-height: calc(100dvh - 56px);
     }
 
     .timeline-panel__stream {

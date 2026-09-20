@@ -67,7 +67,8 @@ const mdiLanguageMarkdown = 'mdi-language-markdown';
    高度 < 30px，永远矮于单行行高，不可能再撑出内容区的滚动条。 */
 .md-toggle {
     position: absolute;
-    top: 4px;
+    /* 只让开一行，所以图标尽量贴顶：top 越小，它下面那行越不容易擦到字形。 */
+    top: 2px;
     /* 右缩进必须**大于滚动条宽度**：滚动条永远贴着滚动盒的右沿，
        缩进不够就会压在它上面（便签阅读器的「图标盖住滚动条」就是这么来的）。
        这里 12px vs 8px 的滚动条，见下面各消费方的 ::-webkit-scrollbar。 */
@@ -108,5 +109,11 @@ const mdiLanguageMarkdown = 'mdi-language-markdown';
    注意别把它加在不滚动的外层盒子上：滚动条不会跟着让位，白加。 */
 :root {
     --md-toggle-gutter: 64px;
+    /* 让位的**高度**：`1lh` = 该容器自己的一个行高 —— 所以无论字号/行高是多少，
+       都只让开**一行**。（`lh` 是较新的单位，消费方会再写一个 px 兜底。）
+       消费方用 `::before` 做一个 float 占位块，宽 × 高就是这两个值：
+       只有和图标垂直重叠的那一行会绕开，下面的行恢复整宽。
+       （以前是给整个容器 padding-right，等于每一行都压窄 64px，图标下方的宽度全浪费。） */
+    --md-toggle-height: 1lh;
 }
 </style>

@@ -19,5 +19,6 @@ const viewComponent = computed(() => resolveModeComponent(app.uiMode));
 <style scoped>
 .mode-root {
     min-height: 100vh;
+    min-height: 100dvh;
 }
 </style>
