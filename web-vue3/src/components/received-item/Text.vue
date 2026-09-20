@@ -89,6 +89,16 @@ function openShareDialog(mode = 'copy') {
         shareUnprotected(mode);
         return;
     }
+    // 「分享时弹出设置框」关掉时，直接用设置里存好的默认值建链接，不弹框。
+    // 先把默认值灌进表单再走同一条确认路径 —— 这样两条路只有一个建链接的地方。
+    if (!app.display.shareDialog) {
+        shareForm.value = {
+            ttlMinutes: app.shareDefaults.ttlMinutes,
+            maxUses: app.shareDefaults.maxUses,
+        };
+        confirmShareDialog();
+        return;
+    }
     shareForm.value = { ttlMinutes: SHARE_DEFAULT_TTL_MINUTES, maxUses: 0 };
     shareDialogVisible.value = true;
 }

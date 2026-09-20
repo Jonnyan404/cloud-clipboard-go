@@ -743,7 +743,8 @@ watch(() => route.fullPath, () => {
                                                                 ></v-switch>
                                                             </div>
                                                             <v-list class="cc-settings__list cc-settings__toggles" density="comfortable">
-                                                                <v-list-item v-for="toggle in togglesInGroup(group.key)" :key="toggle.key" class="cc-settings__item">
+                                                                <template v-for="toggle in togglesInGroup(group.key)" :key="toggle.key">
+                                                                <v-list-item class="cc-settings__item">
                                                                     <template v-slot:prepend>
                                                                         <v-icon color="primary">{{ toggle.icon }}</v-icon>
                                                                     </template>
@@ -758,9 +759,46 @@ watch(() => route.fullPath, () => {
                                                                         ></v-switch>
                                                                     </template>
                                                                 </v-list-item>
+
+                                                                <!-- 紧挨着「分享时弹出设置框」这个开关：关掉它之后，这两项就是那次弹框的
+                                                                     全部内容。放到面板末尾等于让用户去别处找。 -->
+                                                                <template v-if="toggle.key === 'shareDialog' && !app.display.shareDialog">
+                                                                    <v-list-item class="cc-settings__item">
+                                                                        <v-list-item-title>{{ t('shareDefaultTtl') }}</v-list-item-title>
+                                                                        <template v-slot:append>
+                                                                            <v-text-field
+                                                                                :model-value="app.shareDefaults.ttlMinutes"
+                                                                                type="number"
+                                                                                density="compact"
+                                                                                variant="solo"
+                                                                                flat
+                                                                                hide-details
+                                                                                class="cc-settings__num"
+                                                                                @update:model-value="v => app.setShareDefaults({ ttlMinutes: Number(v) })"
+                                                                            ></v-text-field>
+                                                                        </template>
+                                                                    </v-list-item>
+                                                                    <v-list-item class="cc-settings__item">
+                                                                        <v-list-item-title>{{ t('shareDefaultMaxUses') }}</v-list-item-title>
+                                                                        <template v-slot:append>
+                                                                            <v-text-field
+                                                                                :model-value="app.shareDefaults.maxUses"
+                                                                                type="number"
+                                                                                density="compact"
+                                                                                variant="solo"
+                                                                                flat
+                                                                                hide-details
+                                                                                class="cc-settings__num"
+                                                                                @update:model-value="v => app.setShareDefaults({ maxUses: Number(v) })"
+                                                                            ></v-text-field>
+                                                                        </template>
+                                                                    </v-list-item>
+                                                                </template>
+                                                            </template>
                                                             </v-list>
                                                         </template>
                                                     </template>
+
                         </v-card-text>
                     </v-tabs-window-item>
                 </v-tabs-window>
@@ -1080,6 +1118,11 @@ watch(() => route.fullPath, () => {
 }
 
 /* 分类标题右侧那个「整组开关」，以及面板顶部的开关搜索。 */
+/* 设置里的数字输入（分享默认值）。窄一点，别把标题挤没了。 */
+.cc-settings__num {
+    max-width: 96px;
+}
+
 .cc-settings__group-head {
     display: flex;
     align-items: center;

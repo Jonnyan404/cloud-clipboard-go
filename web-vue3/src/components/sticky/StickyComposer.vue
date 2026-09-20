@@ -289,11 +289,17 @@ async function sendAll() {
 
 <style scoped>
 /* 搜索态：去掉便签那圈虚线外框 —— 它不再是「写点什么」的地方，是个搜索框。 */
-.sticky-composer--search {
+/* ⚠️ 用**两个类**写，不要只写 .sticky-composer--search：
+   它和基础规则 .sticky-composer 权重相同，而基础规则在文件里更靠后，
+   于是米黄底 (#fffbe8) 和那圈虚线边框照样生效 —— 表现为「五个非标准模式的
+   搜索框全长成便签样」。两个类权重更高，跟位置无关。 */
+.sticky-composer.sticky-composer--search {
     background: transparent;
     border: none;
     box-shadow: none;
     padding: 0;
+    /* 颜色回到模式本身，不要沿用便签 composer 的褐字（搜索框底色是从 currentColor 推的） */
+    color: inherit;
 }
 /* 搜索框底色跟着模式走。各模式没有统一的颜色 token（终端有 --tw-*，便签/聊天是写死的），
    所以用 currentColor 混一层浅底：深色模式文字浅 → 得到浅底；浅色模式文字深 → 得到深一点的底。

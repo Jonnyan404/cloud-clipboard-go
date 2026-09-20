@@ -21,6 +21,23 @@ const INITIAL_DISPLAY = (() => {
 
 // 只读回用户显式配置过的模式。坏数据当没有 —— 大不了回落到 INITIAL_DISPLAY。
 // 另带一次性的 markdown 旧值迁移（见内）。
+// 分享默认值：{ ttlMinutes, maxUses }。坏数据当没有，回落到出厂值。
+function loadShareDefaults() {
+    const fallback = { ttlMinutes: 15, maxUses: 0 };
+    try {
+        const raw = localStorage.getItem('shareDefaults');
+        if (!raw) return fallback;
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object') return fallback;
+        return {
+            ttlMinutes: Number.isFinite(Number(parsed.ttlMinutes)) ? Number(parsed.ttlMinutes) : fallback.ttlMinutes,
+            maxUses: Number.isFinite(Number(parsed.maxUses)) ? Number(parsed.maxUses) : fallback.maxUses,
+        };
+    } catch {
+        return fallback;
+    }
+}
+
 function loadDisplayByMode() {
     const raw = localStorage.getItem('displayByMode');
     if (!raw) return {};
@@ -70,6 +87,9 @@ export const useAppStore = defineStore('app', {
         displayByMode: loadDisplayByMode(),
         // 纯预览模式的搜索词（见 getters 里的说明）
         searchQuery: '',
+        // 分享的默认参数。**不是显示开关**（那套只存布尔），所以单独一份。
+        // 关掉「分享弹窗」开关后，建链接直接用这里的值。
+        shareDefaults: loadShareDefaults(),
         composerPrimary: localStorage.getItem('composerPrimary') || 'text',
         fullscreenSendClose: localStorage.getItem('fullscreenSendClose') !== null
             ? localStorage.getItem('fullscreenSendClose') === 'true'
@@ -80,7 +100,13 @@ export const useAppStore = defineStore('app', {
         setSearchQuery(value) {
             this.searchQuery = String(value || '');
         },
-
+        // 分享默认值：改完立刻落盘，不弹窗时要用
+        setShareDefaults(next) {
+            this.shareDefaults = { ...this.shareDefaults, ...(next || {}) };
+            try {
+                localStorage.setItem('shareDefaults', JSON.stringify(this.shareDefaults));
+            } catch { /* 存不下就算了，内存里仍然生效 */ }
+        },
         setConfig(config) {
             this.config = config;
         },

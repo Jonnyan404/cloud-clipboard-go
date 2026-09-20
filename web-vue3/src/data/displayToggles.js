@@ -70,6 +70,10 @@ export const DISPLAY_TOGGLES = [
     // ── 卡片（时间流卡片右上角那排图标）──────────────────────────────
     // 文本卡片只有「复制」，文件卡片是「下载」；两者都有的（复制链接/二维码/删除）
     // 共用一个开关 —— 同一件事在两个组件里各有一个开关，用户没法预期。
+    // 分享时是否弹那个「有效期 / 次数」设置框。
+    // 关掉就直接用设置里存好的默认值建链接 —— 适合「每次都用同一套参数」的人。
+    // 默认开：跟其它开关同一条原则（默认关等于升级后功能消失）。
+    { key: 'shareDialog', group: 'card', labelKey: 'showShareDialog', icon: 'mdi-share-variant-outline', modes: ONLY_DEFAULT },
     { key: 'cardDownload', group: 'card', labelKey: 'download', icon: 'mdi-download', modes: ONLY_DEFAULT },
     { key: 'cardPreview', group: 'card', labelKey: 'preview', icon: 'mdi-text-box-search-outline', modes: ONLY_DEFAULT },
     { key: 'cardCopy', group: 'card', labelKey: 'copyText', icon: 'mdi-content-copy', modes: ONLY_DEFAULT },
@@ -119,6 +123,7 @@ export const DEFAULT_DISPLAY = {
     // 默认开：跟上面那排图标同一条理由 —— 默认关等于「升级后功能消失」。
     composerText: true,
     composerUpload: true,
+    shareDialog: true,
     cardDownload: true,
     cardPreview: true,
     cardCopy: true,
