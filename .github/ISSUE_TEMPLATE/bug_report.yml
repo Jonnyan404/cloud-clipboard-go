@@ -1,0 +1,79 @@
+name: 🐞 问题反馈 / Bug Report
+description: 反馈你遇到的问题 / Report an issue
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢你提交问题！提交前请先搜索一下 [现有 Issue](https://github.com/Jonnyan404/cloud-clipboard-go/issues)，避免重复。
+
+        Thanks for reporting! Please search [existing issues](https://github.com/Jonnyan404/cloud-clipboard-go/issues) first.
+
+        > 如果是**自建服务端**的问题，请务必说明部署方式与版本号 —— 没有这两样基本没法定位。
+
+  - type: textarea
+    id: description
+    attributes:
+      label: 问题描述 / Description
+      description: 请说清楚「你期望发生什么」和「实际发生了什么」。必要时附截图。 / What you expected versus what actually happened. Screenshots welcome.
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: 版本号 / Version
+      description: 运行 `./cloud-clipboard-go -v`，或看服务端启动日志里 `Cloud Clipboard Server vX.Y.Z` 那一行。 / Run `-v`, or read the version off the startup banner.
+      placeholder: 例如 v5.1.0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: 部署方式 / Deployment
+      description: 服务端是怎么跑起来的？ / How is the server running?
+      options:
+        - 直接运行二进制 / Standalone binary
+        - Docker / GHCR 镜像
+        - Cloudflare Worker
+        - OpenWrt 路由器
+        - 只用了 Android App 或 Apple 快捷指令（没自建服务端）
+        - 其他 / Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: 出问题的端 / Where it happens
+      options:
+        - Web 前端（浏览器 / PWA）
+        - 服务端本身
+        - Android App
+        - Apple 快捷指令（iOS / macOS）
+        - OpenWrt / LuCI
+        - Cloudflare Worker
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤 / Reproduction Steps
+      placeholder: |
+        1. 打开...
+        2. 点击...
+        3. 出现...
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 相关日志 / Logs
+      description: 服务端控制台输出或浏览器控制台的报错。请勿粘贴超长日志文件。 / Server console output or browser console errors. No huge log dumps.
+      render: shell
+    validations:
+      required: false

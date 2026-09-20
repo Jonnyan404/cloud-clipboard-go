@@ -1,0 +1,44 @@
+name: ✨ 功能建议 / Feature Request
+description: 提交一个新的功能建议 / Propose a new feature
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢你为提高项目质量做出贡献！提交前请先看看 [已有 Issue](https://github.com/Jonnyan404/cloud-clipboard-go/issues) 里是不是已经有人提过。
+
+        Thanks for your contribution! Please check [existing issues](https://github.com/Jonnyan404/cloud-clipboard-go/issues) first.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: 功能描述 / Description
+      placeholder: 请清晰简洁地描述你希望增加什么。 / A concise description of what you want.
+    validations:
+      required: true
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: 使用场景 / Use Case
+      description: 你在什么情况下需要它？解决了什么麻烦？ / When would you use it, and what does it solve?
+      placeholder: 描述使用场景，以及它解决的问题。 / Describe the scenario and the problem it solves.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: targets
+    attributes:
+      label: 涉及哪一端 / Which parts
+      description: 可多选。 / Select all that apply.
+      options:
+        - label: Web 前端（界面 / 交互）
+        - label: 服务端
+        - label: Android App
+        - label: Apple 快捷指令
+        - label: OpenWrt / LuCI
+        - label: Cloudflare Worker
+        - label: 文档 / README
+    validations:
+      required: true
