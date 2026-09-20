@@ -7,7 +7,7 @@ import MarkdownToggle from '@/components/MarkdownToggle.vue';
 import { useWebSocketStore } from '@/store/websocket';
 import { useI18n } from 'vue-i18n';
 import { toast } from '@/plugins/toast';
-import { SHARE_DEFAULT_TTL, buildCleanAbsoluteRouteUrl, copyTextToClipboard, createShareLink, deviceLabel, errorMessage, formatTimestamp, prettyFileSize } from '@/util.js';
+import { SHARE_DEFAULT_TTL, buildCleanAbsoluteRouteUrl, copyTextToClipboard, createShareLink, deviceLabel, errorMessage, formatTimestamp, isImageName, prettyFileSize } from '@/util.js';
 
 const props = defineProps({
     meta: {
@@ -122,7 +122,7 @@ const fileIcon = computed(() => {
     if (!props.meta.name) {
         return '📄';
     }
-    if (/\.(png|jpe?g|gif|webp|svg|bmp|ico|avif)$/i.test(props.meta.name)) {
+    if (isImageName(props.meta.name)) {
         return '🖼️';
     }
     if (/\.(mp4|webm|ogv|mov)$/i.test(props.meta.name)) {
@@ -135,7 +135,7 @@ const fileIcon = computed(() => {
 });
 const fileMetaLabel = computed(() => {
     const size = prettyFileSize(props.meta.size || 0);
-    if (/\.(png|jpe?g|gif|webp|svg|bmp|ico|avif)$/i.test(props.meta.name || '')) {
+    if (isImageName(props.meta.name || '')) {
         return `${size} · ${t('stickyImage')}`;
     }
     return size;

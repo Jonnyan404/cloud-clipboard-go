@@ -5,7 +5,7 @@ import { useWebSocketStore } from '@/store/websocket';
 import { useTheme } from 'vuetify';
 import { useI18n } from 'vue-i18n';
 import { toast } from '@/plugins/toast';
-import { SHARE_DEFAULT_TTL, buildCleanAbsoluteRouteUrl, copyTextToClipboard, createShareLink, deviceLabel, errorMessage, formatTimestamp, getClientId, prettyFileSize } from '@/util.js';
+import { SHARE_DEFAULT_TTL, buildCleanAbsoluteRouteUrl, copyTextToClipboard, createShareLink, deviceLabel, errorMessage, formatTimestamp, getClientId, isImageName, prettyFileSize } from '@/util.js';
 import PageToolbar from '@/components/PageToolbar.vue';
 import StickyComposer from '@/components/sticky/StickyComposer.vue';
 import { useStickyAutoscroll } from '@/composables/useStickyAutoscroll';
@@ -93,7 +93,7 @@ function decodedContent(item) {
 
 function fileIcon(item) {
     const name = item.name || '';
-    if (/\.(png|jpe?g|gif|webp|svg|bmp|ico|avif)$/i.test(name)) {
+    if (isImageName(name)) {
         return '🖼️';
     }
     if (/\.(mp4|webm|ogv|mov)$/i.test(name)) {

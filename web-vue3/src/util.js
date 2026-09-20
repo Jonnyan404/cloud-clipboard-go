@@ -232,3 +232,12 @@ export function renderMarkdownHtml(text) {
     const html = marked.parse(String(text || ''), { breaks: true, gfm: true });
     return DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
 }
+
+// 文件名是不是图片。**全站唯一实现** —— 之前这段正则在 6 个地方各抄了一份
+// （StickyNote 两处、ChatWall / MegaWall / TerminalWall / WorkbenchWall 各一处），
+// 再加一份就是第 7 份，改一处必漏其余。判型只看扩展名，不看内容：
+// 服务端不嗅探、客户端也不该嗅探，两边同一套标准。
+const IMAGE_NAME_RE = /\.(png|jpe?g|gif|webp|svg|bmp|ico|avif)$/i;
+export function isImageName(name) {
+    return IMAGE_NAME_RE.test(String(name || ''));
+}
