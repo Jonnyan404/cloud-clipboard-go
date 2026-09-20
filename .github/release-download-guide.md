@@ -28,7 +28,7 @@ tar xzf CCG_server-linux-x86_64-v__VERSION__.tar.gz   # Windows 下是 .zip，�
 
 ### OpenWrt 怎么选
 
-- **包格式**看固件版本：OpenWrt 24.10 及以上用 `.apk`，更早的用 `.ipk`。
+- **包格式**看固件版本：OpenWrt **25.12 及以上**用 `.apk`（从这一版起 apk 取代了 opkg），**24.10 及更早**用 `.ipk`。
 - **CPU 架构**在路由器上执行 `uname -m`，或对照型号。软路由（x86）选 `x86_64`；常见家用路由多在 `arm_cortex-a7` / `arm_cortex-a9` 一档。
 - 只带 LuCI 界面、不含服务端的是 `CCG_server-luci-*` 那两个。
 
