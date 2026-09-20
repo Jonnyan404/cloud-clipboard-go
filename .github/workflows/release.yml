@@ -295,20 +295,39 @@ jobs:
     runs-on: ubuntu-latest
     needs: [determine-tag, build-desktop, build-apk, build-universal-apk, build-openwrt]
     steps:
+      # 需要 checkout 才能拿到 .github/release-download-guide.md
+      - name: Checkout
+        uses: actions/checkout@v7
       - name: Download all artifacts
         uses: actions/download-artifact@v8
         with:
           path: artifacts
       - name: Display downloaded artifacts structure for debugging
         run: ls -R artifacts
+      # 发布页上挂着 30+ 个资产，光看文件名用户不知道该下哪个。在自动生成的 CHANGELOG
+      # 前面拼一段「按平台选哪个」—— 引导文案放在 .github/release-download-guide.md，
+      # 用 __VERSION__ 占位，这里替换成真实版本号。
+      # 做成独立文件而不是写死在 workflow 里：好改、好 diff，改资产命名时一处就够。
+      - name: Compose release body (download guide + changelog)
+        run: |
+          set -euo pipefail
+          V="${{ needs.determine-tag.outputs.version_name }}"
+          OUT="artifacts/goreleaser-dist/RELEASE_BODY.md"
+          sed "s/__VERSION__/${V}/g" .github/release-download-guide.md > "$OUT"
+          printf '\n' >> "$OUT"
+          cat artifacts/goreleaser-dist/CHANGELOG.md >> "$OUT"
+          echo "已生成 $OUT（$(wc -l < "$OUT") 行）"
+          grep -c '__VERSION__' "$OUT" && echo "⚠️ 还有未替换的占位符" || echo "占位符已全部替换"
       - name: Create Release and Upload Assets
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.determine-tag.outputs.tag }}
           overwrite_files: true
           # 2. 修正：使用更简单、更可靠的 glob 模式来匹配所有 APK
+          # 排除 RELEASE_BODY.md：它是上面拼出来的发布说明，不该出现在下载列表里
           files: |
             artifacts/goreleaser-dist/*
+            !artifacts/goreleaser-dist/RELEASE_BODY.md
             artifacts/apk-per-arch-artifacts-*/*.apk
             artifacts/apk-universal-artifact/*.apk
             artifacts/CCG_server-openwrt-ipk-*/*.ipk
@@ -317,7 +336,7 @@ jobs:
             artifacts/CCG_server-luci-apk-*/*.apk
           # 注意：GoReleaser 在 --skip-publish 模式下可能不生成 release-notes.md
           # 我们暂时使用 CHANGELOG.md 作为 body
-          body_path: "artifacts/goreleaser-dist/CHANGELOG.md"
+          body_path: "artifacts/goreleaser-dist/RELEASE_BODY.md"
 
   # ====================================================================
   # Job 7: Sync Homebrew Tap
