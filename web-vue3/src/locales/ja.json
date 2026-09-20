@@ -183,6 +183,7 @@
   "activeRoomsLabel": "アクティブ",
   "otherRoomsLabel": "その他のルーム",
   "hideRoomBrowser": "ルームサイドバーを隠す",
+  "showRoomBrowser": "ルームサイドバーを表示",
   "dockLeft": "左側に固定",
   "dockRight": "右側に固定",
   "shareLinkSettings": "共有リンク設定",

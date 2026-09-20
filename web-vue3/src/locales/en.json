@@ -183,6 +183,7 @@
   "activeRoomsLabel": "Active",
   "otherRoomsLabel": "Other rooms",
   "hideRoomBrowser": "Hide room sidebar",
+  "showRoomBrowser": "Show room sidebar",
   "dockLeft": "Dock to left",
   "dockRight": "Dock to right",
   "workspaceTitle": "Shared Workspace",

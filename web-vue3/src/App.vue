@@ -18,6 +18,8 @@ import { DISPLAY_GROUPS, togglesForMode } from '@/data/displayToggles.js';
 const mdiBrightness4 = 'mdi-brightness-4';
 const mdiChevronLeft = 'mdi-chevron-left';
 const mdiChevronRight = 'mdi-chevron-right';
+const mdiDockLeft = 'mdi-dock-left';
+const mdiDockRight = 'mdi-dock-right';
 const mdiClose = 'mdi-close';
 const mdiContentPaste = 'mdi-content-paste';
 const mdiDiceMultiple = 'mdi-dice-multiple';
@@ -85,6 +87,8 @@ provide('pageToolbarActions', {
         }
     },
     openRoomBrowser: () => { openRoomBrowser(); },
+    // 工具栏要拿它给那个按钮做「已开启」的状态样式和动态提示语
+    roomBrowserVisible: computed(() => isDesktopRoomDockVisible.value || roomSheet.value),
     openPageQr: () => { pageQrDialogVisible.value = true; },
     goHome: () => { goHome(); },
     roomCount: computed(() => availableRooms.value.length),
@@ -240,21 +244,27 @@ function syncAvailableRooms(rooms) {
     }
     availableRooms.value.splice(0, availableRooms.value.length, ...orderedRooms);
 }
+// 工具栏那个房间图标是**开关**，不是「打开」。
+//
+// 原来「打开」在工具栏、「关闭」在侧栏头部（一个 ✕）：同一个东西的两个动作分居两地，
+// 而且 ✕ 在面板头部天然被读成「关掉这个弹窗」—— 侧栏是个持久偏好，不是弹窗，语义对不上。
+// 现在两个方向都归这一个按钮，跟 VS Code / 访达的侧栏开关一致。
 function openRoomBrowser() {
     if (isDesktopRoomDockEnabled.value) {
-        roomDockVisible.value = true;
+        roomDockVisible.value = !roomDockVisible.value;
         persistRoomBrowserPreferences();
-        ensureRoomPresent();
-        fetchRoomList();
+        // 关掉时不用拉数据；打开时才需要
+        if (roomDockVisible.value) {
+            ensureRoomPresent();
+            fetchRoomList();
+        }
         return;
     }
-    roomSheet.value = true;
-    ensureRoomPresent();
-    fetchRoomList();
-}
-function hideDesktopRoomDock() {
-    roomDockVisible.value = false;
-    persistRoomBrowserPreferences();
+    roomSheet.value = !roomSheet.value;
+    if (roomSheet.value) {
+        ensureRoomPresent();
+        fetchRoomList();
+    }
 }
 function toggleRoomDockSide() {
     roomDockSide.value = roomDockSide.value === 'right' ? 'left' : 'right';
@@ -547,21 +557,18 @@ watch(() => route.fullPath, () => {
                         :dock-side="roomDockSide"
                     >
                         <template #actions>
+                            <!-- 这里只剩「停靠方向」一个按钮。
+                                 原来的 ✕（隐藏侧栏）删了：开关收到工具栏那个房间图标上，
+                                 同一个东西的两个方向不该分居两地；而且 ✕ 在面板头部天然被读成
+                                 「关掉这个弹窗」，跟「侧栏是个持久偏好」对不上。
+                                 图标画的是「会停到哪一侧」，比 chevron 明确 —— 原来那个 ‹ 太像收起。 -->
                             <v-tooltip left>
                                 <template v-slot:activator="{ props }">
-                                    <v-btn icon density="comfortable" variant="text" v-bind="props" @click="toggleRoomDockSide()">
-                                        <v-icon>{{ roomDockSide === 'right' ? mdiChevronLeft : mdiChevronRight }}</v-icon>
+                                    <v-btn icon density="comfortable" variant="text" class="room-browser__action" v-bind="props" @click="toggleRoomDockSide()">
+                                        <v-icon size="20">{{ roomDockSide === 'right' ? mdiDockLeft : mdiDockRight }}</v-icon>
                                     </v-btn>
                                 </template>
                                 <span>{{ roomDockSide === 'right' ? t('dockLeft') : t('dockRight') }}</span>
-                            </v-tooltip>
-                            <v-tooltip bottom>
-                                <template v-slot:activator="{ props }">
-                                    <v-btn icon density="comfortable" variant="text" size="small" v-bind="props" @click="hideDesktopRoomDock()">
-                                        <v-icon>{{ mdiClose }}</v-icon>
-                                    </v-btn>
-                                </template>
-                                <span>{{ t('hideRoomBrowser') }}</span>
                             </v-tooltip>
                         </template>
                     </RoomList>
@@ -1183,6 +1190,16 @@ watch(() => route.fullPath, () => {
         display: block;
         padding: 0;
     }
+}
+
+/* 侧栏头部那两个图标按钮（停靠方向 / 关闭）。Vuetify 默认那层悬停遮罩在便签、终端
+   这类自带底色的皮肤上几乎看不出来，所以显式给一层中性底色。 */
+.room-browser__action {
+    color: inherit;
+}
+
+.room-browser__action:hover {
+    background: rgba(148, 163, 184, 0.2);
 }
 
 /* 认证密码与进入房间弹窗的输入框：去掉灰色填充底色 */

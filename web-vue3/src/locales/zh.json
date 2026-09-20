@@ -183,6 +183,7 @@
   "activeRoomsLabel": "活跃",
   "otherRoomsLabel": "其他房间",
   "hideRoomBrowser": "隐藏房间侧栏",
+  "showRoomBrowser": "显示房间侧栏",
   "dockLeft": "停靠到左侧",
   "dockRight": "停靠到右侧",
   "workspaceTitle": "共享工作台",
