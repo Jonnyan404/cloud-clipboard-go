@@ -313,15 +313,24 @@ jobs:
       # files 的 glob 全是 artifacts/**，写在里面就会被当成资产传上去。
       # 这是 action README 里给的惯用法。别改成靠 `!` 排除 —— files 只接受
       # 换行分隔的 glob 列表，README 里没有 negation 的任何说明，不能赌它支持。
-      - name: Compose release body (download guide + changelog)
+      - name: Compose release body (prerelease notice + download guide + changelog)
         run: |
           set -euo pipefail
           V="${{ needs.determine-tag.outputs.version_name }}"
+          IS_PRE="${{ needs.determine-tag.outputs.is_prerelease }}"
           OUT="${{ github.workspace }}-RELEASE_BODY.md"
-          sed "s/__VERSION__/${V}/g" .github/release-download-guide.md > "$OUT"
+          : > "$OUT"
+          # 预发布时先挂一段提示（对应参考实现的 pre 模板）。
+          # 提示单独一个文件、正文共用一份 —— 不照抄成两份完整模板，
+          # 否则下载表要在两个文件里各维护一遍，改资产名就得改两处。
+          if [ "$IS_PRE" = "true" ]; then
+            cat .github/release-notice-prerelease.md >> "$OUT"
+            printf '\n' >> "$OUT"
+          fi
+          sed "s/__VERSION__/${V}/g" .github/release-download-guide.md >> "$OUT"
           printf '\n' >> "$OUT"
           cat artifacts/goreleaser-dist/CHANGELOG.md >> "$OUT"
-          echo "已生成 $OUT（$(wc -l < "$OUT") 行）"
+          echo "已生成 $OUT（$(wc -l < "$OUT") 行，预发布=$IS_PRE）"
           if grep -q '__VERSION__' "$OUT"; then
             echo "⚠️ 还有未替换的占位符"; exit 1
           fi
