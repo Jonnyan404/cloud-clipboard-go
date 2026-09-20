@@ -52,8 +52,6 @@ const latencyHexColor = computed(() => {
 function setMode(mode) {
     app.setUiMode(mode);
 }
-
-const currentMode = computed(() => MODES.find(mode => mode.key === app.uiMode) || MODES[0]);
 </script>
 
 <template>
@@ -118,33 +116,6 @@ const currentMode = computed(() => MODES.find(mode => mode.key === app.uiMode) |
             </div>
 
             <div class="page-toolbar__actions">
-                <v-menu location="bottom end" min-width="192" :close-on-content-click="true">
-                    <template v-slot:activator="{ props: menuProps }">
-                        <button
-                            v-bind="menuProps"
-                            class="page-toolbar__mode"
-                            :title="t('uiMode')"
-                        >
-                            <v-icon size="24">{{ currentMode.icon }}</v-icon>
-                            <span class="page-toolbar__mode-label d-none d-sm-inline">{{ t(currentMode.labelKey) }}</span>
-                            <v-icon size="x-small" class="page-toolbar__mode-caret">mdi-chevron-down</v-icon>
-                        </button>
-                    </template>
-                    <v-list density="compact" nav>
-                        <v-list-item
-                            v-for="mode in MODES"
-                            :key="mode.key"
-                            :active="app.uiMode === mode.key"
-                            @click="setMode(mode.key)"
-                        >
-                            <template v-slot:prepend>
-                                <v-icon size="small">{{ mode.icon }}</v-icon>
-                            </template>
-                            <v-list-item-title>{{ t(mode.labelKey) }}</v-list-item-title>
-                        </v-list-item>
-                    </v-list>
-                </v-menu>
-
                 <div class="page-toolbar__group">
                     <v-tooltip v-if="roomListEnabled" :text="t('roomList')" location="bottom">
                         <template v-slot:activator="{ props }">
@@ -185,6 +156,27 @@ const currentMode = computed(() => MODES.find(mode => mode.key === app.uiMode) |
             </div>
         </div>
 
+        <!-- 模式切换器摊在工具栏下沿，取代原来的「标准 ▾」下拉。
+             六种界面模式是这个项目的主要卖点，藏在下拉后面新用户根本不知道有几档；
+             摊开之后一眼看到全部六档，也省掉「点开再选」那一步。
+             宽屏图标 + 文字、窄屏只留图标：六个带文字的 chip 在 375px 放不下，
+             而横滑比下拉更不可发现。**同一份标记，纯 CSS 切换，不开第二套状态。** -->
+        <div class="page-toolbar__modes">
+            <button
+                v-for="mode in MODES"
+                :key="mode.key"
+                type="button"
+                class="page-toolbar__mode-chip"
+                :class="{ 'page-toolbar__mode-chip--active': app.uiMode === mode.key }"
+                :title="t(mode.labelKey)"
+                :aria-current="app.uiMode === mode.key ? 'true' : undefined"
+                @click="setMode(mode.key)"
+            >
+                <v-icon size="15">{{ mode.icon }}</v-icon>
+                <span class="page-toolbar__mode-chip-label d-none d-sm-inline">{{ t(mode.labelKey) }}</span>
+            </button>
+        </div>
+
         <button
             type="button"
             class="page-toolbar__collapse-toggle"
@@ -204,7 +196,9 @@ const currentMode = computed(() => MODES.find(mode => mode.key === app.uiMode) |
     z-index: 40;
 }
 
-.page-toolbar--collapsed .page-toolbar__inner {
+/* 折叠开关一并收掉模式行：它是工具栏的一部分，不另开一个开关、也不另存一份状态 */
+.page-toolbar--collapsed .page-toolbar__inner,
+.page-toolbar--collapsed .page-toolbar__modes {
     display: none !important;
 }
 
@@ -383,36 +377,77 @@ const currentMode = computed(() => MODES.find(mode => mode.key === app.uiMode) |
     color: rgb(var(--v-theme-error));
 }
 
-.page-toolbar__mode {
+/* ── 模式切换器（工具栏下沿那一行）───────────────────────────────── */
+
+/* 和工具栏共用底色（它就在同一个 .page-toolbar 里），只用一条发丝线分出上下两带。
+   尺寸压到最小可用：这一行是常驻的，每多 1px 都是从内容区拿走的。 */
+.page-toolbar__modes {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 4px;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 16px 4px;
+    border-top: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.page-toolbar__mode-chip {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    border: 1px solid rgba(148, 163, 184, 0.35);
-    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid transparent;
+    background: transparent;
     border-radius: 999px;
-    padding: 3px 10px;
-    font-size: 0.72rem;
+    padding: 1px 8px;
+    font-size: 0.7rem;
+    line-height: 1.3;
+    font-family: inherit;
+    color: rgba(100, 116, 139, 0.95);
     cursor: pointer;
-    color: rgba(100, 116, 139, 0.9);
-    transition: background 0.15s, color 0.15s;
+    white-space: nowrap;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 
-.page-toolbar--dark .page-toolbar__mode {
-    background: rgba(0, 0, 0, 0.25);
-    color: rgba(148, 163, 184, 0.9);
+.page-toolbar__mode-chip:hover {
+    background: rgba(148, 163, 184, 0.18);
 }
 
-.page-toolbar__mode:hover {
+/* 当前项：实心反白 —— 沿用原来那个下拉触发器 hover 时的蓝，视觉语言不另起一套。
+   一行六个里只靠字重区分太弱，认不出哪个是当前的。 */
+.page-toolbar__mode-chip--active {
     background: #1e88e5;
+    border-color: #1e88e5;
+    color: #fff;
+    font-weight: 600;
+}
+
+.page-toolbar__mode-chip--active :deep(.v-icon) {
     color: #fff;
 }
 
-.page-toolbar__mode-caret {
-    opacity: 0.75;
+.page-toolbar--dark .page-toolbar__modes {
+    border-top-color: rgba(148, 163, 184, 0.22);
 }
 
-.page-toolbar__mode:hover :deep(.v-icon) {
-    color: #fff;
+.page-toolbar--dark .page-toolbar__mode-chip {
+    color: rgba(203, 213, 225, 0.9);
+}
+
+.page-toolbar--dark .page-toolbar__mode-chip:hover {
+    background: rgba(148, 163, 184, 0.2);
+}
+
+/* 深色下换成浅蓝底 + 深字：整块 #1e88e5 在深底上太重 */
+.page-toolbar--dark .page-toolbar__mode-chip--active {
+    background: #90caf9;
+    border-color: #90caf9;
+    color: #0d1117;
+}
+
+.page-toolbar--dark .page-toolbar__mode-chip--active :deep(.v-icon) {
+    color: #0d1117;
 }
 
 @media (max-width: 600px) {
