@@ -52,7 +52,8 @@ function addFiles(fileList) {
 }
 
 function openFilePicker() {
-    selectFile.value.click();
+    // 上传开关关掉时这个 input 会被 v-if 摘掉，ref 就是 null —— 不能裸点
+    selectFile.value?.click();
 }
 
 function handlePaste(event) {
@@ -197,7 +198,7 @@ async function sendAll() {
 
 <template>
     <div class="sticky-composer" :class="`sticky-composer--${props.variant}`">
-        <div v-if="app.send.files.length" class="sticky-composer__files">
+        <div v-if="app.display.composerUpload && app.send.files.length" class="sticky-composer__files">
             <span
                 v-for="(file, index) in app.send.files"
                 :key="file.name + index"
@@ -206,8 +207,9 @@ async function sendAll() {
             <span v-if="sending" class="sticky-composer__progress">{{ Math.round(uploadProgress * 100) }}%</span>
         </div>
         <div class="sticky-composer__row">
-            <button type="button" class="sticky-composer__attach" title="📎" @click="openFilePicker">➕</button>
+            <button v-if="app.display.composerUpload" type="button" class="sticky-composer__attach" title="📎" @click="openFilePicker">➕</button>
             <textarea
+                v-if="app.display.composerText"
                 ref="textarea"
                 v-model="app.send.text"
                 class="sticky-composer__area"
@@ -251,6 +253,7 @@ async function sendAll() {
                 @click="sendAll"
             >{{ t('stickyStick') }}</button>
             <input
+                v-if="app.display.composerUpload"
                 ref="selectFile"
                 type="file"
                 multiple

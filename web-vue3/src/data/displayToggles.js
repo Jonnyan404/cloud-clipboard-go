@@ -41,6 +41,20 @@ export const DISPLAY_TOGGLES = [
     { key: 'composerShortcuts', group: 'composer', labelKey: 'shortcuts', icon: 'mdi-flash', modes: ONLY_DEFAULT },
     { key: 'composerTheme', group: 'composer', labelKey: 'toggleDarkMode', icon: 'mdi-theme-light-dark', modes: ONLY_DEFAULT },
     { key: 'composerReward', group: 'composer', labelKey: 'reward', icon: 'mdi-currency-cny', modes: ONLY_DEFAULT },
+    // 两个「整块关掉」的开关：文本输入框 / 上传文件。
+    // 关掉整块是给「只想收、不想发」或「只用其中一种」的人用的 ——
+    // 只关图标那排解决不了这个（图标底下还留着空输入框）。
+    //
+    // ⚠️ 这两个**故意不写 modes**，意思是「六个模式的面板里都要出现这一项」——
+    // 不是「六个模式共用一份值」。存储始终是 displayByMode[模式][开关]，
+    // 每个模式各存各的（见 store/app.js），在聊天里关掉不会影响标准模式。
+    //
+    // 为什么必须每个模式都出现：发送区有两套实现 ——
+    // UnifiedComposer（标准模式）和 StickyComposer（其余五个模式），
+    // 但「文本输入 / 上传文件」这两块两边都有，所以每一端都该能关。
+    // 上面那排图标则相反：只有 UnifiedComposer 有，所以是 ONLY_DEFAULT。
+    { key: 'composerText', group: 'composer', labelKey: 'showComposerText', icon: 'mdi-text-box-outline' },
+    { key: 'composerUpload', group: 'composer', labelKey: 'showComposerUpload', icon: 'mdi-cloud-upload-outline' },
 
     // ── 卡片（时间流卡片右上角那排图标）──────────────────────────────
     // 文本卡片只有「复制」，文件卡片是「下载」；两者都有的（复制链接/二维码/删除）
@@ -86,6 +100,9 @@ export const DEFAULT_DISPLAY = {
     composerShortcuts: true,
     composerTheme: true,
     composerReward: true,
+    // 默认开：跟上面那排图标同一条理由 —— 默认关等于「升级后功能消失」。
+    composerText: true,
+    composerUpload: true,
     cardDownload: true,
     cardPreview: true,
     cardCopy: true,

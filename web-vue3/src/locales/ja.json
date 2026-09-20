@@ -123,6 +123,8 @@
   "displayGroupCard": "カードのアイコン",
   "showComposerDevice": "オンライン端末",
   "showComposerSwap": "テキスト/ファイルの入替",
+  "showComposerText": "テキスト入力欄を表示",
+  "showComposerUpload": "ファイルアップロードを表示",
   "showTimestamp": "タイムスタンプを表示",
   "showDeviceInfo": "デバイス情報を表示",
   "showSenderIP": "送信者IPを表示",

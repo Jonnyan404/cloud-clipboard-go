@@ -123,6 +123,8 @@
   "displayGroupCard": "卡片图标",
   "showComposerDevice": "在线设备",
   "showComposerSwap": "文本/文件主次切换",
+  "showComposerText": "显示文本输入框",
+  "showComposerUpload": "显示上传文件区",
   "showTimestamp": "显示时间戳",
   "showDeviceInfo": "显示设备信息",
   "showSenderIP": "显示发送者IP",

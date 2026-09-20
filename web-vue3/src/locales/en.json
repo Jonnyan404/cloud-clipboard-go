@@ -123,6 +123,8 @@
   "displayGroupCard": "Card icons",
   "showComposerDevice": "Online devices",
   "showComposerSwap": "Swap text and files",
+  "showComposerText": "Show text box",
+  "showComposerUpload": "Show file upload",
   "showTimestamp": "Show Timestamp",
   "showDeviceInfo": "Show Device Info",
   "showSenderIP": "Show Sender IP",

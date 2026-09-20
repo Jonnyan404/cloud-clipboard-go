@@ -13,7 +13,7 @@
                 class="unified-composer__inputs"
                 :class="{ 'unified-composer__inputs--files-first': isFilePrimary }"
             >
-                <div class="unified-composer__textblock">
+                <div v-if="app.display.composerText" class="unified-composer__textblock">
                     <v-btn
                         icon
                         size="small"
@@ -42,7 +42,7 @@
                     ></v-textarea>
                 </div>
 
-                <div class="unified-composer__divider">
+                <div v-if="app.display.composerText && app.display.composerUpload" class="unified-composer__divider">
                     <div class="unified-composer__divider-line"></div>
                     <span class="unified-composer__limit text-caption text-medium-emphasis">{{ textLimitLabel }}</span>
                     <div class="unified-composer__divider-line unified-composer__divider-line--short"></div>
@@ -67,7 +67,7 @@
                     <div class="unified-composer__divider-line"></div>
                 </div>
 
-                <div class="unified-composer__fileblock">
+                <div v-if="app.display.composerUpload" class="unified-composer__fileblock">
                     <div
                         class="unified-composer__dropzone"
                         :class="{ 'unified-composer__dropzone--primary': isFilePrimary }"
@@ -487,7 +487,8 @@ function focus(type) {
     }
 }
 function openFilePicker() {
-    selectFile.value.click();
+    // 上传开关关掉时这个 input 会被 v-if 摘掉，ref 就是 null —— 不能裸点
+    selectFile.value?.click();
 }
 function onSendShortcut() {
     if (!sendDisabled.value) {
@@ -637,12 +638,14 @@ onBeforeUnmount(() => {
     display: flex;
     flex-direction: column;
     max-height: calc(100vh - 6.5rem);
+    max-height: calc(100dvh - 6.5rem);
     min-height: 0;
 }
 
 @media (max-width: 1263px) {
     .unified-composer {
         max-height: calc(100vh - 4.5rem);
+        max-height: calc(100dvh - 4.5rem);
     }
 }
 
