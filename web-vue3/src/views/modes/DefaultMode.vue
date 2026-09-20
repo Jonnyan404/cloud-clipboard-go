@@ -105,27 +105,31 @@ watch(() => ws.room, (room) => {
         <PageToolbar variant="default"></PageToolbar>
         <v-container fluid class="home-minimal__body px-3 px-md-5 pb-3 pb-md-5">
             <div class="home-minimal__shell mx-auto">
-            <v-card class="composer-dock composer-dock--top px-3 px-md-4 py-2 mb-2" :class="{ 'surface-card--dark': isDark }" variant="outlined">
+            <v-card v-if="!app.composerFullyHidden" class="composer-dock composer-dock--top px-3 px-md-4 py-2 mb-2" :class="{ 'surface-card--dark': isDark }" variant="outlined">
                 <unified-composer ref="composer"></unified-composer>
             </v-card>
 
+
+            <!-- 搜索条独立成一块，不塞在时间流卡片里：
+                 它是「浏览这一屏」的工具，和时间流本身是两件事；
+                 挤在卡片里也会跟着卡片的内边距一起缩进，看着像时间流的一部分。 -->
+            <div v-if="app.received.length && showTimelineSearch" class="timeline-search">
+                <v-text-field
+                    :model-value="app.searchQuery"
+                    density="compact"
+                    variant="solo"
+                            rounded="pill"
+                    flat
+                    hide-details
+                    clearable
+                    prepend-inner-icon="mdi-magnify"
+                    :placeholder="t('searchPlaceholder')"
+                    @update:model-value="app.setSearchQuery"
+                ></v-text-field>
+            </div>
+
             <v-card class="timeline-panel" :class="{ 'surface-card--dark': isDark }" variant="outlined">
                 <div class="timeline-panel__body px-3 px-md-4 py-2">
-                    <!-- 搜索条：在时间流正上方，和分类条一起构成「浏览这一屏内容」的工具。
-                         只在真有内容时出现 —— 空列表上摆一个搜索框更碍事。 -->
-                    <div v-if="app.received.length && showTimelineSearch" class="timeline-panel__search">
-                        <v-text-field
-                            :model-value="app.searchQuery"
-                            density="compact"
-                            variant="solo"
-                            flat
-                            hide-details
-                            clearable
-                            prepend-inner-icon="mdi-magnify"
-                            :placeholder="t('searchPlaceholder')"
-                            @update:model-value="app.setSearchQuery"
-                        ></v-text-field>
-                    </div>
 
                     <!-- 分类条：只在真有内容时出现（空列表上摆一条没用的过滤条更碍事） -->
                     <div v-if="app.received.length && app.display.timelineFilter" class="timeline-panel__filters">
@@ -238,13 +242,30 @@ watch(() => ws.room, (room) => {
 }
 
 /* 分类条（全部 / 文本 / 图片 / 文件）。默认关，见 data/displayToggles.js。 */
-/* 时间流上方的搜索条。默认关，见 data/displayToggles.js 的 timelineSearch。 */
-.timeline-panel__search {
-    padding: 2px 0 8px;
-    /* 限宽居中：跟下面的分类条对齐，别拉成通栏 —— 搜索框不需要占满整行。 */
+/* 搜索条：独立在时间流卡片之外的一块。默认关，见 displayToggles 的 timelineSearch。
+   限宽居中 —— 搜索框不需要占满整行，也跟时间流的宽度拉开区分。 */
+.timeline-search {
     max-width: 420px;
-    margin: 0 auto;
+    margin: 0 auto 8px;
 }
+/* 搜索框底色跟着模式走。各模式没有统一的颜色 token（终端有 --tw-*，便签/聊天是写死的），
+   所以用 currentColor 混一层浅底：深色模式文字浅 → 得到浅底；浅色模式文字深 → 得到深一点的底。
+   一处规则适配六套皮肤，不用每套各写一份。 */
+.timeline-search :deep(.v-field) {
+    background: color-mix(in srgb, currentColor 8%, transparent);
+    /* ⚠️ `color: inherit` 必须加在 .v-field 上，不能只加在 .v-field__input 上：
+       color-mix 里的 currentColor 取的是**元素自己**的颜色。只改 input 的话，
+       .v-field 仍是 Vuetify 给的颜色，于是便签/终端这类自带皮肤的模式的底色
+       全都算成黑色 —— 看着像「没适配」。 */
+    color: inherit;
+}
+
+.timeline-search :deep(.v-field__input),
+.timeline-search :deep(.v-field__prepend-inner .v-icon),
+.timeline-search :deep(.v-field__clearable .v-icon) {
+    color: inherit;
+}
+
 
 .timeline-panel__filters {
     display: flex;

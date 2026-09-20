@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { DEFAULT_DISPLAY, LEGACY_STORAGE_KEYS } from '@/data/displayToggles';
+import { DEFAULT_DISPLAY, DISPLAY_TOGGLES, LEGACY_STORAGE_KEYS } from '@/data/displayToggles';
 import { MODES } from '@/views/modes/registry';
 
 // 某个模式「没被用户单独配过」时的取值。
@@ -137,6 +137,19 @@ export const useAppStore = defineStore('app', {
         // 六个模式**全都**把文本区与上传区关掉了 —— 即「纯预览模式」。
         // 两个开关的出厂默认都是 true，所以必须每个模式都显式关掉才算成立。
         // 用 DEFAULT_DISPLAY 兜底：没配过的模式取默认值（true），于是不算关。
+        // 输入区**什么都不剩**了：文本区、上传区、以及 composer 那一整组图标全关。
+        // 这时候只剩一个空外框，该把整个输入区一起藏掉。
+        // ⚠️ 只是图标全关、输入框还在时**不该**藏 —— 框是输入框的容器。
+        // 图标键从注册表现推，别手写一份：以后加图标开关会自动算进来。
+        composerFullyHidden() {
+            const d = this.display;
+            if (d.composerText || d.composerUpload) return false;
+            const iconKeys = DISPLAY_TOGGLES
+                .filter((x) => x.group === 'composer' && x.key !== 'composerText' && x.key !== 'composerUpload')
+                .map((x) => x.key);
+            return !iconKeys.some((k) => d[k]);
+        },
+
         composerDisabledEverywhere() {
             // ⚠️ 模式列表**在 getter 里现取**，不要在模块顶层算成常量：
             // store ← registry ← 各模式 ← store 是个循环，顶层求值可能拿到还没初始化的 MODES。

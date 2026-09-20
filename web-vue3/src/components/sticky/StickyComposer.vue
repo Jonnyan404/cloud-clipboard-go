@@ -200,7 +200,25 @@ async function sendAll() {
 </script>
 
 <template>
-    <div class="sticky-composer" :class="`sticky-composer--${props.variant}`">
+    <!-- 文本区与上传区都关掉 = 这个模式只想接收。
+         此时**不要留空**，把这块位置改成搜索框 —— 不能发的时候，搜索才是这里的主动作。
+         （搜索条本身只在标准模式，所以这里自带一个。） -->
+    <div v-if="!app.display.composerText && !app.display.composerUpload" class="sticky-composer sticky-composer--search">
+        <v-text-field
+            :model-value="app.searchQuery"
+            density="compact"
+            variant="solo"
+            rounded="pill"
+            flat
+            hide-details
+            clearable
+            prepend-inner-icon="mdi-magnify"
+            :placeholder="t('searchPlaceholder')"
+            @update:model-value="app.setSearchQuery"
+        ></v-text-field>
+    </div>
+
+    <div v-else class="sticky-composer" :class="`sticky-composer--${props.variant}`">
         <div v-if="app.display.composerUpload && app.send.files.length" class="sticky-composer__files">
             <span
                 v-for="(file, index) in app.send.files"
@@ -270,6 +288,32 @@ async function sendAll() {
 </template>
 
 <style scoped>
+/* 搜索态：去掉便签那圈虚线外框 —— 它不再是「写点什么」的地方，是个搜索框。 */
+.sticky-composer--search {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+}
+/* 搜索框底色跟着模式走。各模式没有统一的颜色 token（终端有 --tw-*，便签/聊天是写死的），
+   所以用 currentColor 混一层浅底：深色模式文字浅 → 得到浅底；浅色模式文字深 → 得到深一点的底。
+   一处规则适配六套皮肤，不用每套各写一份。 */
+.sticky-composer--search :deep(.v-field) {
+    background: color-mix(in srgb, currentColor 8%, transparent);
+    /* ⚠️ `color: inherit` 必须加在 .v-field 上，不能只加在 .v-field__input 上：
+       color-mix 里的 currentColor 取的是**元素自己**的颜色。只改 input 的话，
+       .v-field 仍是 Vuetify 给的颜色，于是便签/终端这类自带皮肤的模式的底色
+       全都算成黑色 —— 看着像「没适配」。 */
+    color: inherit;
+}
+
+.sticky-composer--search :deep(.v-field__input),
+.sticky-composer--search :deep(.v-field__prepend-inner .v-icon),
+.sticky-composer--search :deep(.v-field__clearable .v-icon) {
+    color: inherit;
+}
+
+
 .sticky-composer {
     background: #fffbe8;
     border: 1.5px dashed #d5c49a;
