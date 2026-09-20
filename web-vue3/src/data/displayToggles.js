@@ -29,6 +29,12 @@ export const DISPLAY_TOGGLES = [
     // 必须声明 modes：个性化面板是「每模式一组开关」，不声明的话用户会在聊天/终端模式里
     // 拨到一个完全没反应的开关 —— 显示一个不生效的开关，比不显示它更糟。
     { key: 'markdown', group: 'content', labelKey: 'markdownToggle', icon: 'mdi-language-markdown-outline', modes: ['default', 'sticky'] },
+    // 时间流上方的分类条（全部 / 文本 / 图片 / 文件）。
+    // ⚠️ **这是「默认关」的例外**，下面 DEFAULT_DISPLAY 里那条「默认全开」的原则在这里**故意不适用**：
+    // 分类条是可选的新浏览方式，不是原本就有的东西 —— 默认开会在所有老用户的时间流上
+    // 凭空多一条横条。Jonny 明确要求默认关。
+    // 只对标准模式：分类条只存在于 DefaultMode 的时间流上。
+    { key: 'timelineFilter', group: 'content', labelKey: 'showTimelineFilter', icon: 'mdi-filter-variant', modes: ONLY_DEFAULT },
 
     // ── 输入区（标准模式输入框下方那排小图标）────────────────────────
     // 文案复用已有的 traditionalColors / shortcuts / toggleDarkMode / reward，
@@ -91,6 +97,9 @@ export const DEFAULT_DISPLAY = {
     // `这是一句普通的话` 不会冒图标，`# hi` / `**hi**` / `- a` 才会。
     // 之前默认关，结果是用户写了 markdown 却以为功能没生效（开关藏在设置里，找不到）。
     markdown: true,
+    // ⚠️ 上面那条「默认全开」的原则在这里**故意破例**：分类条是新增的可选浏览方式，
+    // 默认开等于给所有老用户的时间流凭空加一条横条。Jonny 要求默认关。
+    timelineFilter: false,
     // 输入区与卡片上的图标：**默认全开**。
     // 默认关等于「升级后功能消失」，用户根本不知道是设置里多了个开关；
     // 默认开则相反 —— 想清静的人自己去设置里关，找不到也不会觉得坏了什么。

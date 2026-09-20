@@ -1,4 +1,5 @@
 <script setup>import { computed, nextTick, ref, watch } from 'vue';
+import { isImageName } from '@/util.js';
 import { useAppStore } from '@/store/app';
 import { useWebSocketStore } from '@/store/websocket';
 import { useTheme } from 'vuetify';
@@ -9,6 +10,9 @@ import ReceivedText from '@/components/received-item/Text.vue';
 import ReceivedFile from '@/components/received-item/File.vue';
 
 const mdiTimeline = 'mdi-timeline';
+const mdiTextBox = 'mdi-text-box-outline';
+const mdiImage = 'mdi-image-outline';
+const mdiFile = 'mdi-file-outline';
 const tlLastRoom = ref('');
 let tlJustSwitched = false;
 
@@ -19,6 +23,36 @@ const theme = useTheme();
 const isDark = computed(() => theme.current.value?.dark ?? false);
 const { t } = useI18n();
 const composer = ref(null);
+
+// 时间流的分类过滤。选择存 localStorage —— 切模式/刷新后不该莫名回到「全部」。
+// 默认 'all'：跟「显示开关默认全开」同一条原则，默认态不能改变既有行为。
+const TIMELINE_FILTER_KEY = 'timelineFilter';
+const TIMELINE_FILTER_KEYS = ['all', 'text', 'image', 'file'];
+const storedFilter = localStorage.getItem(TIMELINE_FILTER_KEY);
+const timelineFilter = ref(TIMELINE_FILTER_KEYS.includes(storedFilter) ? storedFilter : 'all');
+function setTimelineFilter(key) {
+    timelineFilter.value = key;
+    localStorage.setItem(TIMELINE_FILTER_KEY, key);
+}
+
+const FILTER_OPTIONS = [
+    { key: 'all', labelKey: 'filterAll', icon: mdiTimeline },
+    { key: 'text', labelKey: 'filterText', icon: mdiTextBox },
+    { key: 'image', labelKey: 'filterImage', icon: mdiImage },
+    { key: 'file', labelKey: 'filterFile', icon: mdiFile },
+];
+
+// 「图片」= 文件条目里文件名是图片扩展名的那些；文本条目永远只归「文本」。
+// 判型用 util 的 isImageName（全站唯一实现），别在这里再抄一份正则。
+const filteredReceived = computed(() => {
+    // 开关关掉时整个过滤不生效（不只是藏起分类条）——
+    // 否则用户关掉开关后，列表还停在上次选的分类上，看着像内容丢了。
+    if (!app.display.timelineFilter) return app.received;
+    if (timelineFilter.value === 'all') return app.received;
+    if (timelineFilter.value === 'text') return app.received.filter((item) => item.type === 'text');
+    const wantImage = timelineFilter.value === 'image';
+    return app.received.filter((item) => item.type === 'file' && isImageName(item.name) === wantImage);
+});
 const historyUsageLabel = computed(() => {
     const current = app.received.length;
     const limit = Number(app.config?.server?.history || 0);
@@ -70,15 +104,31 @@ watch(() => ws.room, (room) => {
 
             <v-card class="timeline-panel" :class="{ 'surface-card--dark': isDark }" variant="outlined">
                 <div class="timeline-panel__body px-3 px-md-4 py-2">
+                    <!-- 分类条：只在真有内容时出现（空列表上摆一条没用的过滤条更碍事） -->
+                    <div v-if="app.received.length && app.display.timelineFilter" class="timeline-panel__filters">
+                        <v-chip
+                            v-for="opt in FILTER_OPTIONS"
+                            :key="opt.key"
+                            size="small"
+                            label
+                            class="timeline-panel__filter"
+                            :variant="timelineFilter === opt.key ? 'flat' : 'outlined'"
+                            :color="timelineFilter === opt.key ? 'primary' : undefined"
+                            @click="setTimelineFilter(opt.key)"
+                        >
+                            <v-icon start size="16">{{ opt.icon }}</v-icon>{{ t(opt.labelKey) }}
+                        </v-chip>
+                    </div>
+
                     <div v-if="app.received.length" class="timeline-panel__stream">
                         <div
-                            v-for="item in app.received"
+                            v-for="item in filteredReceived"
                             :key="item.id"
                             class="timeline-panel__item"
-                            :class="{ 'timeline-panel__item--first': item === app.received[0] }"
+                            :class="{ 'timeline-panel__item--first': item === filteredReceived[0] }"
                         >
                             <v-chip
-                                v-if="item === app.received[0]"
+                                v-if="item === filteredReceived[0]"
                                 size="x-small"
                                 :variant="'outlined'"
                                 color="primary"
@@ -91,6 +141,10 @@ watch(() => ws.room, (room) => {
                                 :meta="item"
                             />
                         </div>
+                        <div
+                            v-if="!filteredReceived.length"
+                            class="text-center text-caption text-medium-emphasis py-6"
+                        >{{ t('filterEmpty') }}</div>
                     </div>
 
                     <v-sheet
@@ -108,7 +162,7 @@ watch(() => ws.room, (room) => {
                         </v-btn>
                     </v-sheet>
 
-                    <div v-else class="text-center text-caption text-medium-emphasis pt-2">{{ t('alreadyAtBottom') }}</div>
+                    <div v-else-if="filteredReceived.length" class="text-center text-caption text-medium-emphasis pt-2">{{ t('alreadyAtBottom') }}</div>
                 </div>
             </v-card>
         </div>
@@ -158,6 +212,19 @@ watch(() => ws.room, (room) => {
 
 .timeline-panel__body {
     min-height: 24rem;
+}
+
+/* 分类条（全部 / 文本 / 图片 / 文件）。默认关，见 data/displayToggles.js。 */
+.timeline-panel__filters {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+    padding: 2px 0 10px;
+}
+
+.timeline-panel__filter {
+    cursor: pointer;
 }
 
 .timeline-panel__stream {
