@@ -40,5 +40,3 @@ body:
         - label: OpenWrt / LuCI
         - label: Cloudflare Worker
         - label: 文档 / README
-    validations:
-      required: true
