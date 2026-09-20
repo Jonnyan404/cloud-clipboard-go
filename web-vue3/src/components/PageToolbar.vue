@@ -126,8 +126,12 @@ const currentMode = computed(() => MODES.find(mode => mode.key === app.uiMode) |
                             class="page-toolbar__mode"
                             :title="t('uiMode')"
                         >
-                            <v-icon size="24">{{ currentMode.icon }}</v-icon>
-                            <span class="page-toolbar__mode-label d-none d-sm-inline">{{ t(currentMode.labelKey) }}</span>
+                            <!-- 菜单栏里只留文字：旁边那几个都是纯图标按钮，这里放个图标反而
+                                 多一层信息（而且 6 个模式图标挤在一起时辨识度本来就低）。
+                                 图标留到下拉里，那里有文字并排，认得出。
+                                 文字不能再挂 d-none d-sm-inline —— 图标去掉后它是唯一内容，
+                                 窄屏藏了就只剩一个箭头。 -->
+                            <span class="page-toolbar__mode-label">{{ t(currentMode.labelKey) }}</span>
                             <v-icon size="x-small" class="page-toolbar__mode-caret">mdi-chevron-down</v-icon>
                         </button>
                     </template>
@@ -413,36 +417,42 @@ const currentMode = computed(() => MODES.find(mode => mode.key === app.uiMode) |
     color: rgb(var(--v-theme-error));
 }
 
+/* 模式触发器。改前是「半透明白底 + 淡边框 + 悬停整块变实心蓝」，两个毛病：
+   1) 白底淡边框让它读起来像状态标签，跟左边的房间 chip 撞脸，看不出是个控件；
+   2) 悬停直接变实心蓝，跟旁边那几个图标按钮的轻悬停不是一套语言。
+   现在跟图标按钮统一：无边框、静止一层中性底色、悬停只加深一点。
+   胶囊形状保留 —— 它是「选择器」，胶囊比圆角方块更能说明这件事。 */
 .page-toolbar__mode {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    border: 1px solid rgba(148, 163, 184, 0.35);
-    background: rgba(255, 255, 255, 0.6);
+    gap: 5px;
+    border: none;
+    background: rgba(148, 163, 184, 0.14);
     border-radius: 999px;
     padding: 3px 10px;
-    font-size: 0.72rem;
+    font-size: 0.78rem;
+    line-height: 1.3;
+    font-family: inherit;
     cursor: pointer;
-    color: rgba(100, 116, 139, 0.9);
+    color: rgba(71, 85, 105, 0.95);
     transition: background 0.15s, color 0.15s;
 }
 
-.page-toolbar--dark .page-toolbar__mode {
-    background: rgba(0, 0, 0, 0.25);
-    color: rgba(148, 163, 184, 0.9);
+.page-toolbar__mode:hover {
+    background: rgba(148, 163, 184, 0.26);
 }
 
-.page-toolbar__mode:hover {
-    background: #1e88e5;
-    color: #fff;
+.page-toolbar--dark .page-toolbar__mode {
+    background: rgba(148, 163, 184, 0.16);
+    color: rgba(203, 213, 225, 0.92);
+}
+
+.page-toolbar--dark .page-toolbar__mode:hover {
+    background: rgba(148, 163, 184, 0.28);
 }
 
 .page-toolbar__mode-caret {
-    opacity: 0.75;
-}
-
-.page-toolbar__mode:hover :deep(.v-icon) {
-    color: #fff;
+    opacity: 0.7;
 }
 
 @media (max-width: 600px) {

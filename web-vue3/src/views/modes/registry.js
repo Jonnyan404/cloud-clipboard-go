@@ -9,7 +9,10 @@ export const MODES = [
     {
         key: 'default',
         labelKey: 'uiModeDefault',
-        icon: 'mdi-view-dashboard-outline',
+        // 原来用 mdi-view-dashboard-outline（2×2 宫格）：那画的是「网格」，
+        // 而这个模式是**竖着排的时间流卡片**，宫格更像巨型/工作台那种多栏布局，指错了。
+        // view-stream 是一列竖着堆的块，跟实际长相一致。
+        icon: 'mdi-view-stream-outline',
         component: DefaultMode,
     },
     {
