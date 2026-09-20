@@ -144,7 +144,7 @@
   "scReceiveDesc": "最新の 1 件をこの端末に取り込む",
   "scReceiveById": "ID を指定して受信",
   "scReceiveByIdDesc": "メッセージ ID で 1 件だけ取り込む",
-  "scAppleSteps": "ダウンロードしたファイルを開いて「ショートカット」App に読み込みます。初回はサーバーアドレス・ルーム名・パスワードを聞かれ、以降は共有メニューから直接送れます。",
+  "scAppleSteps": "Mac / iPhone / iPad で使えます。ダウンロードしたファイルを開いて「ショートカット」App に読み込みます。初回はサーバーアドレス・ルーム名・パスワードを聞かれ、以降は共有メニューから直接送れます。",
   "scScanToImport": "iPhone の「カメラ」で読み取る",
   "scAndroidAppHint": "アプリがまだない場合は、先に HTTP Shortcuts を入れてください（読み込みに必要です）：",
   "scAndroidSteps": "方法①: zip をダウンロードし、HTTP Shortcuts App の「インポート/エクスポート-->ファイルからインポート」で選んで、url / room / auth の 3 変数を入力します。\n方法②: リンクをコピーし、HTTP Shortcuts App の「インポート/エクスポート-->URL からインポート」に貼り付けて、url / room / auth の 3 変数を入力します。",

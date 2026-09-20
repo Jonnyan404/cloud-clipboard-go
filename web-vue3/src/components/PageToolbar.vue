@@ -70,7 +70,26 @@ const currentMode = computed(() => MODES.find(mode => mode.key === app.uiMode) |
                 <v-tooltip v-if="ws.room" :text="t('backToDefaultRoom')" location="bottom">
                     <template v-slot:activator="{ props }">
                         <v-btn icon density="compact" size="small" variant="text" class="page-toolbar__home-btn" v-bind="props" @click="ws.switchRoom('')">
-                            <v-icon size="small">mdi-home-outline</v-icon>
+                            <v-icon size="24">mdi-home-outline</v-icon>
+                        </v-btn>
+                    </template>
+                </v-tooltip>
+
+                <!-- 连接图标只在「没连上」时出现。
+                     连上之后它是个**死按钮**：toggleConnection 只在断开时重连，
+                     而「连接好不好」已经由房间 chip 里的延迟数字（还带颜色分级）表达了 ——
+                     常驻就只是白占一个位置、还让人以为点了有用。
+                     断开时给 error 色：这是异常态，不是常态装饰。 -->
+                <v-tooltip
+                    v-if="!ws.websocket"
+                    :text="ws.websocketConnecting ? t('connecting') : t('disconnected')"
+                    location="bottom"
+                >
+                    <template v-slot:activator="{ props }">
+                        <v-btn icon density="compact" size="small" variant="text" v-bind="props" @click="actions.toggleConnection && actions.toggleConnection()">
+                            <v-icon size="24" :color="ws.websocketConnecting ? undefined : 'error'">
+                                {{ ws.websocketConnecting ? 'mdi-lan-pending' : 'mdi-lan-disconnect' }}
+                            </v-icon>
                         </v-btn>
                     </template>
                 </v-tooltip>
@@ -106,7 +125,7 @@ const currentMode = computed(() => MODES.find(mode => mode.key === app.uiMode) |
                             class="page-toolbar__mode"
                             :title="t('uiMode')"
                         >
-                            <v-icon size="small">{{ currentMode.icon }}</v-icon>
+                            <v-icon size="24">{{ currentMode.icon }}</v-icon>
                             <span class="page-toolbar__mode-label d-none d-sm-inline">{{ t(currentMode.labelKey) }}</span>
                             <v-icon size="x-small" class="page-toolbar__mode-caret">mdi-chevron-down</v-icon>
                         </button>
@@ -126,52 +145,43 @@ const currentMode = computed(() => MODES.find(mode => mode.key === app.uiMode) |
                     </v-list>
                 </v-menu>
 
-                <v-tooltip v-if="roomListEnabled" :text="t('roomList')" location="bottom">
-                    <template v-slot:activator="{ props }">
-                        <v-btn icon density="compact" size="small" variant="text" v-bind="props" @click="actions.openRoomBrowser && actions.openRoomBrowser()">
-                            <v-badge :content="roomCount" :model-value="roomCount > 0" color="accent" overlap>
-                                <v-icon size="small">mdi-view-list</v-icon>
-                            </v-badge>
-                        </v-btn>
-                    </template>
-                </v-tooltip>
+                <div class="page-toolbar__group">
+                    <v-tooltip v-if="roomListEnabled" :text="t('roomList')" location="bottom">
+                        <template v-slot:activator="{ props }">
+                            <v-btn icon density="compact" size="small" variant="text" v-bind="props" @click="actions.openRoomBrowser && actions.openRoomBrowser()">
+                                <v-badge :content="roomCount" :model-value="roomCount > 0" color="accent" overlap>
+                                    <v-icon size="24">mdi-view-list</v-icon>
+                                </v-badge>
+                            </v-btn>
+                        </template>
+                    </v-tooltip>
 
-                <v-tooltip :text="t('enterRoom')" location="bottom">
-                    <template v-slot:activator="{ props }">
-                        <v-btn icon density="compact" size="small" variant="text" v-bind="props" @click="actions.openRoomDialog && actions.openRoomDialog()">
-                            <v-icon size="small">mdi-door-open</v-icon>
-                        </v-btn>
-                    </template>
-                </v-tooltip>
+                    <v-tooltip :text="t('enterRoom')" location="bottom">
+                        <template v-slot:activator="{ props }">
+                            <v-btn icon density="compact" size="small" variant="text" v-bind="props" @click="actions.openRoomDialog && actions.openRoomDialog()">
+                                <v-icon size="24">mdi-door-open</v-icon>
+                            </v-btn>
+                        </template>
+                    </v-tooltip>
+                </div>
 
-                <v-tooltip location="bottom">
-                    <template v-slot:activator="{ props }">
-                        <v-btn icon density="compact" size="small" variant="text" v-bind="props" @click="actions.toggleConnection && actions.toggleConnection()">
-                            <v-icon v-if="ws.websocket" size="small">mdi-lan-connect</v-icon>
-                            <v-icon v-else-if="ws.websocketConnecting" size="small">mdi-lan-pending</v-icon>
-                            <v-icon v-else size="small">mdi-lan-disconnect</v-icon>
-                        </v-btn>
-                    </template>
-                    <span v-if="ws.websocket">{{ t('connected') }}</span>
-                    <span v-else-if="ws.websocketConnecting">{{ t('connecting') }}</span>
-                    <span v-else>{{ t('disconnected') }}</span>
-                </v-tooltip>
+                <div class="page-toolbar__group">
+                    <v-tooltip :text="t('clearClipboard')" location="bottom">
+                        <template v-slot:activator="{ props }">
+                            <v-btn icon density="compact" size="small" variant="text" class="page-toolbar__clear" v-bind="props" @click="actions.openClearAll && actions.openClearAll()">
+                                <v-icon size="24">mdi-broom</v-icon>
+                            </v-btn>
+                        </template>
+                    </v-tooltip>
 
-                <v-tooltip :text="t('clearClipboard')" location="bottom">
-                    <template v-slot:activator="{ props }">
-                        <v-btn icon density="compact" size="small" variant="text" v-bind="props" @click="actions.openClearAll && actions.openClearAll()">
-                            <v-icon size="small">mdi-broom</v-icon>
-                        </v-btn>
-                    </template>
-                </v-tooltip>
-
-                <v-tooltip :text="t('settings')" location="bottom">
-                    <template v-slot:activator="{ props }">
-                        <v-btn icon density="compact" size="small" variant="text" v-bind="props" @click="actions.openSettings && actions.openSettings()">
-                            <v-icon size="small">mdi-cog</v-icon>
-                        </v-btn>
-                    </template>
-                </v-tooltip>
+                    <v-tooltip :text="t('settings')" location="bottom">
+                        <template v-slot:activator="{ props }">
+                            <v-btn icon density="compact" size="small" variant="text" v-bind="props" @click="actions.openSettings && actions.openSettings()">
+                                <v-icon size="24">mdi-cog</v-icon>
+                            </v-btn>
+                        </template>
+                    </v-tooltip>
+                </div>
             </div>
         </div>
 
@@ -348,12 +358,29 @@ const currentMode = computed(() => MODES.find(mode => mode.key === app.uiMode) |
     flex-shrink: 0;
 }
 
+/* 右侧按语义分三段：视图（模式）/ 房间 / 系统。
+   组内贴紧、组间留空档 —— 用间距而不是竖线分隔符：这条栏本来就很密，
+   再加一种视觉元素只会更吵。
+   ⚠️ 不要靠「图标大小」分主次：差 2px 眼睛看不出来，只会显得没对齐。
+   层级交给分组间距和悬停色表达。 */
 .page-toolbar__actions {
     display: flex;
     align-items: center;
-    gap: 2px;
+    gap: 12px;
     flex-shrink: 0;
     min-width: 0;
+}
+
+.page-toolbar__group {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+/* 清空是这条栏里唯一的破坏性动作，和「设置」长得一模一样不合适。
+   平时不喧哗，悬停才变红。 */
+.page-toolbar__clear:hover :deep(.v-icon) {
+    color: rgb(var(--v-theme-error));
 }
 
 .page-toolbar__mode {

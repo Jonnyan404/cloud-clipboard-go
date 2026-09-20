@@ -65,7 +65,15 @@ function showQr(url) {
             <v-tabs-window v-model="tab">
                 <v-tabs-window-item value="apple">
                     <v-card-text class="shortcuts-dialog__body">
-                        <div class="text-caption text-medium-emphasis mb-3">{{ t('shortcutsHint') }}</div>
+                        <!-- 平台图标先亮出来：这几条捷径 Mac 和 iPhone / iPad 用的是同一份文件，
+                             不写清楚的话 Mac 用户会以为这是手机专用。
+                             （上面那句 shortcutsHint 是两个 tab 共用的，不能在这里改文案。） -->
+                        <div class="text-caption text-medium-emphasis mb-3 d-flex align-center flex-wrap">
+                            <v-icon size="16" class="mr-1">mdi-apple</v-icon>
+                            <v-icon size="16" class="mr-1">mdi-laptop</v-icon>
+                            <v-icon size="16" class="mr-3">mdi-cellphone</v-icon>
+                            <span>{{ t('shortcutsHint') }}</span>
+                        </div>
                         <v-card
                             v-for="sc in APPLE_SHORTCUTS"
                             :key="sc.file"

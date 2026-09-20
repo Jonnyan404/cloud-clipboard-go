@@ -144,7 +144,7 @@
   "scReceiveDesc": "把最新一条取到本机剪贴板",
   "scReceiveById": "按 ID 接收",
   "scReceiveByIdDesc": "按消息 ID 精确取一条",
-  "scAppleSteps": "下载后点开，用「快捷指令」App 导入。首次运行会问服务器地址、房间名和密码，之后就能从分享菜单直接发送。",
+  "scAppleSteps": "Mac、iPhone、iPad 都能用：下载后点开，用「快捷指令」App 导入。首次运行会问服务器地址、房间名和密码，之后就能从分享菜单直接发送。",
   "scScanToImport": "用 iPhone 的「相机」扫码导入",
   "scAndroidAppHint": "还没装 App？先装 HTTP Shortcuts（导入包需要它）：",
   "scAndroidSteps": "方法①: 下载zip,在 HTTP Shortcuts App 里用「导入/导出-->从文件导入」选中它，再填上 url / room / auth 三个变量。\n方法②: 复制链接,在 HTTP Shortcuts App 里用「导入/导出-->从URL导入」粘贴它，再填上 url / room / auth 三个变量。",
