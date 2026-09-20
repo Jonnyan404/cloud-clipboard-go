@@ -10,6 +10,12 @@ import {
 import { errorResponse } from './errors';
 
 export const SHARE_TOKEN_QUERY_KEY = 't';
+
+// 分享密码走的请求头。**不要放 URL** —— query 会进浏览器历史和访问日志。
+const SHARE_PASSWORD_HEADER = 'X-Share-Password';
+// 存进 token 的是 HMAC(签名密钥, "share-password:"+密码) 的十六进制前 16 位。
+// 用密钥而不是裸 SHA256：token 在 URL 里，裸哈希能被离线爆破。
+const SHARE_PASSWORD_HASH_LEN = 16;
 export const DEFAULT_SHARE_TTL_SECONDS = 15 * 60;
 export const MIN_SHARE_TTL_SECONDS = 60;
 export const MAX_SHARE_TTL_SECONDS = 24 * 60 * 60;
@@ -97,6 +103,33 @@ export function extractShareToken(request) {
   return new URL(request.url).searchParams.get(SHARE_TOKEN_QUERY_KEY) || '';
 }
 
+// 把分享密码算成可存进 token 的短串；空密码返回空串（不需要密码）。
+async function sharePasswordHash(env, password) {
+  const normalized = String(password || '').trim();
+  if (!normalized) {
+    return '';
+  }
+  const key = await getShareSigningKey(env);
+  const signature = await crypto.subtle.sign('HMAC', key, textToBytes(`share-password:${normalized}`));
+  const hex = [...new Uint8Array(signature)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  return hex.slice(0, SHARE_PASSWORD_HASH_LEN);
+}
+
+// 常数时间比较：逐字节异或累加，不要短路返回。
+// 用 `===` 会在第一个不同的字节就返回，能按时间差逐字节猜出哈希。
+function constantTimeEqual(a, b) {
+  const left = String(a || '');
+  const right = String(b || '');
+  if (left.length !== right.length) {
+    return false;
+  }
+  let diff = 0;
+  for (let i = 0; i < left.length; i += 1) {
+    diff |= left.charCodeAt(i) ^ right.charCodeAt(i);
+  }
+  return diff === 0;
+}
+
 export async function signShareClaims(env, claims) {
   const key = await getShareSigningKey(env);
   const payload = bytesToBase64Url(textToBytes(JSON.stringify(claims)));
@@ -150,6 +183,8 @@ export async function parseShareToken(env, token) {
       exp,
       jti,
       maxUses: Number.isFinite(maxUses) && maxUses > 0 ? Math.floor(maxUses) : 0,
+      // 非空表示这条分享需要密码；值是 HMAC(签名密钥, 密码) 的前若干位
+      pwdHash: String(claims?.p || '').trim(),
     };
   } catch {
     return null;
@@ -293,6 +328,14 @@ export async function validateShareToken(env, request, expectedType, expectedId,
     return false;
   }
 
+  // 需要密码的分享：请求头里必须带对（常数时间比较）
+  if (claims.pwdHash) {
+    const supplied = await sharePasswordHash(env, request.headers.get(SHARE_PASSWORD_HEADER));
+    if (!constantTimeEqual(supplied, claims.pwdHash)) {
+      return false;
+    }
+  }
+
   if (claims.maxUses > 0 && shouldConsumeShareUse(request)) {
     const ok = await consumeShareUse(env, claims);
     if (!ok) {
@@ -390,7 +433,7 @@ async function findFileMeta(env, uuid) {
   return null;
 }
 
-async function issueShareToken(env, { type, id, room, ttl, maxUses }) {
+async function issueShareToken(env, { type, id, room, ttl, maxUses, password }) {
   const expiresAt = Math.floor(Date.now() / 1000) + ttl;
   const claims = {
     typ: type,
@@ -401,6 +444,10 @@ async function issueShareToken(env, { type, id, room, ttl, maxUses }) {
   if (maxUses > 0) {
     claims.jti = newShareJTI();
     claims.mu = maxUses;
+  }
+  const pwdHash = await sharePasswordHash(env, password);
+  if (pwdHash) {
+    claims.p = pwdHash;
   }
   const token = await signShareClaims(env, claims);
   return { token, expiresAt };
@@ -462,6 +509,7 @@ export class ShareHandler {
             room,
             ttl,
             maxUses,
+            password: body?.password,
           });
           expiresAt = issued.expiresAt;
           response.expiresAt = expiresAt;
