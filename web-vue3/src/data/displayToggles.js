@@ -28,7 +28,7 @@ export const DISPLAY_TOGGLES = [
     // markdown 接在两个模式：标准（时间流卡片 + 文件预览）和便签（阅读器大视图）。
     // 必须声明 modes：个性化面板是「每模式一组开关」，不声明的话用户会在聊天/终端模式里
     // 拨到一个完全没反应的开关 —— 显示一个不生效的开关，比不显示它更糟。
-    { key: 'markdown', group: 'content', labelKey: 'markdownToggle', icon: 'mdi-language-markdown-outline', modes: ['default', 'sticky'] },
+    { key: 'markdown', group: 'content', labelKey: 'markdownToggle', icon: 'mdi-language-markdown-outline', modes: ['default', 'sticky', 'chat'] },
     // 时间流上方的分类条（全部 / 文本 / 图片 / 文件）。
     // ⚠️ **这是「默认关」的例外**，下面 DEFAULT_DISPLAY 里那条「默认全开」的原则在这里**故意不适用**：
     // 分类条是可选的新浏览方式，不是原本就有的东西 —— 默认开会在所有老用户的时间流上

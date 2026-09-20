@@ -1,13 +1,14 @@
-<script setup>import { computed, ref, watch } from 'vue';
+<script setup>import { computed, reactive, ref, watch } from 'vue';
 import axios from 'axios';
 import { useAppStore } from '@/store/app';
 import { useWebSocketStore } from '@/store/websocket';
 import { useTheme } from 'vuetify';
 import { useI18n } from 'vue-i18n';
 import { toast } from '@/plugins/toast';
-import { SHARE_DEFAULT_TTL, buildCleanAbsoluteRouteUrl, copyTextToClipboard, createShareLink, deviceLabel, errorMessage, formatTimestamp, getClientId, isImageName, prettyFileSize } from '@/util.js';
+import { SHARE_DEFAULT_TTL, buildCleanAbsoluteRouteUrl, copyTextToClipboard, createShareLink, deviceLabel, errorMessage, formatTimestamp, getClientId, isImageName, looksLikeMarkdown, renderMarkdownHtml, prettyFileSize } from '@/util.js';
 import PageToolbar from '@/components/PageToolbar.vue';
 import StickyComposer from '@/components/sticky/StickyComposer.vue';
+import MarkdownBody from '@/components/MarkdownBody.vue';
 import { useStickyAutoscroll } from '@/composables/useStickyAutoscroll';
 
 const app = useAppStore();
@@ -15,6 +16,37 @@ const ws = useWebSocketStore();
 const theme = useTheme();
 const isDark = computed(() => theme.current.value?.dark ?? false);
 const { t } = useI18n();
+
+// 聊天气泡的 md 渲染。
+//
+// 每条气泡**默认渲染 md**（Jonny 明确要求的），气泡那排操作按钮里有切换图标，
+// 想看原文的人自己切 —— 跟标准模式卡片、便签阅读器一致。
+// 每条的状态存在 mdModes（默认 'md'）；渲染结果按 id 先算成一张表，
+// 模板里按 id 取，避免同一条渲染两遍。
+const mdModes = reactive(new Map());
+function setBubbleMd(id, mode) {
+    mdModes.set(id, mode);
+}
+function bubbleMdMode(item) {
+    return mdModes.get(item.id) || 'md';
+}
+const bubbleHtml = computed(() => {
+    const map = new Map();
+    if (!app.display.markdown) return map;
+    for (const item of app.visibleReceived) {
+        if (item.type !== 'text') continue;
+        if (bubbleMdMode(item) !== 'md') continue;
+        const text = decodedContent(item);
+        if (looksLikeMarkdown(text)) map.set(item.id, renderMarkdownHtml(text));
+    }
+    return map;
+});
+// 内容不像 markdown 时不给图标（跟 useMarkdown 的 available 同一条判断）
+function bubbleMdAvailable(item) {
+    return app.display.markdown && item.type === 'text' && looksLikeMarkdown(decodedContent(item));
+}
+const mdiCodeTags = 'mdi-code-tags';
+const mdiLanguageMarkdown = 'mdi-language-markdown';
 
 const items = computed(() => app.visibleReceived);
 const streamItems = computed(() => [...app.visibleReceived].reverse());
@@ -347,9 +379,20 @@ watch(detailItem, (item) => {
                             <span class="chat-wall__file-meta">{{ prettyFileSize(item.size || 0) }}</span>
                         </span>
                     </div>
+                    <markdown-body v-else-if="bubbleHtml.get(item.id)" :html="bubbleHtml.get(item.id)"></markdown-body>
                     <div v-else class="chat-wall__text">{{ decodedContent(item) }}</div>
                     <span class="chat-wall__bubble-time">{{ bubbleFooter(item) }}</span>
                     <span class="chat-wall__bubble-ops">
+                        <!-- 原文 / Markdown 切换。只有内容真的像 markdown 时才出现。 -->
+                        <button
+                            v-if="bubbleMdAvailable(item)"
+                            type="button"
+                            class="chat-wall__op"
+                            :title="bubbleMdMode(item) === 'md' ? t('rawText') : t('renderMarkdown')"
+                            @click="setBubbleMd(item.id, bubbleMdMode(item) === 'md' ? 'raw' : 'md')"
+                        >
+                            <v-icon size="14">{{ bubbleMdMode(item) === 'md' ? mdiCodeTags : mdiLanguageMarkdown }}</v-icon>
+                        </button>
                         <button v-if="item.type === 'text'" type="button" class="chat-wall__op" :title="t('copyText')" @click="copyContent(item)">
                             <v-icon size="large">mdi-content-copy</v-icon>
                         </button>

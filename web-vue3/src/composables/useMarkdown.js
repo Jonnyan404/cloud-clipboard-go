@@ -9,7 +9,11 @@ import { looksLikeMarkdown, renderMarkdownHtml } from '@/util.js';
  *   · 个性化里的开关（app.display.markdown）—— 只决定**要不要显示那两个切换图标**
  *   · 右上角那两个图标 —— 决定**这一条用哪种方式看**，raw 还是 md
  *
- * 开关默认关：不想要这个功能的人，界面上不会多出任何东西。
+ * 开关默认**开**（见 displayToggles 的 DEFAULT_DISPLAY.markdown）。
+ *
+ * ⚠️ 这一条（标准模式卡片 / 便签阅读器 / 文件预览）**默认看原文**。
+ * 「默认渲染 md」只针对**聊天气泡** —— 那里不做每条一个切换图标，
+ * 直接按内容判断渲染，见 ChatWall 的 bubbleHtml。别把这个默认值改成 md。
  *
  * @param {() => string} getText        取原始文本
  * @param {() => boolean} isMarkdownFile 可选：扩展名是 .md 这类可靠信号。
