@@ -345,7 +345,46 @@ jobs:
           body_path: ${{ github.workspace }}-RELEASE_BODY.md
 
   # ====================================================================
-  # Job 7: Sync Homebrew Tap
+  # Job 7: Record the version on main
+  # 只往 main 上留一条「vX.Y.Z 发过了」的记录，不改任何文件。
+  #
+  # ⚠️ `--allow-empty` 是**故意**的，两个原因：
+  #   1. 需求就是「记一条版本信息」，不需要动文件；
+  #   2. 不改文件 ⇒ 没有文件变更 ⇒ **带 paths 过滤的 workflow 不会跑**
+  #      （GitHub 的规则：diff 为空时 paths 过滤判定为不匹配）。
+  #      本仓库只有 pages.yml 挂在 push→main 上，它带 `paths: docs/**`，
+  #      所以这条空提交不会触发多余的 Pages 部署。
+  #
+  # 放在 release 之后：先保证资产传完，记录是收尾动作，失败也不影响已发布的产物。
+  # ====================================================================
+  record-version:
+    name: Record Version Commit
+    runs-on: ubuntu-latest
+    needs: [determine-tag, release]
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Commit and push the version marker
+        run: |
+          set -euo pipefail
+          TAG="${{ needs.determine-tag.outputs.tag }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # workflow_dispatch 可以对同一个 tag 重跑（补传资产），别因此堆出一串重复记录
+          if git log --format=%s -n 200 | grep -qxF "chore(release): ${TAG}"; then
+            echo "main 上已有 ${TAG} 的记录，跳过"
+            exit 0
+          fi
+          git pull --rebase origin main
+          git commit --allow-empty -m "chore(release): ${TAG}"
+          git push origin HEAD:main
+          echo "已记录 ${TAG}"
+
+  # ====================================================================
+  # Job 8: Sync Homebrew Tap
   # GoReleaser 以 --skip=publish 运行（Release 由 softprops 创建），
   # brews 推送被一并跳过，这里在 Release 资产就绪后手动补推 formula，
   # 必须放在 release 之后，否则用户安装时下载链接会 404
