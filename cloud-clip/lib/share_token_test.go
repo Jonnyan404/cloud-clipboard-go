@@ -70,7 +70,7 @@ func TestShareTokenMaxUses(t *testing.T) {
 	}
 	s.config.Server.Auth = "secret-pass"
 
-	token, _, err := s.issueShareToken("content", "7", "default", 600, 2)
+	token, _, err := s.issueShareToken("content", "7", "default", 600, 2, "")
 	if err != nil {
 		t.Fatalf("issue failed: %v", err)
 	}
@@ -95,7 +95,7 @@ func TestShareTokenRangeContinuationDoesNotConsume(t *testing.T) {
 	}
 	s.config.Server.Auth = "secret-pass"
 
-	token, _, err := s.issueShareToken("file", "uuid-x", "default", 600, 1)
+	token, _, err := s.issueShareToken("file", "uuid-x", "default", 600, 1, "")
 	if err != nil {
 		t.Fatalf("issue failed: %v", err)
 	}
@@ -341,5 +341,69 @@ func TestHandleAuthTokenRefresh(t *testing.T) {
 	s.handleAuthTokenRefresh(w4, httptest.NewRequest(http.MethodPost, "/auth/token/refresh?room=default", nil))
 	if w4.Code != http.StatusUnauthorized {
 		t.Fatalf("expected 401 for missing token, got %d", w4.Code)
+	}
+}
+
+// 分享密码：签进 token 的是 HMAC(签名密钥, 密码)，校验走请求头 X-Share-Password。
+// 这里覆盖四种情况：没带 / 带错 / 带对 / 以及「本来就不需要密码的分享不受影响」。
+func TestShareTokenPassword(t *testing.T) {
+	s := &ClipboardServer{config: &Config{}}
+	s.config.Server.Auth = "secret-pass"
+
+	token, _, err := s.issueShareToken("content", "7", "default", 600, 0, "hunter2")
+	if err != nil {
+		t.Fatalf("issue failed: %v", err)
+	}
+
+	newReq := func() *http.Request {
+		return httptest.NewRequest(http.MethodGet, "/content/7?t="+token, nil)
+	}
+
+	if s.validateShareToken(newReq(), "content", "7", "default") {
+		t.Fatal("expected reject when no password is supplied")
+	}
+
+	req := newReq()
+	req.Header.Set(sharePasswordHeader, "wrong")
+	if s.validateShareToken(req, "content", "7", "default") {
+		t.Fatal("expected reject with the wrong password")
+	}
+
+	req = newReq()
+	req.Header.Set(sharePasswordHeader, "hunter2")
+	if !s.validateShareToken(req, "content", "7", "default") {
+		t.Fatal("expected accept with the correct password")
+	}
+
+	// 不带密码签发的分享：客户端多带一个密码头也不该被拦
+	plain, _, err := s.issueShareToken("content", "8", "default", 600, 0, "")
+	if err != nil {
+		t.Fatalf("issue failed: %v", err)
+	}
+	req = httptest.NewRequest(http.MethodGet, "/content/8?t="+plain, nil)
+	req.Header.Set(sharePasswordHeader, "whatever")
+	if !s.validateShareToken(req, "content", "8", "default") {
+		t.Fatal("a share without a password should not be affected by the header")
+	}
+}
+
+// 密码不进 URL：token 里只有哈希，明文密码不该出现在 token 里。
+func TestShareTokenPasswordNotInToken(t *testing.T) {
+	s := &ClipboardServer{config: &Config{}}
+	s.config.Server.Auth = "secret-pass"
+
+	token, _, err := s.issueShareToken("content", "9", "default", 600, 0, "hunter2")
+	if err != nil {
+		t.Fatalf("issue failed: %v", err)
+	}
+	if strings.Contains(token, "hunter2") {
+		t.Fatal("the plaintext password must not appear in the token")
+	}
+	claims, ok := s.parseShareToken(token)
+	if !ok {
+		t.Fatal("token should parse")
+	}
+	if claims.PwdHash == "" || claims.PwdHash == "hunter2" {
+		t.Fatalf("expected a hashed password marker, got %q", claims.PwdHash)
 	}
 }

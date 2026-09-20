@@ -22,6 +22,14 @@ const (
 	minShareTTLSeconds     = 60
 	maxShareMaxUses        = 1000
 	shareTokenQueryKey     = "t"
+
+	// 分享密码走的请求头。**不要放 URL** —— query 会进浏览器历史和服务器访问日志。
+	// 分享页是前端那一条路由，发请求时带这个头即可。
+	sharePasswordHeader = "X-Share-Password"
+	// 存进 token 的是 HMAC(服务端签名密钥, 密码) 的十六进制前 16 位。
+	// 用密钥而不是裸 SHA256：token 在 URL 里，裸哈希能被离线爆破；带密钥的算不出来。
+	// 存 token 里而不是内存 map：usage map 是进程内的，重启就没了，密码不能跟着丢。
+	sharePasswordHashLen = 16
 )
 
 type shareClaims struct {
@@ -32,6 +40,8 @@ type shareClaims struct {
 	Exp     int64  `json:"exp"`
 	JTI     string `json:"jti,omitempty"` // token id when usage-limited
 	MaxUses int    `json:"mu,omitempty"`  // 0 = unlimited
+	// 非空表示这条分享需要密码；值是 HMAC(签名密钥, 密码) 的前若干位
+	PwdHash string `json:"p,omitempty"`
 }
 
 type shareRequest struct {
@@ -40,6 +50,8 @@ type shareRequest struct {
 	UUID    string `json:"uuid"`
 	TTL     int    `json:"ttl"`
 	MaxUses int    `json:"maxUses"`
+	// 可选：给这条分享加密码。空串 = 不需要密码
+	Password string `json:"password"`
 }
 
 type shareUsageEntry struct {
@@ -136,6 +148,24 @@ func newShareJTI() (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(buf), nil
+}
+
+// 把分享密码算成可存进 token 的短串。
+// 空密码返回空串（表示这条分享不需要密码）。
+func (s *ClipboardServer) sharePasswordHash(password string) string {
+	password = strings.TrimSpace(password)
+	if password == "" {
+		return ""
+	}
+	s.initShareSigningKey()
+	mac := hmac.New(sha256.New, s.shareSigningKey)
+	_, _ = mac.Write([]byte("share-password:" + password))
+	return hex.EncodeToString(mac.Sum(nil))[:sharePasswordHashLen]
+}
+
+// 从请求里取分享密码（请求头）。
+func extractSharePassword(r *http.Request) string {
+	return strings.TrimSpace(r.Header.Get(sharePasswordHeader))
 }
 
 func (s *ClipboardServer) signShareClaims(claims shareClaims) (string, error) {
@@ -362,6 +392,14 @@ func (s *ClipboardServer) validateShareToken(r *http.Request, expectedType, expe
 		return false
 	}
 
+	// 需要密码的分享：请求头里必须带对。用 hmac.Equal 做常数时间比较，
+	// 别用 == —— 字符串比较会在第一个不同的字节就返回，能按时间差逐字节猜。
+	if claims.PwdHash != "" {
+		if !hmac.Equal([]byte(s.sharePasswordHash(extractSharePassword(r))), []byte(claims.PwdHash)) {
+			return false
+		}
+	}
+
 	if claims.MaxUses > 0 && shouldConsumeShareUse(r) {
 		if !s.consumeShareUse(claims) {
 			return false
@@ -433,7 +471,7 @@ func (s *ClipboardServer) findContentForShare(contentID int, preferredRoom strin
 	return "", "", "", false
 }
 
-func (s *ClipboardServer) issueShareToken(shareType, id, room string, ttl, maxUses int) (token string, expiresAt int64, err error) {
+func (s *ClipboardServer) issueShareToken(shareType, id, room string, ttl, maxUses int, password string) (token string, expiresAt int64, err error) {
 	expiresAt = time.Now().Unix() + int64(ttl)
 	claims := shareClaims{
 		Type:    shareType,
@@ -441,6 +479,7 @@ func (s *ClipboardServer) issueShareToken(shareType, id, room string, ttl, maxUs
 		Room:    room,
 		Exp:     expiresAt,
 		MaxUses: maxUses,
+		PwdHash: s.sharePasswordHash(password),
 	}
 	if maxUses > 0 {
 		jti, jerr := newShareJTI()
@@ -460,7 +499,7 @@ func (s *ClipboardServer) handle_share(w http.ResponseWriter, r *http.Request) {
 	// 与 authMiddleware 保持一致的 CORS 行为，便于前后端分离调用
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Room-Auth-Tokens")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Room-Auth-Tokens, "+sharePasswordHeader)
 	if r.Method == http.MethodOptions {
 		w.WriteHeader(http.StatusOK)
 		return
@@ -530,7 +569,7 @@ func (s *ClipboardServer) handle_share(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if requirement.Required {
-			token, exp, err := s.issueShareToken("content", idStr, room, ttl, maxUses)
+			token, exp, err := s.issueShareToken("content", idStr, room, ttl, maxUses, req.Password)
 			if err != nil {
 				writeError(w, http.StatusInternalServerError, "share_token_failed", "Failed to generate share token", "生成分享令牌失败")
 				return
@@ -595,7 +634,7 @@ func (s *ClipboardServer) handle_share(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if requirement.Required {
-			token, exp, err := s.issueShareToken("file", fileUUID, room, ttl, maxUses)
+			token, exp, err := s.issueShareToken("file", fileUUID, room, ttl, maxUses, req.Password)
 			if err != nil {
 				writeError(w, http.StatusInternalServerError, "share_token_failed", "Failed to generate share token", "生成分享令牌失败")
 				return
