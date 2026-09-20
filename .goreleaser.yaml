@@ -40,9 +40,10 @@ builds:
       - -tags=embed
     ldflags:
       - -s -w
-      # - -X main.version={{ .Version }}
-      # 增加一个标记告诉程序使用嵌入式静态资源
-      - -X lib.UseEmbeddedStr=true
+      # 把 tag 注入二进制：`-v`、启动横幅、/server 接口返回的版本号读的都是这个变量。
+      # 变量是 lib 包里全小写的 server_version，所以包路径要写全，别用短名。
+      # 不带这个 ldflag 时（本地 `go build`）它保持源码里的默认值。
+      - -X github.com/jonnyan404/cloud-clipboard-go/cloud-clip/lib.server_version=v{{ .Version }}
 
 archives:
   - formats: [ 'tar.gz' ]
