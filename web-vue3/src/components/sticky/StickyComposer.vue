@@ -173,6 +173,9 @@ async function sendFiles() {
     app.send.files.splice(0);
 }
 
+// 同 UnifiedComposer：两边都关掉就没有可发的东西，藏起发送按钮。
+const canSend = computed(() => Boolean(app.display.composerText || app.display.composerUpload));
+
 async function sendAll() {
     if (sendDisabled.value) {
         return;
@@ -217,6 +220,7 @@ async function sendAll() {
                 :placeholder="placeholder"
                 @keydown="onKeydown"
             ></textarea>
+<template v-if="canSend">
             <button
                 v-if="props.variant === 'mega'"
                 type="button"
@@ -252,6 +256,7 @@ async function sendAll() {
                 :disabled="sendDisabled"
                 @click="sendAll"
             >{{ t('stickyStick') }}</button>
+            </template>
             <input
                 v-if="app.display.composerUpload"
                 ref="selectFile"

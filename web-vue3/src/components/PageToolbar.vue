@@ -118,23 +118,6 @@ const currentMode = computed(() => MODES.find(mode => mode.key === app.uiMode) |
                 </v-chip>
             </div>
 
-            <!-- 纯预览模式（六个模式都把文本区与上传区关掉）才出现：
-                 那个状态下没有发送动作，换成搜索条更贴合「只是来看内容」的用法。
-                 判定在 store 的 composerDisabledEverywhere，别在这里重算。 -->
-            <div v-if="app.composerDisabledEverywhere" class="page-toolbar__search">
-                <v-text-field
-                    :model-value="app.searchQuery"
-                    density="compact"
-                    variant="solo"
-                    flat
-                    hide-details
-                    clearable
-                    prepend-inner-icon="mdi-magnify"
-                    :placeholder="t('searchPlaceholder')"
-                    @update:model-value="app.setSearchQuery"
-                ></v-text-field>
-            </div>
-
             <div class="page-toolbar__actions">
                 <v-menu location="bottom end" min-width="192" :close-on-content-click="true">
                     <template v-slot:activator="{ props: menuProps }">
@@ -402,12 +385,6 @@ const currentMode = computed(() => MODES.find(mode => mode.key === app.uiMode) |
     gap: 12px;
     flex-shrink: 0;
     min-width: 0;
-}
-
-/* 纯预览模式的搜索条：和工具栏共用底色，只用一条发丝线分带（同模式行的做法）。 */
-.page-toolbar__search {
-    padding: 6px 16px 8px;
-    border-top: 1px solid rgba(148, 163, 184, 0.28);
 }
 
 .page-toolbar__group {

@@ -93,6 +93,13 @@ export const useAppStore = defineStore('app', {
             localStorage.setItem('fullscreenSendClose', String(this.fullscreenSendClose));
         },
         setUiMode(mode) {
+
+            // 搜索条只存在于标准模式；不在这里清掉的话，切到别的模式会看到
+
+            // 一份被悄悄过滤过的列表，而那个模式里根本没有搜索框可以清。
+
+            this.searchQuery = '';
+
             this.uiMode = mode;
             localStorage.setItem('uiMode', mode);
         },

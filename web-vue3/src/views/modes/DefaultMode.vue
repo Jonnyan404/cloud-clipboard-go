@@ -35,6 +35,10 @@ function setTimelineFilter(key) {
     localStorage.setItem(TIMELINE_FILTER_KEY, key);
 }
 
+// 搜索条什么时候出现：开关打开，或者「纯预览模式」（六个模式都把发送区关掉）——
+// 后者是 Jonny 要求的「自动出现」：那种状态下没有发送动作，搜索才是主操作。
+const showTimelineSearch = computed(() => app.display.timelineSearch || app.composerDisabledEverywhere);
+
 const FILTER_OPTIONS = [
     { key: 'all', labelKey: 'filterAll', icon: mdiTimeline },
     { key: 'text', labelKey: 'filterText', icon: mdiTextBox },
@@ -107,6 +111,22 @@ watch(() => ws.room, (room) => {
 
             <v-card class="timeline-panel" :class="{ 'surface-card--dark': isDark }" variant="outlined">
                 <div class="timeline-panel__body px-3 px-md-4 py-2">
+                    <!-- 搜索条：在时间流正上方，和分类条一起构成「浏览这一屏内容」的工具。
+                         只在真有内容时出现 —— 空列表上摆一个搜索框更碍事。 -->
+                    <div v-if="app.received.length && showTimelineSearch" class="timeline-panel__search">
+                        <v-text-field
+                            :model-value="app.searchQuery"
+                            density="compact"
+                            variant="solo"
+                            flat
+                            hide-details
+                            clearable
+                            prepend-inner-icon="mdi-magnify"
+                            :placeholder="t('searchPlaceholder')"
+                            @update:model-value="app.setSearchQuery"
+                        ></v-text-field>
+                    </div>
+
                     <!-- 分类条：只在真有内容时出现（空列表上摆一条没用的过滤条更碍事） -->
                     <div v-if="app.received.length && app.display.timelineFilter" class="timeline-panel__filters">
                         <v-chip
@@ -218,6 +238,14 @@ watch(() => ws.room, (room) => {
 }
 
 /* 分类条（全部 / 文本 / 图片 / 文件）。默认关，见 data/displayToggles.js。 */
+/* 时间流上方的搜索条。默认关，见 data/displayToggles.js 的 timelineSearch。 */
+.timeline-panel__search {
+    padding: 2px 0 8px;
+    /* 限宽居中：跟下面的分类条对齐，别拉成通栏 —— 搜索框不需要占满整行。 */
+    max-width: 420px;
+    margin: 0 auto;
+}
+
 .timeline-panel__filters {
     display: flex;
     flex-wrap: wrap;

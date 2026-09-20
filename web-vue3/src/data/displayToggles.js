@@ -35,6 +35,11 @@ export const DISPLAY_TOGGLES = [
     // 凭空多一条横条。Jonny 明确要求默认关。
     // 只对标准模式：分类条只存在于 DefaultMode 的时间流上。
     { key: 'timelineFilter', group: 'content', labelKey: 'showTimelineFilter', icon: 'mdi-filter-variant', modes: ONLY_DEFAULT },
+    // 时间流上方的搜索条。默认关，跟分类条同一条理由（新增的可选浏览方式，
+    // 默认开会给老用户凭空加一条横条）。
+    // ⚠️ 例外：**六个模式都把发送区关掉**（纯预览模式）时会自动出现，
+    // 不依赖这个开关 —— 那种状态下没有发送动作，搜索才是主操作。
+    { key: 'timelineSearch', group: 'content', labelKey: 'showTimelineSearch', icon: 'mdi-magnify', modes: ONLY_DEFAULT },
 
     // ── 输入区（标准模式输入框下方那排小图标）────────────────────────
     // 文案复用已有的 traditionalColors / shortcuts / toggleDarkMode / reward，
@@ -100,6 +105,8 @@ export const DEFAULT_DISPLAY = {
     // ⚠️ 上面那条「默认全开」的原则在这里**故意破例**：分类条是新增的可选浏览方式，
     // 默认开等于给所有老用户的时间流凭空加一条横条。Jonny 要求默认关。
     timelineFilter: false,
+    // 同上：默认关，但纯预览模式下会自动出现。
+    timelineSearch: false,
     // 输入区与卡片上的图标：**默认全开**。
     // 默认关等于「升级后功能消失」，用户根本不知道是设置里多了个开关；
     // 默认开则相反 —— 想清静的人自己去设置里关，找不到也不会觉得坏了什么。

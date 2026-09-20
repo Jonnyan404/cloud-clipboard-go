@@ -52,6 +52,16 @@ const settingsTab = ref('general');
 
 // 个性化面板只显示「当前模式真的能用」的开关（见 displayToggles.js 的 modes 声明）
 const togglesInGroup = (groupKey) => togglesForMode(app.uiMode, groupKey);
+
+// 分组总开关：全开才算「开」；点它要么全开、要么全关。
+// 半开状态显示为关（而不是三态）—— 用户点一下就能得到「全开」，符合预期。
+const groupAllOn = (groupKey) => {
+    const list = togglesInGroup(groupKey);
+    return list.length > 0 && list.every((toggle) => app.display[toggle.key]);
+};
+function setGroupAll(groupKey, value) {
+    togglesInGroup(groupKey).forEach((toggle) => app.setDisplayToggle(toggle.key, value));
+}
 const pageQrMode = ref('page');
 const currentPrimary = computed(() => isDark.value ? theme.themes.value.dark.colors.primary : theme.themes.value.light.colors.primary);
 const clearAllDialog = ref(false);
@@ -717,9 +727,21 @@ watch(() => route.fullPath, () => {
                                                             <v-icon start size="18">{{ mode.icon }}</v-icon>{{ t(mode.labelKey) }}
                                                         </v-btn>
                                                     </v-btn-toggle>
+
                                                     <template v-for="group in DISPLAY_GROUPS" :key="group.key">
                                                         <template v-if="togglesInGroup(group.key).length">
-                                                            <v-list-subheader class="cc-settings__subheader">{{ t(group.labelKey) }}</v-list-subheader>
+                                                            <div class="cc-settings__group-head">
+                                                                <v-list-subheader class="cc-settings__subheader">{{ t(group.labelKey) }}</v-list-subheader>
+                                                                <v-switch
+                                                                    :model-value="groupAllOn(group.key)"
+                                                                    @update:model-value="value => setGroupAll(group.key, value)"
+                                                                    color="primary"
+                                                                    hide-details
+                                                                    inset
+                                                                    density="compact"
+                                                                    :title="t('toggleGroupAll')"
+                                                                ></v-switch>
+                                                            </div>
                                                             <v-list class="cc-settings__list cc-settings__toggles" density="comfortable">
                                                                 <v-list-item v-for="toggle in togglesInGroup(group.key)" :key="toggle.key" class="cc-settings__item">
                                                                     <template v-slot:prepend>
@@ -1055,6 +1077,19 @@ watch(() => route.fullPath, () => {
 
 .cc-settings__group {
     margin-bottom: 10px;
+}
+
+/* 分类标题右侧那个「整组开关」，以及面板顶部的开关搜索。 */
+.cc-settings__group-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.cc-settings__group-head .v-switch {
+    flex: none;
+    margin: 0;
 }
 
 .cc-settings__subheader {

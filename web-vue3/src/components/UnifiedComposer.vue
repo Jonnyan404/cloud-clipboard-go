@@ -197,7 +197,7 @@
                     class="unified-composer__send"
                     :disabled="sendDisabled"
                     @click="sendAll"
-                >
+                 v-if="canSend">
                     <v-icon start size="small">{{ mdiSend }}</v-icon>
                     {{ t('send') }}
                 </v-btn>
@@ -282,7 +282,7 @@
                     color="primary"
                     :disabled="sendDisabled"
                     @click="sendAll"
-                >
+                 v-if="canSend">
                     <v-icon start size="small">{{ mdiSend }}</v-icon>
                     {{ t('send') }}
                 </v-btn>
@@ -470,6 +470,10 @@ const textareaPlaceholder = computed(() => {
     }
     return `${t('enterTextToSend')} ${sendShortcutLabel.value}`;
 });
+// 文本区和上传区都被关掉时，发送按钮没有任何东西可发 —— 藏起来，
+// 而不是留一个点了没反应的按钮。（两边都关 = 这个模式只想接收。）
+const canSend = computed(() => Boolean(app.display.composerText || app.display.composerUpload));
+
 const textLimitLabel = computed(() => t('composerTextLimit', {
     current: app.send.text.length,
     limit: app.config.text.limit,
