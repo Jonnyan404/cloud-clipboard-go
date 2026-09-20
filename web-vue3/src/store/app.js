@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { DEFAULT_DISPLAY, LEGACY_STORAGE_KEYS } from '@/data/displayToggles';
+import { MODES } from '@/views/modes/registry';
 
 // 某个模式「没被用户单独配过」时的取值。
 //
@@ -67,6 +68,8 @@ export const useAppStore = defineStore('app', {
         // 每个界面模式一组显示开关，键是模式 key（default / chat / sticky / ...）。
         // 只存用户**改过**的模式，没配过的由 display getter 兜底。
         displayByMode: loadDisplayByMode(),
+        // 纯预览模式的搜索词（见 getters 里的说明）
+        searchQuery: '',
         composerPrimary: localStorage.getItem('composerPrimary') || 'text',
         fullscreenSendClose: localStorage.getItem('fullscreenSendClose') !== null
             ? localStorage.getItem('fullscreenSendClose') === 'true'
@@ -74,6 +77,10 @@ export const useAppStore = defineStore('app', {
         uiMode: localStorage.getItem('uiMode') || 'default',
     }),
     actions: {
+        setSearchQuery(value) {
+            this.searchQuery = String(value || '');
+        },
+
         setConfig(config) {
             this.config = config;
         },
@@ -101,6 +108,38 @@ export const useAppStore = defineStore('app', {
         },
     },
     getters: {
+        // ⚠️ 这里**不要**再写一个 `searchQuery: (state) => state.searchQuery` 的 getter。
+        // state 里的字段本来就能直接读（app.searchQuery），多加一个同名 getter 会把它挡住，
+        // action 里 `this.searchQuery = ...` 的赋值就落不到 state 上 —— 搜索词永远是空，
+        // 表现为「搜索框能输入但列表不过滤」。踩过。
+
+        // 搜索过滤后的内容列表。**各模式渲染列表都取这个，不要直接取 received** ——
+        // 否则搜索框只在部分模式生效，看着像坏了。
+        // 计数、空态判断仍然用 received（那是「房间里有多少内容」，与搜索无关）。
+        visibleReceived() {
+            const q = String(this.searchQuery || '').trim().toLowerCase();
+            if (!q) return this.received;
+            return this.received.filter((item) => {
+                const haystack = item.type === 'text'
+                    ? String(item.content || '')
+                    : String(item.name || '');
+                return haystack.toLowerCase().includes(q);
+            });
+        },
+
+        // 六个模式**全都**把文本区与上传区关掉了 —— 即「纯预览模式」。
+        // 两个开关的出厂默认都是 true，所以必须每个模式都显式关掉才算成立。
+        // 用 DEFAULT_DISPLAY 兜底：没配过的模式取默认值（true），于是不算关。
+        composerDisabledEverywhere() {
+            // ⚠️ 模式列表**在 getter 里现取**，不要在模块顶层算成常量：
+            // store ← registry ← 各模式 ← store 是个循环，顶层求值可能拿到还没初始化的 MODES。
+            return MODES.map((m) => m.key).every((mode) => {
+                const cfg = this.displayByMode[mode] || {};
+                const off = (key) => (key in cfg ? cfg[key] : DEFAULT_DISPLAY[key]) === false;
+                return off('composerText') && off('composerUpload');
+            });
+        },
+
         // 当前模式的显示开关。缺的键用 INITIAL_DISPLAY 兜底 —— 这样加新开关时，
         // 老用户不用迁移就能拿到默认值。
         display() {

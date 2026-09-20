@@ -47,11 +47,14 @@ const FILTER_OPTIONS = [
 const filteredReceived = computed(() => {
     // 开关关掉时整个过滤不生效（不只是藏起分类条）——
     // 否则用户关掉开关后，列表还停在上次选的分类上，看着像内容丢了。
-    if (!app.display.timelineFilter) return app.received;
-    if (timelineFilter.value === 'all') return app.received;
-    if (timelineFilter.value === 'text') return app.received.filter((item) => item.type === 'text');
+    // 列表来源是 visibleReceived（已套搜索），不是 received ——
+    // 否则纯预览模式下搜索框只在别的模式生效。
+    const list = app.visibleReceived;
+    if (!app.display.timelineFilter) return list;
+    if (timelineFilter.value === 'all') return list;
+    if (timelineFilter.value === 'text') return list.filter((item) => item.type === 'text');
     const wantImage = timelineFilter.value === 'image';
-    return app.received.filter((item) => item.type === 'file' && isImageName(item.name) === wantImage);
+    return list.filter((item) => item.type === 'file' && isImageName(item.name) === wantImage);
 });
 const historyUsageLabel = computed(() => {
     const current = app.received.length;

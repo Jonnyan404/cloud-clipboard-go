@@ -91,7 +91,7 @@ function switchToRoom(room) {
     ws.switchRoom(room);
 }
 
-const items = computed(() => app.received);
+const items = computed(() => app.visibleReceived);
 const streamItems = computed(() => [...items.value].reverse());
 const filesPane = computed(() => streamItems.value.filter(item => item.type === 'file'));
 const textsPane = computed(() => streamItems.value.filter(item => item.type === 'text'));

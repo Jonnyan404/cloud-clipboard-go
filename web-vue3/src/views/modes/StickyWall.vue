@@ -16,7 +16,7 @@ const theme = useTheme();
 const isDark = computed(() => theme.current.value?.dark ?? false);
 const { t } = useI18n();
 const composer = ref(null);
-const streamItems = computed(() => [...app.received].reverse());
+const streamItems = computed(() => [...app.visibleReceived].reverse());
 const streamEl = ref(null);
 const { pinToBottom } = useStickyAutoscroll(streamEl, {
     items: () => [...streamItems.value],
