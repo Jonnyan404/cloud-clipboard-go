@@ -151,6 +151,9 @@ export async function createShareLink({ type, id, uuid, ttl, maxUses, password, 
  *
  * ⚠️ 分享页走 hash 路由，`?t=` 在 **fragment** 里 —— `new URL(u).searchParams` 看到的是空的，
  * 拿它去 set 会把参数拼到 `#` 前面，页面读不到。必须拆 fragment 再拼。
+ *
+ * ⚠️ 目前**没有调用方**：发送方预设展示格式那个设置已经删了（分享页自带 raw↔md 切换）。
+ * 留着是为了将来真有「按链接预设格式」的需求时不用重新踩 fragment 这个坑。
  */
 export function withSharePageFormat(url, format) {
     const raw = String(url || '');

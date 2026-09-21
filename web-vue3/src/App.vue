@@ -769,8 +769,11 @@ watch(() => route.fullPath, () => {
                                                                     </template>
                                                                 </v-list-item>
 
-                                                                <!-- 紧挨着「分享时弹出设置框」这个开关：关掉它之后，这两项就是那次弹框的
-                                                                     全部内容。放到面板末尾等于让用户去别处找。 -->
+                                                                <!-- 紧挨着「分享时弹出设置框」这个开关：关掉它之后，这三项就是那次弹框的
+                                                                     全部内容。放到面板末尾等于让用户去别处找。
+                                                                     ⚠️ 这三个输入框必须 `variant="outlined"`：`solo` + `flat` 的底色是
+                                                                     `rgb(var(--v-theme-surface))`，跟设置卡片本身一模一样，又没有阴影 ——
+                                                                     白底白框，看着就像「没有输入框」。 -->
                                                                 <template v-if="toggle.key === 'shareDialog' && !app.display.shareDialog">
                                                                     <v-list-item class="cc-settings__item">
                                                                         <v-list-item-title>{{ t('shareDefaultTtl') }}</v-list-item-title>
@@ -779,8 +782,7 @@ watch(() => route.fullPath, () => {
                                                                                 :model-value="app.shareDefaults.ttlMinutes"
                                                                                 type="number"
                                                                                 density="compact"
-                                                                                variant="solo"
-                                                                                flat
+                                                                                variant="outlined"
                                                                                 hide-details
                                                                                 class="cc-settings__num"
                                                                                 @update:model-value="v => app.setShareDefaults({ ttlMinutes: Number(v) })"
@@ -794,28 +796,11 @@ watch(() => route.fullPath, () => {
                                                                                 :model-value="app.shareDefaults.maxUses"
                                                                                 type="number"
                                                                                 density="compact"
-                                                                                variant="solo"
-                                                                                flat
+                                                                                variant="outlined"
                                                                                 hide-details
                                                                                 class="cc-settings__num"
                                                                                 @update:model-value="v => app.setShareDefaults({ maxUses: Number(v) })"
                                                                             ></v-text-field>
-                                                                        </template>
-                                                                    </v-list-item>
-                                                                    <v-list-item class="cc-settings__item">
-                                                                        <v-list-item-title>{{ t('shareDefaultFormat') }}</v-list-item-title>
-                                                                        <template v-slot:append>
-                                                                            <v-btn-toggle
-                                                                                :model-value="app.shareDefaults.format"
-                                                                                mandatory
-                                                                                density="compact"
-                                                                                variant="outlined"
-                                                                                divided
-                                                                                @update:model-value="v => app.setShareDefaults({ format: v === 'md' ? 'md' : 'raw' })"
-                                                                            >
-                                                                                <v-btn value="raw" size="small">{{ t('rawText') }}</v-btn>
-                                                                                <v-btn value="md" size="small">{{ t('renderMarkdown') }}</v-btn>
-                                                                            </v-btn-toggle>
                                                                         </template>
                                                                     </v-list-item>
                                                                     <v-list-item class="cc-settings__item">
@@ -826,8 +811,7 @@ watch(() => route.fullPath, () => {
                                                                                 type="password"
                                                                                 autocomplete="new-password"
                                                                                 density="compact"
-                                                                                variant="solo"
-                                                                                flat
+                                                                                variant="outlined"
                                                                                 hide-details
                                                                                 class="cc-settings__text"
                                                                                 @update:model-value="v => app.setShareDefaults({ password: String(v || '') })"
@@ -1165,8 +1149,12 @@ watch(() => route.fullPath, () => {
     max-width: 96px;
 }
 
+/* 密码比数字长得多（数字 2~3 位就够），168px 下输个稍微像样的密码就被挤没了。
+   ⚠️ 必须写 `width` 而不是 `max-width`：v-list-item 的 append 列是 `auto`，
+   它的宽度由输入框的**内容固有宽度**（内部 `<input>` 默认 size=20）决定 ——
+   max-width 比它大就永远不生效，写多少都还是 ~170px。 */
 .cc-settings__text {
-    max-width: 168px;
+    width: 220px;
 }
 
 .cc-settings__group-head {

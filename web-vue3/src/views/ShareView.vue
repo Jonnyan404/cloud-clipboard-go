@@ -38,7 +38,10 @@ const route = useRoute();
 const { t } = useI18n();
 
 const token = computed(() => String(route.query.t || ''));
-// 发送方可以在链接里带展示偏好（f=md）。默认原文 —— 与站内其它地方一致，md 是显式选择。
+// 链接里可以带展示偏好（f=md）当**初始**格式，页面上仍可切换。
+// ⚠️ 站内已经没有任何地方会生成这个参数了 —— 发送方那个「默认展示格式」设置删掉了
+// （分享页自带 raw↔md 切换，让发送方替他选一次是多余的）。这里继续读它是为了
+// 不让**已经发出去的旧链接**失效，以及留一个手工拼链接的入口。默认原文，md 是显式选择。
 const linkedFormat = computed(() => (String(route.query.f || '').toLowerCase() === 'md' ? 'md' : 'raw'));
 
 const loading = ref(true);

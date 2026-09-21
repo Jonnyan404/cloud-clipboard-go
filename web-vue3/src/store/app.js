@@ -21,9 +21,10 @@ const INITIAL_DISPLAY = (() => {
 
 // 只读回用户显式配置过的模式。坏数据当没有 —— 大不了回落到 INITIAL_DISPLAY。
 // 另带一次性的 markdown 旧值迁移（见内）。
-// 分享默认值：{ ttlMinutes, maxUses }。坏数据当没有，回落到出厂值。
+// 分享默认值：{ ttlMinutes, maxUses, password }。坏数据当没有，回落到出厂值。
+// ⚠️ 这里**故意没有展示格式** —— 分享页自己带 raw↔md 切换，发送方再预设一次是多余的。
 function loadShareDefaults() {
-    const fallback = { ttlMinutes: 15, maxUses: 0, password: '', format: 'raw' };
+    const fallback = { ttlMinutes: 15, maxUses: 0, password: '' };
     try {
         const raw = localStorage.getItem('shareDefaults');
         if (!raw) return fallback;
@@ -32,9 +33,8 @@ function loadShareDefaults() {
         return {
             ttlMinutes: Number.isFinite(Number(parsed.ttlMinutes)) ? Number(parsed.ttlMinutes) : fallback.ttlMinutes,
             maxUses: Number.isFinite(Number(parsed.maxUses)) ? Number(parsed.maxUses) : fallback.maxUses,
-            // 密码与展示格式也存下来：不弹窗时要用它们，否则「关了弹窗就没法设密码」。
+            // 密码也存下来：不弹窗时要用它，否则「关了弹窗就没法设密码」。
             password: typeof parsed.password === 'string' ? parsed.password : fallback.password,
-            format: parsed.format === 'md' ? 'md' : fallback.format,
         };
     } catch {
         return fallback;
