@@ -1,5 +1,5 @@
 <script setup>import { computed, nextTick, ref, watch } from 'vue';
-import { isImageName } from '@/util.js';
+import { isImageName, looksLikeTable, looksLikeTaskList } from '@/util.js';
 import { useAppStore } from '@/store/app';
 import { useWebSocketStore } from '@/store/websocket';
 import { useTheme } from 'vuetify';
@@ -13,6 +13,8 @@ const mdiTimeline = 'mdi-timeline';
 const mdiTextBox = 'mdi-text-box-outline';
 const mdiImage = 'mdi-image-outline';
 const mdiFile = 'mdi-file-outline';
+const mdiCheckboxMarkedOutline = 'mdi-checkbox-marked-outline';
+const mdiTable = 'mdi-table';
 const tlLastRoom = ref('');
 let tlJustSwitched = false;
 
@@ -27,7 +29,7 @@ const composer = ref(null);
 // 时间流的分类过滤。选择存 localStorage —— 切模式/刷新后不该莫名回到「全部」。
 // 默认 'all'：跟「显示开关默认全开」同一条原则，默认态不能改变既有行为。
 const TIMELINE_FILTER_KEY = 'timelineFilter';
-const TIMELINE_FILTER_KEYS = ['all', 'text', 'image', 'file'];
+const TIMELINE_FILTER_KEYS = ['all', 'text', 'image', 'file', 'task', 'table'];
 const storedFilter = localStorage.getItem(TIMELINE_FILTER_KEY);
 const timelineFilter = ref(TIMELINE_FILTER_KEYS.includes(storedFilter) ? storedFilter : 'all');
 function setTimelineFilter(key) {
@@ -39,15 +41,23 @@ function setTimelineFilter(key) {
 // 后者是 Jonny 要求的「自动出现」：那种状态下没有发送动作，搜索才是主操作。
 const showTimelineSearch = computed(() => app.display.timelineSearch || app.composerDisabledEverywhere);
 
+// 「任务列表」「表格」是**文本条目里的 markdown 结构**，不是新的条目类型 ——
+// 所以它们排在三个类型之后：前面三格回答「是什么」，后两格回答「里面有什么结构」。
 const FILTER_OPTIONS = [
     { key: 'all', labelKey: 'filterAll', icon: mdiTimeline },
     { key: 'text', labelKey: 'filterText', icon: mdiTextBox },
     { key: 'image', labelKey: 'filterImage', icon: mdiImage },
     { key: 'file', labelKey: 'filterFile', icon: mdiFile },
+    { key: 'task', labelKey: 'filterTaskList', icon: mdiCheckboxMarkedOutline },
+    { key: 'table', labelKey: 'filterTable', icon: mdiTable },
 ];
 
 // 「图片」= 文件条目里文件名是图片扩展名的那些；文本条目永远只归「文本」。
 // 判型用 util 的 isImageName（全站唯一实现），别在这里再抄一份正则。
+//
+// 「任务列表」「表格」同理用 util 的 looksLikeTaskList / looksLikeTable。
+// ⚠️ 直接拿 item.content 判、**不解 HTML 实体**：这两个判据只看 `|` `-` `[` `]` `x` 空格，
+// 实体编码动的是 `&` `<` `>` 之类，标记本身不会被编码。
 const filteredReceived = computed(() => {
     // 开关关掉时整个过滤不生效（不只是藏起分类条）——
     // 否则用户关掉开关后，列表还停在上次选的分类上，看着像内容丢了。
@@ -57,6 +67,12 @@ const filteredReceived = computed(() => {
     if (!app.display.timelineFilter) return list;
     if (timelineFilter.value === 'all') return list;
     if (timelineFilter.value === 'text') return list.filter((item) => item.type === 'text');
+    if (timelineFilter.value === 'task') {
+        return list.filter((item) => item.type === 'text' && looksLikeTaskList(item.content));
+    }
+    if (timelineFilter.value === 'table') {
+        return list.filter((item) => item.type === 'text' && looksLikeTable(item.content));
+    }
     const wantImage = timelineFilter.value === 'image';
     return list.filter((item) => item.type === 'file' && isImageName(item.name) === wantImage);
 });
@@ -141,9 +157,13 @@ watch(() => ws.room, (room) => {
                             class="timeline-panel__filter"
                             :variant="timelineFilter === opt.key ? 'flat' : 'outlined'"
                             :color="timelineFilter === opt.key ? 'primary' : undefined"
+                            :aria-label="t(opt.labelKey)"
                             @click="setTimelineFilter(opt.key)"
                         >
-                            <v-icon start size="16">{{ opt.icon }}</v-icon>{{ t(opt.labelKey) }}
+                            <!-- 窄屏只留图标：六个带字的分类在手机上会折成两行。
+                                 文字藏掉后图标要自己居中，所以间距交给 CSS 管（不用 `start`）。 -->
+                            <v-icon size="16" class="timeline-panel__filter-icon">{{ opt.icon }}</v-icon>
+                            <span class="timeline-panel__filter-label">{{ t(opt.labelKey) }}</span>
                         </v-chip>
                     </div>
 
@@ -277,6 +297,23 @@ watch(() => ws.room, (room) => {
 
 .timeline-panel__filter {
     cursor: pointer;
+}
+
+.timeline-panel__filter-icon {
+    margin-inline-end: 6px;
+}
+
+/* 窄屏只留图标：六个带字的分类在手机上会折成两行，白白占掉一条横条的高度。
+   图标本身认得出来（全部 / 文本 / 图片 / 文件 / 任务列表 / 表格），
+   文案靠 chip 上的 aria-label 保住可访问性。 */
+@media (max-width: 768px) {
+    .timeline-panel__filter-label {
+        display: none;
+    }
+
+    .timeline-panel__filter-icon {
+        margin-inline-end: 0;
+    }
 }
 
 .timeline-panel__stream {

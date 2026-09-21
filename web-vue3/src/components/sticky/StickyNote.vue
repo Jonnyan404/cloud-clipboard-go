@@ -2,13 +2,14 @@
 import axios from 'axios';
 import { useAppStore } from '@/store/app';
 import { useMarkdown } from '@/composables/useMarkdown.js';
+import { useTaskListToggle } from '@/composables/useTaskListToggle.js';
 import MarkdownBody from '@/components/MarkdownBody.vue';
 import MarkdownToggle from '@/components/MarkdownToggle.vue';
 import ShareLinkButton from '@/components/ShareLinkButton.vue';
 import { useWebSocketStore } from '@/store/websocket';
 import { useI18n } from 'vue-i18n';
 import { toast } from '@/plugins/toast';
-import { SHARE_DEFAULT_TTL, buildCleanAbsoluteRouteUrl, copyTextToClipboard, createShareLink, deviceLabel, errorMessage, formatTimestamp, isImageName, prettyFileSize } from '@/util.js';
+import { SHARE_DEFAULT_TTL, copyTextToClipboard, createShareLink, deviceLabel, errorMessage, formatTimestamp, isImageName, prettyFileSize, toggleTaskListItem } from '@/util.js';
 
 const props = defineProps({
     meta: {
@@ -40,11 +41,9 @@ const displayedTextPreview = computed(() => {
     }
     return `${textPreview.value.slice(0, textPreviewDisplayLimit)}\n\n...`;
 });
-const decodedContent = computed(() => {
-    const textArea = document.createElement('textarea');
-    textArea.innerHTML = props.meta.content || '';
-    return textArea.value;
-});
+// 正文（含任务列表打勾 + 落盘）交给共享 composable —— 标准模式卡片那边是同一套逻辑。
+// 复制文本也用它返回的 text：用户看到什么就复制什么。
+const { text: decodedContent, onMdClick } = useTaskListToggle(props.meta, () => ws.room);
 // md 渲染只接在**阅读器**（点开便签后的大视图）—— 便签卡片本身是贴纸风格，
 // 面积也小，渲染排版反而破坏那个感觉。默认跟随个性化开关，阅读器右上角可临时切。
 //
@@ -141,11 +140,6 @@ const fileMetaLabel = computed(() => {
     }
     return size;
 });
-const contentUrl = computed(() => {
-    const roomQuery = ws.room ? `?room=${encodeURIComponent(ws.room)}` : '';
-    const id = props.meta?.id ?? '';
-    return buildCleanAbsoluteRouteUrl(`content/${id}${roomQuery}`, app?.config?.server?.prefix || '');
-});
 // 文件分享：一次签发拿到**两条**地址。
 //   raw  直连正文 —— 下载与预览用（分享页是 hash 路由，取不了字节）
 //   page 前端分享页 —— 复制给别人用
@@ -186,24 +180,10 @@ async function copyContent() {
         toast(t('copyFailedGeneral'));
     }
 }
-async function copyLink() {
-    // 一律走服务端签发：房间没开密码也发 token，否则 ttl / 次数限制会被静默丢弃。
-    // 拿到的 url 是**前端分享页**地址，不是裸接口地址。
-    let url = contentUrl.value;
-    try {
-        const data = await createShareLink({ type: 'content', id: props.meta?.id, ttl: SHARE_DEFAULT_TTL, maxUses: 0, room: ws.room });
-        url = data?.url || url;
-    } catch (error) {
-        toast(t('copyFailedGeneral'));
-        return;
-    }
-    try {
-        await copyTextToClipboard(url);
-        toast(t('copySuccess'));
-    } catch (err) {
-        toast(t('copyFailedGeneral'));
-    }
-}
+// 卡片上曾经还有一个「复制链接」图标（mdi-link-variant），已删：
+// 分享动作统一收在阅读器弹窗里的 ShareLinkButton（签名 + 自动复制 + 二维码面板），
+// 卡片上再放一个只复制、不弹面板的入口，等于同一个功能两种行为。
+// 跟着它一起下线的还有 copyLink() 和 contentUrl（只被它用）。
 async function loadPreview() {
     if (!canPreview.value) {
         return;
@@ -301,9 +281,15 @@ async function deleteItem() {
         <div class="sticky-note__label">{{ noteLabel }}</div>
         <div v-if="isFile" class="sticky-note__meta">{{ fileMetaLabel }}</div>
         <div v-else class="sticky-note__text"
-             :class="isLink ? 'sticky-note__text--link' : ''"
+             :class="[isLink ? 'sticky-note__text--link' : '', md.html ? 'sticky-note__text--rendered' : '']"
              :title="decodedContent"
-        >{{ decodedContent }}</div>
+             @click="onMdClick"
+        >
+            <!-- 卡片上也渲染 md（任务列表 / 表格默认就是 md，见 useMarkdown）。
+                 普通文本仍然走原文 —— 便签的贴纸观感靠的就是那一版。 -->
+            <markdown-body v-if="md.html" :html="md.html"></markdown-body>
+            <template v-else>{{ decodedContent }}</template>
+        </div>
         <span v-if="timestampLabel" class="sticky-note__time">{{ timestampLabel }}</span>
 
         <span class="sticky-note__ops" @click.stop>
@@ -321,13 +307,6 @@ async function deleteItem() {
                         @click.stop="isFile ? downloadFile() : copyContent()"
                     >
                         <v-icon size="large">{{ isFile ? 'mdi-download' : 'mdi-content-copy' }}</v-icon>
-                    </v-btn>
-                </template>
-            </v-tooltip>
-            <v-tooltip v-if="!isFile" :text="t('copyLink')" location="top">
-                <template v-slot:activator="{ props }">
-                    <v-btn v-bind="props" icon density="compact" size="small" variant="text" class="sticky-note__op" @click.stop="copyLink">
-                        <v-icon size="large">mdi-link-variant</v-icon>
                     </v-btn>
                 </template>
             </v-tooltip>
@@ -365,7 +344,7 @@ async function deleteItem() {
                 <!-- 文本便签的正文块。文件不走这里 —— 文件的正文在下面的预览块里，
                      md 开关也得跟着正文走（与标准模式的 File.vue 一致）。
                      图标放在**不滚动**的外层、正文放里层：否则内容一长往下滚，图标跟着滚走。 -->
-                <div v-else class="md-preview">
+                <div v-else class="md-preview" @click="onMdClick">
                     <markdown-toggle v-if="md.available" v-model:mode="md.mode"></markdown-toggle>
                     <div
                         class="sticky-note__reader-text"
@@ -569,9 +548,36 @@ async function deleteItem() {
     overflow: hidden;
 }
 
+/* 卡片上的渲染态。上面那条 4 行 clamp 是给**纯文本**的（贴纸观感），
+   渲染态必须放开：否则一张表只露 4 行、复选框也点不到。改成限高 + 滚动。 */
+.sticky-note__text--rendered {
+    display: block;
+    -webkit-line-clamp: unset;
+    white-space: normal;
+    max-height: 46vh;
+    overflow: auto;
+}
+
+.sticky-note__text--rendered :deep(.markdown-body) {
+    font-size: 12px;
+    /* 便签正文本身是 500，markdown 段落跟着变粗会很难看 */
+    font-weight: 400;
+}
+
+.sticky-note__text--rendered :deep(.markdown-body > :first-child) {
+    margin-top: 0;
+}
+
+.sticky-note__text--rendered :deep(.markdown-body > :last-child) {
+    margin-bottom: 0;
+}
+
+.sticky-note__text--rendered :deep(.markdown-body table) {
+    font-size: 11px;
+}
+
 .sticky-note__text--link {
-    color: #1e6bb8;
-    text-decoration: underline;
+    color: #1e6bb8;    text-decoration: underline;
     font-size: 12.5px;
     word-break: break-all;
     display: -webkit-box;

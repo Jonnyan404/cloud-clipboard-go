@@ -147,6 +147,28 @@ export async function createShareLink({ type, id, uuid, ttl, maxUses, password, 
 }
 
 /**
+ * 把服务端给的分享页地址**换成本浏览器自己的 origin**（保留它的路径与 `#` 片段）。
+ *
+ * 为什么必须换：服务端是用**请求的 Host** 拼这个地址的（见 buildSharePageURL）。
+ * 而分享页是**前端路由**，它得落在前端所在的 origin 上 —— 只要中间有一层会改写 Host 的
+ * 代理，服务端拼出来的主机就是错的：
+ *   - dev：`vite.config.js` 的 proxy 写了 `changeOrigin: true`，于是 Host 变成后端
+ *     （`localhost:9501`），链接指向一个**没有前端**的后端 → 点开白页；
+ *   - 线上：任何 `proxy_set_header Host` 改写过的反代同理。
+ *
+ * 服务端那个 `url` 保留不动（脚本/第三方客户端仍然可以直接用），只是网页端不采用它的主机。
+ * 前缀由服务端决定，这里只换 origin —— 所以带 prefix 部署时也不会丢。
+ */
+export function withCurrentOrigin(url) {
+    const raw = String(url || '');
+    if (!raw || typeof window === 'undefined') {
+        return raw;
+    }
+    const m = raw.match(/^[a-z][a-z0-9+.-]*:\/\/[^/]+(\/.*)?$/i);
+    return m ? window.location.origin + (m[1] || '/') : raw;
+}
+
+/**
  * 往分享页地址上补展示格式（f=md|raw）。返回的地址直接给收件人用。
  *
  * ⚠️ 分享页走 hash 路由，`?t=` 在 **fragment** 里 —— `new URL(u).searchParams` 看到的是空的，
@@ -253,7 +275,35 @@ export function looksLikeMarkdown(text) {
     return /(^|\n)\s{0,3}(#{1,6}\s|>\s|[-*+]\s|\d+\.\s|```)/.test(s)
         || /\[[^\]]+\]\([^)\s]+\)/.test(s)                    // [文字](链接)
         || /\*\*[^\s][^*]*\*\*|__[^\s][^_]*__/.test(s)         // 粗体
-        || /`[^`\n]+`/.test(s);                                  // 行内代码
+        || /`[^`\n]+`/.test(s)                                  // 行内代码
+        || looksLikeTable(s);                                   // 表格：上面几条都认不出来
+}
+
+/**
+ * 内容里有 GFM 任务列表（`- [ ] xxx` / `- [x] xxx`）。
+ *
+ * 有序变体（`1. [ ]`）也算 —— GFM 允许，渲染出来同样是复选框。
+ * 只看行首标记，不看缩进层级：嵌套任务列表的每一行都以 `- [ ]` 开头，自然命中。
+ */
+export function looksLikeTaskList(text) {
+    return /(^|\n)\s{0,3}([-*+]|\d+\.)\s+\[[ xX]\](\s|$)/.test(String(text || ''));
+}
+
+/**
+ * 内容里有 GFM 表格。
+ *
+ * 判据是「表头行 + 紧跟一行分隔线」，不是「有竖线」：随手打的 `a | b` 到处都是
+ * （shell 管道、位运算），拿竖线当判据会误判一大片。分隔线（`|---|---|`）才是表格的签名。
+ */
+export function looksLikeTable(text) {
+    const lines = String(text || '').split('\n');
+    for (let i = 0; i + 1 < lines.length; i++) {
+        if (!lines[i].includes('|')) continue;
+        if (/^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?\s*$/.test(lines[i + 1])) {
+            return true;
+        }
+    }
+    return false;
 }
 
 /**
@@ -262,10 +312,53 @@ export function looksLikeMarkdown(text) {
  * **必须清洗**：内容可能是别人发过来的，`<img src=x onerror=...>` 这类注入是真实风险
  * —— 剪贴板本身就是个「别人能往你这里塞字符串」的通道。DOMPurify 默认配置会去掉
  * script、事件属性、javascript: 这类 URL。
+ *
+ * @param {object} [opts]
+ * @param {boolean} [opts.interactiveTasks] 任务列表的复选框可点。默认 false（清洗后 `disabled`
+ *        会被去掉但没人处理点击，看着能点其实没反应）—— 只有真的会接住点击的调用点才开。
  */
-export function renderMarkdownHtml(text) {
+let allowCheckboxInteraction = false;
+let checkboxHookInstalled = false;
+function ensureCheckboxHook() {
+    if (checkboxHookInstalled) return;
+    DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+        if (!allowCheckboxInteraction) return;
+        if (node.tagName === 'INPUT' && node.getAttribute('type') === 'checkbox') {
+            // marked 给任务列表的复选框加 `disabled`；要能点就得摘掉。
+            // 只在交互开关打开时摘 —— 否则聊天气泡里的复选框也能点，而那里没人接住点击。
+            node.removeAttribute('disabled');
+        }
+    });
+    checkboxHookInstalled = true;
+}
+
+export function renderMarkdownHtml(text, opts = {}) {
+    ensureCheckboxHook();
     const html = marked.parse(String(text || ''), { breaks: true, gfm: true });
-    return DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
+    allowCheckboxInteraction = Boolean(opts.interactiveTasks);
+    try {
+        return DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
+    } finally {
+        allowCheckboxInteraction = false;
+    }
+}
+
+/**
+ * 翻转第 `index` 个任务列表项（`- [ ]` ↔ `- [x]`），返回新文本。
+ *
+ * 按**渲染顺序**数，和页面上复选框的顺序一一对应 —— 调用方传的是「第几个复选框被点了」。
+ * 有序变体（`1. [ ]`）一起认，和 looksLikeTaskList 同一套标记。
+ * 越界就原样返回，不抛错。
+ */
+export function toggleTaskListItem(text, index) {
+    let seen = 0;
+    return String(text || '').replace(
+        /(^|\n)(\s{0,3}(?:[-*+]|\d+\.)\s+\[)([ xX])(\])/g,
+        (match, lead, prefix, mark, close) => {
+            if (seen++ !== index) return match;
+            return lead + prefix + (mark === ' ' ? 'x' : ' ') + close;
+        },
+    );
 }
 
 // 文件名是不是图片。**全站唯一实现** —— 之前这段正则在 6 个地方各抄了一份
@@ -275,4 +368,34 @@ export function renderMarkdownHtml(text) {
 const IMAGE_NAME_RE = /\.(png|jpe?g|gif|webp|svg|bmp|ico|avif)$/i;
 export function isImageName(name) {
     return IMAGE_NAME_RE.test(String(name || ''));
+}
+
+/**
+ * 把 HTML 实体还原成文本。
+ *
+ * 服务端存的是实体编码过的正文（`<` 之类），卡片里要显示原文就得先解回来。
+ * **全站唯一实现** —— 之前 Text.vue / File.vue / StickyNote 各写了一份（第 4 份正在路上）。
+ */
+export function decodeHtmlEntities(text) {
+    const el = document.createElement('textarea');
+    el.innerHTML = String(text ?? '');
+    return el.value;
+}
+
+/**
+ * 覆盖一条**已有**文本条目的正文（`POST /text?id=<id>`）。
+ *
+ * 这条接口两个后端**早就有**（Go `updateTextMessage` / Worker `Text.update`）：落盘、
+ * 广播 `update` 事件、id 不变。前端一直没人用 —— 任务列表打勾是第一个用它的地方，
+ * 所以持久化不需要动服务端。
+ *
+ * ⚠️ 服务端会把时间戳更新成「现在」（最近改过的算最新），但前端收到 `update` 是**原地替换**
+ * （见 store/websocket.js 的 case 'update'），所以卡片不会在眼皮底下跳走；
+ * 刷新之后它会出现在最前面。
+ */
+export async function updateTextEntry(id, room, content) {
+    await axios.post('text', String(content ?? ''), {
+        params: new URLSearchParams([['room', room ?? ''], ['id', String(id)]]),
+        headers: { 'Content-Type': 'text/plain' },
+    });
 }

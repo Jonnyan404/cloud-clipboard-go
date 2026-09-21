@@ -14,6 +14,10 @@
                 :class="{ 'unified-composer__inputs--files-first': isFilePrimary }"
             >
                 <div v-if="app.display.composerText" class="unified-composer__textblock">
+                    <!-- `/` 模板菜单：行首打 `/` 弹出。放在文本区**上方**、走正常流 ——
+                         这块是底部停靠的，多出来的高度往上长，输入框位置不动。
+                         不用绝对定位：浮动元素一旦祖先有 overflow 就会被静默裁掉（踩过）。 -->
+                    <composer-slash-menu v-if="slashMenu" :items="SLASH_TEMPLATES" @pick="insertSlashTemplate" />
                     <v-btn
                         icon
                         size="small"
@@ -39,6 +43,7 @@
                         :class="{ 'unified-composer__textarea--secondary': isFilePrimary }"
                         @keydown.ctrl.enter.prevent="onSendShortcut"
                         @keydown.meta.enter.prevent="onSendShortcut"
+                        @keydown="onTextareaKeydown"
                     ></v-textarea>
                 </div>
 
@@ -288,6 +293,7 @@
                 </v-btn>
             </v-toolbar>
             <div class="pts-fullscreen-body flex-grow-1">
+                <composer-slash-menu v-if="slashMenu" :items="SLASH_TEMPLATES" @pick="insertSlashTemplate" />
                 <v-textarea
                     v-model="app.send.text"
                     variant="solo"
@@ -298,6 +304,7 @@
                     :placeholder="textareaPlaceholder"
                     @keydown.ctrl.enter.prevent="onSendShortcut"
                     @keydown.meta.enter.prevent="onSendShortcut"
+                    @keydown="onTextareaKeydown"
                 ></v-textarea>
                 <small class="d-flex justify-center pa-2 text-medium-emphasis">{{ textLimitLabel }}</small>
             </div>
@@ -373,6 +380,7 @@ import axios from 'axios';
 import { toast } from '@/plugins/toast';
 import { errorMessage, prettyFileSize } from '@/util.js';
 import TraditionalColorDialog from '@/components/TraditionalColorDialog.vue';
+import ComposerSlashMenu from '@/components/ComposerSlashMenu.vue';
 import ShortcutsDialog from '@/components/ShortcutsDialog.vue';
 
 const mdiPalette = 'mdi-palette';
@@ -465,10 +473,9 @@ const sendShortcutLabel = computed(() => t('sendShortcutTip', {
     keys: isMac ? '⌘+Enter' : 'Ctrl+Enter',
 }));
 const textareaPlaceholder = computed(() => {
-    if (mobile.value) {
-        return t('enterTextToSend');
-    }
-    return `${t('enterTextToSend')} ${sendShortcutLabel.value}`;
+    // 「/」模板是这套输入区里最不容易被发现的功能，直接写在占位符里。
+    const hint = t('composerSlashHint');
+    return mobile.value ? hint : `${hint} ${sendShortcutLabel.value}`;
 });
 // 文本区和上传区都被关掉时，发送按钮没有任何东西可发 —— 藏起来，
 // 而不是留一个点了没反应的按钮。（两边都关 = 这个模式只想接收。）
@@ -493,6 +500,55 @@ function focus(type) {
 function openFilePicker() {
     // 上传开关关掉时这个 input 会被 v-if 摘掉，ref 就是 null —— 不能裸点
     selectFile.value?.click();
+}
+
+// 「/」快捷方式：在**行首**打 `/` 弹出 markdown 模板菜单。
+//
+// 为什么限定行首：正文里 `/` 太常见了（路径、日期、`a/b`），到处弹菜单会烦人；
+// 行首打 `/` 是个明确的开头动作。缩进过的行（前面只有空白）也算行首。
+//
+// 模板正文用中性的占位符，不放进 i18n —— 它们是要被用户改写的骨架，不是文案。
+// 菜单项文案复用分类条那两个键（`filterTaskList` / `filterTable`）：说的是同一个东西，
+// 没必要为「筛选」和「插入」各存一份同义文案（两份迟早会漂）。
+const SLASH_TEMPLATES = [
+    { key: 'filterTaskList', icon: 'mdi-checkbox-marked-outline', text: '- [ ] \n- [ ] \n- [ ] ' },
+    { key: 'filterTable', icon: 'mdi-table', text: '| A | B |\n| --- | --- |\n|  |  |' },
+];
+const slashMenu = ref(false);
+let slashEl = null;
+
+function onTextareaKeydown(e) {
+    if (e.key === 'Escape') {
+        if (slashMenu.value) {
+            slashMenu.value = false;
+            e.stopPropagation();
+        }
+        return;
+    }
+    if (e.key !== '/') return;
+    const el = e.target;
+    const pos = typeof el?.selectionStart === 'number' ? el.selectionStart : 0;
+    const lineStart = (app.send.text || '').lastIndexOf('\n', Math.max(0, pos - 1)) + 1;
+    // 只认「本行到目前为止只有空白」
+    if (pos > lineStart && /\S/.test((app.send.text || '').slice(lineStart, pos))) return;
+    slashEl = el;
+    slashMenu.value = true;
+}
+
+function insertSlashTemplate(tpl) {
+    const el = slashEl;
+    const text = app.send.text || '';
+    const pos = el && typeof el.selectionStart === 'number' ? el.selectionStart : text.length;
+    // 连同刚打的那个 `/` 一起换掉（如果它还在光标前）
+    const head = text.slice(0, pos).replace(/\/$/, '');
+    const tail = text.slice(pos);
+    app.send.text = head + tpl.text + tail;
+    slashMenu.value = false;
+    nextTick(() => {
+        const caret = head.length + tpl.text.length;
+        el?.focus?.();
+        el?.setSelectionRange?.(caret, caret);
+    });
 }
 function onSendShortcut() {
     if (!sendDisabled.value) {

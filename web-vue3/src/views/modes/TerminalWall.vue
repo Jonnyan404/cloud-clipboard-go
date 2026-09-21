@@ -91,6 +91,25 @@ function deviceTag(item) {
     return deviceLabel(item?.senderDevice);
 }
 
+// 行内的来源前缀：「设备名 · IP」拼成**一个**字符串。
+//
+// 为什么不分成两个 span：移动端 `.terminal-wall__log` 是 grid，`.terminal-wall__device` 被
+// 指定 `grid-area: device` —— 两个元素拿到同一个区就**重叠**（设备名压在 IP 上）。
+// 拼一串没有这个问题，而且和 mega / workbench / sticky / 详情弹窗里的 readerOrigin 一致。
+// 太长时由 __device 自己的 `overflow: hidden + text-overflow: ellipsis` 收尾（它本来就是
+// 那个「第一个让位」的格子）。
+function rowOrigin(item) {
+    const parts = [];
+    const device = deviceTag(item);
+    if (device) {
+        parts.push(device);
+    }
+    if (app.display.ip && item?.senderIP) {
+        parts.push(item.senderIP);
+    }
+    return parts.join(' · ');
+}
+
 // 详情弹窗里的「设备 · IP」。行内那行元信息放不下 IP，而「显示发送者IP」这个开关
 // 之前在 mega / terminal / workbench / sticky 四个紧凑模式里完全没有生效点 ——
 // 打开开关四个模式毫无变化，等于开关在说谎。放不下的元信息落到详情里，
@@ -271,10 +290,11 @@ watch(detailItem, (item) => {
                     <span v-if="app.display.timestamp" class="terminal-wall__ts">{{ timeLabel(item) }}</span>
                     <span v-if="item.type === 'file'" class="terminal-wall__tag terminal-wall__tag--file">[FILE]</span>
                     <span v-else class="terminal-wall__tag terminal-wall__tag--text">[TEXT]</span>
-                    <span v-if="app.display.device && deviceTag(item)" class="terminal-wall__device">{{ deviceTag(item) }}</span>
-                    <!-- 复用 __device 的样式：IP 在这一行里扮演的角色和设备名一样，
-                         都是正文前的来源前缀。这一行右边空间足够，不必挪进详情。 -->
-                    <span v-if="app.display.ip && item.senderIP" class="terminal-wall__device">{{ item.senderIP }}</span>
+                    <!-- ⚠️ 来源前缀（设备名 · IP）必须是**一个** span。
+                         移动端这一行是 grid，两个 span 都带 __device → 都拿到 `grid-area: device`
+                         → 落进同一个格子、**直接重叠**（实测在 390px 下设备名和 IP 叠在一起）。
+                         拼成一串同时也和另外四个模式一致：它们本来就是 `parts.join(' · ')`。 -->
+                    <span v-if="rowOrigin(item)" class="terminal-wall__device">{{ rowOrigin(item) }}</span>
                     <template v-if="item.type === 'text'">
                         <span class="terminal-wall__val">{{ decodedContent(item) }}</span>
                         <span class="terminal-wall__ops">

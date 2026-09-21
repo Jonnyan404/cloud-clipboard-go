@@ -6,10 +6,11 @@ import { useI18n } from 'vue-i18n';
 import axios from 'axios';
 import { toast } from '@/plugins/toast';
 import { useMarkdown } from '@/composables/useMarkdown.js';
+import { useTaskListToggle } from '@/composables/useTaskListToggle.js';
 import MarkdownBody from '@/components/MarkdownBody.vue';
 import MarkdownToggle from '@/components/MarkdownToggle.vue';
 import ShareLinkButton from '@/components/ShareLinkButton.vue';
-import { copyTextToClipboard, deviceLabel, errorMessage, formatTimestamp } from '@/util.js';
+import { copyTextToClipboard, deviceLabel, errorMessage, formatTimestamp, looksLikeTable, looksLikeTaskList } from '@/util.js';
 
 const mdiCellphone = 'mdi-cellphone';
 const mdiChevronRight = 'mdi-chevron-right';
@@ -32,18 +33,22 @@ const ws = useWebSocketStore();
 const theme = useTheme();
 const isDark = computed(() => theme.current.value?.dark ?? false);
 const { t } = useI18n();
-const expand = ref(false);
-function decodeHtmlEntities(text) {
-    const textArea = document.createElement('textarea');
-    textArea.innerHTML = text;
-    return textArea.value;
-}
-const decodedContent = computed(() => decodeHtmlEntities(props.meta.content || ''));
+// 任务列表 / 表格**默认展开**：这两种内容的全部价值就在结构本身，折叠成一行预览等于没看见
+// （预览只截一行，看到的是 `- [ ] 买菜` 这种原文，读者得先点开才知道底下是张表）。
+//
+// ⚠️ 这是**初始值**，不是 watch：用户手动收起之后不该被重新展开。
+// ⚠️ 直接拿 props.meta.content 判、不解 HTML 实体 —— 两个判据只看 `|` `-` `[` `]`，
+// 实体编码动不到它们（和 DefaultMode 的分类过滤同一个理由）。
+const expand = ref(looksLikeTaskList(props.meta?.content) || looksLikeTable(props.meta?.content));
+
+// 正文（含任务列表打勾 + 落盘）交给共享 composable —— 便签卡片那边是同一套逻辑。
+// 复制文本也用它返回的 text：用户看到什么就复制什么。
+const { text: decodedContent, onMdClick } = useTaskListToggle(props.meta, () => ws.room);
 
 // md 渲染：默认跟随个性化里的开关，内容旁的按钮可以临时覆盖这一条（见 useMarkdown）。
 // v-html 的内容在 renderMarkdownHtml 里已经过了一遍 DOMPurify（内容是别人发的）。
 const md = useMarkdown(() => decodedContent.value);
-const decodedContentPreview = computed(() => decodeHtmlEntities(props.meta.content || ''));
+const decodedContentPreview = computed(() => decodedContent.value);
 function deviceIcon(type) {
     const lowerType = (type || '').toLowerCase();
     if (lowerType.includes('mobile') || lowerType.includes('phone') || lowerType.includes('tablet') || lowerType.includes('ios') || lowerType.includes('android')) {
@@ -126,7 +131,7 @@ async function deleteItem() {
                 <v-expand-transition>
                     <div v-show="expand">
                         <v-divider class="my-2"></v-divider>
-                                                <div class="md-preview" :class="{ 'md-preview--md': md.available }">
+                                                <div class="md-preview" :class="{ 'md-preview--md': md.available }" @click="onMdClick">
                             <markdown-toggle v-if="md.available" v-model:mode="md.mode"></markdown-toggle>
                             <markdown-body v-if="md.html" :html="md.html"></markdown-body>
                             <div v-else style="white-space: pre-wrap; word-break: break-all;">{{ decodedContent }}</div>

@@ -39,6 +39,7 @@ import {
     minutesToShareTTL,
     normalizeShareMaxUses,
     normalizeShareTTL,
+    withCurrentOrigin,
 } from '@/util.js';
 
 const mdiContentCopy = 'mdi-content-copy';
@@ -142,9 +143,12 @@ async function confirmShareDialog() {
             password,
             room: ws.room,
         });
-        // 服务端一律签发 token 并返回分享页地址，前端不再往上挂任何展示参数 ——
-        // 展示格式由分享页自己切换（见本文件顶部的说明）。
-        const url = data?.url || contentUrl.value;
+        // 服务端一律签发 token 并返回分享页地址。⚠️ 但它的**主机名**不能直接用：
+        // 服务端是按请求的 Host 拼的（buildSharePageURL），中间只要有改写 Host 的代理就错 ——
+        // dev 的 vite proxy 写了 `changeOrigin: true`，拼出来会指向后端（`localhost:9501`），
+        // 而分享页是前端路由，指向一个没有前端的后端只会白页。换成本浏览器自己的 origin，
+        // 路径与 `#` 片段照原样保留（所以带 prefix 部署也不会丢）。
+        const url = withCurrentOrigin(data?.url) || contentUrl.value;
         shareContentUrl.value = url;
         lastShareMeta.value = {
             ttl: data?.ttl ?? ttl,
