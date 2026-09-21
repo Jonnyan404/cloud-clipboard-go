@@ -130,10 +130,10 @@ token 里只存 `HMAC(服务端签名密钥, "share-password:"+密码)` 的前 1
 
 - **`views/ShareView.vue`** —— 新增。收件人页面：loading / 密码闸门 / 失败提示 / 文本（raw↔md 切换 + 复制）/ 文件（缩略图 + 名字 + 大小 + 下载）
 - `router/index.js` —— 新增 `/s` 路由，**懒加载**（收件人不需要主应用那一整包），`meta.sharePage: true`
-- `App.vue` —— 模板顶部 `isShareRoute` 的 `v-if`；个性化面板补「默认格式 / 默认密码」两项
+- `App.vue` —— 模板顶部 `isShareRoute` 的 `v-if`；个性化面板补「默认密码」一项（默认格式后来删了，见文末）
 - `main.js` —— 分享路由上跳过 `wsStore.connect()`
 - `util.js` —— `createShareLink()` 加 `password`；新增 `withSharePageFormat()`（**必须拆 fragment 再拼**，`?t=` 在 `#` 后面）
-- `store/app.js` —— `shareDefaults` 加 `password` / `format`
+- `store/app.js` —— `shareDefaults` 加 `password`（`format` 后来删了，见文末）
 - `data/displayToggles.js` —— `cardCopyLink` + `cardQr` → 合并为 **`cardShare`**
 - `components/received-item/Text.vue`、`File.vue` —— 一个分享图标；`shareResultVisible` 面板（二维码 + 链接 + 复制按钮 + 有效期/次数）；`confirmShareDialog()` 建完链接**自动复制**并打开面板
 - `components/sticky/StickyNote.vue` + `views/modes/{Chat,Mega,Workbench,Terminal}Wall.vue` ——
@@ -168,7 +168,7 @@ Go 侧新增的测试钉住了这几件事：分享页 URL 的形状与 `#` 没�
 ### 端到端（无头 Chrome + 真实前后端）
 
 一套临时环境：**临时后端 9502（开放房间）+ 临时 vite 1211 + 无头 Chrome 9222**，
-全程不碰正在跑的 9501。12 个场景全绿：
+全程不碰正在跑的 9501。20 个场景全绿：
 
 | 场景 | 断言要点 |
 |---|---|
@@ -183,6 +183,10 @@ Go 侧新增的测试钉住了这几件事：分享页 URL 的形状与 `#` 没�
 | **10 同路由换 token** | 换完**重新加载**并弹出密码闸门（就是上面那个 watch 的回归守卫） |
 | 11 合并后的分享图标 | 面板有二维码 + `/#/s?t=` 链接 + 2 个按钮；`qrIconCount=0`、`linkIconCount=0` |
 | 12 逐张卡片点分享 | 每张卡片都能弹出面板 |
+| 13 分享设置弹窗 | 只剩 有效期滑块 / 次数 / 密码；**没有**格式切换；按钮仍带 `timeline-card__icon-button`（组件化后 `$attrs` 没掉） |
+| 14 设置面板的分享默认值 | 三个输入框是 `outlined`、底色不再跟卡片重合、密码框 ≥200px（隐形/太短的回归守卫） |
+| 15 工作台模式 · 触屏 | 打开触屏模拟后 `(hover: none)` 为真，`.workbench-wall__row-ops` 无需 hover 即可见 |
+| 16a~16e 五个模式的分享入口 | 逐个模式打开详情弹窗 → 按钮文案是「分享链接」（不是旧的「复制链接」）→ 点开确认后弹出面板，且链接是 `/#/s?t=` |
 | 09 主应用 | 外壳完好（`v-if` 包装没弄坏主界面） |
 
 外加一步 curl 校验：`rawUrl` 对文本返回正确内容、对文件**逐字节等于上传的字节**（89 字节）。
@@ -198,6 +202,90 @@ Go 侧新增的测试钉住了这几件事：分享页 URL 的形状与 `#` 没�
   固定 sleep 会让整轮的第一张失败，看起来像功能坏了
 - `pkill -f "<模式>"` 的模式串如果出现在你自己的命令行里，**会把自己这个 shell 也杀掉**。
   用括号技巧：`pkill -f "ccg[-]share-test"`
+- **`verify.mjs` 结尾必须显式退出**：CDP 那条 WebSocket 是活句柄，只设 `process.exitCode`
+  的话事件循环永远不空、node 不退，外层 `run.sh` 就一直挂着等（实测卡了 11 分钟才看出来）。
+  结尾 `ws.close(); process.exit(...)`，`catch` 里也要关。
+- **就绪要等目标选择器，不能等外壳**：场景 12 曾经等 `.page-toolbar`，但工具栏先出来、
+  卡片是接口回来之后才渲染的 —— 撞上空窗期就报「没找到任何分享按钮」。
+  等 `.timeline-card__icon-button` 里真的出现 share 图标才稳。
+- **触屏兜底（`@media (hover: none)`）在 headless 里默认测不到**：headless 是「有 hover 的
+  桌面」。要 `Emulation.setTouchEmulationEnabled` + `setEmitTouchEventsForMouse`，
+  而且先断言 `matchMedia('(hover: none)').matches === true` —— 不然那条断言等于没测。
+
+---
+
+## 后续改动（同日，两处）
+
+### 1. 分享逻辑抽成 `components/ShareLinkButton.vue`
+
+「图标 + 两个弹窗 + 有效期滑块的全部样式」原来在 `received-item/Text.vue` 和
+`received-item/File.vue` 里**逐字节各存了一份**（约 110 行 script + 110 行 template + 80 行 style），
+改一处要改两处，而且其余五个模式迟早也要接同一个入口 —— 再抄下去就是七份。
+现在收成一个组件，两个调用点各一行：
+
+```html
+<share-link-button :meta="meta" class="timeline-card__icon-button" />
+```
+
+- 是否显示由组件内部按 `app.display.cardShare` 判断，调用点不用管。
+- 组件根节点不止一个（图标 + 两个弹窗），所以 `defineOptions({ inheritAttrs: false })`，
+  再在按钮上 `v-bind="{ ...activatorProps, ...$attrs }"` —— 调用点写的 `class` 才落得回按钮上。
+  ⚠️ **只能合成一个 v-bind**：同一元素上写两个 `v-bind="..."` 会被 SFC 解析器判成
+  `Duplicate attribute`（`mergeProps` 那套是运行时行为，编译期先拦下来）。
+  tooltip 的 activator 属性里只有事件和 `aria-describedby`、**没有 class**，所以展开合并不会互相覆盖。
+- **样式必须跟着组件走**：`v-dialog` 一律 teleport 出应用子树，scoped 样式留在卡片里会失配。
+- 顺手统一了一处不一致：`Text.vue` 的「取消」按钮写的是 Vuetify 2 的 `<v-btn text>` ——
+  在 Vuetify 3 里 `text` 只是个无效属性，按钮实际落到**默认的 elevated 变体**，
+  而 `File.vue` 写的是 `variant="text"`。两个卡片的同一个按钮长得不一样，现在统一成后者。
+
+### 2. 删掉「默认展示格式」
+
+分享页自己就带 raw↔md 切换，发送方再预设一次是多余的一道决定（选错了收件人还得自己找按钮换回来）。
+删掉的是：设置弹窗里的格式切换块、个性化面板里的「分享页默认格式」、
+`store/app.js` 的 `shareDefaults.format`，以及 `shareFormat` / `shareFormatHint` / `shareDefaultFormat`
+三个文案键（四份 locale 同步删，键仍然对齐）。
+
+**保留**：分享页仍然认 `?f=md|raw` 当初始格式（`ShareView.vue` 的 `linkedFormat`，
+工具函数 `util.js` 的 `withSharePageFormat`）。站内已经没有地方生成这个参数了，留着是为了
+①不让已经发出去的旧链接失效 ②留一个手工拼链接的入口。`withSharePageFormat` 目前**零调用方**，
+注释里写明了原因；想彻底删掉就连 `ShareView.vue` 的 `linkedFormat` 一起去掉（e2e 场景 03 也要删）。
+
+### 3. 设置面板里的分享默认值输入框是「隐形」的
+
+关掉「分享时弹出设置框」之后，面板里会露出 有效期 / 次数 / 密码 三个输入框。
+它们原本写的是 `variant="solo"` + `flat` —— Vuetify 里 solo 的底色是
+`rgb(var(--v-theme-surface))`，跟设置卡片本身**一模一样**，`flat` 又把阴影去掉了。
+白底白框、没有边框，看着就像「这里根本没有输入框」（数字那两项还能靠数字认出来，
+密码框空的，就完全看不见了）。改成 `variant="outlined"`，靠边框站住。
+宽度也一起从 168px 放到 220px —— 数字 2~3 位就够，密码不是。
+
+> 这条与分享页无关，只是刚好落在同一个代码块里；记在这里免得下次又踩。
+
+### 4. 其余五个模式的分享入口也接上了同一个面板
+
+之前只有标准模式的卡片图标是「合并后的分享」。其余五个模式仍是老的「复制链接」纯复制按钮
+（在详情 / 阅读器弹窗的动作行里，便签模式卡片上还有一个），没有二维码、没有面板、不自动复制。
+现在它们都换成 `<share-link-button :meta="…" :icon-only="false" />`：
+
+| 模式 | 入口位置 |
+|---|---|
+| 聊天 / 巨型 / 工作台 / 终端 | 详情弹窗动作行（**文件**条目才有这一行） |
+| 便签 | 阅读器弹窗动作行（`v-if="!isFile"`，**文本**条目）+ 卡片上那个链接图标（仍是旧的，见下） |
+
+`ShareLinkButton` 因此有了 `iconOnly` 这个 prop：
+
+- `true`（默认）= 卡片上那排里的纯图标按钮，**受 `app.display.cardShare` 控制**；
+- `false` = 弹窗动作行里的带文字按钮，**不受开关管** —— 那个开关叫「卡片图标」，
+  只管卡片上那排图标。弹窗里的动作行本来也不是「卡片图标」。
+
+⚠️ **工作台模式卡片上那个「复制」按钮没动**（对文件走 `copyFileLink`，复制分享页地址）。
+所以 `copyFileLink` / `contentUrlOf` 只在 `WorkbenchWall.vue` 里留着，另外三个
+（聊天 / 巨型 / 终端）已经删干净 —— 那三个文件里留了一行注释说明为什么不一致，
+免得下次有人「顺手统一」把工作台的那份也删了。`ensureFileShareLinks` 五个模式都保持
+返回 `{ raw, page }`（工作台和便签还要用 `page`），没跟着改签名。
+
+> **仍然没做**：聊天 / 巨型 / 工作台 / 终端的**文本**条目没有分享入口（它们的动作行只对文件渲染）。
+> 卡片操作行也一个都没加图标 —— 那是版式决定，不该被「合并图标」这件事绑架。
 
 ---
 
@@ -207,8 +295,8 @@ Go 侧新增的测试钉住了这几件事：分享页 URL 的形状与 `#` 没�
    四份 locale 里都还在，可删可留。
 2. 老用户 localStorage 里的 `cardCopyLink` / `cardQr` 会继续留着（**无害**，代码不再读它们）。
    合并后的 `cardShare` 默认 `true`，所以升级后图标还在。
-3. 另外五个模式的「复制链接」现在复制的是**分享页地址**（以前开放房间时是直连文件地址）。
-   这是统一后的预期行为，但值得在 release note 里提一句。
+3. 另外五个模式的分享入口现在弹的是**分享面板**（以前只把分享页地址丢进剪贴板，
+   而且更早以前开放房间时给的是直连文件地址）。值得在 release note 里提一句。
 4. 分享页用的是 Vuetify 默认主题，**没有**跟主应用那六种模式皮肤联动。
 5. Worker 侧的分享页地址不带 prefix（Worker 没有 prefix 概念）；Go 侧带 `server.prefix`。
 6. 没做：分享页的 OG/社交卡片、扫码统计、分享记录列表。
