@@ -28,6 +28,8 @@ router.post('/auth/token/refresh', handleAuthTokenRefresh);
 router.get('/rooms', RoomsHandler.list);
 router.post('/text', TextHandler.create);
 router.post('/share', ShareHandler.create);
+// 分享页在取正文之前先问一次：类型 / 文件名 / 大小 / 剩余有效期 / 是否需要密码。
+router.get('/share', ShareHandler.info);
 router.get('/content/latest', ContentHandler.getLatest);
 router.get('/content/latest.json', ContentHandler.getLatest);
 router.get('/content/:id', ContentHandler.getById);

@@ -410,6 +410,7 @@ async function findFileMeta(env, uuid) {
       return {
         uuid,
         name: object.customMetadata?.originalName || 'file',
+        size: Number(object.size || 0),
         room: normalizeRoomName(object.customMetadata?.room || 'default'),
         expireTime: Number(object.customMetadata?.expireTime || 0),
       };
@@ -417,13 +418,14 @@ async function findFileMeta(env, uuid) {
   }
 
   if (env.DB) {
-    const row = await env.DB.prepare('SELECT uuid, name, room, expireTime FROM messages WHERE uuid = ? ORDER BY id DESC LIMIT 1')
+    const row = await env.DB.prepare('SELECT uuid, name, size, room, expireTime FROM messages WHERE uuid = ? ORDER BY id DESC LIMIT 1')
       .bind(uuid)
       .first();
     if (row) {
       return {
         uuid: row.uuid,
         name: row.name || 'file',
+        size: Number(row.size || 0),
         room: normalizeRoomName(row.room || 'default'),
         expireTime: Number(row.expireTime || 0),
       };
@@ -431,6 +433,31 @@ async function findFileMeta(env, uuid) {
   }
 
   return null;
+}
+
+// 分享链接指向前端分享页（hash 路由），不再是裸接口地址。
+// `#` 必须保留字面量 —— 交给 URL 对象拼会被转义成 %23，hash 路由当场失效。
+function buildSharePageURL(request, token) {
+  const origin = new URL(request.url).origin;
+  return `${origin}/#/s?${SHARE_TOKEN_QUERY_KEY}=${encodeURIComponent(token)}`;
+}
+
+// 已用次数，只读。表可能还没建起来（没消费过就没有行），出错按 0 处理。
+async function readShareUsed(env, claims) {
+  if (!claims?.jti || !claims?.maxUses) {
+    return 0;
+  }
+  if (env.DB) {
+    try {
+      const row = await env.DB.prepare('SELECT used FROM share_token_usage WHERE jti = ?')
+        .bind(claims.jti)
+        .first();
+      return Number(row?.used || 0);
+    } catch {
+      return 0;
+    }
+  }
+  return Number(memoryShareUsage.get(claims.jti)?.used || 0);
 }
 
 async function issueShareToken(env, { type, id, room, ttl, maxUses, password }) {
@@ -464,7 +491,6 @@ export class ShareHandler {
       const ttl = normalizeShareTTL(body?.ttl);
       const maxUses = normalizeShareMaxUses(body?.maxUses);
       const authToken = extractAuthToken(request);
-      let expiresAt = Math.floor(Date.now() / 1000) + ttl;
 
       if (!shareType) {
         return errorResponse(400, 'missing_type', 'Bad Request', '缺少 type');
@@ -486,39 +512,37 @@ export class ShareHandler {
           return errorResponse(401, 'room_forbidden', 'Unauthorized', '无权访问该房间');
         }
 
-        const requirement = resolveRoomAuth(env, room);
-        const target = new URL(`${url.origin}/content/${id}`);
-        if (room !== 'default') {
-          target.searchParams.set('room', room);
-        }
-
-        const response = {
+        // 一律签发 token：TTL / 次数限制 / 密码都由它承载，房间是否需要鉴权不再影响这件事。
+        // 曾经只在 requirement.required 时才发 —— 结果是开放房间的分享链接永不过期、不限次数，
+        // 弹窗里让用户设的值被静默丢弃，而响应里却照样回 ttl/maxUses，会骗到调用方。
+        const issued = await issueShareToken(env, {
           type: 'content',
           id,
           room,
           ttl,
-          expiresAt,
           maxUses,
-          url: target.toString(),
-        };
+          password: body?.password,
+        });
 
-        if (requirement.required) {
-          const issued = await issueShareToken(env, {
-            type: 'content',
-            id,
-            room,
-            ttl,
-            maxUses,
-            password: body?.password,
-          });
-          expiresAt = issued.expiresAt;
-          response.expiresAt = expiresAt;
-          target.searchParams.set(SHARE_TOKEN_QUERY_KEY, issued.token);
-          response.token = issued.token;
-          response.url = target.toString();
+        // rawUrl 是「直接拿正文」的地址（带同一个 token），给分享页的下载按钮
+        // 和前端自己的下载链路用 —— 分享页地址是 hash 路由，取不了正文。
+        const rawUrl = new URL(`${url.origin}/content/${id}`);
+        if (room !== 'default') {
+          rawUrl.searchParams.set('room', room);
         }
+        rawUrl.searchParams.set(SHARE_TOKEN_QUERY_KEY, issued.token);
 
-        return new Response(JSON.stringify(response), {
+        return new Response(JSON.stringify({
+          type: 'content',
+          id,
+          room,
+          ttl,
+          expiresAt: issued.expiresAt,
+          maxUses,
+          token: issued.token,
+          url: buildSharePageURL(request, issued.token),
+          rawUrl: rawUrl.toString(),
+        }), {
           headers: { 'Content-Type': 'application/json', ...corsHeaders },
         });
       }
@@ -547,35 +571,31 @@ export class ShareHandler {
           return errorResponse(401, 'room_forbidden', 'Unauthorized', '无权访问该房间');
         }
 
-        const requirement = resolveRoomAuth(env, room);
-        const filename = encodeURIComponent(fileMeta.name || 'file');
-        const target = new URL(`${url.origin}/file/${uuid}/${filename}`);
-        const response = {
+        // 同 content 分支：一律签发 token，文件名不再进 URL ——
+        // 分享页会先问一次 GET /share 拿到它，再拼 /file/<uuid>/<name>。
+        const issued = await issueShareToken(env, {
+          type: 'file',
+          id: uuid,
+          room,
+          ttl,
+          maxUses,
+          password: body?.password,
+        });
+
+        const rawUrl = new URL(`${url.origin}/file/${uuid}/${encodeURIComponent(fileMeta.name || 'file')}`);
+        rawUrl.searchParams.set(SHARE_TOKEN_QUERY_KEY, issued.token);
+
+        return new Response(JSON.stringify({
           type: 'file',
           uuid,
           room,
           ttl,
-          expiresAt,
+          expiresAt: issued.expiresAt,
           maxUses,
-          url: target.toString(),
-        };
-
-        if (requirement.required) {
-          const issued = await issueShareToken(env, {
-            type: 'file',
-            id: uuid,
-            room,
-            ttl,
-            maxUses,
-          });
-          expiresAt = issued.expiresAt;
-          response.expiresAt = expiresAt;
-          target.searchParams.set(SHARE_TOKEN_QUERY_KEY, issued.token);
-          response.token = issued.token;
-          response.url = target.toString();
-        }
-
-        return new Response(JSON.stringify(response), {
+          token: issued.token,
+          url: buildSharePageURL(request, issued.token),
+          rawUrl: rawUrl.toString(),
+        }), {
           headers: { 'Content-Type': 'application/json', ...corsHeaders },
         });
       }
@@ -584,6 +604,86 @@ export class ShareHandler {
     } catch (error) {
       console.error('Share create error:', error);
       return errorResponse(500, 'share_token_failed', 'Internal Server Error', '生成分享链接失败');
+    }
+  }
+
+  /**
+   * GET /share?t=... —— 分享页在取正文之前先问一次这里。
+   *
+   * 为什么不直接让分享页去调 /content 或 /file：
+   *   - 文件场景必须先知道**文件名**才能拼出 /file/<uuid>/<name>，而 token 里没有这个名字；
+   *   - 分享页要在取正文之前就把「类型 / 大小 / 剩余有效期 / 剩余次数」渲染出来；
+   *   - 「token 无效」「已过期」「需要密码」三种情况要能分开报，取正文的接口分不出来。
+   *
+   * **不消耗使用次数**：打开页面本身不该烧掉一次，真正取正文时才消耗（见 validateShareToken）。
+   */
+  static async info(request, env) {
+    try {
+      const claims = await parseShareToken(env, extractShareToken(request));
+      if (!claims) {
+        return errorResponse(401, 'share_token_invalid', 'Unauthorized', '分享链接无效或已过期');
+      }
+
+      if (claims.pwdHash) {
+        const supplied = await sharePasswordHash(env, request.headers.get(SHARE_PASSWORD_HEADER));
+        if (!constantTimeEqual(supplied, claims.pwdHash)) {
+          return errorResponse(401, 'share_password_required', 'Unauthorized', '需要分享密码');
+        }
+      }
+
+      const now = Math.floor(Date.now() / 1000);
+      const response = {
+        type: claims.type,
+        room: claims.room,
+        expiresAt: claims.exp,
+        maxUses: claims.maxUses || 0,
+        used: await readShareUsed(env, claims),
+        needsPassword: Boolean(claims.pwdHash),
+      };
+
+      if (claims.type === 'content') {
+        const row = await findContentById(env, Number(claims.id), claims.room, true);
+        if (!row) {
+          return errorResponse(404, 'content_not_found', 'Not Found', '内容未找到');
+        }
+        response.id = claims.id;
+        response.room = normalizeRoomName(row.room || claims.room);
+        response.kind = String(row.type || 'text');
+
+        if (response.kind === 'file') {
+          const meta = await findFileMeta(env, row.uuid);
+          if (!meta) {
+            return errorResponse(404, 'file_not_found', 'Not Found', '文件未找到或已过期');
+          }
+          if (meta.expireTime > 0 && meta.expireTime < now) {
+            return errorResponse(404, 'file_expired', 'Not Found', '文件已过期');
+          }
+          response.uuid = meta.uuid;
+          response.name = meta.name;
+          response.size = meta.size;
+        }
+      } else if (claims.type === 'file') {
+        const meta = await findFileMeta(env, claims.id);
+        if (!meta) {
+          return errorResponse(404, 'file_not_found', 'Not Found', '文件未找到或已过期');
+        }
+        if (meta.expireTime > 0 && meta.expireTime < now) {
+          return errorResponse(404, 'file_expired', 'Not Found', '文件已过期');
+        }
+        response.kind = 'file';
+        response.uuid = meta.uuid;
+        response.name = meta.name;
+        response.size = meta.size;
+      } else {
+        return errorResponse(400, 'unsupported_type', 'Bad Request', '不支持的分享类型');
+      }
+
+      return new Response(JSON.stringify(response), {
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
+    } catch (error) {
+      console.error('Share info error:', error);
+      return errorResponse(500, 'share_info_failed', 'Internal Server Error', '读取分享信息失败');
     }
   }
 }
