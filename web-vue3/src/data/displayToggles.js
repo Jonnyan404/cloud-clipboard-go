@@ -16,9 +16,14 @@ export const DISPLAY_GROUPS = [
     { key: 'card', labelKey: 'displayGroupCard' },
 ];
 
-// 图标类开关（composer / card 两组）只对标准模式有意义：
-// 输入区是 UnifiedComposer、卡片是 received-item/*，两者都只被 DefaultMode 用。
+// 图标类开关（composer / card 两组）只对标准模式有意义：输入区是 UnifiedComposer、
+// 卡片图标那排是 received-item/*，两者都只被 DefaultMode 用。
 // 所以整组都写 modes: ['default']，别的模式的面板里不会冒出拨了没反应的开关。
+//
+// ⚠️ 但「只对标准模式有意义」不等于「别的模式没有相关功能」：其余五个模式的**详情弹窗**
+// 里也有分享入口（ShareLinkButton 的 iconOnly=false 形态），便签模式的卡片上还有链接图标。
+// 那些入口**刻意不受这里的开关管** —— 这个分组叫「卡片图标」，只管卡片上那排图标。
+// 加开关时先想清楚它管的是哪一种入口。
 const ONLY_DEFAULT = ['default'];
 
 export const DISPLAY_TOGGLES = [

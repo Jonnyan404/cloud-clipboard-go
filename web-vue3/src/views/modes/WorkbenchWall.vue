@@ -8,6 +8,7 @@ import { toast } from '@/plugins/toast';
 import { SHARE_DEFAULT_TTL, buildCleanAbsoluteRouteUrl, copyTextToClipboard, createShareLink, deviceLabel, errorMessage, formatTimestamp, isImageName, prettyFileSize } from '@/util.js';
 import PageToolbar from '@/components/PageToolbar.vue';
 import StickyComposer from '@/components/sticky/StickyComposer.vue';
+import ShareLinkButton from '@/components/ShareLinkButton.vue';
 import { useStickyAutoscroll } from '@/composables/useStickyAutoscroll';
 
 const app = useAppStore();
@@ -605,9 +606,7 @@ watch(detailItem, (item) => {
                     >
                         <v-icon start size="small">mdi-download</v-icon>{{ expired ? t('expired') : t('download') }}
                     </v-btn>
-                    <v-btn variant="text" size="small" @click="copyFileLink(detailItem)">
-                        <v-icon start size="small">mdi-link-variant</v-icon>{{ t('copyLink') }}
-                    </v-btn>
+                    <share-link-button :meta="detailItem" :icon-only="false" />
                 </div>
                 <!-- 文字条目的操作跟它在列表行里那套对齐：复制 / 删除。
                      删除后必须顺手关掉弹窗 —— 条目在 store 里已经没了，
@@ -937,6 +936,16 @@ watch(detailItem, (item) => {
 .workbench-wall__row:hover .workbench-wall__row-ops,
 .workbench-wall__row:focus-within .workbench-wall__row-ops {
     display: flex;
+}
+
+/* ⚠️ 触屏没有 hover：不给兜底的话，工作台模式的操作图标在手机上**永远出不来**
+   （这一行只在 :hover / :focus-within 时才显示它们，而手指点不出 hover）。
+   另外四个非标准模式都有这条兜底，只有这里漏了。
+   用 `hover: none` 而不是 `max-width` —— 宽度判断会漏掉宽屏触屏设备（平板）。 */
+@media (hover: none) {
+    .workbench-wall__row-ops {
+        display: flex;
+    }
 }
 
 .workbench-wall__op {

@@ -5,9 +5,10 @@ import { useWebSocketStore } from '@/store/websocket';
 import { useTheme } from 'vuetify';
 import { useI18n } from 'vue-i18n';
 import { toast } from '@/plugins/toast';
-import { SHARE_DEFAULT_TTL, buildCleanAbsoluteRouteUrl, copyTextToClipboard, createShareLink, deviceLabel, errorMessage, isImageName, prettyFileSize } from '@/util.js';
+import { SHARE_DEFAULT_TTL, copyTextToClipboard, createShareLink, deviceLabel, errorMessage, isImageName, prettyFileSize } from '@/util.js';
 import PageToolbar from '@/components/PageToolbar.vue';
 import StickyComposer from '@/components/sticky/StickyComposer.vue';
+import ShareLinkButton from '@/components/ShareLinkButton.vue';
 import { useStickyAutoscroll } from '@/composables/useStickyAutoscroll';
 
 const app = useAppStore();
@@ -160,21 +161,9 @@ async function copyContent(item) {
     }
 }
 
-async function copyFileLink(item) {
-    try {
-        const url = item.cache ? (await ensureFileShareLinks(item)).page : contentUrlOf(item);
-        await copyTextToClipboard(url);
-        toast(t('copySuccess'));
-    } catch (err) {
-        console.error('复制失败:', err);
-        toast(t('copyFailedGeneral'));
-    }
-}
-
-function contentUrlOf(item) {
-    const roomQuery = ws.room ? `?room=${encodeURIComponent(ws.room)}` : '';
-    return buildCleanAbsoluteRouteUrl(`content/${item.id}${roomQuery}`, app?.config?.server?.prefix || '');
-}
+// 「复制链接」这个动作已经交给 ShareLinkButton（签名 + 自动复制 + 二维码面板），这里不再自己拼地址。
+// ⚠️ 工作台模式**还留着** copyFileLink —— 它卡片上那个「复制」按钮对文件走的是同一条路。
+// 所以 ensureFileShareLinks 五个模式都保持返回 { raw, page }，这个文件只用到 raw。
 
 async function deleteItem(item) {
     try {
@@ -377,9 +366,7 @@ watch(detailItem, (item) => {
                     <v-btn color="primary" variant="flat" size="small" :loading="downloading" :disabled="expired" @click="downloadFromItem(detailItem)">
                         <v-icon start size="small">mdi-download</v-icon>{{ expired ? t('expired') : t('download') }}
                     </v-btn>
-                    <v-btn variant="text" size="small" @click="copyFileLink(detailItem)">
-                        <v-icon start size="small">mdi-link-variant</v-icon>{{ t('copyLink') }}
-                    </v-btn>
+                    <share-link-button :meta="detailItem" :icon-only="false" />
                 </div>
             </div>
         </v-dialog>

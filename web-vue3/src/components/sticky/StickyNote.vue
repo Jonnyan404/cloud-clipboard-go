@@ -4,6 +4,7 @@ import { useAppStore } from '@/store/app';
 import { useMarkdown } from '@/composables/useMarkdown.js';
 import MarkdownBody from '@/components/MarkdownBody.vue';
 import MarkdownToggle from '@/components/MarkdownToggle.vue';
+import ShareLinkButton from '@/components/ShareLinkButton.vue';
 import { useWebSocketStore } from '@/store/websocket';
 import { useI18n } from 'vue-i18n';
 import { toast } from '@/plugins/toast';
@@ -448,9 +449,7 @@ async function deleteItem() {
                     <v-btn v-else color="primary" variant="flat" size="small" @click="copyContent">
                         <v-icon start size="small">mdi-content-copy</v-icon>{{ t('copyText') }}
                     </v-btn>
-                    <v-btn v-if="!isFile" variant="text" size="small" @click="copyLink">
-                        <v-icon start size="small">mdi-link-variant</v-icon>{{ t('copyLink') }}
-                    </v-btn>
+                    <share-link-button v-if="!isFile" :meta="meta" :icon-only="false" />
                     <v-btn variant="text" size="small" color="error" class="sticky-note__reader-delete" @click="deleteItem">
                         <v-icon start size="small">mdi-delete-outline</v-icon>{{ t('delete') }}
                     </v-btn>

@@ -5,9 +5,10 @@ import { useWebSocketStore } from '@/store/websocket';
 import { useTheme } from 'vuetify';
 import { useI18n } from 'vue-i18n';
 import { toast } from '@/plugins/toast';
-import { SHARE_DEFAULT_TTL, buildCleanAbsoluteRouteUrl, copyTextToClipboard, createShareLink, deviceLabel, errorMessage, formatTimestamp, getClientId, isImageName, looksLikeMarkdown, renderMarkdownHtml, prettyFileSize } from '@/util.js';
+import { SHARE_DEFAULT_TTL, copyTextToClipboard, createShareLink, deviceLabel, errorMessage, formatTimestamp, getClientId, isImageName, looksLikeMarkdown, renderMarkdownHtml, prettyFileSize } from '@/util.js';
 import PageToolbar from '@/components/PageToolbar.vue';
 import StickyComposer from '@/components/sticky/StickyComposer.vue';
+import ShareLinkButton from '@/components/ShareLinkButton.vue';
 import MarkdownBody from '@/components/MarkdownBody.vue';
 import { useStickyAutoscroll } from '@/composables/useStickyAutoscroll';
 
@@ -240,21 +241,9 @@ async function copyContent(item) {
     }
 }
 
-async function copyFileLink(item) {
-    try {
-        const url = item.cache ? (await ensureFileShareLinks(item)).page : contentUrlOf(item);
-        await copyTextToClipboard(url);
-        toast(t('copySuccess'));
-    } catch (err) {
-        console.error('复制失败:', err);
-        toast(t('copyFailedGeneral'));
-    }
-}
-
-function contentUrlOf(item) {
-    const roomQuery = ws.room ? `?room=${encodeURIComponent(ws.room)}` : '';
-    return buildCleanAbsoluteRouteUrl(`content/${item.id}${roomQuery}`, app?.config?.server?.prefix || '');
-}
+// 「复制链接」这个动作已经交给 ShareLinkButton（签名 + 自动复制 + 二维码面板），这里不再自己拼地址。
+// ⚠️ 工作台模式**还留着** copyFileLink —— 它卡片上那个「复制」按钮对文件走的是同一条路。
+// 所以 ensureFileShareLinks 五个模式都保持返回 { raw, page }，这个文件只用到 raw。
 
 async function deleteItem(item) {
     try {
@@ -484,9 +473,7 @@ watch(detailItem, (item) => {
                     >
                         <v-icon start size="small">mdi-download</v-icon>{{ expired ? t('expired') : t('download') }}
                     </v-btn>
-                    <v-btn variant="text" size="small" @click="copyFileLink(detailItem)">
-                        <v-icon start size="small">mdi-link-variant</v-icon>{{ t('copyLink') }}
-                    </v-btn>
+                    <share-link-button :meta="detailItem" :icon-only="false" />
                 </div>
             </div>
         </v-dialog>
@@ -749,7 +736,11 @@ watch(detailItem, (item) => {
     display: flex;
 }
 
-@media (max-width: 768px) {
+/* 触屏没有 hover，气泡里的操作图标得常显。
+   宽度那条是原有的（窄屏本来就该常显）；`hover: none` 补的是**宽屏触屏设备**（平板）——
+   光看宽度会漏掉它们，另外三个模式的 `@media (hover: none)` 覆盖得到、聊天模式覆盖不到，
+   表现就不一致了。两条并列，取并集。 */
+@media (hover: none), (max-width: 768px) {
     .chat-wall__bubble-ops {
         display: flex;
     }
