@@ -187,6 +187,8 @@ apk add --allow-untrusted ./cloud-clipboard-<version>-<apk-arch>.apk
 apk add --allow-untrusted ./luci-app-cloud-clipboard-<version>-noarch.apk
 
 # OpenWrt 24.10 and earlier (OPKG package manager)
+# Check your router architecture
+opkg print-architecture
 opkg install ./cloud-clipboard_<version>_<arch>.ipk
 opkg install ./luci-app-cloud-clipboard_<version>_all.ipk
 ```

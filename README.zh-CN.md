@@ -186,6 +186,8 @@ apk add --allow-untrusted ./cloud-clipboard-<version>-<apk-arch>.apk
 apk add --allow-untrusted ./luci-app-cloud-clipboard-<version>-noarch.apk
 
 # OpenWrt 24.10 及以下 (OPKG 包管理器)
+#查看架构信息
+opkg print-architecture
 opkg install ./cloud-clipboard_<version>_<arch>.ipk
 opkg install ./luci-app-cloud-clipboard_<version>_all.ipk
 ```
