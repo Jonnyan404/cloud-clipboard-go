@@ -41,7 +41,10 @@ Three ways, pick one:
 **Rooms and credentials:**
 
 - `?room=` empty means the `default` room; **omitting `room` entirely** means "any room"
-- A room with an empty password accepts requests without credentials
+- Whether a room needs a password comes from the global `auth` plus that room's `roomAuth` entry:
+  not configured → follows the global `auth`; an empty string → also follows the global `auth`
+  (**not** "open"); `{"open": true}` → **open**, even with a global `auth` set; a non-empty password →
+  requires it, and the global password still works too (an extra key, not a replacement lock)
 - The server authorizes against **the room recorded on the content itself**, not the
   `?room=` the client claims — `/file/:uuid/:name` especially, to prevent forgery
 
