@@ -1,6 +1,6 @@
 import { Router } from 'itty-router';
 import { corsHeaders, handleCors } from './cors';
-import { canAccessRoom, canAccessRoomAsync, hasRoomAuthEntry, resolveRoomAuth, issueRoomSessionToken, validateRoomSessionToken, parseRoomSessionToken, extractAuthToken } from './auth';
+import { canAccessRoom, canAccessRoomAsync, resolveRoomAuth, issueRoomSessionToken, validateRoomSessionToken, parseRoomSessionToken, extractAuthToken } from './auth';
 import { TextHandler } from './handlers/text';
 import { FileHandler } from './handlers/file';
 import { ContentHandler } from './handlers/content';
@@ -170,7 +170,7 @@ async function handleServer(request, env) {
     const requirement = resolveRoomAuth(env, requestedRoom);
     authRequired = requirement.required;
     authorized = !requirement.required || await canAccessRoomAsync(env, requestedRoom, token);
-    roomProtected = hasRoomAuthEntry(env, requestedRoom);
+    roomProtected = requirement.required;
   } else if (globalPassword) {
     authRequired = true;
     authorized = await canAccessRoomAsync(env, 'default', token);

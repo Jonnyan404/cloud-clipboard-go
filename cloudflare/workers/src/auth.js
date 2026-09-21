@@ -123,17 +123,23 @@ function parseFileExpireValue(room, value) {
   return undefined;
 }
 
-// 单个房间的 ROOM_AUTH_JSON 值支持两种形式：
-//   字符串/数字                 -> 仅密码（旧格式，完全兼容）
-//   对象 {password, fileExpire} -> 密码 + 文件过期覆盖策略
+// 单个房间的 ROOM_AUTH_JSON 值支持三种形式：
+//   字符串/数字                    -> 仅密码（旧格式，完全兼容）
+//   对象 {password, fileExpire}    -> 密码 + 文件过期覆盖策略
+//   对象 {open: true, fileExpire}  -> **开放房间**：不要密码，即使全局 AUTH_PASSWORD 设了也一样
+//
+// `open` 单独一个字段、而不是拿「空密码」当信号：空字符串在这份配置里**已经有含义**
+// （只接受全局密码，见 config.md），改掉它会静默改变现有配置 —— 某个房间会悄悄敞开。
+// 与 Go 侧 RoomAuthEntry 同一套语义，改一边记得改另一边。
 function parseRoomAuthEntry(room, value) {
   if (value !== null && typeof value === 'object') {
     return {
       password: normalizeAuthValue(value.password),
       fileExpire: parseFileExpireValue(room, value.fileExpire),
+      open: value.open === true,
     };
   }
-  return { password: normalizeAuthValue(value), fileExpire: undefined };
+  return { password: normalizeAuthValue(value), fileExpire: undefined, open: false };
 }
 
 export function parseRoomAuth(env) {
@@ -169,13 +175,23 @@ export function resolveRoomAuth(env, room) {
   const globalPassword = normalizeAuthValue(env.AUTH_PASSWORD);
   const roomAuth = parseRoomAuth(env);
   const hasRoomEntry = Object.prototype.hasOwnProperty.call(roomAuth, normalizedRoom);
-  const entry = hasRoomEntry ? roomAuth[normalizedRoom] : { password: '', fileExpire: undefined };
+  const entry = hasRoomEntry ? roomAuth[normalizedRoom] : { password: '', fileExpire: undefined, open: false };
   const roomPassword = entry.password;
 
+  // 房间自己带密码 → 用它。全局密码**仍然有效**（见 tokenMatchesRoom），
+  // 所以 ROOM_AUTH_JSON 是「多给一把钥匙」，不是「换锁」。
+  // ⚠️ 同时写了 open 和 password 是配置写错了：**密码优先** —— 宁可多要一次密码，
+  // 也不能因为配置里多打了一个字段就把房间敞开。
   if (roomPassword) {
     return { room: normalizedRoom, required: true, password: roomPassword, fileExpire: entry.fileExpire };
   }
 
+  // 显式开放：**不**回落 AUTH_PASSWORD。这就是「全局加密 + 个别房间开放」的表达方式。
+  if (hasRoomEntry && entry.open) {
+    return { room: normalizedRoom, required: false, password: '', fileExpire: entry.fileExpire };
+  }
+
+  // 没配过、或配了个空密码 → 回落全局密码（旧行为，别改回去）。
   if (globalPassword) {
     return { room: normalizedRoom, required: true, password: globalPassword, fileExpire: entry.fileExpire };
   }
@@ -227,11 +243,10 @@ export async function canAccessRoomAsync(env, room, token) {
   return tokenMatchesRoom(env, room, token);
 }
 
-export function hasRoomAuthEntry(env, room) {
-  const normalizedRoom = normalizeRoomName(room);
-  const roomAuth = parseRoomAuth(env);
-  return Object.prototype.hasOwnProperty.call(roomAuth, normalizedRoom);
-}
+// ⚠️ 这里曾经有个 hasRoomAuthEntry（「配置里有没有这一项」）。它和「这个房间要不要密码」
+// **不是一回事**：显式 `{open: true}` 的房间在配置里有这一项，但**不要**密码。
+// 两个调用点（/server 的 roomProtected、/rooms 的 isProtected）都改成
+// resolveRoomAuth(...).required 之后它就没人用了，删掉。
 
 export async function ensureRoomAccess(request, env, room, tokenOverride) {
   const normalizedRoom = normalizeRoomName(room);

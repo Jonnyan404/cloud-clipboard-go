@@ -13,7 +13,7 @@
 //     Android 快捷指令的第二步下载就靠这个（第一次请求的凭据不会跟着走）。
 import { FileHandler } from './.build/file.mjs';
 import { ContentHandler } from './.build/content.mjs';
-import { issueRoomSessionToken, validateRoomSessionToken } from './.build/auth.mjs';
+import { issueRoomSessionToken, validateRoomSessionToken, resolveRoomAuth, canAccessRoomAsync } from './.build/auth.mjs';
 import { makeEnv, makeChecker, getJson } from './harness.mjs';
 
 const { check, summary } = makeChecker();
@@ -127,6 +127,38 @@ console.log('\n── C. 受保护房间：/content/latest 的 url 能靠 ?auth=
     env,
   );
   check('第二步补上 ?auth= → 200', step2WithAuth.status, 200);
+}
+
+console.log('\n── D. {"open": true} = 全局加密时仍然开放的房间 ──');
+{
+  const { env } = makeEnv();
+  env.AUTH_PASSWORD = 'global-pw';
+  env.ROOM_AUTH_JSON = JSON.stringify({
+    public: { open: true },
+    vault: 'vaultpw',
+    'legacy-empty': '',
+    contradiction: { open: true, password: 'both' },
+  });
+
+  // 显式开放：不要密码，也**不**回落全局密码
+  check('open 房间 required=false', resolveRoomAuth(env, 'public').required, false);
+  check('open 房间不带凭据也放行', await canAccessRoomAsync(env, 'public', ''), true);
+
+  // 房间自己的密码生效；全局密码**仍然有效**（旧行为，别改回去）
+  check('房间密码 required=true', resolveRoomAuth(env, 'vault').required, true);
+  check('房间密码本身放行', await canAccessRoomAsync(env, 'vault', 'vaultpw'), true);
+  check('全局密码对房间仍然有效', await canAccessRoomAsync(env, 'vault', 'global-pw'), true);
+  check('错密码不放行', await canAccessRoomAsync(env, 'vault', 'nope'), false);
+
+  // 空字符串 = 只接受全局密码（旧语义，没变）
+  check('空字符串回落全局密码', resolveRoomAuth(env, 'legacy-empty').password, 'global-pw');
+
+  // 没配过的房间也回落全局密码
+  check('没配过的房间继承全局密码', resolveRoomAuth(env, 'never-configured').password, 'global-pw');
+
+  // open + password 同时给 = 配置写错 → 按**需要密码**处理（不能因为多打一个字段把房间敞开）
+  check('open+password 按需要密码处理', resolveRoomAuth(env, 'contradiction').required, true);
+  check('open+password 空凭据不放行', await canAccessRoomAsync(env, 'contradiction', ''), false);
 }
 
 summary('房间鉴权在 Worker 上成立');

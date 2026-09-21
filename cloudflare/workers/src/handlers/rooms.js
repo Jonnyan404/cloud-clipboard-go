@@ -1,5 +1,5 @@
 import { corsHeaders } from '../cors';
-import { canAccessRoomAsync, extractAuthTokens, hasRoomAuthEntry, normalizeRoomName, parseRoomAuth } from '../auth';
+import { canAccessRoomAsync, extractAuthTokens, normalizeRoomName, parseRoomAuth, resolveRoomAuth } from '../auth';
 import { errorResponse } from '../errors';
 
 function toDisplayRoom(room) {
@@ -97,7 +97,9 @@ export class RoomsHandler {
             deviceCount,
             lastActive: Math.max(messageLastActive, presenceLastActive),
             isActive: deviceCount > 0,
-            isProtected: hasRoomAuthEntry(env, normalizedRoom),
+            // 用「实际需不需要密码」而不是「配置里有没有这一项」：显式配空密码的房间是
+            // **开放**的，报成受保护会在房间列表上挂一把不存在的锁。
+            isProtected: resolveRoomAuth(env, normalizedRoom).required,
           };
         }));
 
