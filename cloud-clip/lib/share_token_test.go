@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -405,5 +406,283 @@ func TestShareTokenPasswordNotInToken(t *testing.T) {
 	}
 	if claims.PwdHash == "" || claims.PwdHash == "hunter2" {
 		t.Fatalf("expected a hashed password marker, got %q", claims.PwdHash)
+	}
+}
+
+// ── 分享页（前端 hash 路由）──────────────────────────────────────────────
+//
+// 分享链接必须指向前端分享页，而不是裸接口地址。这里钉住三件事：
+// 路径形状、`#` 没被转义、以及 URL 里带的 token 还能解析回来。
+
+func TestSharePageURLUsesFrontendRoute(t *testing.T) {
+	s := &ClipboardServer{config: &Config{}}
+	s.config.Server.Auth = "secret-pass"
+	s.config.Server.Prefix = "/cc"
+
+	token, _, err := s.issueShareToken("content", "7", "default", 600, 0, "")
+	if err != nil {
+		t.Fatalf("issue failed: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/share", nil)
+	req.Host = "clip.example.com"
+	req.Header.Set("X-Forwarded-Proto", "https")
+
+	got := s.buildSharePageURL(req, token)
+	if !strings.HasPrefix(got, "https://clip.example.com/cc/#/s?t=") {
+		t.Fatalf("unexpected share page url: %s", got)
+	}
+	// `#` 必须是字面量。交给 url.URL 去拼会被转义成 %23，hash 路由当场失效。
+	if strings.Contains(got, "%23") {
+		t.Fatalf("the hash must not be percent-encoded: %s", got)
+	}
+
+	parsed, err := url.Parse(got)
+	if err != nil {
+		t.Fatalf("share page url should parse: %v", err)
+	}
+	if !strings.HasPrefix(parsed.Fragment, "/s?") {
+		t.Fatalf("expected a hash route fragment, got %q", parsed.Fragment)
+	}
+	fragQuery, err := url.ParseQuery(strings.TrimPrefix(parsed.Fragment, "/s?"))
+	if err != nil {
+		t.Fatalf("fragment query should parse: %v", err)
+	}
+	claims, ok := s.parseShareToken(fragQuery.Get("t"))
+	if !ok {
+		t.Fatal("the token carried in the share page url should still parse")
+	}
+	if claims.ID != "7" || claims.Type != "content" {
+		t.Fatalf("unexpected claims: %+v", claims)
+	}
+}
+
+// 房间开放时也**必须**签发 token。
+//
+// 曾经只在 requirement.Required 时才发，于是开放房间的分享链接是裸接口地址：
+// 弹窗里让用户设的 TTL / 次数限制被静默丢弃，而响应里照样回 ttl/maxUses。
+func TestShareAlwaysIssuesTokenOnOpenRoom(t *testing.T) {
+	s := &ClipboardServer{
+		config:       &Config{},
+		logger:       log.New(io.Discard, "", 0),
+		messageQueue: &PostList{},
+	}
+	// 没有 Server.Auth、没有 RoomAuth —— 这就是「开放房间」
+	s.messageQueue.List = append(s.messageQueue.List, PostEvent{
+		Event: "receive",
+		Data: ReceiveHolder{TextReceive: &TextReceive{
+			ReceiveBase: ReceiveBase{ID: 42, Type: "text", Room: "default", Timestamp: time.Now().Unix()},
+			Content:     "hello",
+		}},
+	})
+
+	body := strings.NewReader(`{"type":"content","id":"42","ttl":60,"maxUses":3}`)
+	req := httptest.NewRequest(http.MethodPost, "/share", body)
+	req.Host = "clip.example.com"
+	w := httptest.NewRecorder()
+	s.handle_share(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp struct {
+		Token     string `json:"token"`
+		URL       string `json:"url"`
+		RawURL    string `json:"rawUrl"`
+		MaxUses   int    `json:"maxUses"`
+		ExpiresAt int64  `json:"expiresAt"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+	if resp.Token == "" {
+		t.Fatal("an open room must still get a share token, otherwise ttl/maxUses are silently dropped")
+	}
+	if !strings.Contains(resp.URL, "/#/s?t=") {
+		t.Fatalf("share url should point at the frontend share page, got %s", resp.URL)
+	}
+	// 分享页地址是 hash 路由，取不了正文 —— 下载/取正文要另一条带同一个 token 的地址
+	if !strings.Contains(resp.RawURL, "/content/42") || !strings.Contains(resp.RawURL, "t=") {
+		t.Fatalf("rawUrl should reach the content endpoint with the same token, got %s", resp.RawURL)
+	}
+	if resp.MaxUses != 3 {
+		t.Fatalf("expected maxUses 3, got %d", resp.MaxUses)
+	}
+	if resp.ExpiresAt <= time.Now().Unix() {
+		t.Fatal("expiresAt should be in the future")
+	}
+
+	// 次数限制这次真的生效
+	next := func() *http.Request {
+		return httptest.NewRequest(http.MethodGet, "/content/42?t="+resp.Token, nil)
+	}
+	for i := 1; i <= 3; i++ {
+		if !s.validateShareToken(next(), "content", "42", "default") {
+			t.Fatalf("use %d should succeed", i)
+		}
+	}
+	if s.validateShareToken(next(), "content", "42", "default") {
+		t.Fatal("the 4th use should be rejected when maxUses=3")
+	}
+}
+
+func newShareInfoTestServer(t *testing.T, files map[string]File) *ClipboardServer {
+	t.Helper()
+	return &ClipboardServer{
+		config:        &Config{},
+		logger:        log.New(io.Discard, "", 0),
+		messageQueue:  &PostList{},
+		uploadFileMap: files,
+	}
+}
+
+type shareInfoResponse struct {
+	Type          string `json:"type"`
+	Kind          string `json:"kind"`
+	ID            string `json:"id"`
+	UUID          string `json:"uuid"`
+	Name          string `json:"name"`
+	Size          int64  `json:"size"`
+	Room          string `json:"room"`
+	ExpiresAt     int64  `json:"expiresAt"`
+	MaxUses       int    `json:"maxUses"`
+	Used          int    `json:"used"`
+	NeedsPassword bool   `json:"needsPassword"`
+}
+
+func TestShareInfoForFileShare(t *testing.T) {
+	s := newShareInfoTestServer(t, map[string]File{
+		"uuid-1": {Name: "photo.png", UUID: "uuid-1", Size: 4096, ExpireTime: time.Now().Unix() + 600},
+	})
+
+	token, _, err := s.issueShareToken("file", "uuid-1", "default", 600, 0, "")
+	if err != nil {
+		t.Fatalf("issue failed: %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	s.handle_share(w, httptest.NewRequest(http.MethodGet, "/share?t="+token, nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp shareInfoResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+	if resp.Type != "file" || resp.Kind != "file" {
+		t.Fatalf("unexpected type/kind: %+v", resp)
+	}
+	if resp.UUID != "uuid-1" || resp.Name != "photo.png" || resp.Size != 4096 {
+		t.Fatalf("the share page needs uuid/name/size to build the download link, got %+v", resp)
+	}
+	if resp.NeedsPassword {
+		t.Fatal("this share has no password")
+	}
+}
+
+// 分享页在取正文之前必须先能问出「这条分享到底要不要密码」——
+// 否则收件人只会拿到一个笼统的 401，不知道该输什么。
+func TestShareInfoPasswordGate(t *testing.T) {
+	s := newShareInfoTestServer(t, map[string]File{
+		"uuid-2": {Name: "a.txt", UUID: "uuid-2", Size: 10, ExpireTime: time.Now().Unix() + 600},
+	})
+
+	token, _, err := s.issueShareToken("file", "uuid-2", "default", 600, 0, "hunter2")
+	if err != nil {
+		t.Fatalf("issue failed: %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	s.handle_share(w, httptest.NewRequest(http.MethodGet, "/share?t="+token, nil))
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 without the password, got %d", w.Code)
+	}
+	var errResp struct {
+		Code string `json:"code"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&errResp); err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+	if errResp.Code != "share_password_required" {
+		t.Fatalf("expected share_password_required, got %q", errResp.Code)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/share?t="+token, nil)
+	req.Header.Set(sharePasswordHeader, "hunter2")
+	w2 := httptest.NewRecorder()
+	s.handle_share(w2, req)
+	if w2.Code != http.StatusOK {
+		t.Fatalf("expected 200 with the correct password, got %d: %s", w2.Code, w2.Body.String())
+	}
+}
+
+func TestShareInfoRejectsBadToken(t *testing.T) {
+	s := newShareInfoTestServer(t, nil)
+
+	w := httptest.NewRecorder()
+	s.handle_share(w, httptest.NewRequest(http.MethodGet, "/share?t=not-a-token", nil))
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 for a malformed token, got %d", w.Code)
+	}
+
+	expired, err := s.signShareClaims(shareClaims{
+		Type: "file", ID: "uuid-1", Room: "default", Exp: time.Now().Unix() - 10,
+	})
+	if err != nil {
+		t.Fatalf("sign failed: %v", err)
+	}
+	w2 := httptest.NewRecorder()
+	s.handle_share(w2, httptest.NewRequest(http.MethodGet, "/share?t="+expired, nil))
+	if w2.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 for an expired token, got %d", w2.Code)
+	}
+}
+
+// 「看一眼」不消耗次数：打开分享页本身不该烧掉一次，真正取正文时才算。
+func TestShareInfoDoesNotConsumeUses(t *testing.T) {
+	s := newShareInfoTestServer(t, map[string]File{
+		"uuid-3": {Name: "a.txt", UUID: "uuid-3", Size: 10, ExpireTime: time.Now().Unix() + 600},
+	})
+
+	token, _, err := s.issueShareToken("file", "uuid-3", "default", 600, 1, "")
+	if err != nil {
+		t.Fatalf("issue failed: %v", err)
+	}
+
+	for i := 0; i < 3; i++ {
+		w := httptest.NewRecorder()
+		s.handle_share(w, httptest.NewRequest(http.MethodGet, "/share?t="+token, nil))
+		if w.Code != http.StatusOK {
+			t.Fatalf("peek %d should succeed, got %d: %s", i+1, w.Code, w.Body.String())
+		}
+	}
+
+	next := func() *http.Request {
+		return httptest.NewRequest(http.MethodGet, "/file/uuid-3/a.txt?t="+token, nil)
+	}
+	if !s.validateShareToken(next(), "file", "uuid-3", "default") {
+		t.Fatal("the first real fetch should succeed after any number of peeks")
+	}
+	if s.validateShareToken(next(), "file", "uuid-3", "default") {
+		t.Fatal("the second real fetch should fail with maxUses=1")
+	}
+}
+
+// 分享页地址里不该出现明文密码（密码只走请求头，且 token 里只有哈希）。
+func TestSharePageURLHasNoPassword(t *testing.T) {
+	s := &ClipboardServer{config: &Config{}}
+	s.config.Server.Auth = "secret-pass"
+
+	token, _, err := s.issueShareToken("content", "7", "default", 600, 0, "hunter2")
+	if err != nil {
+		t.Fatalf("issue failed: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/share", nil)
+	req.Host = "clip.example.com"
+	if got := s.buildSharePageURL(req, token); strings.Contains(got, "hunter2") {
+		t.Fatalf("the share page url must not carry the plaintext password: %s", got)
 	}
 }
