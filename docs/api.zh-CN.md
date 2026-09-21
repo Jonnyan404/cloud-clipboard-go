@@ -125,6 +125,7 @@ curl "http://localhost:9501/content/7?format=raw"
 | GET | `/file/:uuid/:name` | 下载文件 | 是 |
 | GET | `/rooms` | 房间列表 | 是 |
 | POST | `/share` | 创建分享令牌 | 是 |
+| GET | `/share?t=` | 分享页元信息（不消耗次数） | 否 |
 | DELETE | `/revoke/:id` | 删除一条 | 是 |
 | DELETE | `/revoke/all` | 清空房间 | 是 |
 | WS | `/push` | 实时推送 | 是 |
@@ -308,22 +309,59 @@ curl "http://localhost:9501/content/latest.json?room=default" -H "Authorization:
 
 ### POST /share
 
-为单条内容创建**短期分享令牌**，让拿到链接的人无需房间密码即可访问：
+为单条内容创建**短期分享令牌**，让拿到链接的人可以访问：
 
 ```http
 POST /share
 Content-Type: application/json
 Authorization: Bearer <凭据>
 
-{"type": "content", "id": "7", "ttl": 900, "maxUses": 0}
+{"type": "content", "id": "7", "ttl": 900, "maxUses": 0, "password": ""}
 ```
 
 - `type`：`content` 或 `file`
 - `file` 类型用 `uuid` 而不是 `id`
 - `ttl` 秒，默认 900（15 分钟），范围 60 ~ 86400
 - `maxUses` 为 `0` 表示不限次数
+- `password` 可选；一旦设置，收件人必须提供（见下）
 
-响应给出带令牌的 URL（`?t=<token>`）。
+令牌**一律签发** —— 开放房间也会拿到一个，因为有效期、次数限制和密码全都装在它里面。
+响应给出两个地址：
+
+```json
+{
+  "url": "https://host/#/s?t=<token>",
+  "rawUrl": "https://host/content/7?t=<token>",
+  "token": "<token>",
+  "expiresAt": 1750000000,
+  "maxUses": 0
+}
+```
+
+- `url` 是**分享页** —— 交给收件人的就是它
+- `rawUrl` 带同一个令牌直连内容 / 文件接口（下载链路用）
+
+### GET /share?t=&lt;token&gt;
+
+分享页在取正文之前先问一次这里：类型、文件名与大小、剩余有效期、以及是否需要密码。
+**不消耗使用次数** —— 打开页面本身不该烧掉一次。
+
+```json
+{"type": "content", "kind": "text", "id": "7", "room": "default",
+ "expiresAt": 1750000000, "maxUses": 0, "used": 0, "needsPassword": false}
+```
+
+失败原因可区分，分享页据此给出对应提示：
+
+| `code` | 状态码 | 含义 |
+|---|---|---|
+| `share_token_invalid` | 401 | 签名不对或已过期 |
+| `share_password_required` | 401 | 没带密码或密码不对 |
+| `content_not_found` / `file_not_found` | 404 | 内容已不存在 |
+| `file_expired` | 404 | 文件已过期 |
+
+**密码走 `X-Share-Password` 请求头，绝不进 URL** —— query 会进浏览器历史和服务器访问日志。
+令牌里只存 `HMAC(服务端密钥, 密码)`。
 
 ### DELETE /revoke/:id
 
@@ -376,6 +414,8 @@ ws://localhost:9501/push?room=default&token=<令牌>
 | `unsupported_type` | 400 | 分享类型不支持 |
 | `password_required` | 401 | 密码为空 |
 | `wrong_password` | 401 | 密码不对 |
+| `share_token_invalid` | 401 | 分享令牌无效或已过期 |
+| `share_password_required` | 401 | 分享密码没带或不对 |
 | `internal_error` | 500 | 服务端内部错误 |
 
 ---

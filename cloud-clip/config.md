@@ -250,15 +250,15 @@ $ curl -H "Authorization: Bearer xxxx" \
   -H "Content-Type: application/json" \
   -d '{"type":"content","id":"7"}' \
   http://localhost:9501/share
-{"type":"content","id":"7","room":"default","ttl":900,"expiresAt":1710000000,"token":"...","url":"http://localhost:9501/content/7?t=..."}
+{"type":"content","id":"7","room":"default","ttl":900,"expiresAt":1710000000,"token":"...","url":"http://localhost:9501/#/s?t=...","rawUrl":"http://localhost:9501/content/7?t=..."}
 
 $ curl -H "Authorization: Bearer xxxx" \
   -H "Content-Type: application/json" \
   -d '{"type":"file","uuid":"530a16de-07cb-4835-ba26-64f5e8e1f300","ttl":600}' \
   http://localhost:9501/share
-{"type":"file","uuid":"530a16de-...","room":"default","ttl":600,"expiresAt":1710000000,"token":"...","url":"http://localhost:9501/file/530a16de-.../image.png?t=..."}
+{"type":"file","uuid":"530a16de-...","room":"default","ttl":600,"expiresAt":1710000000,"token":"...","url":"http://localhost:9501/#/s?t=...","rawUrl":"http://localhost:9501/file/530a16de-.../image.png?t=..."}
 
-# 使用短期 token 访问（无需房间密码）
+# 用短期 token 直连（无需房间密码）
 $ curl "http://localhost:9501/content/7?t=..."
 $ curl -L "http://localhost:9501/file/530a16de-.../image.png?t=..." -o image.png
 
@@ -268,17 +268,32 @@ $ curl -H "Authorization: Bearer xxxx" \
 ```
 
 说明：
+- **`url` 是前端分享页地址**（`<服务地址><prefix>/#/s?t=...`），交给收件人的就是它；
+  `rawUrl` 才是带同一个 token 的直连接口地址，下载链路用。
+- **一律签发 token**，房间没开密码也发 —— 有效期、次数限制、密码都装在 token 里。
+  以前开放房间返回的是裸 `/content/<id>`，`ttl` / `maxUses` 会被静默丢弃。
 - `ttl` 可选，默认 900 秒（15 分钟），范围 60～86400
 - `maxUses` 可选，默认 `0`（不限次数）；正整数表示最多完整访问次数，范围 1～1000
   - 一次完整 GET（无 Range，或 `bytes=0-...`）计 1 次
   - 视频/文件的 Range 续传（`bytes>0`）与 HEAD 不计入次数
   - 次数在服务端按 token 的 `jti` 计数（Go 进程内存；Cloudflare 优先 D1）
-- 未启用房间密码时，返回的 `url` 不含 `t`
+- `password` 可选：设了之后收件人必须提供。**走 `X-Share-Password` 请求头，不进 URL**
+  （query 会进浏览器历史和访问日志）；token 里只存 `HMAC(服务端密钥, 密码)` 的前 16 位
 - 短期 token 仅授予对应 content/file 的读取权限，不能用于上传/删除
+
+分享页在取正文之前会先问一次 `GET /share?t=<token>`，拿类型 / 文件名 / 大小 / 剩余有效期 /
+是否需要密码。**这一步不消耗次数** —— 打开页面本身不该烧掉一次。失败原因可区分：
+`share_token_invalid`（无效或过期）、`share_password_required`（没带或带错密码）、
+`content_not_found` / `file_not_found`、`file_expired`。
 
 ```console
 # 15 分钟、最多打开 3 次
 $ curl -H "Authorization: Bearer xxxx" -H "Content-Type: application/json" \
   -d '{"type":"content","id":"7","ttl":900,"maxUses":3}' \
+  http://localhost:9501/share
+
+# 15 分钟、最多 3 次、且需要密码 hunter2
+$ curl -H "Authorization: Bearer xxxx" -H "Content-Type: application/json" \
+  -d '{"type":"content","id":"7","ttl":900,"maxUses":3,"password":"hunter2"}' \
   http://localhost:9501/share
 ```

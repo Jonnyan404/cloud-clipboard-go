@@ -127,6 +127,7 @@ Common codes are listed in the [error table](#9-error-codes) below.
 | GET | `/file/:uuid/:name` | Download a file | Yes |
 | GET | `/rooms` | Room list | Yes |
 | POST | `/share` | Create a share token | Yes |
+| GET | `/share?t=` | Share-page metadata (no use consumed) | No |
 | DELETE | `/revoke/:id` | Delete one entry | Yes |
 | DELETE | `/revoke/all` | Clear the room | Yes |
 | WS | `/push` | Real-time push | Yes |
@@ -314,23 +315,59 @@ Returns the room list (requires `roomList` to be enabled):
 
 ### POST /share
 
-Creates a **short-lived share token** so someone with the link can read one entry without the
-room password:
+Creates a **short-lived share token** so someone with the link can read one entry:
 
 ```http
 POST /share
 Content-Type: application/json
 Authorization: Bearer <credential>
 
-{"type": "content", "id": "7", "ttl": 900, "maxUses": 0}
+{"type": "content", "id": "7", "ttl": 900, "maxUses": 0, "password": ""}
 ```
 
 - `type` is `content` or `file`
 - File shares use `uuid` instead of `id`
 - `ttl` is in seconds, default 900 (15 min), range 60 – 86400
 - `maxUses` of `0` means unlimited
+- `password` is optional; when set, the recipient must supply it (see below)
 
-The response contains a URL carrying the token (`?t=<token>`).
+A token is issued **always** — an open room gets one too, because the TTL, the usage limit and the
+password all live in it. The response carries two URLs:
+
+```json
+{
+  "url": "https://host/#/s?t=<token>",
+  "rawUrl": "https://host/content/7?t=<token>",
+  "token": "<token>",
+  "expiresAt": 1750000000,
+  "maxUses": 0
+}
+```
+
+- `url` is the **share page** — this is what you hand to the recipient
+- `rawUrl` reaches the content / file endpoint directly with the same token (used for downloads)
+
+### GET /share?t=&lt;token&gt;
+
+What the share page asks before fetching anything: type, file name and size, remaining validity,
+and whether a password is needed. **It does not consume a use** — opening the page should not burn one.
+
+```json
+{"type": "content", "kind": "text", "id": "7", "room": "default",
+ "expiresAt": 1750000000, "maxUses": 0, "used": 0, "needsPassword": false}
+```
+
+Failures are distinguishable so the page can react:
+
+| `code` | Status | Meaning |
+|---|---|---|
+| `share_token_invalid` | 401 | Bad signature, or expired |
+| `share_password_required` | 401 | Password missing or wrong |
+| `content_not_found` / `file_not_found` | 404 | Gone |
+| `file_expired` | 404 | Expired |
+
+**The password travels in the `X-Share-Password` header, never in the URL** — query strings end up in
+browser history and server access logs. The token only stores `HMAC(server key, password)`.
 
 ### DELETE /revoke/:id
 
@@ -383,6 +420,8 @@ Reconnection is the client's job (the web UI retries with exponential backoff).
 | `unsupported_type` | 400 | Unsupported share type |
 | `password_required` | 401 | Empty password |
 | `wrong_password` | 401 | Wrong password |
+| `share_token_invalid` | 401 | Share token bad or expired |
+| `share_password_required` | 401 | Share password missing or wrong |
 | `internal_error` | 500 | Server-side failure |
 
 ---
