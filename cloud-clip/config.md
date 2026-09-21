@@ -18,6 +18,7 @@
         "roomAuth": {
             "private": "", // 空字符串表示该房间只接受全局 auth
             "finance": "finance-pass", // 非空字符串表示该房间额外接受独立密码
+            "public": {"open": true}, // 显式声明该房间**开放**：不要密码，即使全局 auth 设了也一样
             "keep": {"password": "kp", "fileExpire": 0}, // 对象形式：password 为房间密码；fileExpire: 0=该房间文件永不过期，>0=覆盖 file.expire 秒数，不填=使用全局 file.expire
             "archive": {"fileExpire": 604800} // 也可以只配置 fileExpire（无独立密码）
         },
@@ -47,6 +48,9 @@
 > 如果设置了 `server.auth`，它始终作为全局入口密码，对所有房间生效。
 > `server.roomAuth` 不会让 `server.auth` 失效；它只是给指定房间增加一个额外可用密码。
 > `server.roomAuth` 中值为空字符串时，该房间只接受全局 `server.auth`；值为非空字符串时，该房间同时接受全局 `server.auth` 和该房间自己的密码。
+> 想让某个房间在**全局加密**的前提下保持开放，用 `{ "open": true }`：该房间不要密码，且**不**回落全局密码。这样两种混合都能表达 —— 全局加密 + 个别房间开放，或全局开放 + 个别房间加密。
+> `open` 是单独一个字段，不是「把值留空」：空字符串在这份配置里**已经有含义**（只接受全局密码），改掉它会静默改变现有配置 —— 某个房间会悄悄敞开。而且 `open` 还能和 `fileExpire` 一起用（`{"open": true, "fileExpire": 0}` = 开放且文件永不过期），空字符串表达不了这个。
+> 同时写了 `open` 和非空 `password` 属于配置写错：**按需要密码处理**（宁可多要一次密码，也不能因为多打了一个字段把房间敞开）。
 > 值也可以是对象 `{ "password": "xx", "fileExpire": N }`：`fileExpire` 为 `0` 表示该房间上传的文件永不过期；大于 `0` 表示覆盖全局 `file.expire`（秒）；不填表示沿用全局。注意 `fileExpire` 只影响修改配置之后上传的文件；历史条数轮转删除不受其影响。
 > 未通过认证的用户不会在房间列表里看到受保护房间。
 

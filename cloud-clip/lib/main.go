@@ -911,7 +911,9 @@ func (s *ClipboardServer) getRoomList(tokens []string) []RoomInfo {
 			DeviceCount:  deviceCount,
 			LastActive:   lastActive,
 			IsActive:     deviceCount > 0,
-			IsProtected:  s.hasRoomAuthEntry(room),
+			// 用「实际需不需要密码」而不是「roomAuth 里有没有这一项」：
+			// 显式配了空密码的房间是**开放**的，报成受保护会让房间列表挂一把不存在的锁。
+			IsProtected:  s.resolveRoomAuth(room).Required,
 		}
 
 		roomList = append(roomList, roomInfo)

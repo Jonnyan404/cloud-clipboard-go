@@ -124,3 +124,74 @@ func TestResolveRoomAuthKeepsPasswordAndPolicy(t *testing.T) {
 		t.Fatalf("empty-password room should not require auth: %+v", open)
 	}
 }
+
+// 「全局加密 + 个别房间开放」用 `{"open": true}` 表达。
+//
+// ⚠️ 是**显式字段**而不是「把值留空」：空字符串在这份配置里已经有含义（只接受全局 auth），
+// 改掉它会静默改变现有配置 —— 某个房间会悄悄敞开。四种组合都在这里钉住，别改回去。
+func TestOpenRoomOverridesGlobalAuth(t *testing.T) {
+	s := newServerWithRoomAuth(t, `{
+		"server": {
+			"auth": "global-pass",
+			"roomAuth": {
+				"public": {"open": true},
+				"locked": "room-pass",
+				"legacy-empty": ""
+			}
+		}
+	}`)
+
+	// 显式开放：不要密码，也不回落全局密码
+	if req := s.resolveRoomAuth("public"); req.Required {
+		t.Fatalf("open 房间不该要密码: %+v", req)
+	}
+	if !s.canAccessRoom("public", "") {
+		t.Fatal("开放房间不带凭据也该能进")
+	}
+
+	// 房间自己的密码生效，**且全局密码仍然有效**（旧行为，别改回去）
+	locked := s.resolveRoomAuth("locked")
+	if !locked.Required || locked.Password != "room-pass" {
+		t.Fatalf("房间密码应当生效: %+v", locked)
+	}
+	for _, token := range []string{"room-pass", "global-pass"} {
+		if !s.canAccessRoom("locked", token) {
+			t.Fatalf("凭据 %q 应当能进 locked", token)
+		}
+	}
+	for _, token := range []string{"", "wrong"} {
+		if s.canAccessRoom("locked", token) {
+			t.Fatalf("凭据 %q 不该进 locked", token)
+		}
+	}
+
+	// 空字符串 = 只接受全局 auth（旧语义，没变）
+	legacy := s.resolveRoomAuth("legacy-empty")
+	if !legacy.Required || legacy.Password != "global-pass" {
+		t.Fatalf("空字符串应当回落全局密码: %+v", legacy)
+	}
+
+	// 没配过的房间也回落全局密码
+	if req := s.resolveRoomAuth("never-configured"); !req.Required || req.Password != "global-pass" {
+		t.Fatalf("没配过的房间应当继承全局密码: %+v", req)
+	}
+}
+
+// open 和 password 同时给 = 配置写错。按**需要密码**处理：
+// 宁可多要一次密码，也不能因为多打了一个字段把房间敞开。
+func TestOpenWithPasswordPrefersPassword(t *testing.T) {
+	s := newServerWithRoomAuth(t, `{
+		"server": {
+			"auth": "global-pass",
+			"roomAuth": {"contradiction": {"open": true, "password": "room-pass"}}
+		}
+	}`)
+
+	req := s.resolveRoomAuth("contradiction")
+	if !req.Required || req.Password != "room-pass" {
+		t.Fatalf("open + password 同时出现时应当按需要密码处理: %+v", req)
+	}
+	if s.canAccessRoom("contradiction", "") {
+		t.Fatal("不该因为配置里多写了 open 就把房间敞开")
+	}
+}

@@ -22,9 +22,16 @@ type RoomAuthRequirement struct {
 //	"password"                       -> 仅密码（旧格式）
 //	12345                            -> 数字密码
 //	{"password": "x", "fileExpire": 0} -> 密码 + 文件过期覆盖（fileExpire: 0=永不过期，>0=秒数，<0=回退全局）
+//	{"open": true, "fileExpire": 0}  -> **开放房间**：不要密码，即使全局 server.auth 设了也一样
+//
+// `open` 单独一个字段、而不是拿「空密码」当信号，有两个原因：
+//  1. 空字符串在这份配置里**已经有含义**（只接受全局 auth，见 config.md）——
+//     改掉它会静默改变所有现有配置的含义，某个房间会悄悄敞开且不报错。安全设置不能这么反转。
+//  2. 空密码和「压根没配过这个房间」在 JSON 里长得一样，而这两者的意图正好相反。
 type RoomAuthEntry struct {
 	Password   string `json:"password"`
 	FileExpire *int64 `json:"fileExpire"`
+	Open       bool   `json:"open"`
 }
 
 func (e *RoomAuthEntry) UnmarshalJSON(data []byte) error {
@@ -45,6 +52,7 @@ func (e *RoomAuthEntry) UnmarshalJSON(data []byte) error {
 	var obj struct {
 		Password   interface{} `json:"password"`
 		FileExpire *float64    `json:"fileExpire"`
+		Open       bool        `json:"open"`
 	}
 	if err := json.Unmarshal(trimmed, &obj); err != nil {
 		return err
@@ -56,6 +64,7 @@ func (e *RoomAuthEntry) UnmarshalJSON(data []byte) error {
 		v := int64(*obj.FileExpire)
 		e.FileExpire = &v
 	}
+	e.Open = obj.Open
 	return nil
 }
 
@@ -161,12 +170,22 @@ func extractAuthTokens(r *http.Request) []string {
 func (s *ClipboardServer) resolveRoomAuth(room string) RoomAuthRequirement {
 	normalizedRoom := normalizeRoomName(room)
 	globalPassword := normalizeAuthValue(s.config.Server.Auth)
-	entry, _ := s.config.Server.RoomAuth[normalizedRoom]
+	entry, hasEntry := s.config.Server.RoomAuth[normalizedRoom]
 
-	if entry.Password != "" {
+	// 房间自己带密码 → 用它。全局密码**仍然有效**（见 tokenMatchesRoom），
+	// 所以 roomAuth 是「多给一把钥匙」，不是「换锁」。
+	if hasEntry && entry.Password != "" {
+		// ⚠️ 同时写了 open 和 password 是配置写错了。**密码优先** ——
+		// 宁可多要一次密码，也不能因为配置里多打了一个字段就把房间敞开。
 		return RoomAuthRequirement{Room: normalizedRoom, Required: true, Password: entry.Password, FileExpire: entry.FileExpire}
 	}
 
+	// 显式开放：**不**回落全局 auth。这就是「全局加密 + 个别房间开放」的表达方式。
+	if hasEntry && entry.Open {
+		return RoomAuthRequirement{Room: normalizedRoom, FileExpire: entry.FileExpire}
+	}
+
+	// 没配过、或配了个空密码 → 回落全局 auth（旧行为，别改回去）。
 	if globalPassword != "" {
 		return RoomAuthRequirement{Room: normalizedRoom, Required: true, Password: globalPassword, FileExpire: entry.FileExpire}
 	}
