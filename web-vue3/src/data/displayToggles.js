@@ -77,8 +77,10 @@ export const DISPLAY_TOGGLES = [
     { key: 'cardDownload', group: 'card', labelKey: 'download', icon: 'mdi-download', modes: ONLY_DEFAULT },
     { key: 'cardPreview', group: 'card', labelKey: 'preview', icon: 'mdi-text-box-search-outline', modes: ONLY_DEFAULT },
     { key: 'cardCopy', group: 'card', labelKey: 'copyText', icon: 'mdi-content-copy', modes: ONLY_DEFAULT },
-    { key: 'cardCopyLink', group: 'card', labelKey: 'copyLink', icon: 'mdi-link-variant', modes: ONLY_DEFAULT },
-    { key: 'cardQr', group: 'card', labelKey: 'showQrCode', icon: 'mdi-qrcode', modes: ONLY_DEFAULT },
+    // 「复制链接」与「二维码」合成了一个开关：两者产出的**是同一个 URL**（分享页地址），
+    // 区别只剩呈现方式。拆成两个图标等于让用户先做一个没有意义的决定。
+    // 点一次 = 链接进剪贴板 + 弹出面板（二维码 + 链接 + 复制按钮 + 有效期/次数）。
+    { key: 'cardShare', group: 'card', labelKey: 'shareLink', icon: 'mdi-share-variant', modes: ONLY_DEFAULT },
     { key: 'cardDelete', group: 'card', labelKey: 'delete', icon: 'mdi-close-circle-outline', modes: ONLY_DEFAULT },
 ];
 
@@ -127,8 +129,7 @@ export const DEFAULT_DISPLAY = {
     cardDownload: true,
     cardPreview: true,
     cardCopy: true,
-    cardCopyLink: true,
-    cardQr: true,
+    cardShare: true,
     cardDelete: true,
 };
 

@@ -41,6 +41,8 @@ const display = useDisplay();
 const { t, locale } = useI18n();
 const router = useRouter();
 const route = useRoute();
+// 分享页走裸壳：不渲染工具栏 / 房间侧栏 / 设置面板（见模板顶部的 v-if）
+const isShareRoute = computed(() => Boolean(route.meta?.sharePage));
 
 const colorDialog = ref(false);
 const pickColorDialog = ref(false);
@@ -515,6 +517,13 @@ watch(() => route.fullPath, () => {
 
 <template>
     <v-app class="app-shell" :class="{ 'app-shell--dark': isDark }">
+        <!-- 分享页是给收件人看的独立页面：不能带主应用的外壳（工具栏、房间侧栏、设置面板）。
+             包一层 v-if 而不是给每一块加条件 —— 外壳的部件太多，漏一个就漏出去了。 -->
+        <template v-if="isShareRoute">
+            <router-view />
+        </template>
+
+        <template v-else>
         <v-alert
             v-model="clipboardClearedMessageVisible"
             type="error"
@@ -793,6 +802,38 @@ watch(() => route.fullPath, () => {
                                                                             ></v-text-field>
                                                                         </template>
                                                                     </v-list-item>
+                                                                    <v-list-item class="cc-settings__item">
+                                                                        <v-list-item-title>{{ t('shareDefaultFormat') }}</v-list-item-title>
+                                                                        <template v-slot:append>
+                                                                            <v-btn-toggle
+                                                                                :model-value="app.shareDefaults.format"
+                                                                                mandatory
+                                                                                density="compact"
+                                                                                variant="outlined"
+                                                                                divided
+                                                                                @update:model-value="v => app.setShareDefaults({ format: v === 'md' ? 'md' : 'raw' })"
+                                                                            >
+                                                                                <v-btn value="raw" size="small">{{ t('rawText') }}</v-btn>
+                                                                                <v-btn value="md" size="small">{{ t('renderMarkdown') }}</v-btn>
+                                                                            </v-btn-toggle>
+                                                                        </template>
+                                                                    </v-list-item>
+                                                                    <v-list-item class="cc-settings__item">
+                                                                        <v-list-item-title>{{ t('shareDefaultPassword') }}</v-list-item-title>
+                                                                        <template v-slot:append>
+                                                                            <v-text-field
+                                                                                :model-value="app.shareDefaults.password"
+                                                                                type="password"
+                                                                                autocomplete="new-password"
+                                                                                density="compact"
+                                                                                variant="solo"
+                                                                                flat
+                                                                                hide-details
+                                                                                class="cc-settings__text"
+                                                                                @update:model-value="v => app.setShareDefaults({ password: String(v || '') })"
+                                                                            ></v-text-field>
+                                                                        </template>
+                                                                    </v-list-item>
                                                                 </template>
                                                             </template>
                                                             </v-list>
@@ -1033,6 +1074,7 @@ watch(() => route.fullPath, () => {
             {{ toastState.text }}
         </v-snackbar>
 
+        </template>
     </v-app>
 </template>
 
@@ -1121,6 +1163,10 @@ watch(() => route.fullPath, () => {
 /* 设置里的数字输入（分享默认值）。窄一点，别把标题挤没了。 */
 .cc-settings__num {
     max-width: 96px;
+}
+
+.cc-settings__text {
+    max-width: 168px;
 }
 
 .cc-settings__group-head {

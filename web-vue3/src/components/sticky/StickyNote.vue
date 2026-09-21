@@ -145,19 +145,13 @@ const contentUrl = computed(() => {
     const id = props.meta?.id ?? '';
     return buildCleanAbsoluteRouteUrl(`content/${id}${roomQuery}`, app?.config?.server?.prefix || '');
 });
-const fileUrl = computed(() => {
-    const cache = props.meta?.cache || '';
-    const encodedFilename = encodeURIComponent(props.meta?.name || 'file');
-    return buildCleanAbsoluteRouteUrl(`file/${cache}/${encodedFilename}`, app?.config?.server?.prefix || '');
-});
-const needsShareProtection = computed(() => Boolean(app?.config?.auth));
-
-async function ensureFileShareUrl() {
-    if (!needsShareProtection.value) {
-        return fileUrl.value;
-    }
+// 文件分享：一次签发拿到**两条**地址。
+//   raw  直连正文 —— 下载与预览用（分享页是 hash 路由，取不了字节）
+//   page 前端分享页 —— 复制给别人用
+// 一律签发 token：房间没开密码也发，否则 ttl / 次数限制会被静默丢弃。
+async function ensureFileShareLinks() {
     const data = await createShareLink({ type: 'file', uuid: props.meta?.cache, ttl: SHARE_DEFAULT_TTL, maxUses: 0, room: ws.room });
-    return data?.url || '';
+    return { raw: data?.rawUrl || '', page: data?.url || '' };
 }
 async function downloadFile() {
     if (expired.value || downloading.value) {
@@ -165,7 +159,7 @@ async function downloadFile() {
     }
     downloading.value = true;
     try {
-        const url = await ensureFileShareUrl();
+        const { raw: url } = await ensureFileShareLinks();
         const downloadUrl = new URL(url, window.location.origin);
         downloadUrl.searchParams.set('download', 'true');
         const anchor = document.createElement('a');
@@ -192,15 +186,15 @@ async function copyContent() {
     }
 }
 async function copyLink() {
+    // 一律走服务端签发：房间没开密码也发 token，否则 ttl / 次数限制会被静默丢弃。
+    // 拿到的 url 是**前端分享页**地址，不是裸接口地址。
     let url = contentUrl.value;
-    if (needsShareProtection.value) {
-        try {
-            const data = await createShareLink({ type: 'content', id: props.meta?.id, ttl: SHARE_DEFAULT_TTL, maxUses: 0, room: ws.room });
-            url = data?.url || url;
-        } catch (error) {
-            toast(t('copyFailedGeneral'));
-            return;
-        }
+    try {
+        const data = await createShareLink({ type: 'content', id: props.meta?.id, ttl: SHARE_DEFAULT_TTL, maxUses: 0, room: ws.room });
+        url = data?.url || url;
+    } catch (error) {
+        toast(t('copyFailedGeneral'));
+        return;
     }
     try {
         await copyTextToClipboard(url);
@@ -219,7 +213,7 @@ async function loadPreview() {
     if (isPreviewableVideo.value || isPreviewableAudio.value) {
         previewLoading.value = true;
         try {
-            srcPreview.value = await ensureFileShareUrl();
+            srcPreview.value = (await ensureFileShareLinks()).raw;
         } catch (error) {
             console.error('生成预览链接失败:', error);
             toast(t('fileFetchFailed'));

@@ -23,7 +23,7 @@ const INITIAL_DISPLAY = (() => {
 // 另带一次性的 markdown 旧值迁移（见内）。
 // 分享默认值：{ ttlMinutes, maxUses }。坏数据当没有，回落到出厂值。
 function loadShareDefaults() {
-    const fallback = { ttlMinutes: 15, maxUses: 0 };
+    const fallback = { ttlMinutes: 15, maxUses: 0, password: '', format: 'raw' };
     try {
         const raw = localStorage.getItem('shareDefaults');
         if (!raw) return fallback;
@@ -32,6 +32,9 @@ function loadShareDefaults() {
         return {
             ttlMinutes: Number.isFinite(Number(parsed.ttlMinutes)) ? Number(parsed.ttlMinutes) : fallback.ttlMinutes,
             maxUses: Number.isFinite(Number(parsed.maxUses)) ? Number(parsed.maxUses) : fallback.maxUses,
+            // 密码与展示格式也存下来：不弹窗时要用它们，否则「关了弹窗就没法设密码」。
+            password: typeof parsed.password === 'string' ? parsed.password : fallback.password,
+            format: parsed.format === 'md' ? 'md' : fallback.format,
         };
     } catch {
         return fallback;

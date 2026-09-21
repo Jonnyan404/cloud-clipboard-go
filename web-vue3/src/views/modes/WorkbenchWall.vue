@@ -202,19 +202,18 @@ function relativeTimeLabel(item) {
     return new Date(item.timestamp * 1000).toLocaleDateString(undefined, { month: '2-digit', day: '2-digit' });
 }
 
-const needsShareProtection = computed(() => Boolean(app.config?.auth));
 
-async function ensureFileShareUrl(item) {
+// 文件分享：一次签发拿到**两条**地址。
+//   raw  直连正文 —— 下载与预览用（分享页是 hash 路由，取不了字节）
+//   page 前端分享页 —— 复制给别人用
+// 一律签发 token：房间没开密码也发，否则 ttl / 次数限制会被静默丢弃。
+async function ensureFileShareLinks(item) {
     const cache = item?.cache;
     if (!cache) {
-        return '';
-    }
-    if (!needsShareProtection.value) {
-        const encodedFilename = encodeURIComponent(item.name || 'file');
-        return buildCleanAbsoluteRouteUrl(`file/${cache}/${encodedFilename}`, app.config?.server?.prefix || '');
+        return { raw: '', page: '' };
     }
     const data = await createShareLink({ type: 'file', uuid: cache, ttl: SHARE_DEFAULT_TTL, maxUses: 0, room: ws.room });
-    return data?.url || '';
+    return { raw: data?.rawUrl || '', page: data?.url || '' };
 }
 
 async function downloadFile() {
@@ -223,7 +222,7 @@ async function downloadFile() {
     }
     downloading.value = true;
     try {
-        const url = await ensureFileShareUrl(detailItem.value);
+        const { raw: url } = await ensureFileShareLinks(detailItem.value);
         const downloadUrl = new URL(url, window.location.origin);
         downloadUrl.searchParams.set('download', 'true');
         const anchor = document.createElement('a');
@@ -247,7 +246,7 @@ async function downloadItem(item) {
     }
     downloading.value = true;
     try {
-        const url = await ensureFileShareUrl(item);
+        const { raw: url } = await ensureFileShareLinks(item);
         const downloadUrl = new URL(url, window.location.origin);
         downloadUrl.searchParams.set('download', 'true');
         const anchor = document.createElement('a');
@@ -277,7 +276,7 @@ async function copyContent(item) {
 
 async function copyFileLink(item) {
     try {
-        const url = item.cache ? await ensureFileShareUrl(item) : contentUrlOf(item);
+        const url = item.cache ? (await ensureFileShareLinks(item)).page : contentUrlOf(item);
         await copyTextToClipboard(url);
         toast(t('copySuccess'));
     } catch (err) {
@@ -324,7 +323,7 @@ async function loadPreview() {
     if (isPreviewableVideo.value || isPreviewableAudio.value) {
         previewLoading.value = true;
         try {
-            srcPreview.value = await ensureFileShareUrl(detailItem.value);
+            srcPreview.value = (await ensureFileShareLinks(detailItem.value)).raw;
         } catch (error) {
             console.error('生成预览链接失败:', error);
             toast(t('fileFetchFailed'));

@@ -10,7 +10,7 @@ import QrcodeVue from 'qrcode.vue';
 import { useMarkdown } from '@/composables/useMarkdown.js';
 import MarkdownBody from '@/components/MarkdownBody.vue';
 import MarkdownToggle from '@/components/MarkdownToggle.vue';
-import { SHARE_DEFAULT_TTL, SHARE_DEFAULT_TTL_MINUTES, SHARE_MAX_TTL_MINUTES, SHARE_MIN_TTL_MINUTES, buildCleanAbsoluteRouteUrl, copyTextToClipboard, createShareLink, deviceLabel, errorMessage, formatShareDuration, formatTimestamp, minutesToShareTTL, normalizeShareMaxUses, normalizeShareTTL, percentage, prettyFileSize } from '@/util.js';
+import { SHARE_DEFAULT_TTL, SHARE_DEFAULT_TTL_MINUTES, SHARE_MAX_TTL_MINUTES, SHARE_MIN_TTL_MINUTES, buildCleanAbsoluteRouteUrl, copyTextToClipboard, createShareLink, deviceLabel, errorMessage, formatShareDuration, formatTimestamp, minutesToShareTTL, normalizeShareMaxUses, normalizeShareTTL, percentage, prettyFileSize, withSharePageFormat } from '@/util.js';
 
 const mdiCellphone = 'mdi-cellphone';
 const mdiCodeTags = 'mdi-code-tags';
@@ -23,12 +23,11 @@ const mdiDownload = 'mdi-download';
 const mdiDownloadOff = 'mdi-download-off';
 const mdiImageSearchOutline = 'mdi-image-search-outline';
 const mdiIpNetworkOutline = 'mdi-ip-network-outline';
-const mdiLinkVariant = 'mdi-link-variant';
+const mdiShareVariant = 'mdi-share-variant';
 const mdiMovie = 'mdi-movie';
 const mdiMovieSearchOutline = 'mdi-movie-search-outline';
 const mdiMusicNote = 'mdi-music-note';
 const mdiPound = 'mdi-pound';
-const mdiQrcode = 'mdi-qrcode';
 const mdiTextBoxSearchOutline = 'mdi-text-box-search-outline';
 const props = defineProps({
     meta: {
@@ -50,10 +49,9 @@ const expand = ref(false);
 const srcPreview = ref(null);
 const textPreview = ref('');
 const showFullTextPreview = ref(false);
-const qrDialogVisible = ref(false);
+const shareResultVisible = ref(false);
 const shareDialogVisible = ref(false);
-const shareDialogMode = ref('copy');
-const shareForm = ref({ ttlMinutes: SHARE_DEFAULT_TTL_MINUTES, maxUses: 0 });
+const shareForm = ref({ ttlMinutes: SHARE_DEFAULT_TTL_MINUTES, maxUses: 0, password: '', format: 'raw' });
 const shareTtlMinMinutes = SHARE_MIN_TTL_MINUTES;
 const shareTtlMaxMinutes = SHARE_MAX_TTL_MINUTES;
 const shareUrlLoading = ref(false);
@@ -97,12 +95,6 @@ const contentUrl = computed(() => {
     const id = props.meta?.id ?? '';
     return buildCleanAbsoluteRouteUrl(`content/${id}${roomQuery}`, app?.config?.server?.prefix || '');
 });
-const fileUrl = computed(() => {
-    const cache = props.meta?.cache || '';
-    const encodedFilename = encodeURIComponent(props.meta?.name || 'file');
-    return buildCleanAbsoluteRouteUrl(`file/${cache}/${encodedFilename}`, app?.config?.server?.prefix || '');
-});
-const needsShareProtection = computed(() => Boolean(app?.config?.auth));
 const shareTtlSeconds = computed(() => minutesToShareTTL(shareForm.value.ttlMinutes));
 const shareTtlLabel = computed(() => formatShareDuration(shareTtlSeconds.value, (key, params) => t(key, params)));
 const shareTtlProgress = computed(() => {
@@ -125,32 +117,47 @@ function onShareTtlInput(event) {
     const next = Number(event && event.target ? event.target.value : shareForm.value.ttlMinutes);
     shareForm.value.ttlMinutes = Number.isFinite(next) ? next : SHARE_DEFAULT_TTL_MINUTES;
 }
-function openShareDialog(mode = 'copy') {
-    shareDialogMode.value = mode;
-    if (!needsShareProtection.value) {
-        shareUnprotected(mode);
+// 分享：一个图标，一个面板。
+//
+// 「复制链接」和「二维码」以前是两个图标，但它们产出的**是同一个 URL**（分享页地址），
+// 区别只剩呈现方式。现在合成一条路径：点图标 →（可选：有效期/次数/密码/格式设置框）
+// → 链接进剪贴板 + 弹出面板，面板里二维码、链接、复制按钮、有效期/次数一次给全。
+function openShareDialog() {
+    // 「分享时弹出设置框」关掉时，直接用设置里存好的默认值建链接，不弹框。
+    if (!app.display.shareDialog) {
+        shareForm.value = { ...app.shareDefaults };
+        confirmShareDialog();
         return;
     }
-    shareForm.value = { ttlMinutes: SHARE_DEFAULT_TTL_MINUTES, maxUses: 0 };
+    shareForm.value = {
+        ttlMinutes: SHARE_DEFAULT_TTL_MINUTES,
+        maxUses: 0,
+        password: '',
+        format: 'raw',
+    };
     shareDialogVisible.value = true;
 }
-async function shareUnprotected(mode = 'copy') {
-    const url = contentUrl.value;
-    shareContentUrl.value = url;
-    lastShareMeta.value = null;
-    if (mode === 'qr') {
-        qrDialogVisible.value = true;
-        return;
+async function copyShareLink() {
+    if (shareContentUrl.value) {
+        await copyToClipboard(shareContentUrl.value, 'copySuccess');
     }
-    await copyToClipboard(url, 'copySuccess');
 }
 async function confirmShareDialog() {
     const ttl = normalizeShareTTL(shareTtlSeconds.value);
     const maxUses = normalizeShareMaxUses(shareForm.value.maxUses);
+    const password = String(shareForm.value.password || '').trim();
     shareUrlLoading.value = true;
     try {
-        const data = await createShareLink({ type: 'content', id: props.meta?.id, ttl, maxUses, room: ws.room });
-        const url = data?.url || contentUrl.value;
+        const data = await createShareLink({
+            type: 'content',
+            id: props.meta?.id,
+            ttl,
+            maxUses,
+            password,
+            room: ws.room,
+        });
+        // 服务端一律签发 token 并返回分享页地址；这里只再把展示格式挂上去（f=md|raw）
+        const url = withSharePageFormat(data?.url || contentUrl.value, shareForm.value.format);
         shareContentUrl.value = url;
         lastShareMeta.value = {
             ttl: data?.ttl ?? ttl,
@@ -161,11 +168,8 @@ async function confirmShareDialog() {
                 : t('shareUsesUnlimited'),
         };
         shareDialogVisible.value = false;
-        if (shareDialogMode.value === 'qr') {
-            qrDialogVisible.value = true;
-        } else {
-            await copyToClipboard(url, 'copySuccess');
-        }
+        shareResultVisible.value = true;
+        await copyToClipboard(url, 'copySuccess');
     } catch (error) {
         console.error('生成分享链接失败:', error);
         toast(t('copyFailedGeneral'));
@@ -173,15 +177,20 @@ async function confirmShareDialog() {
         shareUrlLoading.value = false;
     }
 }
+// 下载走**直连正文**的地址（rawUrl），不是分享页地址 —— 分享页是 hash 路由，取不了字节。
+// 服务端签发 token 时已经把这条地址一起给出来了，别在前端再拼一遍。
 async function ensureFileShareUrl() {
-    if (!needsShareProtection.value) {
-        return fileUrl.value;
-    }
     if (shareFileUrl.value) {
         return shareFileUrl.value;
     }
-    const data = await createShareLink({ type: 'file', uuid: props.meta?.cache, ttl: SHARE_DEFAULT_TTL, maxUses: 0, room: ws.room });
-    shareFileUrl.value = data?.url || '';
+    const data = await createShareLink({
+        type: 'file',
+        uuid: props.meta?.cache,
+        ttl: SHARE_DEFAULT_TTL,
+        maxUses: 0,
+        room: ws.room,
+    });
+    shareFileUrl.value = data?.rawUrl || '';
     return shareFileUrl.value;
 }
 async function ensureFileDownloadUrl() {
@@ -410,18 +419,10 @@ function deviceIcon(type) {
                             </v-tooltip>
                         </template>
 
-                        <v-tooltip v-if="app.display.cardCopyLink" :text="t('copyLink')" location="top">
+                        <v-tooltip v-if="app.display.cardShare" :text="t('shareLink')" location="top">
                             <template v-slot:activator="{ props }">
-                                <v-btn v-bind="props" icon density="compact" variant="text" color="grey" class="timeline-card__icon-button" @click="openShareDialog('copy')">
-                                    <v-icon>{{mdiLinkVariant }}</v-icon>
-                                </v-btn>
-                            </template>
-                        </v-tooltip>
-
-                        <v-tooltip v-if="app.display.cardQr" :text="t('showQrCode')" location="top">
-                            <template v-slot:activator="{ props }">
-                                <v-btn v-bind="props" icon density="compact" variant="text" color="grey" class="timeline-card__icon-button" @click="openShareDialog('qr')">
-                                    <v-icon>{{mdiQrcode }}</v-icon>
+                                <v-btn v-bind="props" icon density="compact" variant="text" color="grey" class="timeline-card__icon-button" @click="openShareDialog">
+                                    <v-icon>{{mdiShareVariant }}</v-icon>
                                 </v-btn>
                             </template>
                         </v-tooltip>
@@ -532,25 +533,51 @@ function deviceIcon(type) {
                             density="compact"
                             variant="outlined"
                         ></v-text-field>
+
+                        <div class="text-subtitle-2 mt-4 mb-2">{{ t('shareFormat') }}</div>
+                        <v-btn-toggle
+                            v-model="shareForm.format"
+                            mandatory
+                            density="comfortable"
+                            variant="outlined"
+                            divided
+                            class="mb-1"
+                        >
+                            <v-btn value="raw" size="small">{{ t('rawText') }}</v-btn>
+                            <v-btn value="md" size="small">{{ t('renderMarkdown') }}</v-btn>
+                        </v-btn-toggle>
+                        <div class="text-caption text-medium-emphasis mb-4">{{ t('shareFormatHint') }}</div>
+
+                        <v-text-field
+                            v-model="shareForm.password"
+                            type="password"
+                            autocomplete="new-password"
+                            :label="t('sharePasswordLabel')"
+                            :hint="t('sharePasswordHint')"
+                            persistent-hint
+                            density="compact"
+                            variant="outlined"
+                        ></v-text-field>
                     </v-card-text>
                     <v-card-actions>
                         <v-spacer></v-spacer>
                         <v-btn variant="text" @click="shareDialogVisible = false">{{ t('cancel') }}</v-btn>
                         <v-btn color="primary" variant="text" :loading="shareUrlLoading" @click="confirmShareDialog">
-                            {{ shareDialogMode === 'qr' ? t('generateQrCode') : t('generateAndCopy') }}
+                            {{ t('generateAndCopy') }}
                         </v-btn>
                     </v-card-actions>
                 </v-card>
             </v-dialog>
 
-            <v-dialog v-model="qrDialogVisible" max-width="280">
+            <!-- 分享结果面板：复制与二维码合并后的唯一落点 -->
+            <v-dialog v-model="shareResultVisible" max-width="340">
                 <v-card>
-                    <v-card-title class="text-h5 justify-center">{{ t('scanToAccess') }}</v-card-title>
+                    <v-card-title class="text-h5 justify-center">{{ t('shareLink') }}</v-card-title>
                     <v-card-text class="text-center pa-4">
                         <v-progress-circular v-if="shareUrlLoading" indeterminate color="primary" class="my-8"></v-progress-circular>
                         <template v-else>
-                            <qrcode-vue :value="shareContentUrl || contentUrl" :size="200" level="H" />
-                            <div class="text-caption mt-2" style="word-break: break-all;">{{ shareContentUrl || contentUrl }}</div>
+                            <qrcode-vue :value="shareContentUrl" :size="200" level="H" />
+                            <div class="text-caption mt-2" style="word-break: break-all;">{{ shareContentUrl }}</div>
                             <div v-if="lastShareMeta" class="text-caption text-medium-emphasis mt-2">
                                 {{ t('shareMetaSummary', lastShareMeta) }}
                             </div>
@@ -558,7 +585,8 @@ function deviceIcon(type) {
                     </v-card-text>
                     <v-card-actions>
                         <v-spacer></v-spacer>
-                        <v-btn color="primary" variant="text" @click="qrDialogVisible = false">{{ t('close') }}</v-btn>
+                        <v-btn color="primary" variant="text" :prepend-icon="mdiContentCopy" @click="copyShareLink">{{ t('copyLink') }}</v-btn>
+                        <v-btn variant="text" @click="shareResultVisible = false">{{ t('close') }}</v-btn>
                     </v-card-actions>
                 </v-card>
             </v-dialog>

@@ -22,6 +22,11 @@ app.use(i18n);
 
 router.isReady().then(() => {
     appStore.dark = localStorage.getItem('darkmode') || 'prefer';
+    // 分享页是给收件人看的独立页面：不建 WebSocket、不碰房间状态。
+    // 它只认 URL 里的 token，走自己那几个相对路径请求（见 views/ShareView.vue）。
+    if (router.currentRoute.value.meta?.sharePage) {
+        return;
+    }
     wsStore.initFromRoute(router.currentRoute.value.query.room || '');
     wsStore.connect();
 });

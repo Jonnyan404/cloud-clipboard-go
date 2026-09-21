@@ -106,10 +106,15 @@ export function normalizeShareMaxUses(maxUses) {
 }
 
 /**
- * 向服务端申请分享链接。受保护房间会返回带短期 token 的 URL。
- * @param {{type:string,id?:string|number,uuid?:string,ttl?:number,maxUses?:number}} options
+ * 向服务端申请分享链接。
+ *
+ * 服务端现在**一律**签发 token（开放房间也发），返回的 url 是前端分享页地址
+ * `https://host<prefix>/#/s?t=...`。房间是否需要鉴权不再影响这里 ——
+ * 以前开放房间走的是裸 `/content/<id>`，TTL / 次数限制全被静默丢弃。
+ *
+ * @param {{type:string,id?:string|number,uuid?:string,ttl?:number,maxUses?:number,password?:string,room?:string}} options
  */
-export async function createShareLink({ type, id, uuid, ttl, maxUses, room } = {}) {
+export async function createShareLink({ type, id, uuid, ttl, maxUses, password, room } = {}) {
     const params = new URLSearchParams();
     if (room) {
         params.set('room', room);
@@ -131,9 +136,36 @@ export async function createShareLink({ type, id, uuid, ttl, maxUses, room } = {
             body.maxUses = uses;
         }
     }
+    // 密码只进请求体，不进 URL（服务端把它 HMAC 进 token，URL 里连哈希都看不到）
+    const pwd = String(password || '').trim();
+    if (pwd) {
+        body.password = pwd;
+    }
 
     const response = await axios.post('share', body, { params });
     return response.data;
+}
+
+/**
+ * 往分享页地址上补展示格式（f=md|raw）。返回的地址直接给收件人用。
+ *
+ * ⚠️ 分享页走 hash 路由，`?t=` 在 **fragment** 里 —— `new URL(u).searchParams` 看到的是空的，
+ * 拿它去 set 会把参数拼到 `#` 前面，页面读不到。必须拆 fragment 再拼。
+ */
+export function withSharePageFormat(url, format) {
+    const raw = String(url || '');
+    const hashIndex = raw.indexOf('#');
+    if (!raw || hashIndex < 0) {
+        return raw;
+    }
+    const value = String(format || '').toLowerCase() === 'md' ? 'md' : 'raw';
+    const head = raw.slice(0, hashIndex);
+    const fragment = raw.slice(hashIndex + 1);
+    const queryIndex = fragment.indexOf('?');
+    const routePath = queryIndex < 0 ? fragment : fragment.slice(0, queryIndex);
+    const params = new URLSearchParams(queryIndex < 0 ? '' : fragment.slice(queryIndex + 1));
+    params.set('f', value);
+    return `${head}#${routePath}?${params.toString()}`;
 }
 
 export function copyTextToClipboard(textToCopy) {
