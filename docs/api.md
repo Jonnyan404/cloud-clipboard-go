@@ -127,6 +127,7 @@ Common codes are listed in the [error table](#9-error-codes) below.
 | POST | `/upload/multipart/*` | R2 multipart upload (**Worker only**) | Yes |
 | GET | `/content/latest` | Fetch the newest entry | Yes |
 | GET | `/content/:id` | Fetch one entry by ID | Yes |
+| POST | `/content/:id/column` | Move an entry to a board column | Password |
 | GET | `/file/:uuid/:name` | Download a file | Yes |
 | GET | `/rooms` | Room list | Yes |
 | POST | `/share` | Create a share token | Yes |
@@ -315,6 +316,42 @@ Returns the room list (requires `roomList` to be enabled):
   ]
 }
 ```
+
+### POST /content/:id/column
+
+Moves an entry to a board column. The board is a **view over the same entries**, not a second
+store — this sets one field on the entry and nothing else:
+
+```http
+POST /content/7/column?room=default
+Content-Type: application/json
+Authorization: Bearer <credential>
+
+{"column": "doing"}
+```
+
+| Value | Meaning |
+|---|---|
+| `todo` | To do — also the default: a missing or empty `column` normalises to this |
+| `doing` | In progress |
+| `done` | Done |
+
+Response:
+
+```json
+{"id": "7", "type": "text", "column": "doing"}
+```
+
+- The three columns are **fixed** — no per-room column configuration, and no ordering inside a
+  column. Moving a card only changes *which* column it is in.
+- ⚠️ **`timestamp` is not touched.** `POST /text?id=` does bump it when it rewrites the body, but
+  moving a card must not send it to the top of the timeline — that would reshuffle the whole list
+  every time you drag one card.
+- Works for text and file entries alike.
+- Auth is the room password. A share token will **not** work: that credential is read-only.
+- Broadcasts an `update` event on the room's WebSocket, so other clients move the card too.
+- Errors: `invalid_column` (400), `invalid_body` (400), `invalid_content_id` (400),
+  `content_not_found` (404), `method_not_allowed` (405).
 
 ### POST /share
 

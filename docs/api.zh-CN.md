@@ -309,6 +309,40 @@ curl "http://localhost:9501/content/latest.json?room=default" -H "Authorization:
 }
 ```
 
+### POST /content/:id/column
+
+把一条内容挪到看板的某一列。看板是**同一批条目的一个视图**，不是第二份数据 ——
+这里只是在条目上改一个字段，别的什么都不动：
+
+```http
+POST /content/7/column?room=default
+Content-Type: application/json
+Authorization: Bearer <凭据>
+
+{"column": "doing"}
+```
+
+| 取值 | 含义 |
+|---|---|
+| `todo` | 待办 —— 也是默认值：`column` 缺失或空串都会归一成它 |
+| `doing` | 进行中 |
+| `done` | 已完成 |
+
+响应：
+
+```json
+{"id": "7", "type": "text", "column": "doing"}
+```
+
+- 三列是**固定的** —— 没有按房间配置列，也没有列内顺序。挪动只改「在哪一列」。
+- ⚠️ **不动 `timestamp`。** `POST /text?id=` 改正文时会刷新时间戳，但挪卡片**不能**让它在时间流里
+  跳到最前面 —— 否则拖一张卡就把整个列表重排了。
+- 文本条目和文件条目都能上板。
+- 鉴权用**房间密码**。分享 token **不行**：那是只读凭据。
+- 会在房间的 WebSocket 上广播 `update` 事件，其他客户端也会跟着挪。
+- 错误码：`invalid_column`（400）、`invalid_body`（400）、`invalid_content_id`（400）、
+  `content_not_found`（404）、`method_not_allowed`（405）。
+
 ### POST /share
 
 为单条内容创建**短期分享令牌**，让拿到链接的人可以访问：
