@@ -12,6 +12,7 @@ import TraditionalColorDialog from '@/components/TraditionalColorDialog.vue';
 import RoomList from '@/components/RoomList.vue';
 import QrcodeVue from 'qrcode.vue';
 import { errorMessage } from '@/util.js';
+import { buildId } from '@/sw-update';
 import { MODES } from '@/views/modes/registry.js';
 import { DISPLAY_GROUPS, togglesForMode } from '@/data/displayToggles.js';
 
@@ -639,6 +640,8 @@ watch(() => route.fullPath, () => {
                         <div class="cc-settings__version">
                             <span class="mr-1">{{ t('cloudClipboard') }}</span>
                             <span v-if="app.config && app.config.version">{{ app.config.version }}</span>
+                            <!-- 前端构建指纹：和后端 version 是两回事。排查「线上是不是旧版」时看这个 -->
+                            <span v-if="buildId" class="ml-1 text-medium-emphasis">· web {{ buildId }}</span>
                         </div>
                     </div>
                     <v-btn icon variant="text" @click="settingsDialog = false">

@@ -103,6 +103,7 @@
   "connectedDevices": "已連線的裝置列表",
   "devicesConnected": "已有 {count} 個裝置連線，桌面端裝置 {desktop} 個，行動端裝置 {mobile} 個。",
   "connectedTotal": "線上裝置 {count} 台，點擊查看詳情",
+  "newVersionReady": "發現新版本，正在自動重新整理……",
   "notConnectedToServer": "未連線到伺服器。",
   "desktopDevice": "桌面端裝置",
   "mobileDevice": "行動端裝置",

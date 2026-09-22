@@ -103,6 +103,7 @@
   "connectedDevices": "Connected Devices",
   "devicesConnected": "{count} devices connected, {desktop} desktop, {mobile} mobile.",
   "connectedTotal": "{count} devices online, click for details",
+  "newVersionReady": "New version found, refreshing automatically……",
   "notConnectedToServer": "Not connected to server.",
   "desktopDevice": "Desktop Device",
   "mobileDevice": "Mobile Device",

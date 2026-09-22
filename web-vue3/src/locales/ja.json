@@ -103,6 +103,7 @@
   "connectedDevices": "接続されているデバイスリスト",
   "devicesConnected": "{count} 個のデバイスが接続されています。デスクトップデバイス {desktop} 個、モバイルデバイス {mobile} 個。",
   "connectedTotal": "オンライン端末 {count} 台、クリックで詳細を表示",
+  "newVersionReady": "新しいバージョンが見つかりました。自動更新中……",
   "notConnectedToServer": "サーバーに接続されていません。",
   "desktopDevice": "デスクトップデバイス",
   "mobileDevice": "モバイルデバイス",

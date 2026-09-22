@@ -1,13 +1,26 @@
 import { fileURLToPath, URL } from 'node:url';
+import { randomBytes } from 'node:crypto';
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import vuetify from 'vite-plugin-vuetify';
 import { VitePWA } from 'vite-plugin-pwa';
 
+// 每次构建生成一个唯一指纹，替换进前端代码（src/build-info.js）。
+// dev 模式没有构建概念，固定 'dev' 即可。
+const buildId = process.env.NODE_ENV === 'production' ? randomBytes(4).toString('hex') : 'dev';
+
 export default defineConfig({
     plugins: [
         vue(),
         vuetify({ autoImport: true }),
+        // define 只替换 JS 模块；index.html 里的 __BUILD_ID__ 得靠这个钩子。
+        // 写到 <html data-build-id> 上，view-source 就能核对线上是哪次构建。
+        {
+            name: 'inject-build-id-into-html',
+            transformIndexHtml(html) {
+                return html.replaceAll('__BUILD_ID__', buildId);
+            },
+        },
         VitePWA({
             registerType: 'autoUpdate',
             injectRegister: null,
@@ -71,6 +84,8 @@ export default defineConfig({
     ],
     define: {
         '__VUE_PROD_HYDRATION_MISMATCH_DETAILS__': false,
+        // 交给 src/build-info.js 消费，settings 弹窗和 SW 更新提示都会展示它
+        'import.meta.env.__BUILD_ID__': JSON.stringify(buildId),
     },
     resolve: {
         alias: {

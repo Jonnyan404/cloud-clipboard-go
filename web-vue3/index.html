@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="zh" data-build-id="__BUILD_ID__">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
@@ -14,15 +14,5 @@
 <body>
     <div id="app"></div>
     <script type="module" src="/src/main.js"></script>
-    <script>
-        // dev 模式下 vite-plugin-pwa 不生成 sw.js，仅在生产环境注册
-        if ('serviceWorker' in navigator && '%MODE%' === 'production') {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js', { scope: './', updateViaCache: 'none' }).catch((error) => {
-                    console.error('Service worker registration failed:', error);
-                });
-            });
-        }
-    </script>
 </body>
 </html>
