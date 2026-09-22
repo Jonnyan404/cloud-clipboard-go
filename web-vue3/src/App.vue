@@ -12,7 +12,7 @@ import TraditionalColorDialog from '@/components/TraditionalColorDialog.vue';
 import RoomList from '@/components/RoomList.vue';
 import QrcodeVue from 'qrcode.vue';
 import { errorMessage } from '@/util.js';
-import { buildId } from '@/sw-update';
+import { buildId } from '@/sw-update.js';
 import { MODES } from '@/views/modes/registry.js';
 import { DISPLAY_GROUPS, togglesForMode } from '@/data/displayToggles.js';
 

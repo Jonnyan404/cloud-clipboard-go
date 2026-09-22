@@ -7,17 +7,17 @@ import pinia from './store';
 import { setupAxiosInterceptors } from './store/interop';
 import { useWebSocketStore } from './store/websocket';
 import { useAppStore } from './store/app';
-import { setupServiceWorkerUpdate } from './sw-update';
+import { setupServiceWorkerUpdate } from './sw-update.js';
 
 setupAxiosInterceptors();
-
-// SW 更新检测要在应用挂载前就位：页面加载完立刻开始找新版本，
-// 发现了就自动 reload（手机 PWA 上用户永远不会手动强刷，见 sw-update.js）。
-setupServiceWorkerUpdate();
 
 const app = createApp(App);
 
 app.use(pinia);
+
+// SW 更新检测在 pinia 之后装：它要读「有没有还没发出去的内容」来决定现在刷还是等会刷
+// （手机 PWA 上用户永远不会手动强刷，见 sw-update.js）。
+setupServiceWorkerUpdate();
 
 const appStore = useAppStore();
 const wsStore = useWebSocketStore();
