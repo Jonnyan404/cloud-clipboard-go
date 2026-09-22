@@ -67,7 +67,7 @@
 | 💾 **Flexible Storage** | Configurable history capacity and file expiration policies |
 | 🚀 **Lightweight** | Minimal resource consumption, runs smoothly even on routers or low-spec hardware |
 | 🔍 **Shortcuts Support** | Android and iOS shortcut integration for one-tap sharing |
-| 🎨 **Six UI Modes** | Timeline, chat bubbles, sticky notes, terminal and more — each mode keeps its own display settings |
+| 🎨 **Seven UI Modes** | Timeline, chat bubbles, sticky notes, terminal, board and more — each mode keeps its own display settings, and `?mode=` in the URL pins one mode per browser tab |
 
 ---
 
