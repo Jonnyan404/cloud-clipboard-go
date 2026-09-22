@@ -13,9 +13,24 @@ defineProps({
     // [{ key, icon, text }]，其中 key 是 i18n 文案键
     items: { type: Array, required: true },
 });
-defineEmits(['pick']);
+const emit = defineEmits(['pick']);
 
 const { t } = useI18n();
+
+// 触摸屏上点胶囊：`touchstart` 之后浏览器还会补一发合成 `mousedown`，不去重的话
+// 模板会被插进去两次。去重窗口取 400ms —— 合成事件紧跟着来，而人不可能在 400ms
+// 内点上两个不同的模板。
+// `prevent` 也不能少：不拦的话点胶囊会先让输入框失焦（手机上键盘收起、光标丢失），
+// 插入的位置就错了。
+let lastPickAt = 0;
+function pick(tpl) {
+    const now = Date.now();
+    if (now - lastPickAt < 400) {
+        return;
+    }
+    lastPickAt = now;
+    emit('pick', tpl);
+}
 </script>
 
 <template>
@@ -25,7 +40,8 @@ const { t } = useI18n();
             :key="tpl.key"
             type="button"
             class="composer-slash__item"
-            @mousedown.prevent="$emit('pick', tpl)"
+            @mousedown.prevent="pick(tpl)"
+            @touchstart.prevent="pick(tpl)"
         >
             <v-icon size="18" class="me-2">{{ tpl.icon }}</v-icon>{{ t(tpl.key) }}
         </button>

@@ -6,6 +6,7 @@ import { useI18n } from 'vue-i18n';
 import { toast } from '@/plugins/toast';
 import { errorMessage, getClientId, prettyFileSize } from '@/util.js';
 import ComposerSlashMenu from '@/components/ComposerSlashMenu.vue';
+import { SLASH_TEMPLATES, slashMenuShouldOpen, slashMenuShouldStay, slashPendingAt, stripTrailingSlash } from '@/slash-template.js';
 
 const props = defineProps({
     variant: { type: String, default: 'sticky' },
@@ -138,24 +139,25 @@ function removeFile(index) {
 // 以前这里有个 `multiline` 开关、只给看板开。现在不开了：模板（任务清单 / 表格）在哪都能写，
 // 而「同一个 app 里这个框有、那个框没有」是最难解释的一种不一致。
 // ⚠️ 代价是终端模式里 `/usr/local/bin` 也会命中行首规则 —— 用下面的 `onAreaInput` 兜住。
-const SLASH_TEMPLATES = [
-    { key: 'filterTaskList', icon: 'mdi-checkbox-marked-outline', text: '- [ ] \n- [ ] \n- [ ] ' },
-    { key: 'filterTable', icon: 'mdi-table', text: '| A | B |\n| --- | --- |\n|  |  |' },
-];
+//
+// 判定与模板都在 `slash-template.js`：这个组件和 UnifiedComposer 共用一份。
 const slashMenu = ref(false);
 let slashEl = null;
 
-// 行首那个 `/` 一旦被继续打成别的东西（终端里的 `/usr/bin`、`/` 开头的日期…），
-// 菜单就该收起来 —— 它只在「刚打了一个 `/`、还没写别的」那一瞬间有意义。
-// 不收的话，终端模式里敲一条路径就会一直挂着一排胶囊挡在输入框上面。
-function onAreaInput() {
+// 行首那个 `/` 在这里**弹出来**，也在这里收起来。
+//
+// 以前只有「收」的一半，因为「弹」交给了 keydown —— 而手机上的屏幕键盘根本不会回报
+// `key === '/'`（中文/日文输入法组合期间每个键都是 `key: "Unidentified"`，见
+// slash-template.js），于是手机上这里永远收不到菜单。现在 `input` 事件是唯一入口：
+// 刚打完行首 `/` 就弹，继续敲别的东西（终端里的 `/usr/bin`、`/` 开头的日期）就收。
+function onAreaInput(event) {
     if (!slashMenu.value) {
+        if (!slashMenuShouldOpen(event, app.send.text)) return;
+        slashEl = event.target;
+        slashMenu.value = true;
         return;
     }
-    const el = textarea.value;
-    const pos = typeof el?.selectionStart === 'number' ? el.selectionStart : 0;
-    const lineStart = (app.send.text || '').lastIndexOf('\n', Math.max(0, pos - 1)) + 1;
-    if ((app.send.text || '').slice(lineStart, pos).trim() !== '/') {
+    if (!slashMenuShouldStay(event, app.send.text)) {
         slashMenu.value = false;
     }
 }
@@ -165,7 +167,7 @@ function insertSlashTemplate(tpl) {
     const text = app.send.text || '';
     const pos = el && typeof el.selectionStart === 'number' ? el.selectionStart : text.length;
     // 连同刚打的那个 `/` 一起换掉（如果它还在光标前）
-    const head = text.slice(0, pos).replace(/\/$/, '');
+    const head = stripTrailingSlash(text.slice(0, pos));
     const tail = text.slice(pos);
     app.send.text = head + tpl.text + tail;
     slashMenu.value = false;
@@ -183,12 +185,10 @@ function onKeydown(event) {
         return;
     }
     if (event.key === '/') {
-        const el = event.target;
-        const pos = typeof el?.selectionStart === 'number' ? el.selectionStart : 0;
-        const lineStart = (app.send.text || '').lastIndexOf('\n', Math.max(0, pos - 1)) + 1;
-        // 只认「本行到目前为止只有空白」
-        if (!(pos > lineStart && /\S/.test((app.send.text || '').slice(lineStart, pos)))) {
-            slashEl = el;
+        // 硬件键盘（桌面）：这里的 `/` 还没落进文本，判定点在光标当前位置。
+        // 屏幕键盘不保证能走到这里 —— 手机上靠 onAreaInput。
+        if (slashPendingAt(event.target, app.send.text)) {
+            slashEl = event.target;
             slashMenu.value = true;
         }
     }
@@ -337,6 +337,7 @@ async function sendAll() {
                 :placeholder="placeholder"
                 @keydown="onKeydown"
                 @input="onAreaInput"
+                @compositionend="onAreaInput"
             ></textarea>
 <template v-if="canSend">
             <button

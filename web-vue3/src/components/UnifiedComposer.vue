@@ -44,6 +44,8 @@
                         @keydown.ctrl.enter.prevent="onSendShortcut"
                         @keydown.meta.enter.prevent="onSendShortcut"
                         @keydown="onTextareaKeydown"
+                        @input="onTextareaInput"
+                        @compositionend="onTextareaInput"
                     ></v-textarea>
                 </div>
 
@@ -305,6 +307,8 @@
                     @keydown.ctrl.enter.prevent="onSendShortcut"
                     @keydown.meta.enter.prevent="onSendShortcut"
                     @keydown="onTextareaKeydown"
+                    @input="onTextareaInput"
+                    @compositionend="onTextareaInput"
                 ></v-textarea>
                 <small class="d-flex justify-center pa-2 text-medium-emphasis">{{ textLimitLabel }}</small>
             </div>
@@ -381,6 +385,7 @@ import { toast } from '@/plugins/toast';
 import { errorMessage, prettyFileSize } from '@/util.js';
 import TraditionalColorDialog from '@/components/TraditionalColorDialog.vue';
 import ComposerSlashMenu from '@/components/ComposerSlashMenu.vue';
+import { SLASH_TEMPLATES, slashMenuShouldOpen, slashMenuShouldStay, slashPendingAt, stripTrailingSlash } from '@/slash-template.js';
 import ShortcutsDialog from '@/components/ShortcutsDialog.vue';
 
 const mdiPalette = 'mdi-palette';
@@ -507,13 +512,7 @@ function openFilePicker() {
 // 为什么限定行首：正文里 `/` 太常见了（路径、日期、`a/b`），到处弹菜单会烦人；
 // 行首打 `/` 是个明确的开头动作。缩进过的行（前面只有空白）也算行首。
 //
-// 模板正文用中性的占位符，不放进 i18n —— 它们是要被用户改写的骨架，不是文案。
-// 菜单项文案复用分类条那两个键（`filterTaskList` / `filterTable`）：说的是同一个东西，
-// 没必要为「筛选」和「插入」各存一份同义文案（两份迟早会漂）。
-const SLASH_TEMPLATES = [
-    { key: 'filterTaskList', icon: 'mdi-checkbox-marked-outline', text: '- [ ] \n- [ ] \n- [ ] ' },
-    { key: 'filterTable', icon: 'mdi-table', text: '| A | B |\n| --- | --- |\n|  |  |' },
-];
+// 判定与模板都在 `slash-template.js`：这个组件和 StickyComposer 共用一份。
 const slashMenu = ref(false);
 let slashEl = null;
 
@@ -526,13 +525,27 @@ function onTextareaKeydown(e) {
         return;
     }
     if (e.key !== '/') return;
-    const el = e.target;
-    const pos = typeof el?.selectionStart === 'number' ? el.selectionStart : 0;
-    const lineStart = (app.send.text || '').lastIndexOf('\n', Math.max(0, pos - 1)) + 1;
-    // 只认「本行到目前为止只有空白」
-    if (pos > lineStart && /\S/.test((app.send.text || '').slice(lineStart, pos))) return;
-    slashEl = el;
+    // 硬件键盘（桌面）：这里的 `/` 还没落进文本，判定点在光标当前位置。
+    // 屏幕键盘不保证能走到这里 —— 手机上靠下面的 onTextareaInput。
+    if (!slashPendingAt(e.target, app.send.text)) return;
+    slashEl = e.target;
     slashMenu.value = true;
+}
+
+// 手机上 `/` **只有** `input` 事件看得见（原因见 slash-template.js）：这里既负责在刚打完
+// 行首 `/` 时把菜单弹出来，也负责继续敲别的（正文里的路径、日期）时收起来。
+//
+// 顺带补上桌面缺的一半：以前只靠 keydown 弹、没人收 —— 菜单弹出后继续打字不会消失。
+function onTextareaInput(e) {
+    if (!slashMenu.value) {
+        if (!slashMenuShouldOpen(e, app.send.text)) return;
+        slashEl = e.target;
+        slashMenu.value = true;
+        return;
+    }
+    if (!slashMenuShouldStay(e, app.send.text)) {
+        slashMenu.value = false;
+    }
 }
 
 function insertSlashTemplate(tpl) {
@@ -540,7 +553,7 @@ function insertSlashTemplate(tpl) {
     const text = app.send.text || '';
     const pos = el && typeof el.selectionStart === 'number' ? el.selectionStart : text.length;
     // 连同刚打的那个 `/` 一起换掉（如果它还在光标前）
-    const head = text.slice(0, pos).replace(/\/$/, '');
+    const head = stripTrailingSlash(text.slice(0, pos));
     const tail = text.slice(pos);
     app.send.text = head + tpl.text + tail;
     slashMenu.value = false;
