@@ -4,6 +4,7 @@ import MegaWall from './MegaWall.vue';
 import TerminalWall from './TerminalWall.vue';
 import WorkbenchWall from './WorkbenchWall.vue';
 import ChatWall from './ChatWall.vue';
+import BoardWall from './BoardWall.vue';
 
 export const MODES = [
     {
@@ -44,6 +45,14 @@ export const MODES = [
         labelKey: 'uiModeTerminal',
         icon: 'mdi-console-line',
         component: TerminalWall,
+    },
+    {
+        // 看板放在最后：它是最新加的一个，而且和上面几个的定位不太一样 ——
+        // 那几个都是「同一份内容的不同排版」，看板多了一层「这条在哪一列」的状态。
+        key: 'board',
+        labelKey: 'uiModeBoard',
+        icon: 'mdi-view-column-outline',
+        component: BoardWall,
     },
 ];
 

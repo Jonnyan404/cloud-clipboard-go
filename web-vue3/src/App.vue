@@ -44,6 +44,42 @@ const route = useRoute();
 // 分享页走裸壳：不渲染工具栏 / 房间侧栏 / 设置面板（见模板顶部的 v-if）
 const isShareRoute = computed(() => Boolean(route.meta?.sharePage));
 
+// 模式跟着地址走 —— **一个 tab 一个模式**。初值在 store 里从 `?mode=` 取（见 store/app.js），
+// 这里负责在切换时把它写回地址，这样刷新、复制链接、开新 tab 都能复现同一个模式。
+// ⚠️ 用 replace 不用 push：每切一次模式就往历史里塞一条的话，后退键会变成
+// 「回到上一个模式」而不是「回到上一页」。
+watch(() => app.uiMode, (mode) => {
+    if (route.query.mode === mode) {
+        return;
+    }
+    router.replace({ query: { ...route.query, mode } });
+});
+
+// 地址里的模式可能是手打错的（`?mode=xxx`）。`resolveModeComponent` 会安全回落到标准模式、
+// 不会白屏，但地址栏会一直挂着一个不存在的键骗人 —— 开局纠正一次。
+onMounted(() => {
+    if (!MODES.some((entry) => entry.key === app.uiMode)) {
+        app.setUiMode('default');
+    }
+    // `?mode=` 写在 search 里时（手写链接、书签）把它搬进 fragment：路由只认 fragment，
+    // 留在 search 里的话之后每次 replace 都会再写一份，地址栏会同时出现两个 mode。
+    // 用 replaceState 而不是 router.replace —— 后者管不到 search，只能管 fragment。
+    const search = new URLSearchParams(window.location.search);
+    if (search.has('mode')) {
+        search.delete('mode');
+        const rest = search.toString();
+        window.history.replaceState(
+            null,
+            '',
+            `${window.location.pathname}${rest ? `?${rest}` : ''}${window.location.hash || '#/'}`,
+        );
+        // ⚠️ 上面只删了 search 里那份，fragment 里还没有 —— 得主动写一次。
+        // 不能指望下面那个 watcher：它只在 uiMode **变化**时触发，而从 search 读出来的
+        // 模式和初值一致、根本没变，于是链接会变成「参数没了、模式还在」这种半截状态。
+        router.replace({ query: { ...route.query, mode: app.uiMode } });
+    }
+});
+
 const colorDialog = ref(false);
 const pickColorDialog = ref(false);
 const settingsDialog = ref(false);

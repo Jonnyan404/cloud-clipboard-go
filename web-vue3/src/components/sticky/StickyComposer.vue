@@ -5,9 +5,14 @@ import { useWebSocketStore } from '@/store/websocket';
 import { useI18n } from 'vue-i18n';
 import { toast } from '@/plugins/toast';
 import { errorMessage, getClientId, prettyFileSize } from '@/util.js';
+import ComposerSlashMenu from '@/components/ComposerSlashMenu.vue';
 
 const props = defineProps({
     variant: { type: String, default: 'sticky' },
+    // 多行写作输入区：随内容长高 + 带 `/` markdown 模板菜单。
+    // 只有看板开 —— 它是唯一一个「用户会在这里写任务清单 / 表格」的模式。
+    // 别的模式不开：终端里行首的 `/` 是路径（`/usr/local/bin`），弹菜单只会碍事。
+    multiline: { type: Boolean, default: false },
 });
 const emit = defineEmits(['sent']);
 
@@ -19,20 +24,40 @@ const textarea = ref(null);
 const selectFile = ref(null);
 const sending = ref(false);
 const uploadedSizes = ref([]);
+
+// 平台判断**只用于显示**（⌘ 还是 Ctrl），不再参与键盘逻辑 —— 见 onKeydown。
+const isApplePlatform = /mac|iphone|ipad|ipod/i.test(navigator.userAgent || '');
+// 触摸设备没有硬件键盘，键盘提示是纯噪音。用 `pointer: coarse` 而不是屏宽：
+// 宽屏触屏（iPad 横屏、触屏笔记本）同样没有快捷键，按宽度判断会漏掉它们。
+const isTouchOnly = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+    ? window.matchMedia('(pointer: coarse)').matches
+    : false;
+const sendShortcutLabel = computed(() => t('sendShortcutTip', {
+    keys: isApplePlatform ? '⌘+Enter' : 'Ctrl+Enter',
+}));
 const placeholder = computed(() => {
+    // 发送键统一成「主修饰键 + Enter」之后，这句话对**所有模式**都成立，
+    // 所以统一拼在占位符里（标准模式本来就是这么做的）。
+    const withSendHint = (text) => (isTouchOnly ? text : `${text} ${sendShortcutLabel.value}`);
+    // 看板：这里最常写的就是任务清单 / 表格，而「/」模板是最不容易被发现的功能，
+    // 直接写进占位符（标准模式也是这么做的）。
+    if (props.variant === 'board') {
+        return withSendHint(t('composerSlashHint'));
+    }
+    // 巨幕用中性那句：它的输入框也不是「写一张便签」。
     if (props.variant === 'mega') {
-        return t('composerPlaceholder');
+        return withSendHint(t('composerPlaceholder'));
     }
     if (props.variant === 'terminal') {
-        return t('terminalPlaceholder');
+        return withSendHint(t('terminalPlaceholder'));
     }
     if (props.variant === 'workbench') {
-        return t('workbenchInputHint');
+        return withSendHint(t('workbenchInputHint'));
     }
     if (props.variant === 'chat') {
-        return t('chatPlaceholder');
+        return withSendHint(t('chatPlaceholder'));
     }
-    return t('stickyNewNote');
+    return withSendHint(t('stickyNewNote'));
 });
 const fileSize = computed(() => app.send.files.length ? app.send.files.reduce((acc, cur) => acc += cur.size, 0) : 0);
 const uploadedSize = computed(() => uploadedSizes.value.length ? uploadedSizes.value.reduce((acc, cur) => acc += cur, 0) : 0);
@@ -110,9 +135,62 @@ function removeFile(index) {
     app.send.files.splice(index, 1);
 }
 
+// ── 多行写作（看板）：`/` 模板菜单 + 输入框随内容长高 ─────────────────────
+// 逻辑跟标准模式（UnifiedComposer）是同一套：只在**行首**打 `/` 才弹，正文里的 `/`
+// （路径、日期、`a/b`）不管。模板正文是中性占位符，不放进 i18n —— 它们是要被改写的骨架。
+const SLASH_TEMPLATES = [
+    { key: 'filterTaskList', icon: 'mdi-checkbox-marked-outline', text: '- [ ] \n- [ ] \n- [ ] ' },
+    { key: 'filterTable', icon: 'mdi-table', text: '| A | B |\n| --- | --- |\n|  |  |' },
+];
+const slashMenu = ref(false);
+let slashEl = null;
+
+function insertSlashTemplate(tpl) {
+    const el = slashEl || textarea.value;
+    const text = app.send.text || '';
+    const pos = el && typeof el.selectionStart === 'number' ? el.selectionStart : text.length;
+    // 连同刚打的那个 `/` 一起换掉（如果它还在光标前）
+    const head = text.slice(0, pos).replace(/\/$/, '');
+    const tail = text.slice(pos);
+    app.send.text = head + tpl.text + tail;
+    slashMenu.value = false;
+    nextTick(() => {
+        const caret = head.length + tpl.text.length;
+        el?.focus?.();
+        el?.setSelectionRange?.(caret, caret);
+    });
+}
+
 function onKeydown(event) {
-    const isMac = /mac|iphone|ipad|ipod/i.test(navigator.userAgent || '');
-    if ((event.key === 'Enter' && (event.metaKey || event.ctrlKey)) || (event.key === 'Enter' && event.shiftKey === false && !isMac)) {
+    if (props.multiline) {
+        if (event.key === 'Escape' && slashMenu.value) {
+            slashMenu.value = false;
+            event.stopPropagation();
+            return;
+        }
+        if (event.key === '/') {
+            const el = event.target;
+            const pos = typeof el?.selectionStart === 'number' ? el.selectionStart : 0;
+            const lineStart = (app.send.text || '').lastIndexOf('\n', Math.max(0, pos - 1)) + 1;
+            // 只认「本行到目前为止只有空白」
+            if (!(pos > lineStart && /\S/.test((app.send.text || '').slice(lineStart, pos)))) {
+                slashEl = el;
+                slashMenu.value = true;
+            }
+        }
+    }
+    // 发送约定：**主修饰键 + Enter**（Mac 是 ⌘，其余平台是 Ctrl），跨平台、跨模式一套。
+    // 回车本身永远是换行 —— 那是 textarea 的默认行为，不用拦。
+    //
+    // 为什么不再按平台分叉：
+    //   · 标准模式（UnifiedComposer）本来就是 ⌘/Ctrl+Enter。非 Mac 上「回车即发」
+    //     等于**同一个 app、同一个用户，换台机器行为就变** —— 而跨设备正是这个项目
+    //     存在的意义，按平台分叉恰好和它作对；
+    //   · 失败模式不对称：按错键只是多出一个换行（无声、可撤销）；而「回车即发」按错
+    //     是把半条消息发出去了（不可撤销）。
+    // 看板的 `/` 模板一插就是三行骨架，回车即发的话那三行根本没法改 —— 现在这条规则
+    // 对所有模式都成立，不用再给看板开例外。
+    if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
         sendAll();
     }
 }
@@ -194,6 +272,7 @@ async function sendAll() {
         }
     } finally {
         sending.value = false;
+        slashMenu.value = false;
         emit('sent');
     }
 }
@@ -227,6 +306,13 @@ async function sendAll() {
             >{{ file.name }} <b class="sticky-composer__closer" @click="removeFile(index)">✕</b></span>
             <span v-if="sending" class="sticky-composer__progress">{{ Math.round(uploadProgress * 100) }}%</span>
         </div>
+        <!-- 「/」模板菜单走**正常文档流**、不绝对定位：祖先只要有一个 overflow，
+             浮动元素就会被静默裁掉（标准模式那边踩过，DOM 在、就是看不见）。 -->
+        <composer-slash-menu
+            v-if="slashMenu"
+            :items="SLASH_TEMPLATES"
+            @pick="insertSlashTemplate"
+        />
         <div class="sticky-composer__row">
             <button v-if="app.display.composerUpload" type="button" class="sticky-composer__attach" title="📎" @click="openFilePicker">➕</button>
             <textarea
@@ -264,6 +350,13 @@ async function sendAll() {
                 v-else-if="props.variant === 'chat'"
                 type="button"
                 class="sticky-composer__go sticky-composer__go--chat"
+                :disabled="sendDisabled"
+                @click="sendAll"
+            >{{ t('send') }}</button>
+            <button
+                v-else-if="props.variant === 'board'"
+                type="button"
+                class="sticky-composer__go sticky-composer__go--board"
                 :disabled="sendDisabled"
                 @click="sendAll"
             >{{ t('send') }}</button>
@@ -581,6 +674,98 @@ async function sendAll() {
     border-radius: 9px;
     font-size: 12px;
     padding: 8px 15px;
+    font-weight: 650;
+}
+
+/* ── 看板 ────────────────────────────────────────────────────────────────
+   看板的面板是「实心浅底 + 一圈发丝线」，没有便签那张纸的意思，所以这一套皮肤只做
+   一件事：把便签的米黄底 + 虚线边框换掉。颜色不写死在这里 —— 看板有自己的明暗两套配色，
+   由 .board-wall / .board-wall--dark 给变量。这样这个组件不需要认识「看板」，
+   也不需要认识主题。 */
+.sticky-composer--board {
+    background: var(--board-panel-bg, #fff);
+    border: 1px solid var(--board-hairline, rgba(148, 163, 184, 0.32));
+    border-radius: 10px;
+    padding: 7px 11px;
+    box-shadow: none;
+    color: inherit;
+}
+
+/* 看板的发送区是「新建一张卡片」，不是聊天输入条，所以排布跟另外五个模式不同：
+   正文**独占一整行**（要写得下任务清单和表格），动作另起一行（附件在左、发送在右）。
+
+   ⚠️ 之前三样（附件 / 正文 / 发送）挤在同一个 flex 行里、`align-items: center`：
+   正文一长高，附件和发送就被甩到框底，看起来像「底部那一行没被用上」。
+   根因就是这个 —— 不是间距问题，是它们不该在同一行。
+   ⚠️ 改成 grid 之后，每个元素都必须显式写 grid-row / grid-column：
+   grid 靠 grid-area 定位，不写的话按 DOM 顺序排，附件会跑到正文上面去。 */
+.sticky-composer--board .sticky-composer__row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    align-items: center;
+    gap: 6px 8px;
+}
+
+.sticky-composer--board .sticky-composer__area {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    font-size: 12.5px;
+    /* 跟随容器（看板给的文字色），不然深色看板里输入的字是黑的 */
+    color: inherit;
+    padding: 2px 0;
+    /* 起步就给五行：一行的框写不出任务清单 / 表格。
+       5lh 是五行正文，+8px 是上下 padding（盒子是 border-box，min-height 含 padding）。
+       ⚠️ 刻意**只用 CSS 定高**：之前那版用 JS 按内容算高度（el.scrollHeight），
+       结果发送按钮那一行看起来被架空 —— 输入区一长高，底下那行就成了一块用不上的空白。
+       要调高度只改这一个数，别再引入运行时改高度。 */
+    min-height: calc(5lh + 8px);
+    max-height: 38vh;
+    overflow-y: auto;
+}
+
+.sticky-composer--board .sticky-composer__attach {
+    grid-column: 1;
+    grid-row: 2;
+    justify-self: start;
+    /* 之前是个裸 ➕ 文本（`font-size: 15px`），看着像误入的字符；
+       给它一个按钮的形状，读起来才是「可以点」。 */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    background: rgba(148, 163, 184, 0.18);
+    font-size: 14px;
+    color: var(--board-hint, #a8b1bd);
+}
+
+.sticky-composer--board .sticky-composer__go {
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: end;
+}
+
+.sticky-composer--board .sticky-composer__area::placeholder {
+    color: var(--board-hint, #a8b1bd);
+}
+
+.sticky-composer--board .sticky-composer__file {
+    background: rgba(148, 163, 184, 0.18);
+    color: inherit;
+}
+
+.sticky-composer--board .sticky-composer__progress {
+    color: inherit;
+}
+
+.sticky-composer__go--board {
+    background: rgb(var(--v-theme-primary));
+    color: #fff;
+    border-radius: 8px;
+    font-size: 12px;
+    padding: 6px 14px;
     font-weight: 650;
 }
 </style>

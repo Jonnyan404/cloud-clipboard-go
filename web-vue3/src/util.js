@@ -35,6 +35,36 @@ export function buildCleanAbsoluteRouteUrl(path, prefix = '') {
     return new URL(`${prefix}/${normalizedPath}`, `${window.location.origin}/`).toString();
 }
 
+/**
+ * 从地址里读一个 query 参数。**开局读一次**用（store 的初值），不订阅后续变化。
+ *
+ * ⚠️ 这个 app 走 hash 路由，参数可能在**两个地方**：
+ *   `http://host/?mode=board`     —— 直接写在 search 里（外部链接、书签常见）
+ *   `http://host/#/?mode=board`   —— 写在 fragment 的 query 里（路由自己生成的）
+ * 两处都要认。只认其中一处的话，「把地址栏里的链接复制给别人」会读不到参数 ——
+ * 而地址栏里是哪种写法取决于用户是从外部链接进来的还是站内切过去的。
+ *
+ * 为什么不用 `route.query`：store 的初值要在**第一次渲染之前**定下来，
+ * 而 `router.isReady()` 是异步的 —— 那时候定不了，会先按旧值渲染一帧再跳，
+ * 模式差异大的话就是一次可见的闪烁。
+ */
+export function readLocationParam(key) {
+    const name = String(key || '');
+    if (!name || typeof window === 'undefined') {
+        return '';
+    }
+    const fromSearch = new URLSearchParams(window.location.search).get(name);
+    if (fromSearch) {
+        return fromSearch;
+    }
+    const hash = window.location.hash || '';
+    const queryAt = hash.indexOf('?');
+    if (queryAt < 0) {
+        return '';
+    }
+    return new URLSearchParams(hash.slice(queryAt + 1)).get(name) || '';
+}
+
 /** 分享链接默认/约束（秒） */
 export const SHARE_DEFAULT_TTL = 15 * 60; // 15 分钟
 export const SHARE_MIN_TTL = 60; // 1 分钟
@@ -368,6 +398,22 @@ export function toggleTaskListItem(text, index) {
 const IMAGE_NAME_RE = /\.(png|jpe?g|gif|webp|svg|bmp|ico|avif)$/i;
 export function isImageName(name) {
     return IMAGE_NAME_RE.test(String(name || ''));
+}
+
+/**
+ * 把一条内容挪到看板的某一列（`POST /content/<id>/column`）。
+ *
+ * 两个后端都有这条接口（Go `handleContentColumn` / Worker `ContentHandler.setColumn`）：
+ * **固定三列**（todo / doing / done）、卡片就是剪贴板条目本身、不建新表，
+ * 而且**不动 timestamp** —— 挪个位置不该让卡片在时间流里跳到最前面。
+ */
+export async function updateEntryColumn(id, room, column) {
+    const response = await axios.post(
+        `content/${encodeURIComponent(id)}/column`,
+        { column },
+        { params: new URLSearchParams([['room', room ?? '']]) },
+    );
+    return response.data;
 }
 
 /**

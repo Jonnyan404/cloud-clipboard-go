@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { DEFAULT_DISPLAY, DISPLAY_TOGGLES, LEGACY_STORAGE_KEYS } from '@/data/displayToggles';
 import { MODES } from '@/views/modes/registry';
+import { readLocationParam } from '@/util.js';
 
 // 某个模式「没被用户单独配过」时的取值。
 //
@@ -97,7 +98,10 @@ export const useAppStore = defineStore('app', {
         fullscreenSendClose: localStorage.getItem('fullscreenSendClose') !== null
             ? localStorage.getItem('fullscreenSendClose') === 'true'
             : true,
-        uiMode: localStorage.getItem('uiMode') || 'default',
+        // 界面模式：**地址里的 `?mode=` 优先**，其次是上次用过的，最后是标准模式。
+        // 这样「一个 tab 一个模式」——每个 tab 有自己的地址，就互不干扰。
+        // 房间本来就是这么做的（只走 URL、不落 localStorage），模式跟它保持一致。
+        uiMode: readLocationParam('mode') || localStorage.getItem('uiMode') || 'default',
     }),
     actions: {
         setSearchQuery(value) {
