@@ -9,10 +9,6 @@ import ComposerSlashMenu from '@/components/ComposerSlashMenu.vue';
 
 const props = defineProps({
     variant: { type: String, default: 'sticky' },
-    // 多行写作输入区：随内容长高 + 带 `/` markdown 模板菜单。
-    // 只有看板开 —— 它是唯一一个「用户会在这里写任务清单 / 表格」的模式。
-    // 别的模式不开：终端里行首的 `/` 是路径（`/usr/local/bin`），弹菜单只会碍事。
-    multiline: { type: Boolean, default: false },
 });
 const emit = defineEmits(['sent']);
 
@@ -135,15 +131,34 @@ function removeFile(index) {
     app.send.files.splice(index, 1);
 }
 
-// ── 多行写作（看板）：`/` 模板菜单 + 输入框随内容长高 ─────────────────────
+// ── `/` 模板菜单：**所有非标准模式的输入框**都有 ──────────────────────────
 // 逻辑跟标准模式（UnifiedComposer）是同一套：只在**行首**打 `/` 才弹，正文里的 `/`
 // （路径、日期、`a/b`）不管。模板正文是中性占位符，不放进 i18n —— 它们是要被改写的骨架。
+//
+// 以前这里有个 `multiline` 开关、只给看板开。现在不开了：模板（任务清单 / 表格）在哪都能写，
+// 而「同一个 app 里这个框有、那个框没有」是最难解释的一种不一致。
+// ⚠️ 代价是终端模式里 `/usr/local/bin` 也会命中行首规则 —— 用下面的 `onAreaInput` 兜住。
 const SLASH_TEMPLATES = [
     { key: 'filterTaskList', icon: 'mdi-checkbox-marked-outline', text: '- [ ] \n- [ ] \n- [ ] ' },
     { key: 'filterTable', icon: 'mdi-table', text: '| A | B |\n| --- | --- |\n|  |  |' },
 ];
 const slashMenu = ref(false);
 let slashEl = null;
+
+// 行首那个 `/` 一旦被继续打成别的东西（终端里的 `/usr/bin`、`/` 开头的日期…），
+// 菜单就该收起来 —— 它只在「刚打了一个 `/`、还没写别的」那一瞬间有意义。
+// 不收的话，终端模式里敲一条路径就会一直挂着一排胶囊挡在输入框上面。
+function onAreaInput() {
+    if (!slashMenu.value) {
+        return;
+    }
+    const el = textarea.value;
+    const pos = typeof el?.selectionStart === 'number' ? el.selectionStart : 0;
+    const lineStart = (app.send.text || '').lastIndexOf('\n', Math.max(0, pos - 1)) + 1;
+    if ((app.send.text || '').slice(lineStart, pos).trim() !== '/') {
+        slashMenu.value = false;
+    }
+}
 
 function insertSlashTemplate(tpl) {
     const el = slashEl || textarea.value;
@@ -162,21 +177,19 @@ function insertSlashTemplate(tpl) {
 }
 
 function onKeydown(event) {
-    if (props.multiline) {
-        if (event.key === 'Escape' && slashMenu.value) {
-            slashMenu.value = false;
-            event.stopPropagation();
-            return;
-        }
-        if (event.key === '/') {
-            const el = event.target;
-            const pos = typeof el?.selectionStart === 'number' ? el.selectionStart : 0;
-            const lineStart = (app.send.text || '').lastIndexOf('\n', Math.max(0, pos - 1)) + 1;
-            // 只认「本行到目前为止只有空白」
-            if (!(pos > lineStart && /\S/.test((app.send.text || '').slice(lineStart, pos)))) {
-                slashEl = el;
-                slashMenu.value = true;
-            }
+    if (event.key === 'Escape' && slashMenu.value) {
+        slashMenu.value = false;
+        event.stopPropagation();
+        return;
+    }
+    if (event.key === '/') {
+        const el = event.target;
+        const pos = typeof el?.selectionStart === 'number' ? el.selectionStart : 0;
+        const lineStart = (app.send.text || '').lastIndexOf('\n', Math.max(0, pos - 1)) + 1;
+        // 只认「本行到目前为止只有空白」
+        if (!(pos > lineStart && /\S/.test((app.send.text || '').slice(lineStart, pos)))) {
+            slashEl = el;
+            slashMenu.value = true;
         }
     }
     // 发送约定：**主修饰键 + Enter**（Mac 是 ⌘，其余平台是 Ctrl），跨平台、跨模式一套。
@@ -323,6 +336,7 @@ async function sendAll() {
                 rows="1"
                 :placeholder="placeholder"
                 @keydown="onKeydown"
+                @input="onAreaInput"
             ></textarea>
 <template v-if="canSend">
             <button
@@ -477,6 +491,12 @@ async function sendAll() {
     color: #444034;
     font-family: inherit;
     padding: 6px 0;
+    /* 三行起步（所有非标准模式都这样）：`/` 模板插进来的就是多行骨架
+       （任务清单 / 表格），一行高的框只看得到第一行，那个功能等于白给。
+       3lh = 三行正文；+12px 是上下 padding（盒子是 border-box，min-height 含 padding）。
+       ⚠️ 刻意**只用 CSS 定高**：曾经用 JS 按内容算高度（el.scrollHeight），
+       结果发送按钮那一行看起来被架空 —— 要调高度只改这一个数，别再引入运行时改高度。 */
+    min-height: calc(3lh + 12px);
 }
 
 .sticky-composer__area::placeholder {

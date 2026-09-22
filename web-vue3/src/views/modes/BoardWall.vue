@@ -235,8 +235,8 @@ async function deleteItem(item) {
                 <!-- 复用便签那套发送组件（改发送区只需改一处），但**必须换皮肤**：
                      它的默认皮肤是米黄便签纸 + 虚线边框，直接套上来就是「看板底部挂了
                      一个便签模式的发送窗」。board 皮肤的颜色由这里给的变量决定。
-                     multiline：看板是用来写任务清单 / 表格的，输入框要能长高、且带 / 模板菜单。 -->
-                <sticky-composer variant="board" multiline></sticky-composer>
+                     `/` 模板菜单和输入框高度都不用在这里开 —— 它们现在是所有非标准模式共用的。 -->
+                <sticky-composer variant="board"></sticky-composer>
             </div>
         </div>
 
