@@ -62,9 +62,9 @@ Three ways, pick one:
 
 | Priority | Signal | Effect |
 |---|---|---|
-| 1 | `?format=raw\|json` | Explicit, overrides everything else |
-| 2 | `.json` path suffix | `/content/latest.json` (used by the shortcuts) |
-| 3 | `?json=1` / `?json=true` | Legacy signal, still honoured |
+| 1 | `?format=raw\|json` | Explicit, overrides everything else. **New code should use this** |
+| 2 | `.json` path suffix | ⚠️ **Legacy, being retired** — shipped shortcuts still use it, kept for now |
+| 3 | `?json=1` / `?json=true` | ⚠️ **Legacy, being retired**, same as above |
 | 4 | `Accept: application/json` | **Text responses only** |
 | 5 | Default | `raw` |
 
@@ -230,6 +230,24 @@ Response:
 
 Over the limit returns `413` with `code: text_too_long` (limit from `/server` → `text.limit`).
 
+**The body comes in three shapes**, picked by `Content-Type`:
+
+| `Content-Type` | Body |
+|---|---|
+| `text/plain`, absent, or anything else | **the whole request body is the text** |
+| `application/json` | `{"content": "the text to send"}` |
+| `multipart/form-data` | the form field `content` |
+
+The last two exist for **Shortcuts**: when it sends a string variable as the request body the bytes come
+out UTF-16, while a structured body is serialized as UTF-8. All three shapes are stored as UTF-8,
+byte for byte — nothing is escaped or rewritten.
+
+⚠️ `application/x-www-form-urlencoded` is **deliberately not recognised** and keeps taking the
+"whole body is the text" path — it is what `curl --data-binary` and friends send by default, and
+treating it as a form would make those requests **silently store an empty entry**.
+
+Declaring `application/json` with a body that is not valid JSON returns `400` with `code: invalid_body`.
+
 ### POST /upload
 
 ```http
@@ -270,7 +288,7 @@ The form field name is always **`file`**. The response carries `uuid` and `url`:
 Fetches the **newest entry** in the room (text or file record).
 
 ```bash
-curl "http://localhost:9501/content/latest.json?room=default" -H "Authorization: Bearer xxx"
+curl "http://localhost:9501/content/latest?room=default&format=json" -H "Authorization: Bearer xxx"
 ```
 
 ```json
@@ -290,7 +308,7 @@ For file entries you get `uuid` / `name` / `size` / `url` / `expire` instead of 
 
 ### GET /content/:id
 
-Same as above, by exact ID. A `.json` suffix is supported on the path.
+Same as above, by exact ID. ⚠️ The `.json` path suffix is a **legacy signal being retired**; new code should use `?format=json`.
 
 ### GET /file/:uuid/:name
 

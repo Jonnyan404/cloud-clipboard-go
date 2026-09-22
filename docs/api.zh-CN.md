@@ -61,9 +61,9 @@ https://host/cloud-clipboard/text        # PREFIX=/cloud-clipboard
 
 | 优先级 | 信号 | 效果 |
 |---|---|---|
-| 1 | `?format=raw\|json` | 显式指定，压过其他一切 |
-| 2 | `.json` 路径后缀 | `/content/latest.json`（快捷指令在用） |
-| 3 | `?json=1` / `?json=true` | 旧信号，保留兼容 |
+| 1 | `?format=raw\|json` | 显式指定，压过其他一切。**新代码一律用这个** |
+| 2 | `.json` 路径后缀 | ⚠️ **兼容信号，即将下线**：已发布的捷径还在用，暂时保留 |
+| 3 | `?json=1` / `?json=true` | ⚠️ **兼容信号，即将下线**，同上 |
 | 4 | `Accept: application/json` | **只对文本生效** |
 | 5 | 默认 | `raw` |
 
@@ -223,6 +223,22 @@ Authorization: Bearer <凭据>
 
 超限时返回 `413` + `code: text_too_long`（上限见 `/server` 的 `text.limit`）。
 
+**正文有三种形态**，按 `Content-Type` 分：
+
+| `Content-Type` | 正文 |
+|---|---|
+| `text/plain`、不声明、或其它 | **整个请求体就是正文** |
+| `application/json` | `{"content": "要发送的文本"}` |
+| `multipart/form-data` | 表单字段 `content` |
+
+后两种是给**快捷指令**用的：它把字符串变量当请求体发出去时字节会变成 UTF-16，
+而结构化请求体是按 UTF-8 序列化的。三种形态**都按 UTF-8 存原文**，不做任何转义。
+
+⚠️ `application/x-www-form-urlencoded` **刻意不认**，继续走「整个请求体是正文」那一条 ——
+它是 `curl --data-binary` 之类不带 `-H` 时的默认类型，把它当表单解析会让这类请求**静默存成空串**。
+
+声明了 `application/json` 但正文不是合法 JSON → `400` + `code: invalid_body`。
+
 ### POST /upload
 
 ```http
@@ -263,7 +279,7 @@ file=@photo.png
 取该房间**最新一条**（可能是文本也可能是文件记录）。
 
 ```bash
-curl "http://localhost:9501/content/latest.json?room=default" -H "Authorization: Bearer xxx"
+curl "http://localhost:9501/content/latest?room=default&format=json" -H "Authorization: Bearer xxx"
 ```
 
 ```json
@@ -282,7 +298,7 @@ curl "http://localhost:9501/content/latest.json?room=default" -H "Authorization:
 
 ### GET /content/:id
 
-同上，按 ID 精确取。路径支持 `.json` 后缀。
+同上，按 ID 精确取。⚠️ `.json` 路径后缀是**即将下线的兼容信号**，新代码请用 `?format=json`。
 
 ### GET /file/:uuid/:name
 

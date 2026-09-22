@@ -2,7 +2,9 @@
 //
 // 为什么值得单独一份：那几条捷径用的形状和网页端不一样，网页端全绿并不能说明捷径能用 ——
 //   · 鉴权走**查询串** `?auth=`，不是 `Authorization` 头
-//   · 「接收最新」走的是 `/content/latest.json` 路径后缀，不是 `?json=1`
+//   · 要 JSON 响应一律走**规范信号** `?format=json`
+//     （`.json` 路径后缀、`?json=1` / `?json=true` 是**兼容信号，即将下线** ——
+//     已发布出去的安装还在用，服务端暂时保留；见 resolveContentFormat 与 docs/api.md）
 //   · 「展示文件」直连 `/file/<uuid>/<name>`，**且不带 room**（服务端按文件记录的房间鉴权）
 // 上午那个「文本正常、文件/图片 401」就是这么漏出去的：第二次请求（下载）没带凭据。
 // 这条链路上任何一处形状变了，这里必须跟着红。
@@ -11,8 +13,8 @@
 // 所以这里只能照抄一份 —— **改捷径的 URL 时同步改这里**）：
 //   发送文本   POST {url}/text?room={room}&auth={auth}&name={name}         body: text/plain
 //   发送文件   POST {url}/upload?room={room}&auth={auth}&name={name}       multipart，字段名 file
-//   接收最新   GET  {url}/content/latest.json?room={room}&auth={auth}
-//   接收指定ID GET  {url}/content/{ID}?room={room}&json=true&auth={auth}
+//   接收最新   GET  {url}/content/latest?room={room}&auth={auth}&format=json
+//   接收指定ID GET  {url}/content/{ID}?room={room}&format=json&auth={auth}
 //   展示文件   GET  {url}/file/{uuid}/{name}?auth={auth}
 import { TextHandler } from './.build/text.mjs';
 import { FileHandler } from './.build/file.mjs';
@@ -66,12 +68,12 @@ async function textFlow(label, env, auth) {
   check(`${label}｜发送文本 POST /text?auth=`, send.status, 200);
 
   const latest = await getJson(ContentHandler.getLatest, env,
-    `/content/latest.json?room=default&auth=${auth}`, { auth: null });
-  check(`${label}｜接收最新 GET /content/latest.json`, latest.status, 200);
+    `/content/latest?room=default&auth=${auth}&format=json`, { auth: null });
+  check(`${label}｜接收最新 GET /content/latest?format=json`, latest.status, 200);
   check(`${label}｜拿到文字`, latest.json?.content, '捷径验收文本');
 
-  const byId = await getById(env, latest.json.id, `room=default&json=true&auth=${auth}`);
-  check(`${label}｜接收指定ID GET /content/{id}?json=true`, byId.status, 200);
+  const byId = await getById(env, latest.json.id, `room=default&format=json&auth=${auth}`);
+  check(`${label}｜接收指定ID GET /content/{id}?format=json`, byId.status, 200);
   check(`${label}｜按 ID 拿到同一份文字`, byId.json?.content, '捷径验收文本');
 }
 
@@ -80,7 +82,7 @@ async function fileFlow(label, env, auth) {
   check(`${label}｜发送文件 POST /upload (multipart)`, await sendFile(env, { auth }), 200);
 
   const latest = await getJson(ContentHandler.getLatest, env,
-    `/content/latest.json?room=default&auth=${auth}`, { auth: null });
+    `/content/latest?room=default&auth=${auth}&format=json`, { auth: null });
   check(`${label}｜最新一条是文件`, latest.json?.type, 'image');
   check(`${label}｜文件名保真`, latest.json?.name, FILE_NAME);
 
@@ -89,7 +91,7 @@ async function fileFlow(label, env, auth) {
   check(`${label}｜下到的是原字节`, dl.bytes.length === PNG.length
     && dl.bytes.every((b, i) => b === PNG[i]), true);
 
-  const byId = await getById(env, latest.json.id, `room=default&json=true&auth=${auth}`);
+  const byId = await getById(env, latest.json.id, `room=default&format=json&auth=${auth}`);
   check(`${label}｜按 ID 也能取到文件`, byId.json?.uuid, latest.json.uuid);
 }
 
@@ -105,18 +107,18 @@ console.log('\n── B. 加密房间：不带凭据 / 密码错，必须被拒 
   await postJson(TextHandler.create, env, '/text?room=default&auth=123', 'secret', { auth: null });
 
   const noAuth = await getJson(ContentHandler.getLatest, env,
-    '/content/latest.json?room=default', { auth: null });
+    '/content/latest?room=default&format=json', { auth: null });
   check('无凭据读最新被拒', noAuth.status, 401);
 
   const wrong = await getJson(ContentHandler.getLatest, env,
-    '/content/latest.json?room=default&auth=wrong', { auth: null });
+    '/content/latest?room=default&format=json&auth=wrong', { auth: null });
   check('密码错读最新被拒', wrong.status, 401);
 
   // 下载这条最容易漏：它是**第二次**请求，第一次 URL 上的 auth 不会自动跟过来
   const { env: env2 } = makeEnv();
   await sendFile(env2, { auth: '123' });
   const latest = await getJson(ContentHandler.getLatest, env2,
-    '/content/latest.json?room=default&auth=123', { auth: null });
+    '/content/latest?room=default&format=json&auth=123', { auth: null });
   const uuid = latest.json.uuid;
 
   check('无凭据下载被拒', (await download(env2, uuid, FILE_NAME, { auth: '' })).status, 401);

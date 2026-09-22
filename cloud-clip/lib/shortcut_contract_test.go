@@ -4,7 +4,9 @@ package lib
 //
 // 为什么值得单独一份：那几条捷径用的形状和网页端不一样，网页端全绿并不能说明捷径能用 ——
 //   · 鉴权走**查询串** `?auth=`，不是 `Authorization` 头
-//   · 「接收最新」走的是 `/content/latest.json` 路径后缀，不是 `?json=1`
+//   · 要 JSON 响应一律走**规范信号** `?format=json`
+//     （`.json` 路径后缀、`?json=1` / `?json=true` 是**兼容信号，即将下线** ——
+//     已发布出去的安装还在用，服务端暂时保留；见 resolveContentFormat 与 docs/api.md）
 //   · 「展示文件」直连 `/file/<uuid>/<name>`，**且不带 room**（服务端按文件记录的房间鉴权）
 // 曾经坏过的正是这里：下载是**第二次**请求，第一次 URL 上的 auth 不会自动跟过来，
 // 于是文本正常、文件/图片一律 401。
@@ -14,8 +16,8 @@ package lib
 //
 //	发送文本   POST {url}/text?room={room}&auth={auth}&name={name}         body: text/plain
 //	发送文件   POST {url}/upload?room={room}&auth={auth}&name={name}       multipart，字段名 file
-//	接收最新   GET  {url}/content/latest.json?room={room}&auth={auth}
-//	接收指定ID GET  {url}/content/{ID}?room={room}&json=true&auth={auth}
+//	接收最新   GET  {url}/content/latest?room={room}&auth={auth}&format=json
+//	接收指定ID GET  {url}/content/{ID}?room={room}&format=json&auth={auth}
 //	展示文件   GET  {url}/file/{uuid}/{name}?auth={auth}
 //
 // 同一份契约的另一半在 cloudflare/workers/test/shortcut-contract.test.mjs —— 两边都要过。
@@ -125,8 +127,8 @@ func shortcutLatest(t *testing.T, base, auth string) map[string]interface{} {
 	t.Helper()
 
 	status, data := shortcutDo(t, http.MethodGet,
-		base+"/content/latest.json?room=default&auth="+auth, "", "")
-	shortcutWant(t, "接收最新 GET /content/latest.json", status, http.StatusOK)
+		base+"/content/latest?room=default&auth="+auth+"&format=json", "", "")
+	shortcutWant(t, "接收最新 GET /content/latest?format=json", status, http.StatusOK)
 
 	var out map[string]interface{}
 	if err := json.Unmarshal(data, &out); err != nil {
@@ -156,8 +158,8 @@ func shortcutTextFlow(t *testing.T, base, auth string) {
 	// 所以这里跟着用 %v 拼，不假设类型。
 	id := fmt.Sprintf("%v", latest["id"])
 	status, data := shortcutDo(t, http.MethodGet,
-		base+"/content/"+id+"?room=default&json=true&auth="+auth, "", "")
-	shortcutWant(t, "接收指定ID GET /content/{id}?json=true", status, http.StatusOK)
+		base+"/content/"+id+"?room=default&format=json&auth="+auth, "", "")
+	shortcutWant(t, "接收指定ID GET /content/{id}?format=json", status, http.StatusOK)
 
 	var byID map[string]interface{}
 	if err := json.Unmarshal(data, &byID); err != nil {
@@ -236,10 +238,10 @@ func TestShortcutContractRejectsBadCredentials(t *testing.T) {
 
 	shortcutDo(t, http.MethodPost, base+"/text?room=default&auth=global-pw", "secret", "text/plain")
 
-	status, _ := shortcutDo(t, http.MethodGet, base+"/content/latest.json?room=default", "", "")
+	status, _ := shortcutDo(t, http.MethodGet, base+"/content/latest?room=default&format=json", "", "")
 	shortcutWant(t, "无凭据读最新被拒", status, http.StatusUnauthorized)
 
-	status, _ = shortcutDo(t, http.MethodGet, base+"/content/latest.json?room=default&auth=wrong", "", "")
+	status, _ = shortcutDo(t, http.MethodGet, base+"/content/latest?room=default&format=json&auth=wrong", "", "")
 	shortcutWant(t, "密码错读最新被拒", status, http.StatusUnauthorized)
 
 	// 下载这条最容易漏：它是第二次请求，第一次 URL 上的 auth 不会自动跟过来
@@ -291,8 +293,11 @@ func TestShortcutContractRoomPassword(t *testing.T) {
 // /content/* 的格式选择：?format= 优先，旧的三种信号保留为兼容。
 //
 // 为什么要锁：同一件事以前有三种表达（.json 后缀、?json=1、Accept 头），谁优先全靠读代码；
-// 现在多了一个显式的 ?format=，优先级必须写死在这里。已发布的捷径走 .json 后缀 ——
-// 那条路一旦断了，用户手机上装好的捷径就全废。
+// 现在多了一个显式的 ?format=，优先级必须写死在这里。
+//
+// ⚠️ **`.json` 后缀与 `?json=1` 是兼容信号，即将下线**（新写的客户端一律用 ?format=json，
+// 捷径侧已经改完）。但**现在还不能删** —— 用户手机上装好的捷径走的就是 .json 后缀，
+// 那条路一断，存量安装立刻全废。下面那几行兼容用例就是为此存在的，别顺手删掉。
 func TestContentFormatSelection(t *testing.T) {
 	srv := newShortcutServer(t, "global-pw", nil)
 	base := srv.URL

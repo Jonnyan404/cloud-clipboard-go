@@ -52,8 +52,8 @@ if (variants.size !== 1) {
 const EXPECTED_URLS = {
   '发送文本':   '{url}/text?room={room}&auth={auth}&name={name}',
   '发送文件':   '{url}/upload?room={room}&auth={auth}&name={name}',
-  '接收最新':   '{url}/content/latest.json?room={room}&auth={auth}',
-  '接收指定ID': '{url}/content/{ID}?room={room}&json=true&auth={auth}',
+  '接收最新':   '{url}/content/latest?room={room}&auth={auth}&format=json',
+  '接收指定ID': '{url}/content/{ID}?room={room}&format=json&auth={auth}',
   '展示文件':   '{downloadUrl}',
 };
 

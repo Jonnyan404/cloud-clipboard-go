@@ -27,7 +27,10 @@ function normalizeExpire(expireTime) {
 // 读**显式**的格式信号：?format= > .json 后缀 > ?json=1。
 //
 // 与 Go 侧的 resolveContentFormat 是同一份契约 —— 改一边必须改另一边。
-// 已发布的 Android 捷径走的是 .json 后缀，一个字都不能改。
+//
+// ⚠️ `.json` 后缀与 `?json=1` 是**兼容信号，即将下线**：新写的客户端一律用 ?format=json，
+// Android 捷径也已经改完。但**现在还不能删** —— 用户手机上装好的老捷径走的就是后缀那条路，
+// 一断存量安装立刻全废。
 //
 // 返回 '' 表示调用方没显式要格式，由分支自己决定（文本分支会再看 Accept 头，
 // 文件分支不看 —— 见 wantsJSON）。返回 null 表示 format 给了不认识的值
