@@ -44,5 +44,9 @@ echo "── Android 快捷指令的请求形状（?auth= 查询串 / latest.jso
 node --no-warnings test/shortcut-contract.test.mjs
 
 echo
+echo "── 看板列（POST /content/:id/column：固定三列、落库、不动 timestamp）"
+node --no-warnings test/board-column.test.mjs
+
+echo
 echo "── 分享页链路（一律发 token / 链接指向 /#/s / 元信息 / 密码闸门 / 看一眼不消耗次数）"
 node --no-warnings test/share-page.test.mjs

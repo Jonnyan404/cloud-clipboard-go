@@ -124,6 +124,33 @@ async function ensureDeviceNameColumn(db) {
   return ready;
 }
 
+// 看板的列（todo / doing / done）。和 deviceName 一样，靠一次幂等的 ALTER 自愈 ——
+// 已有部署不必手工跑迁移。
+//
+// ⚠️ 数据库列名用 `boardColumn`，不用 `column`：`column` 是 SQL 关键字，
+// SQLite 多数场合允许它当标识符，但没必要在每条 SQL 里赌这一点。
+// 对外（JSON 响应 / API 请求体）仍然叫 `column`，两边的映射在读取处做。
+const boardColumnReady = new WeakMap();
+
+export async function ensureBoardColumn(db) {
+  if (boardColumnReady.has(db)) {
+    return boardColumnReady.get(db);
+  }
+  let ready;
+  try {
+    await db.prepare('ALTER TABLE messages ADD COLUMN boardColumn TEXT').run();
+    ready = true;
+  } catch (error) {
+    // 列已存在时会报 duplicate column name，属预期；其他错误就让看板列退回「只读」
+    ready = /duplicate column/i.test(String(error && error.message));
+    if (!ready) {
+      console.warn('boardColumn 列不可用，看板列将无法保存:', error);
+    }
+  }
+  boardColumnReady.set(db, ready);
+  return ready;
+}
+
 export async function saveToD1(db, messageData, env) { // 修复：添加 env 参数
   try {
     if (!db) {

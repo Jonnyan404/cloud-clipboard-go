@@ -1,8 +1,19 @@
 import { corsHeaders } from '../cors';
-import { broadcastMessage, buildSenderDevice } from '../utils';
+import { broadcastMessage, buildSenderDevice, ensureBoardColumn } from '../utils';
 import { ensureRoomAccess, normalizeRoomName } from '../auth';
 import { ensureRoomOrShareAccess } from '../share';
 import { errorResponse } from '../errors';
+
+// 看板的列：**固定三列**（todo / doing / done）。空串/缺失归一成 todo（新条目默认落待办）。
+// 返回 null 表示不认识这个值 —— 调用方必须报错，不能静默回落，否则客户端以为挪成功了。
+// 与 Go 侧 normalizeBoardColumn 同一份契约，改一边记得改另一边。
+function normalizeBoardColumn(raw) {
+  const value = String(raw ?? '').trim().toLowerCase();
+  if (value === '') {
+    return 'todo';
+  }
+  return ['todo', 'doing', 'done'].includes(value) ? value : null;
+}
 
 function normalizeExpire(expireTime) {
   const numericExpire = Number(expireTime || 0);
@@ -69,6 +80,9 @@ function buildJsonContentPayload(row) {
     senderIP: row.senderIP || 'unknown',
     senderClientID: row.senderClientID || '',
     senderDevice: buildSenderDevice(row.userAgent || 'unknown', row.deviceName),
+    // 看板的列，空串 = 待办。数据库列叫 boardColumn（`column` 是 SQL 关键字），
+    // 对外一律叫 `column` —— 和 Go 侧、和 WebSocket 载荷保持一致。
+    column: row.boardColumn || '',
   };
 
   if (row.type === 'text') {
@@ -233,6 +247,80 @@ export class ContentHandler {
       console.error('Latest content handler error:', error);
       console.error('Error stack:', error.stack);
       return errorResponse(500, 'internal_error', 'Internal Server Error', '获取最新内容时发生错误');
+    }
+  }
+
+  // POST /content/:id/column —— 看板把卡片挪到另一列。
+  //
+  // 与 Go 侧 handleContentColumn 同一份契约：固定三列、卡片就是条目本身、不建新表，
+  // 且**不动 timestamp**（挪个位置不该让卡片在时间流里跳到最前面）。
+  //
+  // ⚠️ 鉴权用 ensureRoomAccess（**房间密码**），不用 getById 那条 ensureRoomOrShareAccess ——
+  // 分享 token 是给「只读一条」用的，不能拿来改东西。
+  static async setColumn(request, env) {
+    try {
+      const { id } = request.params;
+      const url = new URL(request.url);
+      const numericId = parseInt(id, 10);
+      if (!Number.isInteger(numericId) || numericId <= 0) {
+        return errorResponse(400, 'invalid_content_id', 'Invalid content id', '无效的内容 ID');
+      }
+
+      let body;
+      try {
+        body = await request.json();
+      } catch {
+        return errorResponse(400, 'invalid_body', 'Invalid JSON body', '请求体不是合法的 JSON');
+      }
+      const column = normalizeBoardColumn(body && body.column);
+      if (column === null) {
+        return errorResponse(400, 'invalid_column', 'Unknown board column', '未知的看板列（只支持 todo / doing / done）');
+      }
+
+      if (!env.DB) {
+        return errorResponse(503, 'database_unavailable', 'Database not available', '数据库不可用');
+      }
+
+      const hasRequestedRoom = url.searchParams.has('room');
+      const requestedRoom = normalizeRoomName(url.searchParams.get('room'));
+      // 先按条目**自己记录的房间**取，再鉴权 —— 和 getById 同一条思路：不信客户端传的 ?room=
+      const row = hasRequestedRoom
+        ? await env.DB.prepare('SELECT * FROM messages WHERE id = ? AND room = ?').bind(numericId, requestedRoom).first()
+        : await env.DB.prepare('SELECT * FROM messages WHERE id = ? ORDER BY id DESC LIMIT 1').bind(numericId).first();
+
+      if (!row) {
+        return errorResponse(404, 'content_not_found', 'Content not found', '内容未找到');
+      }
+
+      const contentRoom = normalizeRoomName(row.room || 'default');
+      const authResult = await ensureRoomAccess(request, env, contentRoom);
+      if (!authResult.ok) {
+        return authResult.response;
+      }
+
+      if (!await ensureBoardColumn(env.DB)) {
+        return errorResponse(503, 'database_unavailable', 'Board column unavailable', '看板列不可用');
+      }
+
+      await env.DB.prepare('UPDATE messages SET boardColumn = ? WHERE id = ? AND room = ?')
+        .bind(column, numericId, contentRoom).run();
+
+      // 广播载荷和 getById 的形状一致：客户端 `case 'update'` 是原地合并，所以给整条。
+      await broadcastMessage(env, contentRoom, {
+        event: 'update',
+        data: buildJsonContentPayload({ ...row, boardColumn: column }),
+      });
+
+      return new Response(JSON.stringify({
+        id: numericId.toString(),
+        type: row.type,
+        column,
+      }), {
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      });
+    } catch (error) {
+      console.error('Board column handler error:', error);
+      return errorResponse(500, 'internal_error', 'Internal Server Error', '设置看板列时发生错误');
     }
   }
 

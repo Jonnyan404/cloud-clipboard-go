@@ -34,6 +34,8 @@ router.get('/content/latest', ContentHandler.getLatest);
 router.get('/content/latest.json', ContentHandler.getLatest);
 router.get('/content/:id', ContentHandler.getById);
 router.get('/content/:id.json', ContentHandler.getById);
+// 看板：把卡片挪到某一列。`:id` 不跨 `/`，所以不会和上面两条抢。
+router.post('/content/:id/column', ContentHandler.setColumn);
 router.post('/upload/chunk', FileHandler.createChunk);
 router.post('/upload/chunk/:uuid', FileHandler.uploadChunkPart);
 router.post('/upload/finish/:uuid', FileHandler.finishChunk);

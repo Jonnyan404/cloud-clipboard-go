@@ -226,7 +226,10 @@ export class WebSocketRoom {
             room: row.room || 'default',
             senderIP: row.senderIP || 'unknown',
             senderClientID: row.senderClientID || '',
-            senderDevice: buildSenderDevice(row.userAgent || 'unknown', row.deviceName)
+            senderDevice: buildSenderDevice(row.userAgent || 'unknown', row.deviceName),
+            // 看板的列，空串 = 待办。前端整张列表都从这条握手载荷来，所以这里漏了的话
+            // 表现是「刷新之后卡片全回待办」—— 列明明存着。
+            column: row.boardColumn || '',
           }
         };
 
