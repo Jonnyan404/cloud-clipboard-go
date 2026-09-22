@@ -3,6 +3,44 @@ import { buildSenderDevice, saveToD1, broadcastMessage } from '../utils';
 import { ensureRoomAccess, normalizeRoomName } from '../auth';
 import { errorResponse } from '../errors';
 
+/**
+ * 从请求体里取正文。只认两种结构化形态，**其余一律当纯文本**：
+ *
+ *   · application/json    → {"content": "..."}
+ *   · multipart/form-data → 表单字段 content
+ *   · 其它（含不声明、含 urlencoded） → 整个请求体就是正文
+ *
+ * ⚠️ `application/x-www-form-urlencoded` **刻意不认**：它是 `curl --data-binary` 之类
+ * 不带 `-H` 时的**默认** Content-Type，很多老调用方都这样发正文；当表单解析的话，
+ * 一段没有 `=` 的正文会解析出空的 content —— 不是报错，是**静默存成空串**。
+ *
+ * 为什么要有前两条：快捷指令把**字符串变量**当请求体发出去时字节会变成 UTF-16，
+ * 而结构化请求体（JSON / 表单）是按 UTF-8 序列化的。Go 侧 readTextBody 是同一套契约。
+ */
+async function readTextBody(request) {
+  // 只取 media type，丢掉 charset 之类的参数
+  const mediaType = (request.headers.get('Content-Type') || '').toLowerCase().split(';')[0].trim();
+
+  if (mediaType === 'application/json') {
+    const payload = await request.json().catch(() => null);
+    if (!payload || typeof payload !== 'object') {
+      throw new Error('JSON 正文解析失败');
+    }
+    return typeof payload.content === 'string' ? payload.content : '';
+  }
+
+  if (mediaType === 'multipart/form-data') {
+    const form = await request.formData().catch(() => null);
+    if (!form) {
+      throw new Error('表单正文解析失败');
+    }
+    const value = form.get('content');
+    return typeof value === 'string' ? value : '';
+  }
+
+  return request.text();
+}
+
 export class TextHandler {
   static async create(request, env) {
     try {
@@ -19,7 +57,14 @@ export class TextHandler {
       
       console.log(`文本消息房间: ${room}`);
       
-      const content = await request.text();
+      // 正文可以是纯文本、JSON 或表单 —— 见 readTextBody 上面那段说明
+      let content;
+      try {
+        content = await readTextBody(request);
+      } catch (error) {
+        console.log('解析文本请求体失败:', error.message);
+        return errorResponse(400, 'invalid_body', 'Cannot parse request body', '请求体无法解析');
+      }
       
       if (!content || content.trim() === '') {
         console.log('文本内容为空');

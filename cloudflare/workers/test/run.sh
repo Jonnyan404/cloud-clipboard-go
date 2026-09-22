@@ -48,5 +48,9 @@ echo "── 看板列（POST /content/:id/column：固定三列、落库、不�
 node --no-warnings test/board-column.test.mjs
 
 echo
+echo "── /text 的请求体形态（JSON / multipart / 纯文本；urlencoded 刻意不认）"
+node --no-warnings test/text-body.test.mjs
+
+echo
 echo "── 分享页链路（一律发 token / 链接指向 /#/s / 元信息 / 密码闸门 / 看一眼不消耗次数）"
 node --no-warnings test/share-page.test.mjs
