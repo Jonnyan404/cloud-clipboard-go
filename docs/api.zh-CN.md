@@ -232,12 +232,15 @@ Authorization: Bearer <凭据>
 | `multipart/form-data` | 表单字段 `content` |
 
 后两种是给**快捷指令**用的：它把字符串变量当请求体发出去时字节会变成 UTF-16，
-而结构化请求体是按 UTF-8 序列化的。三种形态**都按 UTF-8 存原文**，不做任何转义。
+而结构化请求体是按 UTF-8 序列化的。
 
 ⚠️ `application/x-www-form-urlencoded` **刻意不认**，继续走「整个请求体是正文」那一条 ——
 它是 `curl --data-binary` 之类不带 `-H` 时的默认类型，把它当表单解析会让这类请求**静默存成空串**。
 
 声明了 `application/json` 但正文不是合法 JSON → `400` + `code: invalid_body`。
+
+**纯文本那一条还会认 UTF-16**（带 BOM，或字节形态能看出是 UTF-16）并解码 —— 快捷指令发的就是它；
+认不出就按 UTF-8 存原文，**不做任何转义**。
 
 ### POST /upload
 

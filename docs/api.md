@@ -239,14 +239,17 @@ Over the limit returns `413` with `code: text_too_long` (limit from `/server` �
 | `multipart/form-data` | the form field `content` |
 
 The last two exist for **Shortcuts**: when it sends a string variable as the request body the bytes come
-out UTF-16, while a structured body is serialized as UTF-8. All three shapes are stored as UTF-8,
-byte for byte — nothing is escaped or rewritten.
+out UTF-16, while a structured body is serialized as UTF-8.
 
 ⚠️ `application/x-www-form-urlencoded` is **deliberately not recognised** and keeps taking the
 "whole body is the text" path — it is what `curl --data-binary` and friends send by default, and
 treating it as a form would make those requests **silently store an empty entry**.
 
 Declaring `application/json` with a body that is not valid JSON returns `400` with `code: invalid_body`.
+
+**The plain-text path also recognises UTF-16** (a BOM, or a byte pattern that gives it away) and decodes
+it — that is what a Shortcuts shortcut sends. Anything else is stored as UTF-8, byte for byte, with
+**nothing escaped or rewritten**.
 
 ### POST /upload
 

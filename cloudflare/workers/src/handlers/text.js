@@ -38,7 +38,79 @@ async function readTextBody(request) {
     return typeof value === 'string' ? value : '';
   }
 
-  return request.text();
+  const buffer = await request.arrayBuffer();
+  return decodeTextBytes(new Uint8Array(buffer));
+}
+
+function isValidUtf8(bytes) {
+  try {
+    new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function decode16(bytes, label) {
+  // 奇数长度时丢掉最后一个字节：TextDecoder 对半截 UTF-16 单元会抛
+  const even = bytes.subarray(0, bytes.length - (bytes.length % 2));
+  const text = new TextDecoder(label).decode(even);
+  // 发出去的字符串结尾常带一个孤立的 NUL，别在正文尾巴上多一个字符
+  return text.endsWith('\u0000') ? text.slice(0, -1) : text;
+}
+
+/**
+ * 把请求体的字节还原成字符串。
+ *
+ * 为什么需要它：**快捷指令把字符串变量当请求体发出去时，字节是 UTF-16**
+ *（能直接看到 `A\0B\0C\0` 这种「字符后跟 NUL」的模式）。服务端一直按 UTF-8 读，
+ * 于是中英文一起变乱码。三个信号依次看：
+ *
+ *   ① BOM（FF FE / FE FF）—— 最可靠，见到就认；
+ *   ② 隔位 NUL —— ASCII 为主的正文编成 UTF-16 后每个字符后面跟一个 NUL；
+ *   ③ 整段不是合法 UTF-8、但按 UTF-16LE 解出来没有替换字符 —— 中文为主的正文靠这条
+ *      （CJK 在 UTF-16 里不含 NUL，②对它完全无感）。
+ *
+ * 误判风险：合法 UTF-8 永远不会走到 ③；GBK 之类解成 UTF-16 会满是替换字符，也过不了 ③。
+ * 宁可漏认，不会把好好的 UTF-8 弄坏。Go 侧 decodeTextBytes 是同一套判断。
+ */
+function decodeTextBytes(bytes) {
+  if (bytes.length >= 2) {
+    if (bytes[0] === 0xff && bytes[1] === 0xfe) {
+      return decode16(bytes.subarray(2), 'utf-16le');
+    }
+    if (bytes[0] === 0xfe && bytes[1] === 0xff) {
+      return decode16(bytes.subarray(2), 'utf-16be');
+    }
+  }
+
+  if (bytes.length >= 4 && bytes.length % 2 === 0) {
+    let evenZeros = 0;
+    let oddZeros = 0;
+    for (let i = 0; i < bytes.length; i += 1) {
+      if (bytes[i] === 0) {
+        if (i % 2 === 0) {
+          evenZeros += 1;
+        } else {
+          oddZeros += 1;
+        }
+      }
+    }
+    if (oddZeros >= bytes.length / 4 && evenZeros === 0) {
+      return decode16(bytes, 'utf-16le');
+    }
+    if (evenZeros >= bytes.length / 4 && oddZeros === 0) {
+      return decode16(bytes, 'utf-16be');
+    }
+    if (!isValidUtf8(bytes)) {
+      const decoded = decode16(bytes, 'utf-16le');
+      if (!decoded.includes('\uFFFD')) {
+        return decoded;
+      }
+    }
+  }
+
+  return new TextDecoder('utf-8').decode(bytes);
 }
 
 export class TextHandler {

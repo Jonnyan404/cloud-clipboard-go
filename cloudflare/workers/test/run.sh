@@ -48,7 +48,7 @@ echo "── 看板列（POST /content/:id/column：固定三列、落库、不�
 node --no-warnings test/board-column.test.mjs
 
 echo
-echo "── /text 的请求体形态（JSON / multipart / 纯文本；urlencoded 刻意不认）"
+echo "── /text 的请求体（JSON / multipart / 纯文本；UTF-16 要认出来）"
 node --no-warnings test/text-body.test.mjs
 
 echo

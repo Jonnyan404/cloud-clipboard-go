@@ -80,4 +80,59 @@ for (const [name, body, contentType, want] of cases) {
   check('坏 JSON · message 指向请求体', String(bad.json?.message || ''), '请求体无法解析');
 }
 
+// ── 请求体编码：UTF-16 要能认出来 ────────────────────────────────────────
+// 快捷指令把字符串变量当请求体发出去时就是 UTF-16（`A\0B\0C\0` 那种「字符后跟 NUL」）。
+// 三个信号（BOM / 隔位 NUL / 不是合法 UTF-8）都要认，而且**不能误判正常的 UTF-8**。
+function utf16Bytes(text, littleEndian, bom) {
+  const out = [];
+  const push = (u) => {
+    if (littleEndian) {
+      out.push(u & 0xff, u >> 8);
+    } else {
+      out.push(u >> 8, u & 0xff);
+    }
+  };
+  if (bom) {
+    out.push(...(littleEndian ? [0xff, 0xfe] : [0xfe, 0xff]));
+  }
+  for (const ch of text) {
+    const cp = ch.codePointAt(0);
+    if (cp > 0xffff) {
+      const v = cp - 0x10000;
+      push(0xd800 + (v >> 10));
+      push(0xdc00 + (v & 0x3ff));
+    } else {
+      push(cp);
+    }
+  }
+  return new Uint8Array(out);
+}
+
+const utf16Cases = [
+  ['UTF-16LE + BOM', utf16Bytes(MD, true, true), MD],
+  ['UTF-16BE + BOM', utf16Bytes(MD, false, true), MD],
+  ['UTF-16LE 无 BOM · ASCII 为主（靠隔位 NUL 认）', utf16Bytes('just a plain sentence', true, false), 'just a plain sentence'],
+  ['UTF-16LE 无 BOM · 中文为主（靠「不是合法 UTF-8」认）', utf16Bytes(MD, true, false), MD],
+];
+
+for (const [name, bytes, want] of utf16Cases) {
+  const { env } = makeEnv();
+  // 不声明 Content-Type —— 和捷径实况一致，走「整个 body 是正文」那条
+  const created = await postText(env, bytes, null);
+  if (created.status !== 200) {
+    check(`${name} · POST 成功`, `HTTP ${created.status} ${created.text.slice(0, 120)}`, 'HTTP 200');
+    continue;
+  }
+  const entry = await readBack(env, created.json?.id);
+  check(`${name} · 解码正确`, entry.json?.content ?? null, want);
+}
+
+// 反向：正常的 UTF-8 正文不能被当成 UTF-16 去解（误判会把好好的中文弄坏）
+{
+  const { env } = makeEnv();
+  const created = await postText(env, MD, 'text/plain');
+  const entry = await readBack(env, created.json?.id);
+  check('UTF-8 正文不受影响', entry.json?.content ?? null, MD);
+}
+
 summary();

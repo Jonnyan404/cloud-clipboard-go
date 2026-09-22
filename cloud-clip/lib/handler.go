@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,6 +14,8 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
+	"unicode/utf16"
+	"unicode/utf8"
 
 	"github.com/gorilla/websocket"
 )
@@ -524,8 +527,76 @@ func readTextBody(r *http.Request) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		return string(body), nil
+		// ⚠️ 别直接 string(body)：捷径发出来的字节可能是 UTF-16 —— 见 decodeTextBytes
+		return decodeTextBytes(body), nil
 	}
+}
+
+// decodeTextBytes 把请求体的字节还原成字符串。
+//
+// 为什么需要它：**快捷指令把字符串变量当请求体发出去时，字节是 UTF-16**
+// （能直接看到 `A\x00B\x00C\x00` 这种「字符后跟 NUL」的模式）。服务端一直按 UTF-8 读，
+// 于是中英文一起变乱码。客户端那边为了绕开它做过各种转换动作，而每一种都有自己的副作用 ——
+// 「从多信息文本获取 Markdown」就会把正文里的 markdown 字符转义掉（`- 一条` → `\- 一条`）。
+//
+// 这里只做一件事：**认出 UTF-16 就解码**，认不出原样当 UTF-8。三个信号依次看：
+//
+//	① BOM（FF FE / FE FF）—— 最可靠，见到就认；
+//	② 隔位 NUL —— ASCII 为主的正文编成 UTF-16 后每个字符后面跟一个 NUL；
+//	③ 整段不是合法 UTF-8、但按 UTF-16LE 解出来没有替换字符 —— 中文为主的正文靠这条
+//	   （CJK 在 UTF-16 里不含 NUL，②对它完全无感）。
+//
+// 误判风险：一段**合法 UTF-8** 永远不会走到 ③；而 GBK 之类解成 UTF-16 会满是替换字符，
+// 也过不了 ③。所以宁可漏认，不会把好好的 UTF-8 弄坏。
+func decodeTextBytes(b []byte) string {
+	if len(b) >= 2 {
+		if b[0] == 0xFF && b[1] == 0xFE {
+			return decodeUTF16(b[2:], binary.LittleEndian)
+		}
+		if b[0] == 0xFE && b[1] == 0xFF {
+			return decodeUTF16(b[2:], binary.BigEndian)
+		}
+	}
+
+	if len(b) >= 4 && len(b)%2 == 0 {
+		evenZeros, oddZeros := 0, 0
+		for i, c := range b {
+			if c == 0 {
+				if i%2 == 0 {
+					evenZeros++
+				} else {
+					oddZeros++
+				}
+			}
+		}
+		// ② 隔位 NUL：一半以上的奇数位是 NUL 且偶数位没有 NUL → 小端
+		if oddZeros >= len(b)/4 && evenZeros == 0 {
+			return decodeUTF16(b, binary.LittleEndian)
+		}
+		if evenZeros >= len(b)/4 && oddZeros == 0 {
+			return decodeUTF16(b, binary.BigEndian)
+		}
+		// ③ 不是合法 UTF-8，但按 UTF-16LE 解得干净 → 认它
+		if !utf8.Valid(b) {
+			if s := decodeUTF16(b, binary.LittleEndian); !strings.ContainsRune(s, utf8.RuneError) {
+				return s
+			}
+		}
+	}
+
+	return string(b)
+}
+
+func decodeUTF16(b []byte, order binary.ByteOrder) string {
+	units := make([]uint16, 0, len(b)/2)
+	for i := 0; i+1 < len(b); i += 2 {
+		units = append(units, order.Uint16(b[i:i+2]))
+	}
+	// 末尾常带一个孤立的 NUL（发出去的字符串结尾），去掉它别在正文尾巴上多一个字符
+	if n := len(units); n > 0 && units[n-1] == 0 {
+		units = units[:n-1]
+	}
+	return string(utf16.Decode(units))
 }
 
 func (s *ClipboardServer) handle_text(w http.ResponseWriter, r *http.Request) {
