@@ -473,6 +473,61 @@ func (s *ClipboardServer) handle_file(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// readTextBody 从请求体里取正文。只认两种结构化形态，**其余一律当纯文本**：
+//
+//	· application/json       → {"content": "..."}
+//	· multipart/form-data    → 表单字段 content
+//	· 其它（含不声明、含 urlencoded） → 整个请求体就是正文（老客户端全走这条）
+//
+// ⚠️ **`application/x-www-form-urlencoded` 刻意不认**。它是 `curl --data-binary` 之类
+// 不带 `-H` 时的**默认** Content-Type，很多老调用方（含本仓库的 e2e 灌数据）都这样发正文；
+// 一旦把它当表单解析，`# 标题\n- 一条` 这种没有 `=` 的正文会解析出**空的 content 字段** ——
+// 不是报错，是**静默存成空串**。宁可不认它，让这些请求继续走「整个 body 是正文」那条老路。
+//
+// 为什么要有前两条：快捷指令用「获取 URL 内容」把**字符串变量**当请求体发出去时，
+// 字节会变成 UTF-16（服务端收到的是 `j\0u\0s\0t\0`），而**结构化请求体**（JSON / 表单）
+// 是按 UTF-8 序列化的。所以捷径侧只要把请求体类型从「文件」换成这两个之一，
+// 编码问题就不存在了 —— 前提是服务端这边先收得下。
+//
+// 顺带记一笔（2026-09-22 实测）：那条捷径现在为了绕开编码问题，把正文过了一道
+// 「从多信息文本获取 Markdown」。而那个动作是**富文本 → markdown 的转换器**，
+// 会把 markdown 里有意义的字符转义掉（`- 一条` 变成 `\- 一条`，就是用户看到的「多 `\`」），
+// 对纯文本还会直接返回空串。走 JSON / 表单之后那一步可以整个删掉。
+func readTextBody(r *http.Request) (string, error) {
+	mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+	if err != nil {
+		// Content-Type 写坏了（或不认识）就当老客户端处理 —— 整个 body 是正文
+		mediaType = ""
+	}
+
+	switch mediaType {
+	case "application/json":
+		var payload struct {
+			Content string `json:"content"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			return "", fmt.Errorf("JSON 正文解析失败: %w", err)
+		}
+		return payload.Content, nil
+
+	case "multipart/form-data":
+		// 4MB 走内存、超出落临时文件。一条文本远够用。
+		if err := r.ParseMultipartForm(4 << 20); err != nil {
+			return "", fmt.Errorf("表单正文解析失败: %w", err)
+		}
+		// 用 PostFormValue 而不是 FormValue：后者会回落到查询串，
+		// 于是 `?content=xx` 会**悄悄覆盖**表单里的正文。
+		return r.PostFormValue("content"), nil
+
+	default:
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			return "", err
+		}
+		return string(body), nil
+	}
+}
+
 func (s *ClipboardServer) handle_text(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "Only POST is allowed", "仅允许 POST 请求")
@@ -481,15 +536,15 @@ func (s *ClipboardServer) handle_text(w http.ResponseWriter, r *http.Request) {
 
 	room := normalizeRoomName(r.URL.Query().Get("room"))
 
-	body, err := io.ReadAll(r.Body)
+	// 正文可以是纯文本、JSON 或表单 —— 见 readTextBody 上面那段说明
+	text, err := readTextBody(r)
 	if err != nil {
-		s.logger.Printf("错误: 读取 /text 请求体失败: %v", err)
-		writeError(w, http.StatusInternalServerError, "body_read_failed", "Cannot read request body", "无法读取请求体")
+		// 解析失败（JSON 写坏了 / 表单坏了）比 IO 失败常见得多，统一按「请求体不合法」回 400
+		s.logger.Printf("错误: 解析 /text 请求体失败: %v", err)
+		writeError(w, http.StatusBadRequest, "invalid_body", "Cannot parse request body", "请求体无法解析")
 		return
 	}
 	defer r.Body.Close()
-
-	text := string(body)
 	if s.config.Text.Limit > 0 && len(text) > s.config.Text.Limit {
 		s.logger.Printf("错误: 文本内容超出限制 (%d > %d)", len(text), s.config.Text.Limit)
 		writeError(w, http.StatusRequestEntityTooLarge, "text_too_long", "Text too long", fmt.Sprintf("文本内容超出限制 (最大 %d 字符)", s.config.Text.Limit))
@@ -1148,8 +1203,11 @@ func writeError(w http.ResponseWriter, status int, code, errText, message string
 // resolveContentFormat 读**显式**的格式信号：?format= > .json 后缀 > ?json=1。
 //
 // 为什么要有这个函数：同一件事以前有三种表达，谁优先、哪个算数只能靠读代码。
-// 现在统一成 ?format= 优先，其余两个保留为兼容信号 —— 已发布的捷径走
-// /content/latest.json、Android 端同样用后缀，一个字都不能改。
+// 现在统一成 ?format= 优先，其余两个保留为**兼容信号**。
+//
+// ⚠️ 兼容信号（`.json` 后缀、`?json=1`）**即将下线**：新写的客户端一律用 ?format=json，
+// 捷径侧已经改完。但**现在还不能删** —— 用户手机上装好的老捷径走的就是后缀那条路，
+// 一断存量安装立刻全废。
 //
 // 返回 "" 表示调用方没显式要格式，由分支自己决定（文本分支会再看 Accept 头，
 // 文件分支不看 —— 见 wantsJSON 的注释）。
