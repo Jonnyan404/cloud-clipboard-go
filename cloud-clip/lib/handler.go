@@ -587,6 +587,99 @@ func (s *ClipboardServer) updateTextMessage(id int, newContent string, room stri
 	return false
 }
 
+// 看板的列。**固定三列**，不做用户自建 —— 这是最小实现，见 handleContentColumn。
+var boardColumns = map[string]bool{"todo": true, "doing": true, "done": true}
+
+// normalizeBoardColumn 校验列名。空串归一成 todo（新条目默认落在待办）。
+func normalizeBoardColumn(raw string) (string, bool) {
+	value := strings.ToLower(strings.TrimSpace(raw))
+	if value == "" {
+		return "todo", true
+	}
+	if boardColumns[value] {
+		return value, true
+	}
+	return "", false
+}
+
+// handleContentColumn 把一条内容挪到看板的某一列：`POST /content/<id>/column`。
+//
+// 看板的最小实现：**固定三列**（todo / doing / done），卡片就是剪贴板条目本身 ——
+// 不建新表、不做「列内顺序」，条目上多一个 `column` 字段就够了（空 = 待办）。
+// 列是**视图属性**：所有模式看的是同一批条目，只是看板按列摆。
+//
+// ⚠️ **故意不动 timestamp**。`updateTextMessage` 改正文时会把时间戳刷成现在，
+// 但「把卡片挪到另一列」不该让它在时间流里跳到最前面 —— 挪个位置就重排整个列表太突然。
+func (s *ClipboardServer) handleContentColumn(w http.ResponseWriter, r *http.Request, idStr string) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "Only POST is allowed", "仅允许 POST 请求")
+		return
+	}
+
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_content_id", "Invalid content id", "无效的内容 ID")
+		return
+	}
+
+	var body struct {
+		Column string `json:"column"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_body", "Invalid JSON body", "请求体不是合法的 JSON")
+		return
+	}
+	column, columnOK := normalizeBoardColumn(body.Column)
+	if !columnOK {
+		writeError(w, http.StatusBadRequest, "invalid_column", "Unknown board column", "未知的看板列（只支持 todo / doing / done）")
+		return
+	}
+
+	_, hasRequestedRoom := r.URL.Query()["room"]
+	requestedRoom := normalizeRoomName(r.URL.Query().Get("room"))
+
+	s.messageQueue.Lock()
+	defer s.messageQueue.Unlock()
+
+	for i, msg := range s.messageQueue.List {
+		if msg.Data.ID() != id {
+			continue
+		}
+		messageRoom := normalizeRoomName(msg.Data.Room())
+		if hasRequestedRoom && messageRoom != requestedRoom {
+			continue
+		}
+		// 与 handleContent 同一条鉴权：按**条目自己记录的房间**，不信客户端传的 ?room=
+		if !s.canAccessContent(r, messageRoom, id) {
+			writeError(w, http.StatusUnauthorized, "room_auth_required", "Room authentication required", "无权访问该房间")
+			return
+		}
+
+		s.messageQueue.List[i].Data.SetColumn(column)
+
+		// 广播载荷要和 updateTextMessage 一致：客户端 `case 'update'` 是
+		// `{...app.received[i], ...data}` 原地合并，所以给**具体那一支**（含 id），不是外层 holder。
+		var payload interface{}
+		if msg.Data.TextReceive != nil {
+			payload = s.messageQueue.List[i].Data.TextReceive
+		} else {
+			payload = s.messageQueue.List[i].Data.FileReceive
+		}
+		go s.broadcastWebSocketMessage(WebSocketMessage{Event: "update", Data: payload}, messageRoom)
+		go s.saveHistoryData()
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{
+			"id":     strconv.Itoa(id),
+			"type":   msg.Data.Type(),
+			"column": column,
+		})
+		return
+	}
+
+	writeError(w, http.StatusNotFound, "content_not_found", "Content not found", "内容未找到")
+}
+
 func (s *ClipboardServer) handle_upload(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "Only POST is allowed", "仅允许 POST 请求")
@@ -1106,6 +1199,13 @@ func (s *ClipboardServer) handleContent(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// /content/<id>/column —— 看板把卡片挪到另一列。必须先分派：下面按「最后一段是 id」
+	// 取 id，`/content/7/column` 会被当成 id="column" 然后 Atoi 失败。
+	if len(parts) == 3 && parts[2] == "column" {
+		s.handleContentColumn(w, r, parts[1])
+		return
+	}
+
 	idStr := parts[len(parts)-1]
 
 	// 检查是否是访问 "latest"，如果是，让专用处理函数处理
@@ -1181,6 +1281,8 @@ func (s *ClipboardServer) handleContent(w http.ResponseWriter, r *http.Request) 
 							"id":        strconv.Itoa(msg.Data.ID()),
 							"timestamp": fileReceive.Timestamp,
 							"expire":    fileReceive.Expire,
+							// 空串 = 待办（看板列，见 handleContentColumn）
+							"column": fileReceive.Column,
 						}
 
 						w.Header().Set("Content-Type", "application/json")
@@ -1231,6 +1333,8 @@ func (s *ClipboardServer) handleContent(w http.ResponseWriter, r *http.Request) 
 							"content":   msg.Data.TextReceive.Content,
 							"id":        strconv.Itoa(msg.Data.ID()),
 							"timestamp": msg.Data.TextReceive.Timestamp,
+							// 空串 = 待办（看板列，见 handleContentColumn）
+							"column": msg.Data.TextReceive.Column,
 						}
 
 						w.Header().Set("Content-Type", "application/json")
@@ -1335,6 +1439,8 @@ func (s *ClipboardServer) handleLatestContent(w http.ResponseWriter, r *http.Req
 					"id":        strconv.Itoa(msg.Data.ID()),
 					"timestamp": fileReceive.Timestamp,
 					"expire":    fileReceive.Expire,
+					// 空串 = 待办（看板列，见 handleContentColumn）
+					"column": fileReceive.Column,
 				}
 			} else if msg.Data.Type() == "text" && msg.Data.TextReceive != nil {
 				responseType = "text"
@@ -1343,6 +1449,8 @@ func (s *ClipboardServer) handleLatestContent(w http.ResponseWriter, r *http.Req
 					"content":   msg.Data.TextReceive.Content,
 					"id":        strconv.Itoa(msg.Data.ID()),
 					"timestamp": msg.Data.TextReceive.Timestamp,
+					// 空串 = 待办（看板列，见 handleContentColumn）
+					"column": msg.Data.TextReceive.Column,
 				}
 			} else {
 				// 未知类型，提供基本信息

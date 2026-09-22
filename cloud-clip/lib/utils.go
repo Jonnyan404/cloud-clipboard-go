@@ -295,6 +295,25 @@ func (r *ReceiveHolder) SenderDevice() map[string]string {
 	return nil
 }
 
+// Column 是看板的列（空 = 待办）。文本和文件条目都能上板，所以两个分支都要认。
+func (r *ReceiveHolder) Column() string {
+	if r.TextReceive != nil {
+		return r.TextReceive.Column
+	} else if r.FileReceive != nil {
+		return r.FileReceive.Column
+	}
+	return ""
+}
+
+// SetColumn 写回列。两个分支都要写 —— 只写文本那支会让文件卡片「拖了没反应」。
+func (r *ReceiveHolder) SetColumn(column string) {
+	if r.TextReceive != nil {
+		r.TextReceive.Column = column
+	} else if r.FileReceive != nil {
+		r.FileReceive.Column = column
+	}
+}
+
 // detectDeviceType 将 User-Agent 归类为 desktop / smartphone / tablet，
 // 与前端 Device.vue 期望的类型保持一致。
 //

@@ -148,6 +148,9 @@ type ReceiveBase struct {
 	SenderIP       string            `json:"senderIP"`                 // 发送者 IP 地址
 	SenderClientID string            `json:"senderClientID,omitempty"` // 发送端持久客户端 ID (用于收发气泡归属)
 	SenderDevice   map[string]string `json:"senderDevice"`             // 发送者设备信息 (来自 User-Agent 解析)
+	// Column 是看板的列（`todo` / `doing` / `done`）。空 = 待办 —— 看板只是条目的一个视图，
+	// 不是另一份数据，所以字段挂在条目自己身上，不另建表。见 handleContentColumn。
+	Column string `json:"column,omitempty"`
 }
 
 // "text" type item in Receive[]
