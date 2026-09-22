@@ -5,7 +5,8 @@
 // 那条路），不再犯。所以 public/shortcuts/ 是派生产物，写在 .gitignore 里。
 //
 // dev 和 build 都跑这个脚本：dev 下 vite 也会服务 public/，这样本地就能点下载。
-import { cpSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
+import { cpSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -34,4 +35,32 @@ for (const name of appleFiles) {
 // Android：HTTP Shortcuts 的导入包
 cpSync(join(src, 'android', 'shortcuts.zip'), join(dest, 'android', 'shortcuts.zip'));
 
+// 产物的「更新于」日期，给网页上那个下载弹窗用。
+//
+// 取的是**这两个目录最后一次提交的日期**，不是最新 commit 的日期 ——
+// 日期就贴在「旧版请重新导入」那句提醒旁边，如果随便一个无关提交都让它往后跳，
+// 这句提醒很快就会变成没人看的噪音。
+//
+// 拿不到 git（比如打包环境里没有仓库/历史）就写成 null：页面少显示一行日期，
+// 提醒本身照常显示，不影响下载。
+function lastCommitDate(paths) {
+    try {
+        const out = execFileSync('git', ['log', '-1', '--format=%cs', '--', ...paths], {
+            cwd: repoRoot,
+            encoding: 'utf8',
+            stdio: ['ignore', 'pipe', 'ignore'],
+        });
+        return out.trim() || null;
+    } catch {
+        return null;
+    }
+}
+
+const meta = {
+    apple: lastCommitDate(['shortcuts/apple']),
+    android: lastCommitDate(['shortcuts/android']),
+};
+writeFileSync(join(dest, 'meta.json'), `${JSON.stringify(meta, null, 2)}\n`);
+
 console.log(`[shortcuts] 已同步 ${appleFiles.length} 个 Apple 捷径 + 1 个 Android 包 → public/shortcuts/`);
+console.log(`[shortcuts] 产物日期：apple=${meta.apple || '未知'} · android=${meta.android || '未知'}`);

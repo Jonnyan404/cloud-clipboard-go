@@ -155,6 +155,8 @@
   "scCopyLink": "複製連結",
   "scShowQr": "QR Code",
   "scSendText": "傳送文字",
+  "scOutdatedNotice": "舊版捷徑請重新導入：舊的請求格式即將下線，屆時舊版本將無法使用。",
+  "scUpdatedAt": "更新於 {date}",
   "scSendTextDesc": "把選取文字或剪貼簿內容送過來",
   "scSendFile": "傳送檔案",
   "scSendFileDesc": "從分享選單傳送檔案、圖片",

@@ -155,6 +155,8 @@
   "scCopyLink": "リンクをコピー",
   "scShowQr": "QR コード",
   "scSendText": "テキストを送信",
+  "scOutdatedNotice": "古いショートカットは再インポートしてください。旧リクエスト形式はまもなく廃止され、古い版は使えなくなります。",
+  "scUpdatedAt": "更新日 {date}",
   "scSendTextDesc": "選択中のテキストやクリップボードを送る",
   "scSendFile": "ファイルを送信",
   "scSendFileDesc": "共有メニューからファイルや画像を送る",

@@ -155,6 +155,8 @@
   "scCopyLink": "Copy link",
   "scShowQr": "QR code",
   "scSendText": "Send text",
+  "scOutdatedNotice": "Please re-import an older shortcut: the old request format is being retired, and older copies will stop working.",
+  "scUpdatedAt": "Updated {date}",
   "scSendTextDesc": "Send the selected text or the clipboard",
   "scSendFile": "Send file",
   "scSendFileDesc": "Send files or images from the share sheet",

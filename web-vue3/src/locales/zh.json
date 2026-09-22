@@ -155,6 +155,8 @@
   "scCopyLink": "复制链接",
   "scShowQr": "二维码",
   "scSendText": "发送文本",
+  "scOutdatedNotice": "旧版捷径请重新导入：旧的请求格式即将下线，届时老版本将无法使用。",
+  "scUpdatedAt": "更新于 {date}",
   "scSendTextDesc": "把选中的文字或剪贴板内容发过来",
   "scSendFile": "发送文件",
   "scSendFileDesc": "从分享菜单发送文件、图片",

@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useAppStore } from '@/store/app';
 import QrcodeVue from 'qrcode.vue';
@@ -41,6 +41,22 @@ const androidUrl = () => buildCleanAbsoluteRouteUrl('shortcuts/android/shortcuts
 // 不传 name，让 iOS 用文件名当快捷指令名（传了就是重命名，多语言下还会各叫各的）。
 const appleImportUrl = (file) => `shortcuts://import-shortcut?url=${encodeURIComponent(appleUrl(file))}`;
 
+// 产物的「更新于」日期。`meta.json` 由 scripts/sync-shortcuts.mjs 在 dev/build 时生成，
+// 取的是 shortcuts/apple 与 shortcuts/android **最后一次提交的日期** —— 不是最新 commit，
+// 免得无关提交也让日期往后跳（那会让旁边那句「请更新」变成没人看的噪音）。
+// 拿不到就整个不显示这一行：提醒照常显示，下载照常可用。
+const meta = ref({ apple: null, android: null });
+const activeDate = computed(() => (tab.value === 'apple' ? meta.value.apple : meta.value.android));
+onMounted(async () => {
+    try {
+        const url = buildCleanAbsoluteRouteUrl('shortcuts/meta.json', prefix.value);
+        const data = await (await fetch(url)).json();
+        meta.value = { apple: data?.apple ?? null, android: data?.android ?? null };
+    } catch {
+        // 老版本产物里没有这个文件，或者离线 —— 两种都不该影响这个弹窗
+    }
+});
+
 // 二维码单独一个小对话框：手机扫码直接下载到设备，比在手机上敲地址省事。
 const qrVisible = ref(false);
 const qrUrl = ref('');
@@ -61,6 +77,15 @@ function showQr(url) {
                 <v-tab value="android">{{ t('shortcutsAndroid') }}</v-tab>
             </v-tabs>
             <v-divider></v-divider>
+
+            <!-- 日期 + 「旧版请重新导入」。两个 tab 共用这一条，日期跟着当前 tab 走。
+                 旧版的请求格式即将下线（见 docs/api.md），届时老版本会直接不可用，
+                 所以这句要显眼、常驻，而不是塞在某个 tab 的角落里。 -->
+            <div class="shortcuts-dialog__notice">
+                <v-icon size="16" class="shortcuts-dialog__notice-icon">mdi-alert-circle-outline</v-icon>
+                <span class="shortcuts-dialog__notice-text">{{ t('scOutdatedNotice') }}</span>
+                <span v-if="activeDate" class="shortcuts-dialog__notice-date">{{ t('scUpdatedAt', { date: activeDate }) }}</span>
+            </div>
 
             <v-tabs-window v-model="tab">
                 <v-tabs-window-item value="apple">
@@ -167,6 +192,37 @@ function showQr(url) {
 </template>
 
 <style scoped>
+/* 日期 + 「旧版请重新导入」。用「警告色的一圈淡底」而不是 v-alert：
+   这是常驻提示，v-alert 的体积会把两个 tab 的内容都往下挤。 */
+.shortcuts-dialog__notice {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    padding: 8px 16px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: rgb(var(--v-theme-on-surface));
+    background: rgba(var(--v-theme-warning), 0.12);
+    border-bottom: 1px solid rgba(var(--v-theme-warning), 0.3);
+}
+
+.shortcuts-dialog__notice-icon {
+    color: rgb(var(--v-theme-warning));
+    align-self: center;
+}
+
+.shortcuts-dialog__notice-text {
+    flex: 1;
+    min-width: 12em;
+}
+
+.shortcuts-dialog__notice-date {
+    flex-shrink: 0;
+    opacity: 0.7;
+    font-variant-numeric: tabular-nums;
+}
+
 .shortcuts-dialog__body {
     max-height: 62vh;
     overflow-y: auto;
