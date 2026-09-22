@@ -10,7 +10,7 @@ import { useTaskListToggle } from '@/composables/useTaskListToggle.js';
 import MarkdownBody from '@/components/MarkdownBody.vue';
 import MarkdownToggle from '@/components/MarkdownToggle.vue';
 import ShareLinkButton from '@/components/ShareLinkButton.vue';
-import { copyTextToClipboard, deviceLabel, errorMessage, formatTimestamp, looksLikeTable, looksLikeTaskList } from '@/util.js';
+import { copyTextToClipboard, deviceLabel, errorMessage, formatTimestamp } from '@/util.js';
 
 const mdiCellphone = 'mdi-cellphone';
 const mdiChevronRight = 'mdi-chevron-right';
@@ -39,7 +39,14 @@ const { t } = useI18n();
 // ⚠️ 这是**初始值**，不是 watch：用户手动收起之后不该被重新展开。
 // ⚠️ 直接拿 props.meta.content 判、不解 HTML 实体 —— 两个判据只看 `|` `-` `[` `]`，
 // 实体编码动不到它们（和 DefaultMode 的分类过滤同一个理由）。
-const expand = ref(looksLikeTaskList(props.meta?.content) || looksLikeTable(props.meta?.content));
+// 卡片默认**收起**。
+//
+// 曾经让任务列表 / 表格默认展开，理由是「复选框被 4 行截断，第 5 个点不到」。
+// 那是个**空间取舍**，不是可读性问题 —— 而标准模式的主要动作是「扫一眼最近来了什么」，
+// 一张卡突然比别的卡高两三倍，会把时间流的节奏打断。想读全、勾全去**速览**模式
+// （那个模式就是为查阅做的）。
+// （「默认渲染 md」保留：那是可读性问题，`- [ ] 买菜` 当纯文本看就是一串符号。）
+const expand = ref(false);
 
 // 正文（含任务列表打勾 + 落盘）交给共享 composable —— 便签卡片那边是同一套逻辑。
 // 复制文本也用它返回的 text：用户看到什么就复制什么。

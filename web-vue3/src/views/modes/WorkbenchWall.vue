@@ -10,6 +10,7 @@ import PageToolbar from '@/components/PageToolbar.vue';
 import StickyComposer from '@/components/sticky/StickyComposer.vue';
 import ShareLinkButton from '@/components/ShareLinkButton.vue';
 import { useStickyAutoscroll } from '@/composables/useStickyAutoscroll';
+import { useLocalRooms } from '@/composables/useLocalRooms.js';
 
 const app = useAppStore();
 const ws = useWebSocketStore();
@@ -18,36 +19,13 @@ const isDark = computed(() => theme.current.value?.dark ?? false);
 const { t } = useI18n();
 const actions = inject('pageToolbarActions', {});
 
-const WORKBENCH_ROOMS_KEY = 'workbenchRooms';
-const localRooms = ref(loadLocalRooms());
+// 本地管理的房间列表 —— 和速览模式**共用同一份**（见 composables/useLocalRooms.js）。
+// 抽出去的理由：它是「不依赖服务端 roomList」的那套东西，第二个用它的模式再抄一份，
+// 就会出现两份本地列表、用户会问「我加的房间去哪了」。
+const { localRooms, createRoom: createLocalRoom, removeRoom, switchToRoom } = useLocalRooms();
 const newRoomDialog = ref(false);
 const newRoomName = ref('');
 const newRoomNameInput = ref(null);
-
-function loadLocalRooms() {
-    const rooms = [];
-    try {
-        const parsed = JSON.parse(localStorage.getItem(WORKBENCH_ROOMS_KEY) || '[]');
-        if (Array.isArray(parsed)) {
-            for (const room of parsed) {
-                const normalized = ws.normalizeRoomName(room);
-                if (!rooms.includes(normalized)) {
-                    rooms.push(normalized);
-                }
-            }
-        }
-    } catch (error) {
-        console.error('解析本地房间列表失败:', error);
-    }
-    if (!rooms.includes('')) {
-        rooms.unshift('');
-    }
-    return rooms;
-}
-
-function saveLocalRooms() {
-    localStorage.setItem(WORKBENCH_ROOMS_KEY, JSON.stringify(localRooms.value));
-}
 
 const activeRoom = computed(() => ws.room);
 
@@ -61,35 +39,11 @@ function openNewRoomDialog() {
     }, 50);
 }
 
+// 薄壳：弹窗要读输入框里的名字，建成功才关。
 function createRoom() {
-    const name = ws.normalizeRoomName(newRoomName.value);
-    if (!name) {
-        toast(t('workbenchRoomNameInvalid'));
-        return;
+    if (createLocalRoom(newRoomName.value)) {
+        newRoomDialog.value = false;
     }
-    if (!localRooms.value.includes(name)) {
-        localRooms.value.push(name);
-        saveLocalRooms();
-    }
-    newRoomDialog.value = false;
-    ws.switchRoom(name);
-    toast(t('workbenchRoomCreated', { room: name }));
-}
-
-function removeRoom(room) {
-    const index = localRooms.value.indexOf(room);
-    if (index === -1) {
-        return;
-    }
-    localRooms.value.splice(index, 1);
-    saveLocalRooms();
-    if (activeRoom.value === room) {
-        ws.switchRoom('');
-    }
-}
-
-function switchToRoom(room) {
-    ws.switchRoom(room);
 }
 
 const items = computed(() => app.visibleReceived);

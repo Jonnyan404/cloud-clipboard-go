@@ -1,4 +1,5 @@
 import DefaultMode from './DefaultMode.vue';
+import GlanceWall from './GlanceWall.vue';
 import StickyWall from './StickyWall.vue';
 import MegaWall from './MegaWall.vue';
 import TerminalWall from './TerminalWall.vue';
@@ -15,6 +16,15 @@ export const MODES = [
         // view-stream 是一列竖着堆的块，跟实际长相一致。
         icon: 'mdi-view-stream-outline',
         component: DefaultMode,
+    },
+    {
+        // 速览紧跟标准模式：**同一批条目的同一个视图**，区别只在「发不发东西」——
+        // 标准模式发送区占了大半屏，速览没有发送区、把搜索和分类提到最前。
+        // 挨着放是因为用户会来回比这两个（而不是因为它是最新加的）。
+        key: 'glance',
+        labelKey: 'uiModeGlance',
+        icon: 'mdi-magnify-scan',
+        component: GlanceWall,
     },
     {
         key: 'chat',

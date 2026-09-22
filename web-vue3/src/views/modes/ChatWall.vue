@@ -392,7 +392,7 @@ watch(detailItem, (item) => {
                         </button>
                     </span>
                 </div>
-                <div class="chat-wall__day">{{ t('chatToday') }} · {{ timeLabel(streamItems[streamItems.length - 1]) }}</div>
+                <div class="chat-wall__day">{{ t('dateToday') }} · {{ timeLabel(streamItems[streamItems.length - 1]) }}</div>
             </div>
 
             <div v-else class="chat-wall__empty">
