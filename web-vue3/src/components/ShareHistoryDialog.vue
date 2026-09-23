@@ -70,11 +70,23 @@ function recordSubtitle(record) {
     return parts.join(' · ');
 }
 
+// 一次取多少条。
+//
+// ⚠️ 这个数字受服务端两道闸门夹着，改之前先看：单次请求的上限是 **200**
+// （Go 的 maxShareListLimit / Worker 的 MAX_SHARE_LIST_LIMIT，传再大也会被夹），
+// 而这份日志服务端最多只留 **500** 条（maxShareLogRecords / MAX_SHARE_LOG_ROWS，
+// 超出丢最旧、已过期的优先丢）。
+//
+// 取 100 是折中：比原来的 50 多一倍、够翻，又不至于让对话框里滚不完。
+// **不做分页** —— 服务端一共就 500 条上限，翻页的收益抵不上多出来的那套状态。
+// 被截断时列表底部有「已显示 N / 共 M 条」兜底（见模板里的 shareHistoryMore）。
+const SHARE_HISTORY_LIMIT = 100;
+
 async function load() {
     loading.value = true;
     error.value = '';
     try {
-        const data = await fetchShareRecords({ room: ws.room, limit: 50 });
+        const data = await fetchShareRecords({ room: ws.room, limit: SHARE_HISTORY_LIMIT });
         records.value = Array.isArray(data?.records) ? data.records : [];
         total.value = Number(data?.total || records.value.length);
     } catch (err) {
