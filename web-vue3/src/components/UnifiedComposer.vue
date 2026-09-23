@@ -385,7 +385,7 @@ import { toast } from '@/plugins/toast';
 import { errorMessage, prettyFileSize } from '@/util.js';
 import TraditionalColorDialog from '@/components/TraditionalColorDialog.vue';
 import ComposerSlashMenu from '@/components/ComposerSlashMenu.vue';
-import { SLASH_TEMPLATES, slashMenuShouldOpen, slashMenuShouldStay, slashPendingAt, stripTrailingSlash } from '@/slash-template.js';
+import { SLASH_TEMPLATES, resolveSlashText, slashMenuShouldOpen, slashMenuShouldStay, slashPendingAt, stripTrailingSlash } from '@/slash-template.js';
 import ShortcutsDialog from '@/components/ShortcutsDialog.vue';
 
 const mdiPalette = 'mdi-palette';
@@ -548,17 +548,21 @@ function onTextareaInput(e) {
     }
 }
 
-function insertSlashTemplate(tpl) {
+async function insertSlashTemplate(tpl) {
     const el = slashEl;
     const text = app.send.text || '';
+    // ⚠️ 光标位置要在 await **之前**读 —— 要插入的文本可能是动作算出来的（异步），
+    // 等回来时光标未必还在原处。
     const pos = el && typeof el.selectionStart === 'number' ? el.selectionStart : text.length;
     // 连同刚打的那个 `/` 一起换掉（如果它还在光标前）
     const head = stripTrailingSlash(text.slice(0, pos));
     const tail = text.slice(pos);
-    app.send.text = head + tpl.text + tail;
+    // 模板项直接给文本；动作项（插入时间 / UUID）在**这一刻**才算 —— 时间是「现在」的
+    const insert = await resolveSlashText(tpl);
+    app.send.text = head + insert + tail;
     slashMenu.value = false;
     nextTick(() => {
-        const caret = head.length + tpl.text.length;
+        const caret = head.length + insert.length;
         el?.focus?.();
         el?.setSelectionRange?.(caret, caret);
     });

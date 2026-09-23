@@ -348,9 +348,7 @@ function deviceIcon(type) {
                                 <markdown-toggle
                 v-if="md.available"
                 v-model:mode="md.mode"
-                :json-available="md.jsonAvailable"
-                :json-compact-available="md.jsonCompactAvailable"
-                :code-available="md.codeAvailable"
+                :actions="md.actions"
             ></markdown-toggle>
                                 <markdown-body v-if="md.html" :html="md.html"></markdown-body>
                                 <pre v-else class="timeline-card__text-preview" :class="{ 'timeline-card__text-preview--md': md.available }">{{ displayedTextPreview }}</pre>

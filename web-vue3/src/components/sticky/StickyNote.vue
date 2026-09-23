@@ -350,9 +350,7 @@ async function deleteItem() {
                     <markdown-toggle
                 v-if="md.available"
                 v-model:mode="md.mode"
-                :json-available="md.jsonAvailable"
-                :json-compact-available="md.jsonCompactAvailable"
-                :code-available="md.codeAvailable"
+                :actions="md.actions"
             ></markdown-toggle>
                     <div
                         class="sticky-note__reader-text"
@@ -392,9 +390,7 @@ async function deleteItem() {
                                 <markdown-toggle
                 v-if="md.available"
                 v-model:mode="md.mode"
-                :json-available="md.jsonAvailable"
-                :json-compact-available="md.jsonCompactAvailable"
-                :code-available="md.codeAvailable"
+                :actions="md.actions"
             ></markdown-toggle>
                                 <!-- 渲染态：正文是裸 markdown，自己当滚动盒 -->
                                 <div

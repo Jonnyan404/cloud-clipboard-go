@@ -1,160 +1,144 @@
 import { computed, reactive, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useAppStore } from '@/store/app';
-import {
-    formatJson,
-    looksLikeCode,
-    looksLikeMarkdown,
-    looksLikeTable,
-    looksLikeTaskList,
-    minifyJson,
-    renderMarkdownHtml,
-} from '@/util.js';
-import { detectLanguage } from '@/highlight.js';
+import { findAction, renderFenced, runChain, targetedActions } from '@/data/actions.js';
+import { looksLikeTable, looksLikeTaskList } from '@/util.js';
 
 /**
- * 一条内容的显示方式。除了「原文 / Markdown」，还有三个**结构化视图**：
- *   · `json`     —— JSON 美化（两空格缩进）
- *   · `json-min` —— JSON 压缩（一行）
- *   · `code`     —— 代码视图：整段当源码，转义 + 按语言上色
+ * 一条内容的显示方式 —— **动作库驱动**。
  *
- * ⚠️ **代码视图为什么必须存在**：markdown 会把 `*` `_` `#` `-` `[]` 当标记，
- * 一段 Go / Shell 丢进去点「md 渲染」会被重排得面目全非（Jonny 实测：整段缩进和注释全乱）。
- * 代码只能走「转义 + 高亮」这条路，**不能过 markdown**。
+ * 以前这里写死五个分支（raw / md / code / json / json-min），想加一个「Base64 解码」
+ * 要同时改三处：这个 switch、MarkdownToggle 的固定槽位、gutter 的宽度计算。
+ * 现在「有哪些视图」完全由 `data/actions.js` 的注册表决定，这里只负责三件事：
+ *   · 算这条内容能用哪些动作（`match` 命中的）
+ *   · 维护「当前看哪个」（按内容算出的默认值 + 用户覆盖）
+ *   · 把当前动作跑出来的结果变成消费方认的 `html`
  *
- * 两层职责分得很清楚：
- *   · 个性化里的开关（app.display.markdown）—— 只决定**要不要显示那些切换图标**
+ * 两层职责仍然分得很清楚（别合并）：
+ *   · 个性化里的开关（`app.display.markdown`）—— 只决定**要不要显示那些图标**
  *   · 右上角那几个图标 —— 决定**这一条用哪种方式看**
  *
- * 开关默认**开**（见 displayToggles 的 DEFAULT_DISPLAY.markdown）。
+ * ⚠️ 「原文」不是动作（它不跑任何东西），所以用 `null` 表示。
  *
- * ⚠️ 这一条**默认看原文**。「默认渲染 md」只针对**聊天气泡** —— 那里不做每条一个切换图标，
- * 直接按内容判断渲染，见 ChatWall 的 bubbleHtml。别把这个默认值改成 md。
+ * ⚠️ 任务列表和表格**默认就是 md**：这两种内容的全部价值在结构上，默认看原文等于
+ * 「先让你读一遍 `- [ ]`、再点一下才看到清单」。其余内容默认看原文。
+ * （个性化那个开关仍是上位开关：关掉它，这里连切换图标都不显示。）
  *
- * **例外：任务列表和表格默认就是 md。** 这两种内容的全部价值在结构上 —— 默认看原文等于
- * 「先让你读一遍 `- [ ]`、再点一下才看到清单」。只有这两种结构破例，普通文本照旧看原文。
- * （个性化那个开关仍然是上位开关：关掉它，这里连切换图标都不显示。）
- *
- * @param {() => string} getText        取原始文本
+ * @param {() => string} getText         取原始文本
  * @param {() => boolean} isMarkdownFile 可选：扩展名是 .md 这类可靠信号。
  *        文件场景扩展名比内容启发式可信（一份只有一句话的 README 靠启发式判不出来）。
  */
 export function useMarkdown(getText, isMarkdownFile = () => false) {
     const app = useAppStore();
-    const structured = () => looksLikeTaskList(getText()) || looksLikeTable(getText());
-    const markdownish = () => isMarkdownFile() || looksLikeMarkdown(getText());
+    const { t } = useI18n();
 
-    // 默认值要**跟着内容走**，不能只在 setup 时定一次：
-    // 文件预览的正文是异步抓回来的，setup 时 getText() 还是空串 —— 定成 raw 之后就再也不会变。
-    // 用「用户覆盖值 ?? 按内容算出来的默认值」表达：用户没点过右上角那个切换时，
-    // 正文一到就重新定默认；点过之后一律听用户的。
-    const override = ref(null);
-    const mode = computed({
-        get: () => override.value ?? (structured() ? 'md' : 'raw'),
-        set: (next) => { override.value = next; },
+    // 这条内容能用哪些**有针对性**的动作（声明了 match 且命中），按注册顺序。
+    //
+    // ⚠️ isMarkdownFile 的用途：文件预览的正文是**截断过**的，启发式可能判不出来，
+    // 而扩展名是可靠信号 —— 判准了就把「Markdown 渲染」补到最前面。
+    const targeted = computed(() => {
+        const list = targetedActions(getText());
+        if (isMarkdownFile() && !list.some((action) => action.id === 'format.markdown')) {
+            const markdownAction = findAction('format.markdown');
+            if (markdownAction) {
+                return [markdownAction, ...list];
+            }
+        }
+        return list;
     });
 
-    // 三种结构化视图各算一次，供多处复用 —— 别在 available / html / 模板里各算一遍。
-    const prettyJson = computed(() => formatJson(getText()));
-    const compactJson = computed(() => minifyJson(getText()));
-    const jsonAvailable = computed(() => app.display.markdown && Boolean(prettyJson.value));
-    const jsonCompactAvailable = computed(() => app.display.markdown && Boolean(compactJson.value));
-    const codeAvailable = computed(() => app.display.markdown && looksLikeCode(getText()));
+    // 用户显式选过的动作 id。
+    // `undefined` = 从没选过（跟随默认值），`null` = 明确要看原文，字符串 = 那个动作。
+    const override = ref(undefined);
 
-    // 内容既不像 markdown 也不是 JSON / 代码时，显示这些图标没有意义，所以即使开关开着也不显示。
+    // 默认值要**跟着内容走**，不能只在 setup 时定一次：
+    // 文件预览的正文是异步抓回来的，setup 时 getText() 还是空串 ——
+    // 那时定成 null（原文）之后就再也不会变。
+    // 用「用户覆盖值 ?? 按内容算出来的默认值」表达这个先后关系。
+    const defaultId = computed(() => {
+        const text = getText();
+        const structured = looksLikeTaskList(text) || looksLikeTable(text);
+        return structured ? 'format.markdown' : null;
+    });
+
+    const mode = computed({
+        get: () => (override.value === undefined ? defaultId.value : override.value),
+        set: (next) => {
+            override.value = next ?? null;
+        },
+    });
+
+    // 图标排显示的条件：开关开着 + 至少有一个**针对性**动作。
     //
-    // ⚠️ 两个 JSON 视图**都要算进来**：已经美化过的 JSON，`prettyJson` 是空串（没得美化），
-    // 但 `compactJson` 有值（压得动）—— 只判 prettyJson 的话那种内容会一个图标都不显示，
-    // 于是「压缩」这个唯一有用的入口根本够不着（QA 实测踩到）。
-    const available = computed(
-        () => app.display.markdown
-            && (markdownish() || Boolean(prettyJson.value) || Boolean(compactJson.value) || codeAvailable.value),
-    );
+    // ⚠️ 通用动作（转大写、Base64 编码…）**不单独触发显示** —— 否则每条普通文本上都会
+    // 挂一排图标，那正是现有设计要避免的噪音。它们在 `⋯` 面板里，而 `⋯` 只在图标排
+    // 已经显示时才存在。
+    const available = computed(() => app.display.markdown && targeted.value.length > 0);
 
-    // 代码视图的语言：**自动识别**（`highlightAuto` 限定在我们注册过的那几十种里）。
-    // 认不出来就按「无语言」渲染 —— 那也**仍然是转义后的纯代码**，格式一个字都不会丢，
-    // 只是没颜色。这比走 markdown 好得多（markdown 会重排）。
-    const codeLanguage = ref('');
+    // 当前视图的渲染结果。**是异步的**：format.code 要 await 语言检测。
+    const html = ref('');
+    const viewText = ref('');
+    let renderSeq = 0;
+
+    async function renderCurrent() {
+        const id = mode.value;
+        if (!available.value || !id) {
+            return { html: '', text: '' };
+        }
+        const result = await runChain(getText(), [id], { t });
+        if (result.error) {
+            // 跑不出来就当没有这个视图、退回原文 —— 卡片预览区不该弹错误（报错是工作台的活）
+            return { html: '', text: '' };
+        }
+        const action = findAction(id);
+        const last = result.steps[result.steps.length - 1];
+        // 1. 动作给了 `html`（双表示，如注音制表）→ 用它渲染，`text` 留给复制
+        if (last?.html) {
+            return { html: last.html, text: result.output };
+        }
+        // 2. 动作声明了 render: 'html'（md 渲染 / 代码高亮）→ output 本身就是 HTML
+        if (action?.render === 'html') {
+            return { html: result.output, text: '' };
+        }
+        // 3. 纯文本结果（编解码 / 文本处理）统一包成 `<pre>` 形态的 HTML ——
+        // 消费方本来就只认 `md.html` 一个分支，多一个分支等于要改 5 个消费方。
+        return { html: renderFenced(result.output), text: result.output };
+    }
+
     watch(
-        () => (mode.value === 'code' ? getText() : ''),
-        async (text) => {
-            codeLanguage.value = text ? await detectLanguage(text) : '';
+        [() => getText(), mode, available],
+        async () => {
+            const seq = ++renderSeq;
+            const next = await renderCurrent();
+            // 防竞态：快速切视图时，先发起的计算可能后回来
+            if (seq === renderSeq) {
+                html.value = next.html;
+                viewText.value = next.text;
+            }
         },
         { immediate: true },
     );
 
-    // 把整段文本当成**一个围栏代码块**渲染。
+    // 渲染结果是不是以 `<pre>` 开头（代码视图 / JSON / 编解码结果都是）。
     //
-    // 为什么绕 markdown 这一圈、而不是直接 v-html 一个 `<pre>`：这样消费方**一行模板都不用改**
-    // （它们本来就 `v-if="md.html"` 渲染 markdown-body），而且顺带吃到 MarkdownBody 里的代码高亮。
-    //
-    // ⚠️ 围栏长度必须**比正文里最长的连续反引号还长**，否则正文自带的 ``` 会把围栏提前闭合。
-    function renderFenced(code, language) {
-        const runs = String(code).match(/`+/g) || [];
-        const fence = '`'.repeat(Math.max(3, ...runs.map((run) => run.length + 1)));
-        return renderMarkdownHtml(`${fence}${language || ''}\n${code}\n${fence}`);
-    }
-
-    const html = computed(() => {
-        if (!available.value) {
-            return '';
-        }
-        switch (mode.value) {
-            case 'json':
-                return prettyJson.value ? renderFenced(prettyJson.value, 'json') : '';
-            case 'json-min':
-                return compactJson.value ? renderFenced(compactJson.value, 'json') : '';
-            case 'code':
-                return renderFenced(getText(), codeLanguage.value);
-            case 'md':
-                // 任务列表的复选框要能点。**文件预览那条路不接**：那边的正文是截断过的
-                // （displayedTextPreview 会 slice 掉尾巴），按下标回写会把截断后的内容当成全文。
-                return renderMarkdownHtml(getText(), {
-                    interactiveTasks: looksLikeTaskList(getText()) && !isMarkdownFile(),
-                });
-            default:
-                return '';
-        }
-    });
-
-    // 渲染结果是不是以 `<pre>` 开头（代码视图 / JSON 美化 / 压缩都是）。
-    //
-    // 消费方据此**关掉浮动占位**：`<pre>` 带 `overflow-x: auto`，是个 BFC ——
+    // 消费方据此**关掉浮动占位**：`<pre>` 带 overflow-x: auto，是个 BFC ——
     // 它不会绕着浮动块排版，而是被挤到浮动块**旁边**的窄列里，
-    // 表现就是「正文和图标各占一列」（Jonny 实测踩到）。那种情况改成给 pre 自己留右边距。
+    // 表现就是「正文和图标各占一列」。
     const leadsWithBlock = computed(() => /^\s*<pre[\s>]/.test(html.value || ''));
 
-    // 「复制」该复制**你正在看的那一份**：原文 / 美化后的 JSON / 压缩后的 JSON / 代码。
-    //
+    // 「复制」该复制**你正在看的那一份**：原文 / 当前动作的结果。
     // ⚠️ 别永远复制原文 —— 用户切到「压缩」视图，就是为了把那一行拿走。
-    // md / code / raw 三种视图复制的都是原文（md 视图下拿走的是源文，不是渲染后的 HTML）。
-    const copyText = computed(() => {
-        if (mode.value === 'json') {
-            return prettyJson.value || getText();
-        }
-        if (mode.value === 'json-min') {
-            return compactJson.value || getText();
-        }
-        return getText();
-    });
+    const copyText = computed(() => viewText.value || getText());
 
-    // 图标有几个 → 正文要给图标让出多宽。宽度契约在 MarkdownToggle 的 `--md-toggle-gutter*`，
-    // 消费方把 `gutter` 绑到那个变量上，所以图标增减只要改这里的选择。
+    // 图标有几个 → 正文要给图标让出多宽。
+    //
+    // 布局是「原文 + 最多 2 个针对性动作 + 一个 ⋯」，**总数封在 3 个** ——
+    // 这样 MarkdownToggle 的 --md-toggle-gutter 两档（64 / 96px）够用，不必再加档位。
     const iconCount = computed(() => {
         if (!available.value) {
             return 0;
         }
-        let count = 1;                              // 原文
-        if (jsonAvailable.value) {
-            count += 1;                             // 美化
-        }
-        if (jsonCompactAvailable.value) {
-            count += 1;                             // 压缩
-        }
-        // md / 代码 那个槽位只在不是 JSON 时占位（JSON 渲染成 markdown 和原文一模一样）
-        if (!jsonAvailable.value && !jsonCompactAvailable.value && (markdownish() || codeAvailable.value)) {
-            count += 1;
-        }
-        return count;
+        return 1 + Math.min(targeted.value.length, 2) + (targeted.value.length > 2 ? 1 : 0);
     });
     const gutter = computed(() => (iconCount.value > 2 ? '96px' : '64px'));
 
@@ -170,13 +154,11 @@ export function useMarkdown(getText, isMarkdownFile = () => false) {
     // （模板只对**顶层**的 ref 自动解包，嵌在对象里的不会。踩过一次。）
     return reactive({
         available,
-        codeAvailable,
+        actions: targeted,
         copyText,
         gutter,
         html,
         leadsWithBlock,
-        jsonAvailable,
-        jsonCompactAvailable,
         mode,
         setMode,
     });

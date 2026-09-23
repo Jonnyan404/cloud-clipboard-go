@@ -8,13 +8,41 @@
  * 判定**只看文本**（`/` 落在行首、它前面只有空白），不看按键事件 —— 原因见 slashMenuShouldOpen。
  */
 
+import { findAction } from '@/data/actions.js';
+
 // 模板正文用中性的占位符，不放进 i18n —— 它们是要被用户改写的骨架，不是文案。
 // 菜单项文案复用分类条那两个键（`filterTaskList` / `filterTable`）：说的是同一个东西，
 // 没必要为「筛选」和「插入」各存一份同义文案（两份迟早会漂）。
 export const SLASH_TEMPLATES = [
     { key: 'filterTaskList', icon: 'mdi-checkbox-marked-outline', text: '- [ ] \n- [ ] \n- [ ] ' },
     { key: 'filterTable', icon: 'mdi-table', text: '| A | B |\n| --- | --- |\n|  |  |' },
+
+    // ── 生成类动作（direction=insert）────────────────────────────────
+    // 「插入时间」这类动作的家在**输入框**，不在预览区 —— 它们不吃输入、只产出新文本。
+    //
+    // ⚠️ 这几项**故意不写 text**：时间是「此刻」的，写死会在菜单渲染那一刻就定死。
+    // 用 actionId 指回动作库，在**点击的那一刻**才算 —— 单一数据源，也顺便复用了动作实现。
+    { key: 'actionInsertTime', icon: 'mdi-clock-outline', actionId: 'generate.time' },
+    { key: 'actionInsertDateTime', icon: 'mdi-calendar-clock', actionId: 'generate.datetime' },
+    { key: 'actionInsertUuid', icon: 'mdi-identifier', actionId: 'generate.uuid' },
 ];
+
+/**
+ * 取一个菜单项要插入的文本。
+ *
+ * 模板项直接用它的 `text`；动作项在**这一刻**跑一遍动作（于是拿到的是当前时间 / 新 UUID）。
+ * 返回 Promise 是因为动作**可能**是异步的 —— 这三个都是同步的，但别在这里假设同步。
+ */
+export async function resolveSlashText(item) {
+    if (!item) {
+        return '';
+    }
+    if (item.actionId) {
+        const action = findAction(item.actionId);
+        return action ? String((await action.run('')) ?? '') : '';
+    }
+    return String(item.text ?? '');
+}
 
 // 全角 `/` 也算：中文输入法切到全角标点时打出来的是 `／`。用户做的是同一个动作
 // （行首打一个斜杠），只因为输入法状态不同就不弹菜单，解释不通。

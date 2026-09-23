@@ -1,21 +1,14 @@
 <script setup>
-import { useI18n } from 'vue-i18n';
-
-// 预览框右上角那排「用哪种方式看」的切换图标。
+// 预览框右上角那排「用哪种方式看」的图标 —— **动作库驱动**。
+//
+// 以前是四个写死的槽位（原文 / md-或-代码 / JSON 美化 / JSON 压缩）。现在图标来自
+// data/actions.js 的注册表：**有针对性且命中**的动作直接露图标（最多 2 个），
+// 其余的收进 `⋯` 面板 —— 面板里还有全部通用动作（转大写、编解码…）。
 //
 // ⚠️ **这里不放复制** —— 复制统一走卡片上原来那个复制图标（它会复制**当前视图**的内容，
 // 见各消费方对 `md.copyText` 的用法）。同一个卡片上两个复制按钮、行为还容易不一致。
 //
-// 槽位是**按内容决定**的（最多三个）：
-//   1. 原文        —— 永远有
-//   2. 代码 / md   —— 像代码给「代码」，否则像 markdown 给 md。
-//                     两者不会同时出现：JSON 渲染成 markdown 和原文一模一样，
-//                     而**代码过 markdown 会被重排**（`*` `_` `#` `-` 会被当标记，
-//                     一段 Go 点「md 渲染」整段缩进和注释就乱了）。
-//   3. JSON 美化   —— 内容是 JSON 才有
-//   4. JSON 压缩   —— 内容是 JSON 且**压得动**才有
-//
-// 纯图标，不带任何按钮外框：之前用 v-btn-group 套两个小按钮，
+// 纯图标，不带任何按钮外框：以前用 v-btn-group 套两个小按钮，
 // 外框再怎么压也有 ~22px 高，叠在单行内容（~25px）上还会把内容区撑出滚动条。
 //
 // 浮动定位（absolute）由组件自己带，所以调用方要满足三件事：
@@ -23,122 +16,105 @@ import { useI18n } from 'vue-i18n';
 //   2. 真正滚动的那个盒子上留出 `--md-toggle-gutter`（见文件末尾的全局变量），
 //      否则图标会盖住第一行行尾；
 //   3. 那层盒子上别挂 overflow —— 0 高 + overflow 会把图标整个裁掉，且不报错。
-defineProps({
+import { computed, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
+import ActionPicker from '@/components/bench/ActionPicker.vue';
+
+const props = defineProps({
+    // `null` = 原文；否则是动作 id
     mode: {
         type: String,
-        default: 'raw',
+        default: null,
     },
-    // 内容是「能美化的 JSON」→ 多一个「美化」槽位
-    jsonAvailable: {
-        type: Boolean,
-        default: false,
-    },
-    // 内容是 JSON 且**压得动**（本来就不是一行）→ 多一个「压缩」槽位
-    jsonCompactAvailable: {
-        type: Boolean,
-        default: false,
-    },
-    // 内容像源码 → 第二个槽位给「代码」而不是 md
-    codeAvailable: {
-        type: Boolean,
-        default: false,
+    // 这条内容**有针对性**的动作（match 命中的），按注册顺序
+    actions: {
+        type: Array,
+        default: () => [],
     },
 });
+
 const emit = defineEmits(['update:mode']);
 const { t } = useI18n();
 
 const mdiCodeTags = 'mdi-code-tags';
-const mdiLanguageMarkdown = 'mdi-language-markdown';
-const mdiCodeBraces = 'mdi-code-braces';
-const mdiIndentIncrease = 'mdi-format-indent-increase';
-const mdiIndentDecrease = 'mdi-format-indent-decrease';
+const mdiDotsHorizontal = 'mdi-dots-horizontal';
+
+const menuOpen = ref(false);
+
+// 卡片上直接露图标的动作：**最多 2 个**。
+// 留一个位置给 ⋯ —— 图标总数封在 3 个，--md-toggle-gutter 的两档（64 / 96px）才够用。
+const inlineActions = computed(() => props.actions.slice(0, 2));
+const hasMore = computed(() => props.actions.length > 2);
+
+function choose(id) {
+    emit('update:mode', id);
+    menuOpen.value = false;
+}
 </script>
 
 <template>
     <div class="md-toggle">
+        <!-- 原文。`null` 不是动作 —— 它表示「不跑任何动作」。 -->
         <v-tooltip :text="t('rawText')" location="top">
             <template v-slot:activator="{ props: activatorProps }">
                 <span
                     v-bind="activatorProps"
                     class="md-toggle__icon"
-                    :class="{ 'md-toggle__icon--active': mode === 'raw' }"
+                    :class="{ 'md-toggle__icon--active': mode === null }"
                     role="button"
                     tabindex="0"
-                    @click="emit('update:mode', 'raw')"
-                    @keydown.enter.prevent="emit('update:mode', 'raw')"
-                    @keydown.space.prevent="emit('update:mode', 'raw')"
+                    @click="emit('update:mode', null)"
+                    @keydown.enter.prevent="emit('update:mode', null)"
+                    @keydown.space.prevent="emit('update:mode', null)"
                 >
                     <v-icon size="20">{{ mdiCodeTags }}</v-icon>
                 </span>
             </template>
         </v-tooltip>
 
-        <v-tooltip v-if="codeAvailable" :text="t('codeView')" location="top">
+        <!-- 这条内容**用得着**的动作 -->
+        <v-tooltip v-for="action in inlineActions" :key="action.id" :text="t(action.nameKey)" location="top">
             <template v-slot:activator="{ props: activatorProps }">
                 <span
                     v-bind="activatorProps"
                     class="md-toggle__icon"
-                    :class="{ 'md-toggle__icon--active': mode === 'code' }"
+                    :class="{ 'md-toggle__icon--active': mode === action.id }"
                     role="button"
                     tabindex="0"
-                    @click="emit('update:mode', 'code')"
-                    @keydown.enter.prevent="emit('update:mode', 'code')"
-                    @keydown.space.prevent="emit('update:mode', 'code')"
+                    @click="emit('update:mode', action.id)"
+                    @keydown.enter.prevent="emit('update:mode', action.id)"
+                    @keydown.space.prevent="emit('update:mode', action.id)"
                 >
-                    <v-icon size="20">{{ mdiCodeBraces }}</v-icon>
-                </span>
-            </template>
-        </v-tooltip>
-        <v-tooltip v-else :text="t('renderMarkdown')" location="top">
-            <template v-slot:activator="{ props: activatorProps }">
-                <span
-                    v-bind="activatorProps"
-                    class="md-toggle__icon"
-                    :class="{ 'md-toggle__icon--active': mode === 'md' }"
-                    role="button"
-                    tabindex="0"
-                    @click="emit('update:mode', 'md')"
-                    @keydown.enter.prevent="emit('update:mode', 'md')"
-                    @keydown.space.prevent="emit('update:mode', 'md')"
-                >
-                    <v-icon size="20">{{ mdiLanguageMarkdown }}</v-icon>
+                    <v-icon size="20">{{ action.icon }}</v-icon>
                 </span>
             </template>
         </v-tooltip>
 
-        <v-tooltip v-if="jsonAvailable" :text="t('beautifyJson')" location="top">
+        <!-- 其余动作（含全部通用动作）。
+             ⚠️ 复用工作台的 ActionPicker —— 同一套分组和搜索，**别在这里再造一个简化版菜单**，
+             两份迟早会漂（这个仓库在「同一份逻辑抄了几份」上栽过好几次）。 -->
+        <v-menu
+            v-if="hasMore"
+            v-model="menuOpen"
+            location="bottom end"
+            :close-on-content-click="false"
+            :offset="6"
+        >
             <template v-slot:activator="{ props: activatorProps }">
                 <span
                     v-bind="activatorProps"
                     class="md-toggle__icon"
-                    :class="{ 'md-toggle__icon--active': mode === 'json' }"
                     role="button"
                     tabindex="0"
-                    @click="emit('update:mode', 'json')"
-                    @keydown.enter.prevent="emit('update:mode', 'json')"
-                    @keydown.space.prevent="emit('update:mode', 'json')"
+                    :title="t('actionMore')"
                 >
-                    <v-icon size="20">{{ mdiIndentIncrease }}</v-icon>
+                    <v-icon size="20">{{ mdiDotsHorizontal }}</v-icon>
                 </span>
             </template>
-        </v-tooltip>
-
-        <v-tooltip v-if="jsonCompactAvailable" :text="t('minifyJson')" location="top">
-            <template v-slot:activator="{ props: activatorProps }">
-                <span
-                    v-bind="activatorProps"
-                    class="md-toggle__icon"
-                    :class="{ 'md-toggle__icon--active': mode === 'json-min' }"
-                    role="button"
-                    tabindex="0"
-                    @click="emit('update:mode', 'json-min')"
-                    @keydown.enter.prevent="emit('update:mode', 'json-min')"
-                    @keydown.space.prevent="emit('update:mode', 'json-min')"
-                >
-                    <v-icon size="20">{{ mdiIndentDecrease }}</v-icon>
-                </span>
-            </template>
-        </v-tooltip>
+            <div class="md-toggle__panel">
+                <ActionPicker @pick="choose" />
+            </div>
+        </v-menu>
     </div>
 </template>
 
@@ -152,7 +128,7 @@ const mdiIndentDecrease = 'mdi-format-indent-decrease';
     top: 2px;
     /* 右缩进必须**大于滚动条宽度**：滚动条永远贴着滚动盒的右沿，
        缩进不够就会压在它上面（便签阅读器的「图标盖住滚动条」就是这么来的）。
-       这里 12px vs 8px 的滚动条，见下面各消费方的 ::-webkit-scrollbar。 */
+       这里 12px vs 8px 的滚动条。 */
     right: 12px;
     z-index: 2;
     display: inline-flex;
@@ -179,6 +155,18 @@ const mdiIndentDecrease = 'mdi-format-indent-decrease';
     opacity: 1;
     color: rgb(var(--v-theme-primary));
 }
+
+/* ⋯ 展开的动作面板。给固定尺寸 —— 不固定的话菜单会随内容宽高乱跳，
+   而且 ActionPicker 内部是「搜索框 + 可滚动的分组区」，需要一个有界的高度才滚得起来。 */
+.md-toggle__panel {
+    display: flex;
+    flex-direction: column;
+    width: 340px;
+    max-width: calc(100vw - 32px);
+    max-height: 320px;
+    padding: 10px;
+    overflow: hidden;
+}
 </style>
 
 <style>
@@ -186,19 +174,18 @@ const mdiIndentDecrease = 'mdi-format-indent-decrease';
    图标（每个 20px 字形 + 6px 内边距）加右缩进，就是滚动内容要让出的宽度。
    消费方在**滚动盒**上写 `padding-right: var(--md-toggle-gutter)`。
 
-   ⚠️ 图标**最多三个**（原文 + md/代码 + JSON 美化/压缩），所以有两个值。
+   ⚠️ 图标**最多三个**（原文 + 2 个针对性动作 + ⋯），所以只有两个值。
    消费方**别自己去数图标** —— 把 `useMarkdown` 的 `gutter` 绑到 `--md-toggle-gutter` 上即可，
    数图标那件事在那边一处做完（见 iconCount）。
 
    注意别把它加在不滚动的外层盒子上：滚动条不会跟着让位，白加。 */
 :root {
     --md-toggle-gutter: 64px;      /* 两个图标 */
-    --md-toggle-gutter-wide: 96px; /* 三个图标（内容是 JSON 时） */
+    --md-toggle-gutter-wide: 96px; /* 三个图标 */
     /* 让位的**高度**：`1lh` = 该容器自己的一个行高 —— 所以无论字号/行高是多少，
        都只让开**一行**。（`lh` 是较新的单位，消费方会再写一个 px 兜底。）
        消费方用 `::before` 做一个 float 占位块，宽 × 高就是这两个值：
        只有和图标垂直重叠的那一行会绕开，下面的行恢复整宽。
-       （以前是给整个容器 padding-right，等于每一行都压窄 64px，图标下方的宽度全浪费。）
        ⚠️ 正文以 `<pre>` 开头时**不能用浮动占位** —— 见消费方 `--block` 那条注释。 */
     --md-toggle-height: 1lh;
 }
