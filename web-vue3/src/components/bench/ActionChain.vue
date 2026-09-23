@@ -32,7 +32,6 @@ const mdiContentSavePlusOutline = 'mdi-content-save-plus-outline';
 const { t } = useI18n();
 const { chain, steps, templates, add, removeAt, clear, move, saveTemplate, applyTemplate, removeTemplate } = useActionChain();
 
-const showPicker = ref(false);
 const naming = ref(false);
 const templateName = ref('');
 
@@ -153,19 +152,29 @@ function stepDelta(step) {
             </div>
         </div>
 
+        <!-- 「添加动作」用**弹出面板**，不内联展开：
+             内联那块（ActionPicker 最高 260px）在窄屏上会把整栏挤爆，
+             「添加动作」按钮自己就被顶出可视区（用户报的）；桌面端也会把结果区推下去。
+             弹层由 Vuetify teleport 到 body，不受父级 overflow 影响。
+             `:close-on-content-click="false"` → 选完不关，连着叠三步不用重新打开。 -->
         <div class="action-chain__add">
-            <v-btn
-                size="small"
-                variant="tonal"
-                block
-                :prepend-icon="showPicker ? 'mdi-chevron-up' : 'mdi-plus'"
-                @click="showPicker = !showPicker"
-            >
-                {{ t('actionChainAdd') }}
-            </v-btn>
+            <v-menu location="bottom start" :close-on-content-click="false" :offset="6">
+                <template v-slot:activator="{ props: menuProps }">
+                    <v-btn
+                        v-bind="menuProps"
+                        size="small"
+                        variant="tonal"
+                        block
+                        prepend-icon="mdi-plus"
+                    >
+                        {{ t('actionChainAdd') }}
+                    </v-btn>
+                </template>
+                <div class="action-chain__picker">
+                    <ActionPicker :text="text" direction="view" @pick="pick" />
+                </div>
+            </v-menu>
         </div>
-
-        <ActionPicker v-if="showPicker" :text="text" direction="view" class="action-chain__picker" @pick="pick" />
 
         <!-- 模板 -->
         <div class="action-chain__templates">
@@ -268,6 +277,9 @@ function stepDelta(step) {
     display: flex;
     flex-direction: column;
     min-height: 0;
+    /* 兜底：链很长（或结果很长）时整块能滚 —— 否则窄屏上「添加动作」和结果区
+       会被父级的 overflow: hidden 直接裁掉，而且界面上看不出发生了什么。 */
+    overflow-y: auto;
 }
 
 .action-chain__head {
@@ -281,7 +293,7 @@ function stepDelta(step) {
     font-size: 0.6875rem;
     font-weight: 700;
     letter-spacing: 0.04em;
-    color: rgba(71, 85, 105, 0.75);
+    opacity: 0.75;
 }
 
 .action-chain__steps {
@@ -303,7 +315,8 @@ function stepDelta(step) {
     padding: 5px 8px;
     border: 1px solid rgba(148, 163, 184, 0.42);
     border-radius: 8px;
-    background: #f8fafc;
+    /* 主题变量，别写死浅色 —— 暗色下会是一块白 */
+    background: rgba(var(--v-theme-surface-variant), 0.35);
     font-size: 0.75rem;
 }
 
@@ -348,7 +361,9 @@ function stepDelta(step) {
     border: none;
     border-radius: 4px;
     background: transparent;
-    color: rgba(71, 85, 105, 0.8);
+    /* inherit + opacity，不写死深灰 —— 暗色主题下写死的颜色直接看不见 */
+    color: inherit;
+    opacity: 0.7;
     cursor: pointer;
     font-size: 0.75rem;
     line-height: 1;
@@ -356,8 +371,8 @@ function stepDelta(step) {
 }
 
 .action-chain__mini:hover:not(:disabled) {
-    background: rgba(14, 165, 233, 0.12);
-    color: #0369a1;
+    background: rgba(var(--v-theme-primary), 0.14);
+    color: rgb(var(--v-theme-primary));
 }
 
 .action-chain__mini:disabled {
@@ -366,21 +381,27 @@ function stepDelta(step) {
 }
 
 .action-chain__mini--danger:hover {
-    background: rgba(239, 68, 68, 0.12);
-    color: #b91c1c;
+    background: rgba(var(--v-theme-error), 0.14);
+    color: rgb(var(--v-theme-error));
 }
 
 .action-chain__add {
     margin-top: 8px;
 }
 
+/* 动作面板现在住在 v-menu 的弹层里（见模板里的说明）。
+   固定尺寸是必须的：ActionPicker 内部是「搜索框 + 可滚动的分组区」，
+   需要一个**有界**的高度才滚得起来。
+   ⚠️ 也要有实底 —— 弹层浮在内容之上，透明背景会和底下的文字糊在一起。 */
 .action-chain__picker {
-    margin-top: 8px;
-    max-height: 260px;
-    border: 1px solid rgba(148, 163, 184, 0.42);
-    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    width: 340px;
+    max-width: calc(100vw - 32px);
+    max-height: 320px;
     padding: 10px;
-    background: #fff;
+    background: rgb(var(--v-theme-surface));
+    border-radius: 4px;
 }
 
 .action-chain__templates {
@@ -396,16 +417,15 @@ function stepDelta(step) {
     margin-top: 6px;
 }
 
-/* 结果区：固定高度 + 自己滚。它不该随内容长短推着整页跑 —— 主从布局里
-   右栏的高度必须是稳定的，否则每点一个动作整屏都在跳。 */
+/* ⚠️ 结果区**不自己滚**（没有 max-height / overflow）—— 滚动交给外层 `.action-chain`。
+   两层滚动容器在触屏上很糟：手指在里面滑只滚内层，滚到底外层不动，看着像卡住了。
+   背景用主题变量而不是写死的浅色 —— 暗色下 `#f8fafc` 会变成一块刺眼的白。 */
 .action-chain__result {
     min-height: 140px;
-    max-height: 42vh;
-    overflow: auto;
     border: 1px solid rgba(148, 163, 184, 0.42);
     border-radius: 10px;
     padding: 10px;
-    background: #f8fafc;
+    background: rgba(var(--v-theme-surface-variant), 0.35);
 }
 
 .action-chain__pre {
