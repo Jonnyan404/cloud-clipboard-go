@@ -44,11 +44,17 @@ for (const { name, path } of configs) {
 }
 
 const index = readFileSync(join(root, 'src/index.js'), 'utf8');
+// 读外壳那一步抽到了 spa-shell.js（分享落地页和兜底路由共用同一份注入逻辑），
+// 所以「怎么读」的断言跟着看那边。
+const spaShell = readFileSync(join(root, 'src/spa-shell.js'), 'utf8');
 
-// Worker 必须自己兜底回前端首页，否则 SPA 深链会变成 500（路由没命中时返回 undefined）。
+// Worker 必须自己兜底回前端外壳，否则 SPA 深链会变成 500（路由没命中时返回 undefined）。
 check.check('Worker 注册了 catch-all', /router\.all\(\s*'\*'/.test(index), true);
-check.check('兜底走 env.ASSETS 取 index.html', /env\.ASSETS\.fetch\(/.test(index), true);
-check.check('兜底回的是 /index.html', /'\/index\.html'/.test(index), true);
+check.check('兜底走 readShellHtml 取外壳', /readShellHtml\(/.test(index), true);
+check.check('读外壳走 env.ASSETS', /env\.ASSETS\.fetch\(/.test(spaShell), true);
+check.check('读的是 /index.html', /'\/index\.html'/.test(spaShell), true);
+// history 路由下深路径刷新会落到兜底：不注入 <base> 的话相对资源全 404（白屏）。
+check.check('兜底注入 <base>', /injectShellTags\(/.test(index), true);
 
 // catch-all 必须在所有具名路由之后注册，否则会把它们全吃掉。
 const catchAllAt = index.indexOf("router.all('*'");

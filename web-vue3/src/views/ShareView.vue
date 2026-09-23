@@ -1,16 +1,15 @@
 <script setup>
-// 分享页 —— 收件人打开 `/#/s?t=<token>` 看到的那一页。
+// 分享页 —— 收件人打开 `<prefix>/s/<token>` 看到的那一页。
 //
-// 为什么做成前端路由而不是服务端渲染 HTML：
-//   - 两个后端（Go / Worker）就都不用碰模板，只需要会拼一个绝对地址；
-//   - 静态资源本来就已经打进二进制 / 挂在 Worker assets 上，零额外部署；
-//   - 渲染、密码重试、md 切换这些交互天然归前端。
+// 地址里的 token 由**服务端**用上：它把 OG 标签写进 SPA 外壳再发给我们（见 lib/spa_shell.go），
+// 社交平台抓到的预览卡片、和真人跑起来的这一页，是同一份 HTML、同一个地址。
 //
 // 这个页面**只认 token**：类型、文件名、大小、剩余有效期、要不要密码，
 // 全部靠 GET /share 问出来，URL 里不重复携带（见 lib/share_token.go 的 handleShareInfo）。
 //
-// 所有请求用**相对路径**（不带前导斜杠）—— 与 util.js 的 createShareLink 同一约定：
-// 浏览器按当前页面所在目录解析，部署在子路径（prefix）下时不需要任何配置。
+// 接口一律用**相对路径**（不带前导斜杠），由 `axios.defaults.baseURL`（见 main.js/base.js）
+// 落到 `<prefix>/` 上 —— 部署在子路径下不需要任何配置，深路径（`<prefix>/s/<token>`）也不会
+// 把相对路径算到 `/s/` 底下。
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
@@ -23,6 +22,7 @@ import {
     isImageName,
     prettyFileSize,
     renderMarkdownHtml,
+    reportShareVisit,
 } from '@/util.js';
 import { toast } from '@/plugins/toast';
 
@@ -37,7 +37,7 @@ const mdiLockOutline = 'mdi-lock-outline';
 const route = useRoute();
 const { t } = useI18n();
 
-const token = computed(() => String(route.query.t || ''));
+const token = computed(() => String(route.params.token || route.query.t || ''));
 // 链接里可以带展示偏好（f=md）当**初始**格式，页面上仍可切换。
 // ⚠️ 站内已经没有任何地方会生成这个参数了 —— 发送方那个「默认展示格式」设置删掉了
 // （分享页自带 raw↔md 切换，让发送方替他选一次是多余的）。这里继续读它是为了
@@ -159,14 +159,32 @@ async function copyContent() {
     }
 }
 
-onMounted(loadInfo);
+// 上报「有真人打开了这条分享」。
+//
+// 为什么在前端上报，而不是在服务端落地页（/s/<token>）里计数：落地页是给社交平台的
+// 抓取程序看的（贴一次链接，微信/Telegram/Slack 都会去抓，而且会按自己的节奏重抓），
+// 在那里计数会把机器抓取算成「有人打开」。只有执行了 JS 的这一页能证明是真人。
+//
+// 不做任何角色判定：token 无效或已过期时服务端本来就不会计数，而且报错也一律静默 ——
+// 统计不该影响收件人看内容。
+function reportVisit() {
+    if (!token.value) {
+        return;
+    }
+    reportShareVisit(token.value, { qr: String(route.query.q || '') === '1' });
+}
+
+onMounted(() => {
+    reportVisit();
+    loadInfo();
+});
 
 // ⚠️ 同一条路由上换 token 不会重新挂载组件。
 //
-// 分享页只有一个 path（`/s`），token 在 query 里 —— 从「一个分享链接」切到「另一个」时
-// （改地址栏 hash、点站内链接、扫码后跳转），vue-router 复用同一个组件实例，
-// **`onMounted` 不会再跑**。不盯住它，页面会一直显示上一条分享的内容，
-// 连「无效 token」都显示成上一条的正文。实测踩到过：8 个场景里 3 个是假绿/假红。
+// 分享页只有一条路由（`/s/:token`），从「一个分享链接」切到「另一个」时（点站内链接、
+// 改地址栏、扫码后跳转），vue-router 复用同一个组件实例，**`onMounted` 不会再跑**。
+// 不盯住它，页面会一直显示上一条分享的内容，连「无效 token」都显示成上一条的正文。
+// 实测踩到过：8 个场景里 3 个是假绿/假红。
 watch(token, () => {
     password.value = '';
     passwordNeeded.value = false;
@@ -175,6 +193,7 @@ watch(token, () => {
     info.value = null;
     text.value = '';
     mdMode.value = linkedFormat.value;
+    reportVisit();
     loadInfo();
 });
 </script>

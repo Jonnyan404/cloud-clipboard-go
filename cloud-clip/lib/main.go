@@ -296,12 +296,18 @@ func (s *ClipboardServer) setupRoutes() {
 	s.logger.Println("正在设置路由...")
 	prefix := s.config.Server.Prefix
 	mux := http.NewServeMux()
+
+	// 前端静态资源（+ 前端路由兜底）。两种来源统一成 fs.FS：
+	//   - 外部目录：os.DirFS（老实现的 http.Dir 不是 fs.FS，读不了外壳）
+	//   - 嵌入式：go:embed 里的 static 子目录
+	// 存到 s.staticFS 上：`/s/<token>` 要把 OG 卡片注入同一个外壳（见 spa_shell.go）。
+	var staticFS fs.FS
 	if *flg_static_dir != "" { // 检查配置中的外部静态目录
 		s.logger.Printf("从外部目录提供静态文件: %s", *flg_static_dir)
 		if _, statErr := os.Stat(*flg_static_dir); os.IsNotExist(statErr) {
 			s.logger.Printf("警告: 配置的外部静态目录 %s 不存在。将不提供前端服务。", *flg_static_dir)
 		} else {
-			mux.Handle(prefix+"/", http.StripPrefix(prefix, compressionMiddleware(http.FileServer(http.Dir(*flg_static_dir)))))
+			staticFS = os.DirFS(*flg_static_dir)
 		}
 	} else if hasEmbeddedStatic() { // 直接检测是否有嵌入的静态文件
 		s.logger.Println("使用嵌入式静态文件。")
@@ -309,9 +315,13 @@ func (s *ClipboardServer) setupRoutes() {
 		if err != nil {
 			s.logger.Fatalf("错误: 无法从 embed_static_fs 获取 'static' 子目录: %v", err)
 		}
-		mux.Handle(prefix+"/", http.StripPrefix(prefix, compressionMiddleware(http.FileServer(http.FS(fsys)))))
+		staticFS = fsys
 	} else {
 		s.logger.Println("警告: 未使用嵌入式静态文件，也未配置外部静态目录。将不提供前端服务。")
+	}
+	s.staticFS = staticFS
+	if staticFS != nil {
+		mux.Handle(prefix+"/", http.StripPrefix(prefix, compressionMiddleware(s.spaStaticHandler(staticFS, prefix))))
 	}
 
 	// HTTP 路由（/server、/auth/*、/rooms、/revoke、/content 等无 authMiddleware 的路由补 CORS 头）
@@ -323,6 +333,13 @@ func (s *ClipboardServer) setupRoutes() {
 	mux.HandleFunc(prefix+"/rooms", s.corsMiddleware(s.handleRooms))
 	// /share 在 handler 内按目标资源所在房间鉴权（支持 body 中的 file uuid）
 	mux.HandleFunc(prefix+"/share", s.handle_share)
+	// /share/list 用和「在该房间签发分享」同一套鉴权（canAccessRoom），
+	// /share/visit 只需 token 本身 —— 它是未认证的分享页上报计数用的。
+	// 两条都注册在 /share 之后，ServeMux 按最长前缀匹配，不会互相抢。
+	mux.HandleFunc(prefix+"/share/list", s.corsMiddleware(s.handleShareList))
+	mux.HandleFunc(prefix+"/share/visit", s.corsMiddleware(s.handleShareVisit))
+	// /s/<token>：分享链接的**服务端落地页**，只为社交预览（OG）而存在，见 share_landing.go。
+	mux.HandleFunc(prefix+"/s/", s.handleShareLanding)
 	mux.HandleFunc(prefix+"/file/", s.authMiddleware(s.handle_file))
 	mux.HandleFunc(prefix+"/text", s.authMiddleware(s.handle_text))
 	mux.HandleFunc(prefix+"/upload", s.authMiddleware(s.handle_upload))
@@ -913,7 +930,7 @@ func (s *ClipboardServer) getRoomList(tokens []string) []RoomInfo {
 			IsActive:     deviceCount > 0,
 			// 用「实际需不需要密码」而不是「roomAuth 里有没有这一项」：
 			// 显式配了空密码的房间是**开放**的，报成受保护会让房间列表挂一把不存在的锁。
-			IsProtected:  s.resolveRoomAuth(room).Required,
+			IsProtected: s.resolveRoomAuth(room).Required,
 		}
 
 		roomList = append(roomList, roomInfo)

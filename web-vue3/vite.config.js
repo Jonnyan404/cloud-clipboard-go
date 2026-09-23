@@ -18,10 +18,18 @@ export default defineConfig(({ command }) => {
             vuetify({ autoImport: true }),
             // define 只替换 JS 模块；index.html 里的 __BUILD_ID__ 得靠这个钩子。
             // 写到 <html data-build-id> 上，view-source 就能核对线上是哪次构建。
+            //
+            // dev 下额外注入 `<base href="/">`：history 路由的深路径（`/s/<token>`）靠它把相对
+            // 地址（`./assets/…`、以及 axios 的相对接口路径）拉回根目录。dev 没有 prefix，
+            // 所以固定 `/` 就是对的；线上这一份由服务端注入，带真实 prefix（见 lib/spa_shell.go）。
             {
                 name: 'inject-build-id-into-html',
                 transformIndexHtml(html) {
-                    return html.replaceAll('__BUILD_ID__', buildId);
+                    const withBuildId = html.replaceAll('__BUILD_ID__', buildId);
+                    if (command !== 'build') {
+                        return withBuildId.replace('<head>', '<head>\n    <base href="/">');
+                    }
+                    return withBuildId;
                 },
             },
             VitePWA({
@@ -63,6 +71,12 @@ export default defineConfig(({ command }) => {
                     cleanupOutdatedCaches: true,
                     navigateFallback: 'index.html',
                     navigateFallbackDenylist: [
+                        // /s/<token> 的响应由**服务端**生成：外层是 SPA 外壳，但 `<base href="<prefix>/">`
+                        // 和 OG 标签是服务端注进去的（见 lib/spa_shell.go）。被 SW 从预缓存回掉的话，
+                        // 深路径上会拿到一份没有 `<base>` 的外壳 —— `./assets/…` 全按 `/clip/s/` 解析，
+                        // 页面直接白。所以分享链接的导航一律走网络。
+                        // （抓取程序本来就不跑 SW，OG 那条路不受影响。）
+                        /^\/s\//,
                         /^\/server/,
                         /^\/text/,
                         /^\/auth/,
@@ -136,6 +150,11 @@ export default defineConfig(({ command }) => {
                 '/upload': { target: 'http://localhost:9501/', changeOrigin: true },
                 '/revoke': { target: 'http://localhost:9501/', changeOrigin: true },
                 '/content': { target: 'http://localhost:9501/', changeOrigin: true },
+                // ⚠️ `/s/` **刻意不代理**。分享地址（`/s/<token>`）现在由服务端返回一份注入了 OG
+                // 的外壳（见 lib/spa_shell.go），代理的话 dev 下打开分享链接会落到「后端嵌入的
+                // 上次构建产物」上 —— 改前端代码看不到效果，比不代理更迷惑。这里的 SPA 回退会让
+                // dev server 自己的 HTML 接住它（dev 那份带 `<base href="/">`），分享页照常开发；
+                // 要看注入出来的卡片就 curl 后端：`curl -s localhost:9501/s/<token> | grep og:`。
             },
         },
     };

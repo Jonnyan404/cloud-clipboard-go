@@ -40,6 +40,7 @@ import {
     normalizeShareMaxUses,
     normalizeShareTTL,
     withCurrentOrigin,
+    withShareQrFlag,
 } from '@/util.js';
 
 const mdiContentCopy = 'mdi-content-copy';
@@ -87,6 +88,13 @@ const contentUrl = computed(() => {
     const id = props.meta?.id ?? '';
     return buildCleanAbsoluteRouteUrl(`content/${id}${roomQuery}`, app?.config?.server?.prefix || '');
 });
+// 二维码里编的地址要比「复制到剪贴板的那条」多一个 q=1 ——
+// 扫码和点链接打开的是同一个页面，服务端分不出来，只有地址上带了这个参数，
+// 分享页上报时才能告诉服务端「这次是扫过来的」。
+// 复制出去的那条不带它（它本来就是点开的）。
+// ⚠️ 分享地址是 `<prefix>/s/<token>`（**没有 `#`**），q=1 拼在普通 query 上，分享页用
+// route.query.q 读它 —— 见 withShareQrFlag。
+const shareQrUrl = computed(() => withShareQrFlag(shareContentUrl.value) || shareContentUrl.value);
 const shareTtlSeconds = computed(() => minutesToShareTTL(shareForm.value.ttlMinutes));
 const shareTtlLabel = computed(() => formatShareDuration(shareTtlSeconds.value, (key, params) => t(key, params)));
 const shareTtlProgress = computed(() => {
@@ -143,12 +151,16 @@ async function confirmShareDialog() {
             password,
             room: ws.room,
         });
-        // 服务端一律签发 token 并返回分享页地址。⚠️ 但它的**主机名**不能直接用：
-        // 服务端是按请求的 Host 拼的（buildSharePageURL），中间只要有改写 Host 的代理就错 ——
-        // dev 的 vite proxy 写了 `changeOrigin: true`，拼出来会指向后端（`localhost:9501`），
-        // 而分享页是前端路由，指向一个没有前端的后端只会白页。换成本浏览器自己的 origin，
-        // 路径与 `#` 片段照原样保留（所以带 prefix 部署也不会丢）。
-        const url = withCurrentOrigin(data?.url) || contentUrl.value;
+        // 分享给出去的是**分享地址本身**：`<prefix>/s/<token>`，token 在路径里。
+        // 服务端把 OG 卡片注入 SPA 外壳后就发这一份，所以贴进微信 / Telegram 能展开预览，
+        // 真人打开看到的也是分享页（前端路由 /s/:token 接管）—— 同一个地址，没有第二跳。
+        // `url` 与 `pageUrl` 现在是同一个值（老服务端回来的 `url` 还是 hash 地址，所以两个都试）。
+        //
+        // ⚠️ 主机名照旧不能直接用：服务端是按**请求的 Host** 拼的，中间只要有改写 Host 的代理就错
+        // —— dev 的 vite proxy 写了 `changeOrigin: true`，拼出来会指向后端。换成浏览器自己的
+        // origin，路径照原样保留（所以带 prefix 部署也不会丢）。
+        // 老服务端可能什么都不给：那时回落到本地拼的兜底地址。
+        const url = withCurrentOrigin(data?.pageUrl) || withCurrentOrigin(data?.url) || contentUrl.value;
         shareContentUrl.value = url;
         lastShareMeta.value = {
             ttl: data?.ttl ?? ttl,
@@ -157,6 +169,9 @@ async function confirmShareDialog() {
             usesText: (data?.maxUses ?? maxUses) > 0
                 ? t('shareUsesLimited', { count: data?.maxUses ?? maxUses })
                 : t('shareUsesUnlimited'),
+            // 刚建出来的链接当然是 0 次 —— 写出来不是废话：「0」说明统计是通的，
+            // 之后想看累计就进「设置 → 分享记录」（那边读的是服务端的记录，会累加）。
+            openedText: t('shareOpenedTimes', { count: data?.visits ?? 0 }),
         };
         shareDialogVisible.value = false;
         shareResultVisible.value = true;
@@ -290,10 +305,13 @@ async function copyToClipboard(textToCopy, successMessageKey = 'copySuccess', er
             <v-card-text class="text-center pa-4">
                 <v-progress-circular v-if="shareUrlLoading" indeterminate color="primary" class="my-8"></v-progress-circular>
                 <template v-else>
-                    <qrcode-vue :value="shareContentUrl" :size="200" level="H" />
+                    <qrcode-vue :value="shareQrUrl" :size="200" level="H" />
                     <div class="text-caption mt-2" style="word-break: break-all;">{{ shareContentUrl }}</div>
                     <div v-if="lastShareMeta" class="text-caption text-medium-emphasis mt-2">
                         {{ t('shareMetaSummary', lastShareMeta) }}
+                    </div>
+                    <div v-if="lastShareMeta" class="text-caption text-medium-emphasis mt-1">
+                        {{ lastShareMeta.openedText }} · {{ t('shareOpenedHint') }}
                     </div>
                 </template>
             </v-card-text>

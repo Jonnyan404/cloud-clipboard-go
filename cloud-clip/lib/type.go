@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"io/fs"
 	"log"
 	"net/http"
 	"sync"
@@ -77,6 +78,16 @@ type ClipboardServer struct {
 	shareSigningKey []byte                      // 短期分享链接签名密钥
 	shareTokenUsage map[string]*shareUsageEntry // jti -> 使用计数（进程内）
 	shareUsageMutex sync.Mutex
+
+	// 分享记录（share-log.json）：谁在哪个房间分享了什么、被打开了几次。
+	// 见 share_log.go 文件头部 —— 列表用房间凭据鉴权，开放房间 = 公开。
+	shareLog         map[string]*shareRecord // jti -> 记录
+	shareLogMutex    sync.Mutex
+	shareVisitDedupe map[string]int64 // "jti|访客" -> 上次上报时间，防刷计数
+
+	// 前端静态资源的来源：嵌入式 FS 或外部目录（nil = 这次部署没有前端）。
+	// 发资源、`/s/<token>` 注入 OG、前端路由兜底都要从这里读外壳 index.html，见 spa_shell.go。
+	staticFS fs.FS `json:"-"`
 
 	// 添加房间管理相关字段
 	roomStats         map[string]*RoomStat `json:"-"` // 房间统计信息，不序列化

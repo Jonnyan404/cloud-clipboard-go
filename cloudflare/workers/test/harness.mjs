@@ -2,6 +2,38 @@
 // 被 sniff/upload/receive 三个测试共用。
 import { DatabaseSync } from 'node:sqlite';
 
+// 资源层桩：分享落地页和兜底路由都要读它（`readShellHtml`）来注入 `<base>` / OG 卡片。
+// 夹具形状刻意和 vite 构建产物一致 —— `<head>`、一处 `<title>`、`<div id="app">`、
+// **相对**资源引用（`./assets/…`）。最后这点是关键：不注入 `<base>` 时深路径下会解析错。
+export const SHELL_FIXTURE = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Cloud Clipboard</title>
+<script type="module" crossorigin src="./assets/index-DyTrt7K.js"></script>
+<link rel="stylesheet" crossorigin href="./assets/index-Bkjgy8nt.css">
+</head>
+<body>
+<div id="app"></div>
+</body>
+</html>
+`;
+
+function makeAssetsStub() {
+  return {
+    async fetch(req) {
+      const path = new URL(req.url).pathname;
+      if (path === '/index.html' || path === '/') {
+        return new Response(SHELL_FIXTURE, {
+          status: 200,
+          headers: { 'Content-Type': 'text/html; charset=utf-8' },
+        });
+      }
+      return new Response('not found', { status: 404 });
+    },
+  };
+}
+
 export function makeEnv() {
   const db = new DatabaseSync(':memory:');
   // 刻意停留在「加 deviceName 列之前」的表结构 —— 线上已有部署就是这个样子，
@@ -63,7 +95,7 @@ export function makeEnv() {
   });
 
   const env = {
-    DB, R2_BUCKET, WEBSOCKET_ROOM: makeStub(),
+    DB, R2_BUCKET, ASSETS: makeAssetsStub(), WEBSOCKET_ROOM: makeStub(),
     AUTH_PASSWORD: '123', ROOM_AUTH_JSON: '{}', HISTORY_LIMIT: '50',
     TEXT_LIMIT: '40960', FILE_LIMIT: '204857600', FILE_EXPIRE: '3600',
   };

@@ -8,6 +8,14 @@ import {
   resolveRoomAuth,
 } from './auth';
 import { errorResponse } from './errors';
+import {
+  DEFAULT_SHARE_LIST_LIMIT,
+  listShareRecords,
+  markShareVisit,
+  recordShareInLog,
+  shareLogLimitFromQuery,
+} from './share-log';
+import { SHARE_NAME_LIMIT, firstSummaryLine } from './share-summary';
 
 export const SHARE_TOKEN_QUERY_KEY = 't';
 
@@ -221,11 +229,16 @@ export function shouldConsumeShareUse(request) {
   return startPart === '' || startPart === '0';
 }
 
-let shareUsageTableReady = false;
+// 按 DB 记（WeakSet 而不是布尔）：布尔在进程内是全局的，测试里每个用例都新建一个
+// 内存 D1，第二次进来时标志位已经是 true，新库上就根本没建表。
+const ensuredShareUsageDbs = new WeakSet();
 
 async function ensureShareUsageTable(env) {
-  if (!env?.DB || shareUsageTableReady) {
-    return Boolean(env?.DB);
+  if (!env?.DB) {
+    return false;
+  }
+  if (ensuredShareUsageDbs.has(env.DB)) {
+    return true;
   }
   await env.DB.prepare(`
     CREATE TABLE IF NOT EXISTS share_token_usage (
@@ -238,7 +251,7 @@ async function ensureShareUsageTable(env) {
   await env.DB.prepare(`
     CREATE INDEX IF NOT EXISTS idx_share_token_usage_exp ON share_token_usage(exp)
   `).run();
-  shareUsageTableReady = true;
+  ensuredShareUsageDbs.add(env.DB);
   return true;
 }
 
@@ -387,7 +400,7 @@ export async function ensureRoomOrShareAccess(request, env, room, {
   };
 }
 
-async function findContentById(env, contentId, preferredRoom, hasPreferredRoom) {
+export async function findContentById(env, contentId, preferredRoom, hasPreferredRoom) {
   if (!env.DB) {
     return null;
   }
@@ -403,7 +416,7 @@ async function findContentById(env, contentId, preferredRoom, hasPreferredRoom) 
     .first();
 }
 
-async function findFileMeta(env, uuid) {
+export async function findFileMeta(env, uuid) {
   if (env.R2_BUCKET) {
     const object = await env.R2_BUCKET.head(`files/${uuid}`);
     if (object) {
@@ -435,15 +448,27 @@ async function findFileMeta(env, uuid) {
   return null;
 }
 
-// 分享链接指向前端分享页（hash 路由），不再是裸接口地址。
-// `#` 必须保留字面量 —— 交给 URL 对象拼会被转义成 %23，hash 路由当场失效。
-function buildSharePageURL(request, token) {
+// 分享链接**就是落地页地址本身**（见 share-landing.js）：服务端把 OG 卡片注入 SPA 外壳后
+// 返回同一份 HTML，真人由前端 history 路由 `/s/:token` 接管。没有第二跳、没有第二个地址。
+//
+// 曾经它是前端 hash 路由地址（`/#/s?t=…`）：那时前端用 hash 路由，抓取程序读不到 `#` 之后
+// 的部分，于是另有一个 `/s/<token>` 落地页专给预览用 —— 同一个分享因此有两个地址（贴出去的
+// 和真人看的），平台的点击统计、书签、二维码各认各的。现在收敛成一个。
+//
+// 仍然保留这个函数名：名字说的是「给收件人的地址」，与 `pageUrl`/`url` 两个响应字段对应。
+export function buildSharePageURL(request, token) {
+  return buildShareLandingURL(request, token);
+}
+
+// 分享地址：token 在**路径**里。不能放 `#` 之后 —— 浏览器不把 fragment 发给服务器，
+// 而 OG 标签必须由服务端注入。base64url 里没有 `/`，encodeURIComponent 只是兜住边界字符。
+function buildShareLandingURL(request, token) {
   const origin = new URL(request.url).origin;
-  return `${origin}/#/s?${SHARE_TOKEN_QUERY_KEY}=${encodeURIComponent(token)}`;
+  return `${origin}/s/${encodeURIComponent(token)}`;
 }
 
 // 已用次数，只读。表可能还没建起来（没消费过就没有行），出错按 0 处理。
-async function readShareUsed(env, claims) {
+export async function readShareUsed(env, claims) {
   if (!claims?.jti || !claims?.maxUses) {
     return 0;
   }
@@ -467,9 +492,11 @@ async function issueShareToken(env, { type, id, room, ttl, maxUses, password }) 
     id,
     room,
     exp: expiresAt,
+    // 无条件分配 jti。以前只在限次（maxUses > 0）时才发 —— 于是不限次的分享
+    // 既入不了档（分享记录）也计不了数（打开次数）。现在 jti 还兼作档案号。
+    jti: newShareJTI(),
   };
   if (maxUses > 0) {
-    claims.jti = newShareJTI();
     claims.mu = maxUses;
   }
   const pwdHash = await sharePasswordHash(env, password);
@@ -477,7 +504,20 @@ async function issueShareToken(env, { type, id, room, ttl, maxUses, password }) 
     claims.p = pwdHash;
   }
   const token = await signShareClaims(env, claims);
-  return { token, expiresAt };
+  return {
+    token,
+    expiresAt,
+    jti: claims.jti,
+    claims: {
+      type,
+      id,
+      room,
+      exp: expiresAt,
+      jti: claims.jti,
+      maxUses,
+      pwdHash,
+    },
+  };
 }
 
 export class ShareHandler {
@@ -524,6 +564,14 @@ export class ShareHandler {
           password: body?.password,
         });
 
+        // 入档：记录列表要能回答「我最近分享过什么」。名称取文件名 / 文本首行摘要。
+        const kind = String(row.type || 'text');
+        await recordShareInLog(env, issued.claims, {
+          kind,
+          name: kind === 'file' ? String(row.name || '') : firstSummaryLine(row.content, SHARE_NAME_LIMIT),
+          size: kind === 'file' ? Number(row.size || 0) : 0,
+        });
+
         // rawUrl 是「直接拿正文」的地址（带同一个 token），给分享页的下载按钮
         // 和前端自己的下载链路用 —— 分享页地址是 hash 路由，取不了正文。
         const rawUrl = new URL(`${url.origin}/content/${id}`);
@@ -540,8 +588,12 @@ export class ShareHandler {
           expiresAt: issued.expiresAt,
           maxUses,
           token: issued.token,
+          jti: issued.jti,
           url: buildSharePageURL(request, issued.token),
+          pageUrl: buildShareLandingURL(request, issued.token),
           rawUrl: rawUrl.toString(),
+          visits: 0,
+          scans: 0,
         }), {
           headers: { 'Content-Type': 'application/json', ...corsHeaders },
         });
@@ -582,6 +634,12 @@ export class ShareHandler {
           password: body?.password,
         });
 
+        await recordShareInLog(env, issued.claims, {
+          kind: 'file',
+          name: String(fileMeta.name || ''),
+          size: Number(fileMeta.size || 0),
+        });
+
         const rawUrl = new URL(`${url.origin}/file/${uuid}/${encodeURIComponent(fileMeta.name || 'file')}`);
         rawUrl.searchParams.set(SHARE_TOKEN_QUERY_KEY, issued.token);
 
@@ -593,8 +651,12 @@ export class ShareHandler {
           expiresAt: issued.expiresAt,
           maxUses,
           token: issued.token,
+          jti: issued.jti,
           url: buildSharePageURL(request, issued.token),
+          pageUrl: buildShareLandingURL(request, issued.token),
           rawUrl: rawUrl.toString(),
+          visits: 0,
+          scans: 0,
         }), {
           headers: { 'Content-Type': 'application/json', ...corsHeaders },
         });
@@ -684,6 +746,82 @@ export class ShareHandler {
     } catch (error) {
       console.error('Share info error:', error);
       return errorResponse(500, 'share_info_failed', 'Internal Server Error', '读取分享信息失败');
+    }
+  }
+
+  /**
+   * GET /share/list?room=<room>&limit=<n> —— 某个房间最近的分享记录。
+   *
+   * 鉴权刻意与「在该房间签发分享」完全一致（canAccessRoomAsync），于是规则只有一条，
+   * 不会出现「能建分享但看不到自己建的分享」。房间没配密码时鉴权恒为通过 ——
+   * 也就是开放房间的记录列表是公开可读的，理由见 share-log.js 文件头。
+   *
+   * **不回 token**：token 是 bearer 凭据，列表只是给创建者看统计的。
+   */
+  static async list(request, env) {
+    try {
+      const url = new URL(request.url);
+      const room = normalizeRoomName(url.searchParams.get('room'));
+      if (!await canAccessRoomAsync(env, room, extractAuthToken(request))) {
+        return errorResponse(401, 'room_forbidden', 'Unauthorized', '无权访问该房间');
+      }
+
+      const limit = url.searchParams.get('limit')
+        ? shareLogLimitFromQuery(url.searchParams.get('limit'))
+        : DEFAULT_SHARE_LIST_LIMIT;
+
+      const { records, total } = await listShareRecords(env, room, limit);
+      // 已用次数住在 share_token_usage（只有限次分享才有行），和记录表合并不了 SQL，
+      // 数量又有上限（默认 50、最多 200），逐条查可以接受。
+      const withUsed = [];
+      for (const rec of records) {
+        withUsed.push({ ...rec, used: await readShareUsed(env, { jti: rec.jti, maxUses: rec.maxUses }) });
+      }
+
+      return new Response(JSON.stringify({ room, total, limit, records: withUsed }), {
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
+    } catch (error) {
+      console.error('Share list error:', error);
+      return errorResponse(500, 'share_list_failed', 'Internal Server Error', '读取分享记录失败');
+    }
+  }
+
+  /**
+   * POST /share/visit —— 分享页被**真人**打开时上报一次。
+   *
+   * 为什么由前端上报、而不是在 /s/<token> 落地页里计数：落地页是给社交平台的**抓取
+   * 程序**看的（贴一次链接，微信/Telegram/Slack 都会去抓，且平台侧会按自己的节奏重抓）。
+   * 在那里计数会把「机器抓取」算成「有人打开」。只有执行了 JS 的分享页能证明是真人。
+   *
+   * 鉴权：只需要 token 本身（未认证接口）—— 你拿着链接才能上报，接口也只回**这一条**
+   * 分享的计数。同一访客十分钟内重复上报会被去重（见 markShareVisit）。
+   */
+  static async visit(request, env) {
+    try {
+      const url = new URL(request.url);
+      const body = await request.json().catch(() => ({}));
+      const token = String(body?.token || url.searchParams.get(SHARE_TOKEN_QUERY_KEY) || '').trim();
+      if (!token) {
+        return errorResponse(400, 'missing_token', 'Bad Request', '缺少 token');
+      }
+
+      const claims = await parseShareToken(env, token);
+      if (!claims) {
+        return errorResponse(401, 'share_token_invalid', 'Unauthorized', '分享链接无效或已过期');
+      }
+
+      const result = await markShareVisit(env, claims, {
+        viaQR: Boolean(body?.qr) || url.searchParams.get('q') === '1',
+        visitorKey: request.headers.get('CF-Connecting-IP') || 'unknown',
+      });
+
+      return new Response(JSON.stringify({ ok: true, ...result }), {
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
+    } catch (error) {
+      console.error('Share visit error:', error);
+      return errorResponse(500, 'share_visit_failed', 'Internal Server Error', '分享访问上报失败');
     }
   }
 }

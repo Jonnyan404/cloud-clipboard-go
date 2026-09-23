@@ -443,7 +443,19 @@ func (s *ClipboardServer) buildAbsoluteURL(r *http.Request, path string, query u
 	return u.String()
 }
 
-func (s *ClipboardServer) findContentForShare(contentID int, preferredRoom string, hasPreferredRoom bool) (room string, msgType string, fileUUID string, ok bool) {
+// shareTarget 描述一条分享指向的内容：记录列表和 OG 落地页摘要要用的那几项。
+type shareTarget struct {
+	Room     string
+	Kind     string // text | file
+	FileUUID string
+	FileName string
+	FileSize int64
+	Text     string
+}
+
+// findShareTarget 在消息队列里找到这条内容，顺带把摘要要用的字段捞出来。
+// 房间归属规则与 findContentForShare 是同一次扫描，避免两套判定慢慢漂移。
+func (s *ClipboardServer) findShareTarget(contentID int, preferredRoom string, hasPreferredRoom bool) (shareTarget, bool) {
 	s.messageQueue.Lock()
 	defer s.messageQueue.Unlock()
 
@@ -455,25 +467,40 @@ func (s *ClipboardServer) findContentForShare(contentID int, preferredRoom strin
 		if hasPreferredRoom && messageRoom != preferredRoom {
 			continue
 		}
+
+		target := shareTarget{Room: messageRoom, Kind: msg.Data.Type()}
 		switch msg.Data.Type() {
 		case "text":
-			return messageRoom, "text", "", true
-		case "file":
-			uuid := ""
-			if msg.Data.FileReceive != nil {
-				uuid = msg.Data.FileReceive.Cache
+			if msg.Data.TextReceive != nil {
+				target.Text = msg.Data.TextReceive.Content
 			}
-			return messageRoom, "file", uuid, true
-		default:
-			return messageRoom, msg.Data.Type(), "", true
+		case "file":
+			if msg.Data.FileReceive != nil {
+				target.FileUUID = msg.Data.FileReceive.Cache
+				target.FileName = msg.Data.FileReceive.Name
+				target.FileSize = msg.Data.FileReceive.Size
+			}
 		}
+		return target, true
 	}
-	return "", "", "", false
+	return shareTarget{}, false
 }
 
-func (s *ClipboardServer) issueShareToken(shareType, id, room string, ttl, maxUses int, password string) (token string, expiresAt int64, err error) {
-	expiresAt = time.Now().Unix() + int64(ttl)
-	claims := shareClaims{
+func (s *ClipboardServer) findContentForShare(contentID int, preferredRoom string, hasPreferredRoom bool) (room string, msgType string, fileUUID string, ok bool) {
+	target, found := s.findShareTarget(contentID, preferredRoom, hasPreferredRoom)
+	if !found {
+		return "", "", "", false
+	}
+	return target.Room, target.Kind, target.FileUUID, true
+}
+
+// newShareClaims 造一份 claims（**一律分配 jti**）。
+//
+// 以前只在限次（maxUses > 0）时才发 jti —— 于是不限次的分享在记录里立不了档、
+// 也用不了打开计数。现在 jti 还承担「这条分享的档案号」，所以无条件分配。
+func (s *ClipboardServer) newShareClaims(shareType, id, room string, ttl, maxUses int, password string) (*shareClaims, int64, error) {
+	expiresAt := time.Now().Unix() + int64(ttl)
+	claims := &shareClaims{
 		Type:    shareType,
 		ID:      id,
 		Room:    room,
@@ -481,28 +508,36 @@ func (s *ClipboardServer) issueShareToken(shareType, id, room string, ttl, maxUs
 		MaxUses: maxUses,
 		PwdHash: s.sharePasswordHash(password),
 	}
-	if maxUses > 0 {
-		jti, jerr := newShareJTI()
-		if jerr != nil {
-			return "", 0, jerr
-		}
-		claims.JTI = jti
+	jti, err := newShareJTI()
+	if err != nil {
+		return nil, 0, err
 	}
-	token, err = s.signShareClaims(claims)
+	claims.JTI = jti
+	return claims, expiresAt, nil
+}
+
+func (s *ClipboardServer) issueShareToken(shareType, id, room string, ttl, maxUses int, password string) (token string, expiresAt int64, err error) {
+	claims, expiresAt, err := s.newShareClaims(shareType, id, room, ttl, maxUses, password)
+	if err != nil {
+		return "", 0, err
+	}
+	token, err = s.signShareClaims(*claims)
 	if err != nil {
 		return "", 0, err
 	}
 	return token, expiresAt, nil
 }
 
-// buildSharePageURL 拼前端分享页地址。
+// buildSharePageURL 拼分享链接 —— 现在**就是落地页地址本身**（见 share_landing.go）。
 //
-// 为什么不用 buildAbsoluteURL：那个函数把路径交给 url.URL 处理，`#` 会被转义成 %23，
-// 而分享页走的是 hash 路由，必须保留字面量 `#`。
+// 曾经它是前端 hash 路由地址（`<prefix>/#/s?t=…`）：那时前端用 hash 路由，抓取程序读不到
+// `#` 之后的部分，于是另有一个 `/s/<token>` 落地页专门给预览用 —— 同一个分享因此有两个地址
+// （贴出去的、和真人看的），平台的点击统计、书签、二维码各认各的。现在改成 history 路由 +
+// 服务端把 OG 注入 SPA 外壳：抓取程序和真人拿的是**同一个**地址，不再有第二跳。
+//
+// 仍然保留这个函数名：名字说的是「给收件人的地址」，与 `pageUrl`/`url` 两个响应字段对应。
 func (s *ClipboardServer) buildSharePageURL(r *http.Request, token string) string {
-	scheme := getScheme(r)
-	prefix := strings.TrimRight(s.config.Server.Prefix, "/")
-	return fmt.Sprintf("%s://%s%s/#/s?t=%s", scheme, r.Host, prefix, url.QueryEscape(token))
+	return s.buildLandingURL(r, token)
 }
 
 // handleShareInfo 处理 GET /share?t=...：分享页在取正文之前先问一次这里。
@@ -651,11 +686,12 @@ func (s *ClipboardServer) handle_share(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		room, _, _, found := s.findContentForShare(contentID, requestedRoom, hasRequestedRoom)
+		target, found := s.findShareTarget(contentID, requestedRoom, hasRequestedRoom)
 		if !found {
 			writeError(w, http.StatusNotFound, "content_not_found", "Content not found", "内容未找到")
 			return
 		}
+		room := target.Room
 		if !s.canAccessRoom(room, authToken) {
 			writeError(w, http.StatusUnauthorized, "room_forbidden", "No access to this room", "无权访问该房间")
 			return
@@ -664,11 +700,18 @@ func (s *ClipboardServer) handle_share(w http.ResponseWriter, r *http.Request) {
 		// 一律签发 token：TTL / 次数限制 / 密码都由它承载，房间是否需要鉴权不再影响这件事。
 		// 曾经只在 requirement.Required 时才发 —— 结果是开放房间的分享链接永不过期、不限次数，
 		// 弹窗里让用户设的值被静默丢弃，而响应里却照样回 ttl/maxUses，会骗到调用方。
-		token, expiresAt, err := s.issueShareToken("content", idStr, room, ttl, maxUses, req.Password)
+		claims, expiresAt, err := s.newShareClaims("content", idStr, room, ttl, maxUses, req.Password)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "share_token_failed", "Failed to generate share token", "生成分享令牌失败")
 			return
 		}
+		token, err := s.signShareClaims(*claims)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "share_token_failed", "Failed to generate share token", "生成分享令牌失败")
+			return
+		}
+		s.recordShareForTarget(claims, target)
+
 		// rawUrl 是「直接拿字节」的地址（带同一个 token），给分享页里的下载按钮和
 		// 前端自己的下载链路用 —— 分享页地址是 hash 路由，取不了正文。
 		rawQuery := url.Values{}
@@ -684,8 +727,12 @@ func (s *ClipboardServer) handle_share(w http.ResponseWriter, r *http.Request) {
 			"expiresAt": expiresAt,
 			"maxUses":   maxUses,
 			"token":     token,
+			"jti":       claims.JTI,
 			"url":       s.buildSharePageURL(r, token),
+			"pageUrl":   s.buildLandingURL(r, token),
 			"rawUrl":    s.buildAbsoluteURL(r, fmt.Sprintf("/content/%s", idStr), rawQuery),
+			"visits":    0,
+			"scans":     0,
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(response)
@@ -725,11 +772,18 @@ func (s *ClipboardServer) handle_share(w http.ResponseWriter, r *http.Request) {
 
 		// 同 content 分支：一律签发 token，文件名不再进分享页地址 ——
 		// 分享页会先问一次 GET /share 拿到它，再拼 /file/<uuid>/<name>。
-		token, expiresAt, err := s.issueShareToken("file", fileUUID, room, ttl, maxUses, req.Password)
+		claims, expiresAt, err := s.newShareClaims("file", fileUUID, room, ttl, maxUses, req.Password)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "share_token_failed", "Failed to generate share token", "生成分享令牌失败")
 			return
 		}
+		token, err := s.signShareClaims(*claims)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "share_token_failed", "Failed to generate share token", "生成分享令牌失败")
+			return
+		}
+		s.recordShareForFile(claims, fileUUID, fileInfo.Name, fileInfo.Size)
+
 		filename := fileInfo.Name
 		if filename == "" {
 			filename = "file"
@@ -744,8 +798,12 @@ func (s *ClipboardServer) handle_share(w http.ResponseWriter, r *http.Request) {
 			"expiresAt": expiresAt,
 			"maxUses":   maxUses,
 			"token":     token,
+			"jti":       claims.JTI,
 			"url":       s.buildSharePageURL(r, token),
+			"pageUrl":   s.buildLandingURL(r, token),
 			"rawUrl":    s.buildAbsoluteURL(r, fmt.Sprintf("/file/%s/%s", fileUUID, url.PathEscape(filename)), rawQuery),
+			"visits":    0,
+			"scans":     0,
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(response)

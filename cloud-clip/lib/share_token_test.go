@@ -429,26 +429,24 @@ func TestSharePageURLUsesFrontendRoute(t *testing.T) {
 	req.Header.Set("X-Forwarded-Proto", "https")
 
 	got := s.buildSharePageURL(req, token)
-	if !strings.HasPrefix(got, "https://clip.example.com/cc/#/s?t=") {
+	// 分享地址就是落地页地址：抓取程序和真人共用一条（见 share_landing.go 文件头）。
+	if !strings.HasPrefix(got, "https://clip.example.com/cc/s/") {
 		t.Fatalf("unexpected share page url: %s", got)
 	}
-	// `#` 必须是字面量。交给 url.URL 去拼会被转义成 %23，hash 路由当场失效。
-	if strings.Contains(got, "%23") {
-		t.Fatalf("the hash must not be percent-encoded: %s", got)
+	// 不再是 hash 地址：token 必须在**路径**里，否则服务端读不到（抓取程序也读不到）。
+	if strings.Contains(got, "#") || strings.Contains(got, "?t=") {
+		t.Fatalf("the token must live in the path now: %s", got)
 	}
 
 	parsed, err := url.Parse(got)
 	if err != nil {
 		t.Fatalf("share page url should parse: %v", err)
 	}
-	if !strings.HasPrefix(parsed.Fragment, "/s?") {
-		t.Fatalf("expected a hash route fragment, got %q", parsed.Fragment)
+	// 分享地址不能再带 fragment：`#` 之后的部分服务端收不到，OG 就无从注入。
+	if parsed.Fragment != "" {
+		t.Fatalf("the share url must not carry a fragment any more, got %q", parsed.Fragment)
 	}
-	fragQuery, err := url.ParseQuery(strings.TrimPrefix(parsed.Fragment, "/s?"))
-	if err != nil {
-		t.Fatalf("fragment query should parse: %v", err)
-	}
-	claims, ok := s.parseShareToken(fragQuery.Get("t"))
+	claims, ok := s.parseShareToken(strings.TrimPrefix(parsed.Path, "/cc/s/"))
 	if !ok {
 		t.Fatal("the token carried in the share page url should still parse")
 	}
@@ -499,10 +497,10 @@ func TestShareAlwaysIssuesTokenOnOpenRoom(t *testing.T) {
 	if resp.Token == "" {
 		t.Fatal("an open room must still get a share token, otherwise ttl/maxUses are silently dropped")
 	}
-	if !strings.Contains(resp.URL, "/#/s?t=") {
-		t.Fatalf("share url should point at the frontend share page, got %s", resp.URL)
+	if !strings.Contains(resp.URL, "/s/") {
+		t.Fatalf("share url should point at the share page itself, got %s", resp.URL)
 	}
-	// 分享页地址是 hash 路由，取不了正文 —— 下载/取正文要另一条带同一个 token 的地址
+	// 分享页里取不了正文 —— 下载/取正文要另一条带同一个 token 的接口地址
 	if !strings.Contains(resp.RawURL, "/content/42") || !strings.Contains(resp.RawURL, "t=") {
 		t.Fatalf("rawUrl should reach the content endpoint with the same token, got %s", resp.RawURL)
 	}

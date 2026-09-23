@@ -1,4 +1,4 @@
-// 分享页链路：POST /share 一律签发 token 且链接指向 /#/s，GET /share 提供元信息、且不消耗使用次数。
+// 分享页链路：POST /share 一律签发 token 且链接指向 /s/<token>，GET /share 提供元信息、且不消耗使用次数。
 //
 // 为什么单独一个文件：share.js 此前完全没有测试覆盖 —— 而它是「开放房间不发 token」
 // 那个静默丢弃 TTL / 次数限制的 bug 的所在地。这里把修好之后的形状钉住。
@@ -49,7 +49,10 @@ async function getShare(env, token, password) {
   const open = await postShare(env, { type: 'content', id: '1', ttl: 60, maxUses: 2 });
   check('开放房间：HTTP 200', open.status, 200);
   check('开放房间：仍签发 token', typeof open.json.token === 'string' && open.json.token.length > 0, true);
-  check('开放房间：链接指向前端分享页', open.json.url.includes('/#/s?t='), true);
+  check('开放房间：链接指向 /s/<token>', open.json.url.endsWith(`/s/${encodeURIComponent(open.json.token)}`), true);
+  // 单一地址：url 与 pageUrl 同值（pageUrl 保留只为兼容老客户端）
+  check('开放房间：url 与 pageUrl 同值', open.json.url === open.json.pageUrl, true);
+  check('开放房间：地址里没有 #', open.json.url.includes('#'), false);
   check('开放房间：链接不是裸接口地址', open.json.url.includes('/content/'), false);
   check('开放房间：rawUrl 指向正文接口', open.json.rawUrl.includes('/content/1'), true);
   check('开放房间：rawUrl 带同一个 token', open.json.rawUrl.includes(`t=${encodeURIComponent(open.json.token)}`), true);
@@ -82,7 +85,8 @@ async function getShare(env, token, password) {
   seed(db);
 
   const fileShare = await postShare(env, { type: 'file', uuid: 'uuid-1', ttl: 60, maxUses: 0 });
-  check('文件分享：链接指向分享页', fileShare.json.url.includes('/#/s?t='), true);
+  check('文件分享：链接指向 /s/<token>', fileShare.json.url.endsWith(`/s/${encodeURIComponent(fileShare.json.token)}`), true);
+  check('文件分享：url 与 pageUrl 同值', fileShare.json.url === fileShare.json.pageUrl, true);
   check('文件分享：rawUrl 指向文件接口', fileShare.json.rawUrl.includes('/file/uuid-1/photo.png'), true);
   check('文件分享：rawUrl 带 token', fileShare.json.rawUrl.includes(`t=${encodeURIComponent(fileShare.json.token)}`), true);
 

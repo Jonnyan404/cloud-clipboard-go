@@ -9,6 +9,7 @@ import { useI18n } from 'vue-i18n';
 import axios from 'axios';
 import { toast, toastState } from '@/plugins/toast';
 import TraditionalColorDialog from '@/components/TraditionalColorDialog.vue';
+import ShareHistoryDialog from '@/components/ShareHistoryDialog.vue';
 import RoomList from '@/components/RoomList.vue';
 import QrcodeVue from 'qrcode.vue';
 import { errorMessage } from '@/util.js';
@@ -29,6 +30,7 @@ const mdiHeartOutline = 'mdi-heart-outline';
 const mdiOpenInNew = 'mdi-open-in-new';
 const mdiPalette = 'mdi-palette';
 const mdiPaletteSwatch = 'mdi-palette-swatch';
+const mdiShareVariant = 'mdi-share-variant';
 const mdiCurrencyCny = 'mdi-currency-cny';
 const mdiCoffee = 'mdi-coffee';
 const mdiTranslate = 'mdi-translate';
@@ -49,12 +51,28 @@ const isShareRoute = computed(() => Boolean(route.meta?.sharePage));
 // 这里负责在切换时把它写回地址，这样刷新、复制链接、开新 tab 都能复现同一个模式。
 // ⚠️ 用 replace 不用 push：每切一次模式就往历史里塞一条的话，后退键会变成
 // 「回到上一个模式」而不是「回到上一页」。
-watch(() => app.uiMode, (mode) => {
-    if (route.query.mode === mode) {
+//
+// ⚠️ 两条守卫缺一不可（都踩过）：
+//   1. **分享页不写** —— 往 `/s/<token>` 上挂 `?mode=` 会把收件人的地址顶掉；
+//   2. **路由没解析完不写** —— vue-router 的初次解析是异步的，而 App 的 onMounted 跑在它之前，
+//      那时 `currentRoute` 还停在 `/`，`replace({ query })` 就按 `/` 解析，
+//      直接把 `/s/<token>` 覆盖成 `/?mode=…`。实测症状：**分享链接一打开就变成首页**，
+//      地址栏里那条 `/s/<token>` 没了（OG 标题还是对的，因为那是服务端注入的 —— 极具迷惑性）。
+function syncModeToAddress() {
+    if (isShareRoute.value) {
         return;
     }
-    router.replace({ query: { ...route.query, mode } });
-});
+    // `matched` 为空 = 路由还没解析出任何记录（START_LOCATION），此时写地址必然写错。
+    if (!router.currentRoute.value.matched.length) {
+        return;
+    }
+    if (router.currentRoute.value.query.mode === app.uiMode) {
+        return;
+    }
+    router.replace({ query: { ...router.currentRoute.value.query, mode: app.uiMode } });
+}
+
+watch(() => app.uiMode, syncModeToAddress);
 
 // 地址里的模式可能是手打错的（`?mode=xxx`）。`resolveModeComponent` 会安全回落到标准模式、
 // 不会白屏，但地址栏会一直挂着一个不存在的键骗人 —— 开局纠正一次。
@@ -62,28 +80,16 @@ onMounted(() => {
     if (!MODES.some((entry) => entry.key === app.uiMode)) {
         app.setUiMode('default');
     }
-    // `?mode=` 写在 search 里时（手写链接、书签）把它搬进 fragment：路由只认 fragment，
-    // 留在 search 里的话之后每次 replace 都会再写一份，地址栏会同时出现两个 mode。
-    // 用 replaceState 而不是 router.replace —— 后者管不到 search，只能管 fragment。
-    const search = new URLSearchParams(window.location.search);
-    if (search.has('mode')) {
-        search.delete('mode');
-        const rest = search.toString();
-        window.history.replaceState(
-            null,
-            '',
-            `${window.location.pathname}${rest ? `?${rest}` : ''}${window.location.hash || '#/'}`,
-        );
-        // ⚠️ 上面只删了 search 里那份，fragment 里还没有 —— 得主动写一次。
-        // 不能指望下面那个 watcher：它只在 uiMode **变化**时触发，而从 search 读出来的
-        // 模式和初值一致、根本没变，于是链接会变成「参数没了、模式还在」这种半截状态。
-        router.replace({ query: { ...route.query, mode: app.uiMode } });
-    }
 });
+
+// 初次落地址放在**路由就绪之后**：这时才读得到 `meta.sharePage`，`currentRoute` 也才是真的。
+router.isReady().then(syncModeToAddress);
 
 const colorDialog = ref(false);
 const pickColorDialog = ref(false);
 const settingsDialog = ref(false);
+// 分享记录：这个房间最近分享过什么、被打开了几次（服务端只有签发时才留记录）
+const shareHistoryDialog = ref(false);
 const pageQrDialogVisible = ref(false);
 // 设置面板的页签：通用 / 个性化。个性化里是「每个界面模式一组显示开关」，
 // 开关会长到几十项，所以必须单独占一页，不能平铺在通用页里。
@@ -357,15 +363,15 @@ function goHome() {
     }
 }
 const currentPageUrl = computed(() => {
+    // history 路由：地址本身就是路径，不再往里塞 `#`（老写法拼出来的是 `/#/`，现在会 404）。
+    // room 跟着走：扫码的人要落到同一个房间；分享页自己认路径里的 token，不受影响。
     const currentRoom = ws.room || '';
     const query = {};
     if (currentRoom) {
         query.room = currentRoom;
     }
-    const resolved = router.resolve({ path: '/', query });
-    const url = new URL(window.location.pathname, window.location.origin);
-    url.hash = resolved.href.startsWith('#') ? resolved.href : `#${resolved.href}`;
-    return url.toString();
+    const resolved = router.resolve({ path: route.path, query });
+    return new URL(resolved.href, window.location.origin).toString();
 });
 const latestContentUrl = computed(() => {
     const currentRoom = ws.room || '';
@@ -731,6 +737,21 @@ watch(() => route.fullPath, () => {
                             </v-list>
                         </div>
                             <div class="cc-settings__group">
+                            <v-list-subheader class="cc-settings__subheader">{{ t('shareSettings') }}</v-list-subheader>
+                            <v-list class="cc-settings__list" density="comfortable">
+                                <v-list-item class="cc-settings__item" @click="shareHistoryDialog = true">
+                                    <template v-slot:prepend>
+                                        <v-icon color="primary">{{ mdiShareVariant }}</v-icon>
+                                    </template>
+                                    <v-list-item-title>{{ t('shareHistory') }}</v-list-item-title>
+                                    <v-list-item-subtitle>{{ t('shareHistoryEntryHint') }}</v-list-item-subtitle>
+                                    <template v-slot:append>
+                                        <v-icon size="18">{{ mdiChevronRight }}</v-icon>
+                                    </template>
+                                </v-list-item>
+                            </v-list>
+                        </div>
+                            <div class="cc-settings__group">
                             <v-list-subheader class="cc-settings__subheader">{{ t('about') }}</v-list-subheader>
                             <v-list class="cc-settings__list" density="comfortable">
                                 <v-list-item class="cc-settings__item">
@@ -923,6 +944,9 @@ watch(() => route.fullPath, () => {
                 </v-card-actions>
             </v-card>
         </v-dialog>
+
+        <!-- 分享记录（从设置 → 分享记录 打开）。与设置弹窗并列，都是顶层 teleport 弹窗。 -->
+        <share-history-dialog v-model="shareHistoryDialog"></share-history-dialog>
 
         <traditional-color-dialog v-model="colorDialog"></traditional-color-dialog>
 

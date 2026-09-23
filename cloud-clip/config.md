@@ -254,13 +254,13 @@ $ curl -H "Authorization: Bearer xxxx" \
   -H "Content-Type: application/json" \
   -d '{"type":"content","id":"7"}' \
   http://localhost:9501/share
-{"type":"content","id":"7","room":"default","ttl":900,"expiresAt":1710000000,"token":"...","url":"http://localhost:9501/#/s?t=...","rawUrl":"http://localhost:9501/content/7?t=..."}
+{"type":"content","id":"7","room":"default","ttl":900,"expiresAt":1710000000,"token":"...","url":"http://localhost:9501/s/...","pageUrl":"http://localhost:9501/s/...","rawUrl":"http://localhost:9501/content/7?t=..."}
 
 $ curl -H "Authorization: Bearer xxxx" \
   -H "Content-Type: application/json" \
   -d '{"type":"file","uuid":"530a16de-07cb-4835-ba26-64f5e8e1f300","ttl":600}' \
   http://localhost:9501/share
-{"type":"file","uuid":"530a16de-...","room":"default","ttl":600,"expiresAt":1710000000,"token":"...","url":"http://localhost:9501/#/s?t=...","rawUrl":"http://localhost:9501/file/530a16de-.../image.png?t=..."}
+{"type":"file","uuid":"530a16de-...","room":"default","ttl":600,"expiresAt":1710000000,"token":"...","url":"http://localhost:9501/s/...","pageUrl":"http://localhost:9501/s/...","rawUrl":"http://localhost:9501/file/530a16de-.../image.png?t=..."}
 
 # 用短期 token 直连（无需房间密码）
 $ curl "http://localhost:9501/content/7?t=..."
@@ -272,7 +272,11 @@ $ curl -H "Authorization: Bearer xxxx" \
 ```
 
 说明：
-- **`url` 是前端分享页地址**（`<服务地址><prefix>/#/s?t=...`），交给收件人的就是它；
+- **`url` 就是分享页地址**（`<服务地址><prefix>/s/<token>`），交给收件人的就是它。
+  服务端对这条路径返回 SPA 外壳、并把 Open Graph 标签直接注入它的 `<head>` ——
+  聊天软件拿这个地址展开预览能拿到真实卡片，真人打开**同一个**地址直接进分享页，
+  没有第二跳、也没有第二个地址。
+- `pageUrl` 为兼容保留，目前与 `url` **同值**（只认 `pageUrl` 的老客户端照常工作）；
   `rawUrl` 才是带同一个 token 的直连接口地址，下载链路用。
 - **一律签发 token**，房间没开密码也发 —— 有效期、次数限制、密码都装在 token 里。
   以前开放房间返回的是裸 `/content/<id>`，`ttl` / `maxUses` 会被静默丢弃。

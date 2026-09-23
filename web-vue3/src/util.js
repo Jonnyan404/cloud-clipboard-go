@@ -38,11 +38,8 @@ export function buildCleanAbsoluteRouteUrl(path, prefix = '') {
 /**
  * 从地址里读一个 query 参数。**开局读一次**用（store 的初值），不订阅后续变化。
  *
- * ⚠️ 这个 app 走 hash 路由，参数可能在**两个地方**：
- *   `http://host/?mode=board`     —— 直接写在 search 里（外部链接、书签常见）
- *   `http://host/#/?mode=board`   —— 写在 fragment 的 query 里（路由自己生成的）
- * 两处都要认。只认其中一处的话，「把地址栏里的链接复制给别人」会读不到参数 ——
- * 而地址栏里是哪种写法取决于用户是从外部链接进来的还是站内切过去的。
+ * 这个 app 是 **history 路由**，参数就在 search 里（`http://host/?mode=board`）——
+ * 外部链接、书签、站内切换都是这一种写法。fragment 不参与（老 hash 地址已不兼容）。
  *
  * 为什么不用 `route.query`：store 的初值要在**第一次渲染之前**定下来，
  * 而 `router.isReady()` 是异步的 —— 那时候定不了，会先按旧值渲染一帧再跳，
@@ -53,16 +50,7 @@ export function readLocationParam(key) {
     if (!name || typeof window === 'undefined') {
         return '';
     }
-    const fromSearch = new URLSearchParams(window.location.search).get(name);
-    if (fromSearch) {
-        return fromSearch;
-    }
-    const hash = window.location.hash || '';
-    const queryAt = hash.indexOf('?');
-    if (queryAt < 0) {
-        return '';
-    }
-    return new URLSearchParams(hash.slice(queryAt + 1)).get(name) || '';
+    return new URLSearchParams(window.location.search).get(name) || '';
 }
 
 /** 分享链接默认/约束（秒） */
@@ -138,8 +126,9 @@ export function normalizeShareMaxUses(maxUses) {
 /**
  * 向服务端申请分享链接。
  *
- * 服务端现在**一律**签发 token（开放房间也发），返回的 url 是前端分享页地址
- * `https://host<prefix>/#/s?t=...`。房间是否需要鉴权不再影响这里 ——
+ * 服务端**一律**签发 token（开放房间也发），返回的 url 就是分享地址
+ * `https://host<prefix>/s/<token>` —— token 在**路径**里，服务端读得到，社交平台抓到的是
+ * 一份注入了 OG 卡片的 HTML（见 lib/spa_shell.go）。房间是否需要鉴权不影响这里 ——
  * 以前开放房间走的是裸 `/content/<id>`，TTL / 次数限制全被静默丢弃。
  *
  * @param {{type:string,id?:string|number,uuid?:string,ttl?:number,maxUses?:number,password?:string,room?:string}} options
@@ -199,10 +188,11 @@ export function withCurrentOrigin(url) {
 }
 
 /**
- * 往分享页地址上补展示格式（f=md|raw）。返回的地址直接给收件人用。
+ * 往**老 hash 分享地址**上补展示格式（f=md|raw）。返回的地址直接给收件人用。
  *
- * ⚠️ 分享页走 hash 路由，`?t=` 在 **fragment** 里 —— `new URL(u).searchParams` 看到的是空的，
+ * ⚠️ 老地址走 hash 路由，`?t=` 在 **fragment** 里 —— `new URL(u).searchParams` 看到的是空的，
  * 拿它去 set 会把参数拼到 `#` 前面，页面读不到。必须拆 fragment 再拼。
+ * 新地址（`<prefix>/s/<token>`）没有 fragment，直接返回原值。
  *
  * ⚠️ 目前**没有调用方**：发送方预设展示格式那个设置已经删了（分享页自带 raw↔md 切换）。
  * 留着是为了将来真有「按链接预设格式」的需求时不用重新踩 fragment 这个坑。
@@ -221,6 +211,71 @@ export function withSharePageFormat(url, format) {
     const params = new URLSearchParams(queryIndex < 0 ? '' : fragment.slice(queryIndex + 1));
     params.set('f', value);
     return `${head}#${routePath}?${params.toString()}`;
+}
+
+/**
+ * 往分享地址上补「这是扫码进来的」（q=1）—— 给二维码那个地址专用。
+ *
+ * 为什么要区分：扫码和点链接打开的是**同一个页面**，服务端分不出来，而「有多少人是扫过来的」
+ * 正是二维码最想知道的事。带上这个参数，前端上报时就能告诉服务端一次。
+ *
+ * 分享地址是 `<prefix>/s/<token>`（**没有 `#`**）：token 在路径里，服务端读得到、OG 照旧，
+ * 而 q 拼在普通 query 上，分享页用 `route.query.q` 读它。
+ */
+export function withShareQrFlag(url) {
+    const raw = String(url || '');
+    if (!raw) {
+        return raw;
+    }
+    const queryIndex = raw.indexOf('?');
+    const head = queryIndex < 0 ? raw : raw.slice(0, queryIndex);
+    const params = new URLSearchParams(queryIndex < 0 ? '' : raw.slice(queryIndex + 1));
+    params.set('q', '1');
+    return `${head}?${params.toString()}`;
+}
+
+/**
+ * 上报「分享页被真人打开了」一次。
+ *
+ * 相对路径（无前导斜杠）—— 与 createShareLink 同一约定，部署在子路径下不需要配置。
+ *
+ * 上报失败一律静默：它是统计，不是功能。分享页不该因为计数失败而报错，
+ * 更不该因为服务端没有这条记录就把已打开的内容藏起来。
+ *
+ * @param {string} token 分享 token（就是分享页地址里的 t）
+ * @param {{qr?:boolean}} options qr=true 表示这次是扫码进来的
+ */
+export async function reportShareVisit(token, { qr = false } = {}) {
+    const value = String(token || '').trim();
+    if (!value) {
+        return null;
+    }
+    try {
+        const response = await axios.post('share/visit', { token: value, qr: Boolean(qr) }, { __skipRoomAuthHandling: true });
+        return response.data || null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * 读某个房间的分享记录（最近分享过什么、被打开了几次）。
+ *
+ * 鉴权和「在该房间签发分享」完全一致：房间设了密码就必须带该房间的凭据。
+ * 开放房间的这份列表是**公开可读**的（列表里不含 token，拿不到正文）—— 服务端注释里有论证。
+ *
+ * @param {{room?:string, limit?:number}} options
+ */
+export async function fetchShareRecords({ room = '', limit = 0 } = {}) {
+    const params = {};
+    if (room) {
+        params.room = room;
+    }
+    if (limit > 0) {
+        params.limit = limit;
+    }
+    const response = await axios.get('share/list', { params });
+    return response.data || {};
 }
 
 export function copyTextToClipboard(textToCopy) {

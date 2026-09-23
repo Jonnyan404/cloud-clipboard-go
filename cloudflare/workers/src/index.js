@@ -7,6 +7,8 @@ import { ContentHandler } from './handlers/content';
 import { RoomsHandler } from './handlers/rooms';
 import { WebSocketHandler } from './handlers/websocket';
 import { ShareHandler } from './share';
+import { handleShareLanding } from './share-landing';
+import { SHELL_BASE_HREF, injectShellTags, readShellHtml } from './spa-shell';
 import { errorResponse } from './errors';
 
 // 导入 Durable Objects
@@ -30,6 +32,13 @@ router.post('/text', TextHandler.create);
 router.post('/share', ShareHandler.create);
 // 分享页在取正文之前先问一次：类型 / 文件名 / 大小 / 剩余有效期 / 是否需要密码。
 router.get('/share', ShareHandler.info);
+// /share/list 用和「在该房间签发分享」同一套鉴权（canAccessRoomAsync），
+// /share/visit 只需 token 本身 —— 它是未认证的分享页上报计数用的。
+router.get('/share/list', ShareHandler.list);
+router.post('/share/visit', ShareHandler.visit);
+// /s/<token>：分享链接的**唯一地址** —— 一份注入了 OG 卡片的 SPA 外壳，见 share-landing.js。
+// 它必须落在 Worker 里：资源层只有真实存在的文件，这个地址不存在，会交给 Worker。
+router.get('/s/:token', handleShareLanding);
 router.get('/content/latest', ContentHandler.getLatest);
 router.get('/content/latest.json', ContentHandler.getLatest);
 router.get('/content/:id', ContentHandler.getById);
@@ -68,19 +77,31 @@ router.all('*', handleFallback);
 // 房间会话令牌有效期，默认 1 小时
 const ROOM_SESSION_TTL = 3600;
 
-// 兜底处理：GET/HEAD 回前端首页（等价于原来的 SPA 回退），其余方法明确 404。
-// 前端用的是 hash 路由，所以只有手输错地址之类的场景会走到这里。
+// 兜底处理：GET/HEAD 回前端外壳，其余方法明确 404。
+//
+// ⚠️ **必须注入 `<base>`**：前端现在是 history 路由，任何深路径（`/foo/bar` 直接刷新或粘贴打开）
+// 都会走到这里拿到外壳；不注入的话外壳里的相对资源 `./assets/…` 会按 `/foo/assets/…` 解析，
+// 全部 404、页面白屏。Go 侧 `spaStaticHandler` 对同样的场景也注入了 base，两边必须一致。
 async function handleFallback(request, env) {
   if (request.method !== 'GET' && request.method !== 'HEAD') {
     return errorResponse(404, 'route_not_found', 'Not Found', '接口不存在');
   }
 
-  if (!env.ASSETS) {
+  const shell = await readShellHtml(env, request);
+  if (!shell) {
     return errorResponse(404, 'assets_missing', 'Not Found', '前端资源未部署');
   }
 
-  const indexUrl = new URL('/index.html', request.url);
-  return env.ASSETS.fetch(new Request(indexUrl, { method: request.method }));
+  const page = injectShellTags(shell, { baseHref: SHELL_BASE_HREF });
+  if (!page) {
+    // 外壳形状出乎意料（缺 `<head>` / `</head>`）：宁可 404，也不吐一份半截 HTML。
+    return errorResponse(404, 'shell_malformed', 'Not Found', '前端外壳不可用');
+  }
+
+  return new Response(request.method === 'HEAD' ? null : page, {
+    status: 200,
+    headers: { 'Content-Type': 'text/html; charset=utf-8' },
+  });
 }
 
 // 处理 /auth/token 端点

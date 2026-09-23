@@ -132,6 +132,9 @@ Common codes are listed in the [error table](#9-error-codes) below.
 | GET | `/rooms` | Room list | Yes |
 | POST | `/share` | Create a share token | Yes |
 | GET | `/share?t=` | Share-page metadata (no use consumed) | No |
+| GET | `/share/list` | Recent shares of a room, with open counts | Room |
+| POST | `/share/visit` | Report that a human opened a share | No |
+| GET | `/s/:token` | Share page: SPA shell with injected Open Graph tags (HTML) | No |
 | DELETE | `/revoke/:id` | Delete one entry | Yes |
 | DELETE | `/revoke/all` | Clear the room | Yes |
 | WS | `/push` | Real-time push | Yes |
@@ -393,20 +396,87 @@ Authorization: Bearer <credential>
 - `password` is optional; when set, the recipient must supply it (see below)
 
 A token is issued **always** — an open room gets one too, because the TTL, the usage limit and the
-password all live in it. The response carries two URLs:
+password all live in it. The response carries the addresses:
 
 ```json
 {
-  "url": "https://host/#/s?t=<token>",
+  "url": "https://host/s/<token>",
+  "pageUrl": "https://host/s/<token>",
   "rawUrl": "https://host/content/7?t=<token>",
   "token": "<token>",
+  "jti": "9f2c…",
   "expiresAt": 1750000000,
-  "maxUses": 0
+  "maxUses": 0,
+  "visits": 0,
+  "scans": 0
 }
 ```
 
-- `url` is the **share page** — this is what you hand to the recipient
+- `url` **is** the share page: one address serves the crawler and the human alike. The server answers
+  `/s/<token>` with the SPA shell and the Open Graph tags already injected into its `<head>`, so a
+  chat app unfurling this URL gets a real preview card, while a human opening the very same URL lands
+  in the share page itself — no redirect, no second address
+- `pageUrl` is kept for compatibility and currently holds **the same value as `url`** (clients that
+  only learned about `pageUrl` keep working)
 - `rawUrl` reaches the content / file endpoint directly with the same token (used for downloads)
+- `jti` identifies this share in the logs below; `visits` / `scans` start at 0
+
+### GET /share/list?room=&limit=
+
+What this room shared recently, and how often each link was opened. Same authorisation as
+`POST /share` for that room (`room` defaults to `default`, `limit` defaults to 50, max 200).
+
+```json
+{
+  "room": "default",
+  "total": 3,
+  "limit": 50,
+  "records": [
+    {
+      "jti": "9f2c…", "type": "content", "kind": "text", "id": "7", "room": "default",
+      "name": "first line of the text", "size": 0,
+      "createdAt": 1749999000, "expiresAt": 1750000000,
+      "maxUses": 0, "used": 0, "visits": 2, "scans": 1,
+      "password": false, "expired": false
+    }
+  ]
+}
+```
+
+> **The list never contains the tokens themselves.** They are bearer credentials; a list that hands
+> them out would let anyone who can read a room's history reuse somebody else's share.
+>
+> **Who can read it**: whoever can create a share in that room. In an open room that is everyone
+> who can reach the server — the list records what was shared from that room, and that room's
+> contents are already public. Give the room a password if you need the history protected.
+
+### POST /share/visit
+
+Reports that a **human** opened the share page. The share page calls this once; the server
+validates the token itself (invalid or expired tokens are rejected with 401 and never counted).
+
+```http
+POST /share/visit
+Content-Type: application/json
+
+{"token": "<token>", "qr": true}
+```
+
+```json
+{ "ok": true, "tracked": true, "visits": 3, "scans": 1 }
+```
+
+- `tracked` is `false` when the same visitor reports again within ten minutes — repeated reports
+  must not inflate the number
+- `qr: true` (or `?q=1`) marks one scan in addition to the open; QR codes should encode
+  `/s/<token>?q=1`, and the share page reads that flag straight from the query string of the address
+  it was opened with — nothing has to be forwarded, because the crawler and the human share one
+  address
+- **No authentication**: holding the link is what lets you report, and the response only describes
+  that one share
+- Counting happens **only** through this endpoint (the share page calls it once on mount). Serving
+  `/s/<token>` never counts by itself, so a chat app crawling that address repeatedly cannot inflate
+  anything: crawlers do not execute the page, hence they never report
 
 ### GET /share?t=&lt;token&gt;
 

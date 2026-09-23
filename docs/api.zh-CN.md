@@ -128,6 +128,9 @@ curl "http://localhost:9501/content/7?format=raw"
 | GET | `/rooms` | 房间列表 | 是 |
 | POST | `/share` | 创建分享令牌 | 是 |
 | GET | `/share?t=` | 分享页元信息（不消耗次数） | 否 |
+| GET | `/share/list` | 某房间最近的分享记录（含打开次数） | 房间 |
+| POST | `/share/visit` | 上报「有人打开了这条分享」 | 否 |
+| GET | `/s/:token` | 分享页：SPA 外壳 + 注入的 Open Graph 标签（HTML） | 否 |
 | DELETE | `/revoke/:id` | 删除一条 | 是 |
 | DELETE | `/revoke/all` | 清空房间 | 是 |
 | WS | `/push` | 实时推送 | 是 |
@@ -381,20 +384,80 @@ Authorization: Bearer <凭据>
 - `password` 可选；一旦设置，收件人必须提供（见下）
 
 令牌**一律签发** —— 开放房间也会拿到一个，因为有效期、次数限制和密码全都装在它里面。
-响应给出两个地址：
+响应给出地址：
 
 ```json
 {
-  "url": "https://host/#/s?t=<token>",
+  "url": "https://host/s/<token>",
+  "pageUrl": "https://host/s/<token>",
   "rawUrl": "https://host/content/7?t=<token>",
   "token": "<token>",
+  "jti": "9f2c…",
   "expiresAt": 1750000000,
-  "maxUses": 0
+  "maxUses": 0,
+  "visits": 0,
+  "scans": 0
 }
 ```
 
-- `url` 是**分享页** —— 交给收件人的就是它
+- `url` **就是**分享页：同一个地址同时服务抓取程序和真人。服务端对 `/s/<token>` 返回 SPA 外壳，
+  并把 Open Graph 标签直接注入它的 `<head>` —— 聊天软件拿这个地址展开预览能拿到真实卡片，
+  真人打开**同一个**地址直接进分享页，没有第二跳、没有第二个地址
+- `pageUrl` 为兼容保留，目前与 `url` **同值**（只认 `pageUrl` 的客户端照常工作）
 - `rawUrl` 带同一个令牌直连内容 / 文件接口（下载链路用）
+- `jti` 是这条分享在服务端记录里的编号；`visits` / `scans` 初始为 0
+
+### GET /share/list?room=&limit=
+
+这个房间最近的分享，以及每条被打开了多少次。鉴权与「在该房间签发分享」完全一致
+（`room` 默认 `default`，`limit` 默认 50、最多 200）。
+
+```json
+{
+  "room": "default",
+  "total": 3,
+  "limit": 50,
+  "records": [
+    {
+      "jti": "9f2c…", "type": "content", "kind": "text", "id": "7", "room": "default",
+      "name": "正文首行摘要", "size": 0,
+      "createdAt": 1749999000, "expiresAt": 1750000000,
+      "maxUses": 0, "used": 0, "visits": 2, "scans": 1,
+      "password": false, "expired": false
+    }
+  ]
+}
+```
+
+> **列表里永远没有 token 本身**。它是 bearer 凭据，把列表做成「能再抄一遍链接」的入口，
+> 就等于让任何能读这个房间记录的人取用别人的分享。
+>
+> **谁能读**：能在该房间签发分享的人。房间没设密码时就是所有能访问服务器的人 ——
+> 记录记的是「这个房间分享过什么」，而这个房间的内容本来就已经公开。
+> 需要保护这份记录就给房间设密码。
+
+### POST /share/visit
+
+上报「有**真人**打开了分享页」。分享页调一次；服务端自己验 token
+（无效或已过期一律 401，且不计数）。
+
+```http
+POST /share/visit
+Content-Type: application/json
+
+{"token": "<token>", "qr": true}
+```
+
+```json
+{ "ok": true, "tracked": true, "visits": 3, "scans": 1 }
+```
+
+- 同一访客十分钟内重复上报时 `tracked` 为 `false` —— 重复上报不该把数字刷上去
+- `qr: true`（或 `?q=1`）在「打开」之外另计一次扫码；二维码那条地址写成 `/s/<token>?q=1`，
+  分享页直接从打开时的 query 上读这个标记 —— 抓取程序和真人共用一个地址，不需要谁再转手透传
+- **不需要鉴权**：拿着链接就是上报的凭据，而且响应只描述这一条分享
+- 计数**只走这一个接口**（分享页挂载时调一次）。响应 `/s/<token>` 本身永不计数 ——
+  聊天软件的抓取程序反复访问它也刷不出数字：抓取程序不执行页面，也就不会上报
 
 ### GET /share?t=&lt;token&gt;
 
