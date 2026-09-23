@@ -12,7 +12,7 @@
 // 取正文要另发 GET /file/<cache>/<name>），第一版不做 —— 列出来点进去是空的，比不列更糟。
 //
 // ⚠️ 这个模式**不改数据**。动作结果要落盘只能显式点「另存为新条目」（走现成的 POST /text）。
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import axios from 'axios';
 import { useAppStore } from '@/store/app';
 import { useWebSocketStore } from '@/store/websocket';
@@ -34,8 +34,17 @@ const isWide = ref(window.innerWidth >= 1024);
 function onResize() {
     isWide.value = window.innerWidth >= 1024;
 }
-onMounted(() => window.addEventListener('resize', onResize));
-onBeforeUnmount(() => window.removeEventListener('resize', onResize));
+onMounted(() => {
+    window.addEventListener('resize', onResize);
+    // ⚠️ 监听挂 `window` 而不是列表上：焦点通常不在列表里（用户可能在输入框、或刚点完别处），
+    // 挂在元素上收不到。这和速览是同一套做法。
+    window.addEventListener('keydown', onKeydown);
+});
+
+onBeforeUnmount(() => {
+    window.removeEventListener('resize', onResize);
+    window.removeEventListener('keydown', onKeydown);
+});
 
 // 数据源和标准模式/速览**共用**同一个 `app.visibleReceived`（已含搜索过滤）——
 // 别再自己 filter 一遍 received，否则搜索框在这个模式里会失效。
@@ -48,10 +57,57 @@ const items = computed(() => app.visibleReceived.filter((item) => item.type === 
 // 「想试个动作，却得先往剪贴板发一条」这个调试痛点。
 const draft = ref('');
 
+// 列表容器的引用 —— 上下键切换后要把选中项滚进视野，得从它往下找。
+const itemsEl = ref(null);
+
+// 当前条目在列表里的下标。
+//
+// ⚠️ 上一轮把「选中态」删掉是对的（输入框是唯一输入源），但键盘导航需要一个
+// 「我现在在哪一条」的位置 —— 所以它回来了，只是**只服务于上下键和视觉反馈**，
+// 不再是「另一种输入模式」。
+const activeIndex = ref(-1);
+
 // 服务端存的是 HTML 实体编码过的正文（`<` 之类），填进来之前要还原回原文。
 // 全站唯一实现在 util.js 的 decodeHtmlEntities —— 别在这里再写一份。
 function fillFrom(item) {
     draft.value = decodeHtmlEntities(item.content || '');
+}
+
+/** 选中第 index 条：填进输入框 + 记下位置 + 把它滚进视野。 */
+function selectIndex(index) {
+    const list = items.value;
+    if (index < 0 || index >= list.length) {
+        return; // 到头 / 到尾就不动
+    }
+    activeIndex.value = index;
+    fillFrom(list[index]);
+    // 选中项得留在视野里，否则按住不放它就跑出屏幕了。
+    // `block: 'nearest'` —— 只滚「刚好够看见」那一点，不会把整列翻过去。
+    nextTick(() => {
+        const rows = itemsEl.value?.querySelectorAll('.bench-wall__item');
+        rows?.[index]?.scrollIntoView({ block: 'nearest' });
+    });
+}
+
+/**
+ * 上下键切换输入源条目。
+ *
+ * ⚠️ **焦点在输入框 / 可编辑元素里时不接管** —— 那时上下键是**移光标**，用户正在编辑文本。
+ * 速览那边可以无脑接管（它的搜索框是单行的，上下键本来没别的含义），这里不行：
+ * 动作台的输入框是**多行 textarea**。
+ */
+function onKeydown(event) {
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') {
+        return;
+    }
+    const el = event.target;
+    if (el && (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT' || el.isContentEditable)) {
+        return;
+    }
+    // ⚠️ 必须拦掉默认动作：方向键默认是**滚容器**，不拦就会「换了条目 + 页面也滚了」。
+    event.preventDefault();
+    const delta = event.key === 'ArrowDown' ? 1 : -1;
+    selectIndex(activeIndex.value < 0 ? 0 : activeIndex.value + delta);
 }
 
 // 首次有内容时自动填第一条 —— 一进这个模式就有东西可试。
@@ -60,6 +116,7 @@ watch(
     items,
     (list) => {
         if (!draft.value && list.length) {
+            activeIndex.value = 0;
             fillFrom(list[0]);
         }
     },
@@ -103,13 +160,14 @@ async function saveAsNew(content) {
                     <span class="bench-wall__count">{{ items.length }}</span>
                 </div>
 
-                <div class="bench-wall__items">
+                <div ref="itemsEl" class="bench-wall__items">
                     <button
-                        v-for="item in items"
+                        v-for="(item, index) in items"
                         :key="item.id"
                         type="button"
                         class="bench-wall__item"
-                        @click="fillFrom(item)"
+                        :class="{ 'bench-wall__item--active': index === activeIndex }"
+                        @click="selectIndex(index)"
                     >
                         <span class="bench-wall__item-time">{{ formatTimestamp(item.timestamp) }}</span>
                         <span class="bench-wall__item-text">{{ summary(item) }}</span>
@@ -166,7 +224,9 @@ async function saveAsNew(content) {
     display: flex;
     flex-direction: column;
     min-height: 0;
-    flex: 0 0 38%;
+    /* 窄屏：列表只占三成 —— 这一屏的主体是右边的「输入 → 加工 → 结果」，
+       列表只是取数据的入口。38% 会把工作区挤得只剩一半，动作链和结果都看不全。 */
+    flex: 0 0 30%;
     border: 1px solid rgba(148, 163, 184, 0.26);
     border-radius: 16px;
     background: rgba(255, 255, 255, 0.9);
@@ -272,6 +332,13 @@ async function saveAsNew(content) {
 
 .bench-wall__item:hover {
     background: rgba(14, 165, 233, 0.07);
+}
+
+/* 当前条目（点选的，或上下键选中的那条）。它同时是「输入框里那段文字来自哪」的指示 ——
+   没有这个高亮，用上下键切换时界面上看不出选中的是哪一条。 */
+.bench-wall__item--active {
+    background: rgba(var(--v-theme-primary), 0.12);
+    border-color: rgba(var(--v-theme-primary), 0.45);
 }
 
 .bench-wall__item-time {
