@@ -38,6 +38,7 @@ export const ACTION_GROUPS = [
     { key: 'text', labelKey: 'actionGroupText' },
     { key: 'zh', labelKey: 'actionGroupZh' },
     { key: 'inspect', labelKey: 'actionGroupInspect' },
+    { key: 'date', labelKey: 'actionGroupDate' },
     { key: 'generate', labelKey: 'actionGroupGenerate' },
 ];
 
@@ -436,6 +437,193 @@ async function sha256(text, ctx) {
     return Array.from(new Uint8Array(digest))
         .map((b) => b.toString(16).padStart(2, '0'))
         .join('');
+}
+
+// ── 日期计算 ────────────────────────────────────────────────────────
+//
+// ⚠️ 动作是**单输入单输出**的，而日期间隔天然需要两个日期、日期加减需要日期 + 偏移量。
+// 这里用**约定式解析**：把两个参数写在同一段文本里。
+//   · date.add ：`2026-01-01 +30d`（省略基准则从今天算）
+//   · date.diff：两行日期，或 `2026-01-01 ~ 2026-03-15`
+// 好处是**零新增机制** —— 不用给动作加参数系统，也就不用碰链的语义。
+// 代价是用户得按约定写；等真出现高频需求再考虑参数化。
+
+// 「今天 / 明天 / 昨天」这类相对词。
+const DATE_KEYWORDS = {
+    今天: 0, 明天: 1, 昨天: -1,
+    today: 0, tomorrow: 1, yesterday: -1,
+};
+
+// 一个「日期 token」的完整形状。三种写法都认：
+//   ISO / 斜杠：2026-09-23、2026/9/23
+//   中文：      2026年09月23日、2026年9月23日
+//   紧凑：      20260923（8 位）
+// 前两种可以再跟时间（` 10:30` 或 `T10:30:00`）。
+//
+// ⚠️ 紧凑格式的月/日要**限位**（`0[1-9]|1[0-2]` / `0[1-9]|[12]\d|3[01]`）：
+// 只写 `\d{2}\d{2}` 的话，`12345678` 这种普通数字串也会被判成日期 ——
+// 于是每段 8 位数字都冒出一个「日期加减」。
+const DATE_CORE = String.raw`(?:\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{4}年\d{1,2}月\d{1,2}日?|\d{4}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01]))`;
+const DATE_TIME_PART = String.raw`(?:[ T]\d{1,2}:\d{2}(?::\d{2})?)?`;
+const DATE_TOKEN_RE = new RegExp(
+    `^(?:${DATE_CORE}${DATE_TIME_PART}|今天|明天|昨天|today|tomorrow|yesterday)?$`,
+    'i',
+);
+
+/**
+ * 解析一个日期 token，返回**本地时间**的 Date；认不出返回 null。
+ *
+ * 认这几种：`2026-09-23`、`2026/9/23`、`2026年09月23日`、`20260923`、
+ * 前三种带时间（`2026-09-23 10:30`）、以及 `今天` / `明天` / `昨天`。
+ *
+ * ⚠️ 必须用 `new Date(y, m-1, d, ...)` **本地构造**，不能用 `new Date('2026-01-01')` ——
+ * 后者按 **UTC** 解析，在西半球会变成「前一天」，日期计算直接错一天。
+ */
+function parseDateToken(raw) {
+    const s = String(raw || '').trim();
+    if (!s) {
+        return null; // 空 = 调用方自己决定默认值（date.add 用「今天」）
+    }
+
+    const offsetDays = DATE_KEYWORDS[s.toLowerCase()];
+    if (offsetDays !== undefined) {
+        const d = new Date();
+        d.setDate(d.getDate() + offsetDays);
+        return d;
+    }
+
+    // 带时间分隔符的两种写法（ISO / 斜杠、中文），以及不带时间的紧凑 8 位
+    const m = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/)
+        || s.match(/^(\d{4})年(\d{1,2})月(\d{1,2})日?(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/)
+        || s.match(/^(\d{4})(\d{2})(\d{2})$/);
+    if (!m) {
+        return null;
+    }
+    const [, y, mo, d, hh, mi, ss] = m;
+    const date = new Date(Number(y), Number(mo) - 1, Number(d), Number(hh || 0), Number(mi || 0), Number(ss || 0));
+
+    // ⚠️ 回读校验：`2026-02-31` 会被 Date **悄悄滚到** 3 月 3 日。不校验的话，
+    // 用户写错了日期却拿到一个「看起来正常」的结果 —— 比直接报错糟糕得多。
+    if (date.getFullYear() !== Number(y) || date.getMonth() !== Number(mo) - 1 || date.getDate() !== Number(d)) {
+        return null;
+    }
+    return date;
+}
+
+function formatDate(date, withTime) {
+    const p = (n) => String(n).padStart(2, '0');
+    const base = `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())}`;
+    return withTime ? `${base} ${p(date.getHours())}:${p(date.getMinutes())}` : base;
+}
+
+/**
+ * 加 N 个月。
+ *
+ * ⚠️ 不能直接 `setMonth(getMonth() + n)` —— 「1月31日 + 1个月」会因为 2 月没有 31 号
+ * 而**溢出到 3月3日**。正确做法：先把「日」归到 1 号再加月（避免滚动），
+ * 最后把原来的「日」**夹到目标月的最后一天**（`1月31日 + 1个月` = `2月28/29日`）。
+ */
+function addMonths(date, n) {
+    const day = date.getDate();
+    const result = new Date(date.getTime());
+    result.setDate(1);
+    result.setMonth(result.getMonth() + n);
+    const lastDay = new Date(result.getFullYear(), result.getMonth() + 1, 0).getDate();
+    result.setDate(Math.min(day, lastDay));
+    return result;
+}
+
+/** 本地零点的时间戳 —— 算「差几天」要用它，不能用毫秒差（夏令时那天是 23/25 小时）。 */
+function startOfDayMs(date) {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+}
+
+const DAY_MS = 86400000;
+
+function dateAdd(text, ctx) {
+    const tr = translator(ctx);
+    const s = String(text || '').trim();
+    const m = s.match(/^(.*?)\s*([+-])\s*(\d+)\s*([dwmy]?)\s*$/i);
+    if (!m) {
+        throw new Error(tr('actionDateAddHint'));
+    }
+    const [, baseRaw, sign, amountRaw, unitRaw] = m;
+
+    const parsedBase = parseDateToken(baseRaw);
+    if (baseRaw.trim() && !parsedBase) {
+        // 写了基准但认不出 → 报错。**别悄悄回落到「今天」** —— 那会让用户拿到一个
+        // 看着合理、其实完全不对的结果。
+        throw new Error(tr('actionDateUnrecognized'));
+    }
+
+    const base = parsedBase || new Date(); // 没写基准 = 今天
+    const amount = Number(amountRaw) * (sign === '-' ? -1 : 1);
+    const unit = (unitRaw || 'd').toLowerCase();
+    const withTime = /:/.test(baseRaw); // 基准带时间就保留时间，否则只给日期
+
+    let result;
+    if (unit === 'm') {
+        result = addMonths(base, amount);
+    } else if (unit === 'y') {
+        result = addMonths(base, amount * 12);
+    } else {
+        result = new Date(base.getTime());
+        result.setDate(result.getDate() + (unit === 'w' ? amount * 7 : amount));
+    }
+    return formatDate(result, withTime);
+}
+
+function dateDiff(text, ctx) {
+    const tr = translator(ctx);
+    const s = String(text || '').trim();
+
+    // 两个日期：优先按分隔符拆，否则按行拆（一行一个）
+    let parts = s.split(/\s*(?:~|～|→|->|至|到|\.\.+)\s*/).map((x) => x.trim()).filter(Boolean);
+    if (parts.length < 2) {
+        parts = s.split('\n').map((x) => x.trim()).filter(Boolean);
+    }
+    if (parts.length < 2) {
+        throw new Error(tr('actionDateDiffHint'));
+    }
+
+    const a = parseDateToken(parts[0]);
+    const b = parseDateToken(parts[1]);
+    if (!a || !b) {
+        throw new Error(tr('actionDateUnrecognized'));
+    }
+
+    const days = Math.round((startOfDayMs(b) - startOfDayMs(a)) / DAY_MS);
+    const abs = Math.abs(days);
+    const weeks = Math.floor(abs / 7);
+    const rest = abs % 7;
+
+    const lines = [`${days} ${tr('actionDateUnitDay')}`];
+    if (weeks) {
+        lines.push(`${weeks} ${tr('actionDateUnitWeek')} ${rest} ${tr('actionDateUnitDay')}`);
+    }
+    return lines.join('\n');
+}
+
+// match 要**廉价**：只用形状判断，不真去解析（解析是 run 的事）。
+function looksLikeDateAdd(text) {
+    const s = String(text || '').trim();
+    if (!s || s.length > 40) {
+        return false;
+    }
+    const m = s.match(/^(.*?)\s*([+-]\s*\d+\s*[dwmy]?)$/i);
+    return Boolean(m) && DATE_TOKEN_RE.test(m[1].trim());
+}
+
+function looksLikeDateDiff(text) {
+    const s = String(text || '').trim();
+    if (!s || s.length > 80) {
+        return false;
+    }
+    let parts = s.split(/\s*(?:~|～|→|->|至|到|\.\.+)\s*/).map((x) => x.trim()).filter(Boolean);
+    if (parts.length < 2) {
+        parts = s.split('\n').map((x) => x.trim()).filter(Boolean);
+    }
+    return parts.length === 2 && DATE_TOKEN_RE.test(parts[0]) && DATE_TOKEN_RE.test(parts[1]);
 }
 
 // ── 生成类（无输入 → 新正文）────────────────────────────────────────
@@ -858,6 +1046,29 @@ export const ACTIONS = [
         icon: 'mdi-fingerprint',
         direction: 'view',
         run: (text, ctx) => sha256(text, ctx),
+    },
+
+    // ── 日期 ────────────────────────────────────────────────────────
+    //
+    // 这两个的输入是**约定式**的（见上面 dateAdd / dateDiff 的说明）：
+    // 动作是单输入单输出，而日期计算天然要两个参数，所以把它们写在同一段文本里。
+    {
+        id: 'date.add',
+        group: 'date',
+        nameKey: 'actionDateAdd',
+        icon: 'mdi-calendar-plus',
+        direction: 'view',
+        match: looksLikeDateAdd,
+        run: (text, ctx) => dateAdd(text, ctx),
+    },
+    {
+        id: 'date.diff',
+        group: 'date',
+        nameKey: 'actionDateDiff',
+        icon: 'mdi-calendar-range',
+        direction: 'view',
+        match: looksLikeDateDiff,
+        run: (text, ctx) => dateDiff(text, ctx),
     },
 
     // ── 生成（direction=insert：出现在输入框，不是预览区）────────────
