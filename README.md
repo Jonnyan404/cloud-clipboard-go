@@ -67,7 +67,8 @@
 | 💾 **Flexible Storage** | Configurable history capacity and file expiration policies |
 | 🚀 **Lightweight** | Minimal resource consumption, runs smoothly even on routers or low-spec hardware |
 | 🔍 **Shortcuts Support** | Android and iOS shortcut integration for one-tap sharing |
-| 🎨 **Eight UI Modes** | Timeline, glance, chat bubbles, sticky notes, terminal, board and more — each mode keeps its own display settings, and `?mode=` in the URL pins one mode per browser tab |
+| 🎨 **Nine UI Modes** | Timeline, glance, action bench, sticky notes, board and more — each mode keeps its own display settings, and `?mode=` in the URL pins one mode per browser tab (chat bubbles / mega / workbench / terminal are being retired) |
+| 🧩 **Action Library** | 35 built-in actions: Markdown rendering, JSON beautify/minify, Base64 / URL / Hex codecs, pinyin annotation (per character · table · by word), traditional↔simplified conversion, date math, hashing — use one to view an entry differently, or chain several into a pipeline |
 
 ---
 
