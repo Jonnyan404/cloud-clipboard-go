@@ -157,7 +157,10 @@ function choose(id) {
 }
 
 /* ⋯ 展开的动作面板。给固定尺寸 —— 不固定的话菜单会随内容宽高乱跳，
-   而且 ActionPicker 内部是「搜索框 + 可滚动的分组区」，需要一个有界的高度才滚得起来。 */
+   而且 ActionPicker 内部是「搜索框 + 可滚动的分组区」，需要一个有界的高度才滚得起来。
+
+   ⚠️ **必须有实底**：v-menu 的内容容器**没有默认背景**，
+   不给的话弹层是透明的 —— 底下卡片的文字会直接透上来，和面板里的动作名叠在一起。 */
 .md-toggle__panel {
     display: flex;
     flex-direction: column;
@@ -166,6 +169,8 @@ function choose(id) {
     max-height: 320px;
     padding: 10px;
     overflow: hidden;
+    background: rgb(var(--v-theme-surface));
+    border-radius: 4px;
 }
 </style>
 
