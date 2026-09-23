@@ -32,6 +32,12 @@ openwrt/build/
 /.vite/
 /cloud-clip/cloud-clipboard-go-embed
 
+# 分享记录的运行时落盘：和 history.json 同类 —— 服务自己会重建，不入库。
+/cloud-clip/share-log.json
+
+# 本地工具的项目标记
+/.freebuff/
+
 # 网页端的捷径下载目录：由 web-vue3/scripts/sync-shortcuts.mjs 从 shortcuts/ 生成，
 # 是派生产物 —— 唯一源仍是 shortcuts/ 下那几份，别把副本入库。
 /web-vue3/public/shortcuts/
