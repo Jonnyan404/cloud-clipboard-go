@@ -784,6 +784,9 @@ watch(() => route.fullPath, () => {
                     <v-tabs-window-item value="personalization">
                         <v-card-text class="cc-settings__body" style="max-height: 62vh; overflow-y: auto;">
                             <div class="text-caption text-medium-emphasis mb-3">{{ t('personalizationHint') }}</div>
+                                                    <!-- 即将下架的模式（registry 的 deprecated）**仍然完全可用**，只是弱化显示。
+                                                         这里**不加分割线** —— 这是个横向 flex-wrap 的按钮组，塞一条分隔线比不塞更乱；
+                                                         改用 title 说明，鼠标停一下就知道「即将下架」。 -->
                                                     <v-btn-toggle
                                                         :model-value="app.uiMode"
                                                         @update:model-value="app.setUiMode"
@@ -792,7 +795,15 @@ watch(() => route.fullPath, () => {
                                                         class="flex-wrap mb-2"
                                                         style="height: auto;"
                                                     >
-                                                        <v-btn v-for="mode in MODES" :key="mode.key" :value="mode.key" size="small" class="text-none">
+                                                        <v-btn
+                                                            v-for="mode in MODES"
+                                                            :key="mode.key"
+                                                            :value="mode.key"
+                                                            size="small"
+                                                            class="text-none"
+                                                            :style="{ opacity: mode.deprecated ? 0.62 : 1 }"
+                                                            :title="mode.deprecated ? t('uiModeDeprecated') : undefined"
+                                                        >
                                                             <v-icon start size="18">{{ mode.icon }}</v-icon>{{ t(mode.labelKey) }}
                                                         </v-btn>
                                                     </v-btn-toggle>
