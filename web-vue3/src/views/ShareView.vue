@@ -38,7 +38,9 @@ const mdiLockOutline = 'mdi-lock-outline';
 const route = useRoute();
 const { t } = useI18n();
 
-const token = computed(() => String(route.params.token || route.query.t || ''));
+// 只认路由参数。**没有 `?t=` 兜底** —— 单地址架构下 `/s/:token` 是唯一形态，
+// 站内没有任何地方会往页面地址上拼 `?t=`（接口调用里的 `?t=` 是另一回事），那是个死分支。
+const token = computed(() => String(route.params.token || ''));
 // 链接里可以带展示偏好（f=md）当**初始**格式，页面上仍可切换。
 // ⚠️ 站内已经没有任何地方会生成这个参数了 —— 发送方那个「默认展示格式」设置删掉了
 // （分享页自带 raw↔md 切换，让发送方替他选一次是多余的）。这里继续读它是为了
