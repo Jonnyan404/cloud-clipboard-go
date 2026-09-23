@@ -5,16 +5,62 @@
 // 样式在这里，两边各自只负责「什么时候渲染」。
 //
 // html 必须已经过 DOMPurify（见 util.js 的 renderMarkdownHtml）。
-defineProps({
+import { nextTick, onMounted, ref, watch } from 'vue';
+import { highlightCode } from '@/highlight.js';
+
+const props = defineProps({
     html: {
         type: String,
         default: '',
     },
 });
+
+const root = ref(null);
+
+// 给 ``` 代码块上色。
+//
+// 为什么在**渲染之后**回头处理，而不是挂 marked 的 renderer：marked 的 renderer 是
+// **同步**的，而高亮器是 `import()` 按需加载的 —— 在 renderer 里 await 不了。
+// 所以先照常渲染（代码本来就是转义好的纯文本，看得见），再把这些块找出来上色。
+//
+// 认不出语言就原样留着（`language-` 那一段是 marked 写的）。上色失败也不影响阅读。
+async function highlightCodeBlocks() {
+    const el = root.value;
+    if (!el) {
+        return;
+    }
+    const blocks = el.querySelectorAll('pre > code[class*="language-"]');
+    for (const block of blocks) {
+        if (block.classList.contains('hljs')) {
+            continue;
+        }
+        const lang = (block.className.match(/language-([\w+#.-]+)/) || [])[1] || '';
+        const source = block.textContent || '';
+        if (!lang || !source) {
+            continue;
+        }
+        const html = await highlightCode(source, lang);
+        if (html) {
+            // ⚠️ 直接进 innerHTML：highlight.js 自己会转义输入，所以是安全的；
+            // 也正因为如此，**不要再往上拼任何没转义的内容**。
+            block.innerHTML = html;
+            block.classList.add('hljs');
+        }
+    }
+}
+
+// v-html 更新完 DOM 之后才轮得到我们；html 一变就重新上色。
+watch(
+    () => props.html,
+    () => {
+        nextTick(highlightCodeBlocks);
+    },
+);
+onMounted(highlightCodeBlocks);
 </script>
 
 <template>
-    <div class="markdown-body" v-html="html"></div>
+    <div ref="root" class="markdown-body" v-html="html"></div>
 </template>
 
 <style scoped>

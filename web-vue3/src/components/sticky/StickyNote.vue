@@ -345,12 +345,19 @@ async function deleteItem() {
                      md 开关也得跟着正文走（与标准模式的 File.vue 一致）。
                      图标放在**不滚动**的外层、正文放里层：否则内容一长往下滚，图标跟着滚走。 -->
                 <div v-else class="md-preview" @click="onMdClick">
-                    <markdown-toggle v-if="md.available" v-model:mode="md.mode"></markdown-toggle>
+                    <markdown-toggle
+                v-if="md.available"
+                v-model:mode="md.mode"
+                :json-available="md.jsonAvailable"
+                :json-compact-available="md.jsonCompactAvailable"
+                :code-available="md.codeAvailable"
+            ></markdown-toggle>
                     <div
                         class="sticky-note__reader-text"
                         :class="[
                             isLink ? 'sticky-note__text--link' : '',
                             md.available ? 'sticky-note__reader-text--md' : '',
+                            md.leadsWithBlock ? 'sticky-note__reader-text--block' : '',
                             md.html ? 'sticky-note__reader-text--rendered' : '',
                         ]"
                     >
@@ -380,12 +387,21 @@ async function deleteItem() {
                         ></audio>
                         <template v-else-if="isPreviewableText">
                             <div class="md-preview">
-                                <markdown-toggle v-if="md.available" v-model:mode="md.mode"></markdown-toggle>
+                                <markdown-toggle
+                v-if="md.available"
+                v-model:mode="md.mode"
+                :json-available="md.jsonAvailable"
+                :json-compact-available="md.jsonCompactAvailable"
+                :code-available="md.codeAvailable"
+            ></markdown-toggle>
                                 <!-- 渲染态：正文是裸 markdown，自己当滚动盒 -->
                                 <div
                                     v-if="md.html"
                                     class="sticky-note__preview-scroll"
-                                    :class="{ 'sticky-note__preview-scroll--md': md.available }"
+                                    :class="{
+                                        'sticky-note__preview-scroll--md': md.available,
+                                        'sticky-note__preview-scroll--block': md.leadsWithBlock,
+                                    }"
                                 >
                                     <markdown-body :html="md.html"></markdown-body>
                                 </div>
@@ -789,6 +805,21 @@ async function deleteItem() {
     height: 22px;
     height: var(--md-toggle-height);
 }
+
+/* 同 Text.vue：正文以 <pre> 开头时浮动占位会把它挤成窄列，改成给 pre 留右边距。 */
+.sticky-note__reader-text--block::before,
+.sticky-note__preview-text--block::before,
+.sticky-note__preview-scroll--block::before {
+    float: none;
+    width: 0;
+    height: 0;
+}
+.sticky-note__reader-text--block :deep(pre:first-child),
+.sticky-note__preview-text--block :deep(pre:first-child),
+.sticky-note__preview-scroll--block :deep(pre:first-child) {
+    padding-right: var(--md-toggle-gutter);
+}
+
 
 /* 渲染 markdown 时收掉 white-space: pre-wrap —— 它是给纯文本保留换行的，
    套在 HTML 结构上会凭空多出空白。 */

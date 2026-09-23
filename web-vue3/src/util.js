@@ -353,6 +353,101 @@ export function errorMessage(error) {
  * 符号高度重合 —— `5 * 3 = 15` 会被渲染成斜体、`1. 打开设置` 会被当成有序列表。
  * 所以宁可漏判：漏判的代价是用户看到原文，误判的代价是内容被改形。
  */
+// 解析一段 JSON。**只认对象和数组** —— 裸的 `123` / `"abc"` / `true` 也是合法 JSON，
+// 但对它们做「美化」没有任何意义，却会让这类普通文本凭空多出一个图标。认不出来返回 undefined。
+function parseJsonObject(text) {
+    const s = String(text || '').trim();
+    if (!s) {
+        return undefined;
+    }
+    // 先按首字符挡一道：绝大多数普通文本到这就出去了，不用去试 JSON.parse。
+    if (s[0] !== '{' && s[0] !== '[') {
+        return undefined;
+    }
+    try {
+        const value = JSON.parse(s);
+        return value !== null && typeof value === 'object' ? value : undefined;
+    } catch {
+        return undefined;
+    }
+}
+
+/** 内容是一段**能美化的 JSON**（对象或数组）。给「美化」图标当显示条件。 */
+export function looksLikeJson(text) {
+    const s = String(text || '');
+    // 和 looksLikeMarkdown 同一个上限：几万字的条目算一次就够卡一下了。
+    if (!s.trim() || s.length > 20000) {
+        return false;
+    }
+    return parseJsonObject(s) !== undefined;
+}
+
+/**
+ * 把 JSON 美化（两空格缩进）。
+ *
+ * **不是 JSON、或本来就已美化过 → 返回空串**：调用方据此决定要不要给这个入口 ——
+ * 已经美化过的内容上再放一个「美化」按钮，点了没反应，比没有更差。
+ */
+export function formatJson(text) {
+    const raw = String(text || '');
+    const parsed = parseJsonObject(raw);
+    if (parsed === undefined) {
+        return '';
+    }
+    const pretty = JSON.stringify(parsed, null, 2);
+    return pretty === raw.trim() ? '' : pretty;
+}
+
+/**
+ * 把 JSON 压成一行。**不是 JSON、或本来就是一行 → 返回空串**（同 formatJson 的约定：
+ * 点了没反应的按钮比没有更差）。
+ */
+export function minifyJson(text) {
+    const raw = String(text || '');
+    const parsed = parseJsonObject(raw);
+    if (parsed === undefined) {
+        return '';
+    }
+    const compact = JSON.stringify(parsed);
+    return compact === raw.trim() ? '' : compact;
+}
+
+// 一眼就是代码的行首关键字。刻意列得**具体**（`package` / `func` / `def` …）而不是
+// 拿 `function` 之类的通用词去撞 —— 散文里出现 "class" 的概率并不低。
+const CODE_HINT_RE = /(^|\n)\s*(package|import|from|func|def|class|struct|interface|enum|public|private|protected|static|void|return|const|let|var|using|namespace|#include|#!|SELECT|INSERT|UPDATE|DELETE|CREATE|fn|impl|use|mod)\b/;
+// 没有关键字时看行尾/行首的代码标点：`{` `}` `;` 收尾，或 if/for/while 开头。
+const CODE_LINE_RE = /([{};]\s*$|^\s*(if|for|while|else|try|catch|switch|case)\b)/;
+
+/**
+ * 内容像**一段源码**吗（决定要不要给「代码」视图那个图标）。
+ *
+ * 判错两个方向的代价不一样：
+ *   · 漏判 → 用户只能看原文，或者点 md 把格式搞乱（就是这次的起因）—— 难受但不丢数据；
+ *   · 误判 → 一段散文被当成代码上色，满屏乱配色 —— 更难看。
+ * 所以这里**偏保守**：要两行以上，而且要关键字或够密的代码标点。
+ *
+ * ⚠️ 已经带 ``` 围栏的**不算**：那本来就是 markdown，围栏里的代码会被 MarkdownBody 高亮，
+ * 再套一层代码视图等于把 markdown 当代码渲染。
+ */
+export function looksLikeCode(text) {
+    const s = String(text || '');
+    if (!s.trim() || s.length > 20000) {
+        return false;
+    }
+    if (/^\s*```|[\r\n]\s*```/.test(s)) {
+        return false;
+    }
+    const lines = s.split('\n').filter((line) => line.trim());
+    if (lines.length < 2) {
+        return false;
+    }
+    if (CODE_HINT_RE.test(s)) {
+        return true;
+    }
+    const codeLines = lines.filter((line) => CODE_LINE_RE.test(line)).length;
+    return codeLines >= Math.max(2, Math.ceil(lines.length / 3));
+}
+
 export function looksLikeMarkdown(text) {
     const s = String(text || '');
     // 太长不渲染：一个几万字的条目渲染一次就够列表卡一下了

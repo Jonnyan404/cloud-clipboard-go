@@ -83,16 +83,58 @@ function loadHighlighter() {
     return pending;
 }
 
-/** 这个文件名该用哪个高亮语言（认不出来返回空串）。 */
+// 已注册的语言名本身。markdown 的 ``` 代码块给的就是语言名（```js / ```python），
+// 不是文件名 —— 所以两种输入都要认。
+const LANGUAGE_IDS = new Set([
+    'bash', 'c', 'cpp', 'css', 'diff', 'dockerfile', 'dos', 'go', 'ini', 'java',
+    'javascript', 'json', 'kotlin', 'less', 'markdown', 'php', 'powershell',
+    'protobuf', 'python', 'ruby', 'rust', 'scss', 'sql', 'swift', 'typescript',
+    'xml', 'yaml',
+]);
+
+/**
+ * 该用哪个高亮语言。两种输入都认（认不出来返回空串）：
+ *   · **文件名**：`app.ts` → typescript、`Dockerfile` → dockerfile；
+ *   · **语言名本身**：```js → javascript、```python → python。
+ */
 export function highlightLanguageFor(name) {
     const value = String(name || '').trim().toLowerCase();
     if (!value) {
         return '';
     }
+    if (LANGUAGE_IDS.has(value)) {
+        return value;
+    }
     const dot = value.lastIndexOf('.');
     // 没有扩展名时拿整个名字去查 —— `Dockerfile` 就是这么被认出来的。
     const ext = dot < 0 ? value : value.slice(dot + 1);
     return LANGUAGE_BY_EXT[ext] || '';
+}
+
+/**
+ * 猜一段源码是什么语言（给「代码视图」用）。
+ *
+ * 只在切到代码视图时调一次，别拿它到处跑 —— `highlightAuto` 会把注册过的语言挨个试一遍。
+ *
+ * 返回已注册的语言名，**认不出来返回空串**（调用方按无语言渲染：格式照样是转义后的原文，
+ * 只是没颜色 —— 认错比不认更糟，满屏乱配色）。
+ */
+export async function detectLanguage(code) {
+    const source = String(code || '').trim();
+    if (!source) {
+        return '';
+    }
+    const hljs = await loadHighlighter();
+    if (!hljs) {
+        return '';
+    }
+    try {
+        const result = hljs.highlightAuto(source, [...LANGUAGE_IDS]);
+        // relevance 是 highlight.js 给的匹配度，太低就别硬认。
+        return result.relevance > 5 ? result.language : '';
+    } catch {
+        return '';
+    }
 }
 
 /**

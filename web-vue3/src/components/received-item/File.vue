@@ -354,7 +354,13 @@ function deviceIcon(type) {
                         ></audio>
                         <template v-else-if="isPreviewableText">
                                                         <div class="md-preview">
-                                <markdown-toggle v-if="md.available" v-model:mode="md.mode"></markdown-toggle>
+                                <markdown-toggle
+                v-if="md.available"
+                v-model:mode="md.mode"
+                :json-available="md.jsonAvailable"
+                :json-compact-available="md.jsonCompactAvailable"
+                :code-available="md.codeAvailable"
+            ></markdown-toggle>
                                 <markdown-body v-if="md.html" :html="md.html"></markdown-body>
                                 <pre v-else class="timeline-card__text-preview" :class="{ 'timeline-card__text-preview--md': md.available }">{{ displayedTextPreview }}</pre>
                             </div>
@@ -478,6 +484,7 @@ function deviceIcon(type) {
     height: 22px;
     height: var(--md-toggle-height);
 }
+
 
 .timeline-card--dark .timeline-card__meta,
 .timeline-card--dark .timeline-card__file-meta,

@@ -1,4 +1,6 @@
 import { createApp } from 'vue';
+// 代码高亮的令牌配色：全局一份（CodeBlock 与 MarkdownBody 共用，见文件头注释）
+import './styles/highlight.css';
 import axios from 'axios';
 import App from './App.vue';
 import router from './router';

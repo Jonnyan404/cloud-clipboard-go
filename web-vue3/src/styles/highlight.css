@@ -1,0 +1,99 @@
+/* 代码高亮的**令牌配色** —— 全局一份。
+ *
+ * 谁用：`components/CodeBlock.vue`（分享页的文件预览）和 `components/MarkdownBody.vue`
+ * （markdown 里的 ``` 代码块）。两处的容器类不同，但 highlight.js 吐出来的令牌类名是一样的
+ * （`hljs-keyword` / `hljs-string` …），所以规则挂在**令牌的宿主元素**上就够两边用。
+ *
+ * 为什么单独一个文件而不是写进某个组件的 scoped 样式：scoped 会给选择器加上 `[data-v-x]`，
+ * 而 v-html 注入的内容拿不到那个属性 —— 只能靠 `:deep()` 绕，那就绑死在那个组件里了。
+ * 另一个组件要复用得整份抄一遍，正是这次在别处踩过的坑。
+ *
+ * ⚠️ 变量挂在 `code.hljs` 自己身上（不是 `:root`）：暗色主题的类 `.v-theme--dark` 挂在应用根上，
+ * 祖先选择器能命中；而 `:root` 上取不到主题，浅/暗就没法切。
+ */
+
+code.hljs {
+    --cb-comment: #6a737d;
+    --cb-keyword: #d73a49;
+    --cb-string: #032f62;
+    --cb-number: #005cc5;
+    --cb-title: #6f42c1;
+    --cb-attr: #005cc5;
+    --cb-type: #e36209;
+    --cb-meta: #6a737d;
+    --cb-tag: #22863a;
+    --cb-delete: #b31d28;
+    --cb-insert: #22863a;
+}
+
+.v-theme--dark code.hljs {
+    --cb-comment: #7f848e;
+    --cb-keyword: #c678dd;
+    --cb-string: #98c379;
+    --cb-number: #d19a66;
+    --cb-title: #61afef;
+    --cb-attr: #d19a66;
+    --cb-type: #e5c07b;
+    --cb-meta: #7f848e;
+    --cb-tag: #e06c75;
+    --cb-delete: #e06c75;
+    --cb-insert: #98c379;
+}
+
+code.hljs .hljs-comment,
+code.hljs .hljs-quote {
+    color: var(--cb-comment);
+    font-style: italic;
+}
+code.hljs .hljs-keyword,
+code.hljs .hljs-selector-tag,
+code.hljs .hljs-literal,
+code.hljs .hljs-doctag,
+code.hljs .hljs-formula {
+    color: var(--cb-keyword);
+}
+code.hljs .hljs-string,
+code.hljs .hljs-regexp,
+code.hljs .hljs-addition {
+    color: var(--cb-string);
+}
+code.hljs .hljs-number {
+    color: var(--cb-number);
+}
+code.hljs .hljs-title,
+code.hljs .hljs-section,
+code.hljs .hljs-selector-id,
+code.hljs .hljs-selector-class {
+    color: var(--cb-title);
+}
+code.hljs .hljs-attr,
+code.hljs .hljs-attribute,
+code.hljs .hljs-variable,
+code.hljs .hljs-template-variable,
+code.hljs .hljs-params {
+    color: var(--cb-attr);
+}
+code.hljs .hljs-type,
+code.hljs .hljs-class,
+code.hljs .hljs-built_in,
+code.hljs .hljs-symbol,
+code.hljs .hljs-bullet,
+code.hljs .hljs-link {
+    color: var(--cb-type);
+}
+code.hljs .hljs-meta {
+    color: var(--cb-meta);
+}
+code.hljs .hljs-tag,
+code.hljs .hljs-name {
+    color: var(--cb-tag);
+}
+code.hljs .hljs-deletion {
+    color: var(--cb-delete);
+}
+code.hljs .hljs-emphasis {
+    font-style: italic;
+}
+code.hljs .hljs-strong {
+    font-weight: 600;
+}

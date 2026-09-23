@@ -138,8 +138,19 @@ async function deleteItem() {
                 <v-expand-transition>
                     <div v-show="expand">
                         <v-divider class="my-2"></v-divider>
-                                                <div class="md-preview" :class="{ 'md-preview--md': md.available }" @click="onMdClick">
-                            <markdown-toggle v-if="md.available" v-model:mode="md.mode"></markdown-toggle>
+                                                <div
+                            class="md-preview"
+                            :class="{ 'md-preview--md': md.available, 'md-preview--block': md.leadsWithBlock }"
+                            :style="{ '--md-toggle-gutter': md.gutter }"
+                            @click="onMdClick"
+                        >
+                            <markdown-toggle
+                v-if="md.available"
+                v-model:mode="md.mode"
+                :json-available="md.jsonAvailable"
+                :json-compact-available="md.jsonCompactAvailable"
+                :code-available="md.codeAvailable"
+            ></markdown-toggle>
                             <markdown-body v-if="md.html" :html="md.html"></markdown-body>
                             <div v-else style="white-space: pre-wrap; word-break: break-all;">{{ decodedContent }}</div>
                         </div>
@@ -255,4 +266,17 @@ async function deleteItem() {
     height: 22px;
     height: var(--md-toggle-height);
 }
+
+/* ⚠️ 正文以 `<pre>` 开头时（代码视图 / JSON 美化 / 压缩）**不能用浮动占位**：
+   `<pre>` 带 overflow-x: auto，是个 BFC —— 它不会绕着浮动块排版，而是被挤到浮动块
+   **旁边**的窄列里，表现就是「正文和图标各占一列」。这种情况改成给 pre 自己留右边距。 */
+.md-preview--block::before {
+    float: none;
+    width: 0;
+    height: 0;
+}
+.md-preview--block :deep(pre:first-child) {
+    padding-right: var(--md-toggle-gutter);
+}
+
 </style>

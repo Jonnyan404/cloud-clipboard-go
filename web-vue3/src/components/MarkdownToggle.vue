@@ -1,7 +1,16 @@
 <script setup>
 import { useI18n } from 'vue-i18n';
 
-// 预览框右上角那对「原文 / Markdown」切换图标。
+// 预览框右上角那排「用哪种方式看」的切换图标。
+//
+// 槽位是**按内容决定**的（最多三个）：
+//   1. 原文        —— 永远有
+//   2. 代码 / md   —— 像代码给「代码」，否则像 markdown 给 md。
+//                     两者不会同时出现：JSON 渲染成 markdown 和原文一模一样，
+//                     而**代码过 markdown 会被重排**（`*` `_` `#` `-` 会被当标记，
+//                     一段 Go 点「md 渲染」整段缩进和注释就乱了）。
+//   3. JSON 美化   —— 内容是 JSON 才有
+//   4. JSON 压缩   —— 内容是 JSON 且**压得动**才有
 //
 // 纯图标，不带任何按钮外框：之前用 v-btn-group 套两个小按钮，
 // 外框再怎么压也有 ~22px 高，叠在单行内容（~25px）上还会把内容区撑出滚动条。
@@ -16,12 +25,30 @@ defineProps({
         type: String,
         default: 'raw',
     },
+    // 内容是「能美化的 JSON」→ 多一个「美化」槽位
+    jsonAvailable: {
+        type: Boolean,
+        default: false,
+    },
+    // 内容是 JSON 且**压得动**（本来就不是一行）→ 多一个「压缩」槽位
+    jsonCompactAvailable: {
+        type: Boolean,
+        default: false,
+    },
+    // 内容像源码 → 第二个槽位给「代码」而不是 md
+    codeAvailable: {
+        type: Boolean,
+        default: false,
+    },
 });
 const emit = defineEmits(['update:mode']);
 const { t } = useI18n();
 
 const mdiCodeTags = 'mdi-code-tags';
 const mdiLanguageMarkdown = 'mdi-language-markdown';
+const mdiCodeBraces = 'mdi-code-braces';
+const mdiIndentIncrease = 'mdi-format-indent-increase';
+const mdiIndentDecrease = 'mdi-format-indent-decrease';
 </script>
 
 <template>
@@ -42,7 +69,24 @@ const mdiLanguageMarkdown = 'mdi-language-markdown';
                 </span>
             </template>
         </v-tooltip>
-        <v-tooltip :text="t('renderMarkdown')" location="top">
+
+        <v-tooltip v-if="codeAvailable" :text="t('codeView')" location="top">
+            <template v-slot:activator="{ props: activatorProps }">
+                <span
+                    v-bind="activatorProps"
+                    class="md-toggle__icon"
+                    :class="{ 'md-toggle__icon--active': mode === 'code' }"
+                    role="button"
+                    tabindex="0"
+                    @click="emit('update:mode', 'code')"
+                    @keydown.enter.prevent="emit('update:mode', 'code')"
+                    @keydown.space.prevent="emit('update:mode', 'code')"
+                >
+                    <v-icon size="20">{{ mdiCodeBraces }}</v-icon>
+                </span>
+            </template>
+        </v-tooltip>
+        <v-tooltip v-else :text="t('renderMarkdown')" location="top">
             <template v-slot:activator="{ props: activatorProps }">
                 <span
                     v-bind="activatorProps"
@@ -58,12 +102,46 @@ const mdiLanguageMarkdown = 'mdi-language-markdown';
                 </span>
             </template>
         </v-tooltip>
+
+        <v-tooltip v-if="jsonAvailable" :text="t('beautifyJson')" location="top">
+            <template v-slot:activator="{ props: activatorProps }">
+                <span
+                    v-bind="activatorProps"
+                    class="md-toggle__icon"
+                    :class="{ 'md-toggle__icon--active': mode === 'json' }"
+                    role="button"
+                    tabindex="0"
+                    @click="emit('update:mode', 'json')"
+                    @keydown.enter.prevent="emit('update:mode', 'json')"
+                    @keydown.space.prevent="emit('update:mode', 'json')"
+                >
+                    <v-icon size="20">{{ mdiIndentIncrease }}</v-icon>
+                </span>
+            </template>
+        </v-tooltip>
+
+        <v-tooltip v-if="jsonCompactAvailable" :text="t('minifyJson')" location="top">
+            <template v-slot:activator="{ props: activatorProps }">
+                <span
+                    v-bind="activatorProps"
+                    class="md-toggle__icon"
+                    :class="{ 'md-toggle__icon--active': mode === 'json-min' }"
+                    role="button"
+                    tabindex="0"
+                    @click="emit('update:mode', 'json-min')"
+                    @keydown.enter.prevent="emit('update:mode', 'json-min')"
+                    @keydown.space.prevent="emit('update:mode', 'json-min')"
+                >
+                    <v-icon size="20">{{ mdiIndentDecrease }}</v-icon>
+                </span>
+            </template>
+        </v-tooltip>
     </div>
 </template>
 
 <style scoped>
 /* 浮在预览框右上角：不占布局，内容该多高还多高。
-   无底色、无阴影、无边框 —— 就是两个字形，叠在任何底色（便签黄/卡片白/暗色）上都成立。
+   无底色、无阴影、无边框 —— 就是几个字形，叠在任何底色（便签黄/卡片白/暗色）上都成立。
    高度 < 30px，永远矮于单行行高，不可能再撑出内容区的滚动条。 */
 .md-toggle {
     position: absolute;
@@ -102,18 +180,23 @@ const mdiLanguageMarkdown = 'mdi-language-markdown';
 
 <style>
 /* 故意不写 scoped：这是本组件对外的一条约定的宽度 ——
-   两个图标（2 × 20px 字形 + 内边距）加右缩进，正好是滚动内容要让出的宽度。
-   消费方在**滚动盒**上写 `padding-right: var(--md-toggle-gutter)`，
-   以后调图标尺寸只改这里一处，不会三个组件各留一个对不上的魔法数字。
+   图标（每个 20px 字形 + 6px 内边距）加右缩进，就是滚动内容要让出的宽度。
+   消费方在**滚动盒**上写 `padding-right: var(--md-toggle-gutter)`。
+
+   ⚠️ 图标**最多三个**（原文 + md/代码 + JSON 美化/压缩），所以有两个值。
+   消费方**别自己去数图标** —— 把 `useMarkdown` 的 `gutter` 绑到 `--md-toggle-gutter` 上即可，
+   数图标那件事在那边一处做完（见 iconCount）。
 
    注意别把它加在不滚动的外层盒子上：滚动条不会跟着让位，白加。 */
 :root {
-    --md-toggle-gutter: 64px;
+    --md-toggle-gutter: 64px;      /* 两个图标 */
+    --md-toggle-gutter-wide: 96px; /* 三个图标（内容是 JSON 时） */
     /* 让位的**高度**：`1lh` = 该容器自己的一个行高 —— 所以无论字号/行高是多少，
        都只让开**一行**。（`lh` 是较新的单位，消费方会再写一个 px 兜底。）
        消费方用 `::before` 做一个 float 占位块，宽 × 高就是这两个值：
        只有和图标垂直重叠的那一行会绕开，下面的行恢复整宽。
-       （以前是给整个容器 padding-right，等于每一行都压窄 64px，图标下方的宽度全浪费。） */
+       （以前是给整个容器 padding-right，等于每一行都压窄 64px，图标下方的宽度全浪费。）
+       ⚠️ 正文以 `<pre>` 开头时**不能用浮动占位** —— 见消费方 `--block` 那条注释。 */
     --md-toggle-height: 1lh;
 }
 </style>
