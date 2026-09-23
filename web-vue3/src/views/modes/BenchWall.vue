@@ -41,20 +41,26 @@ onBeforeUnmount(() => window.removeEventListener('resize', onResize));
 // 别再自己 filter 一遍 received，否则搜索框在这个模式里会失效。
 const items = computed(() => app.visibleReceived.filter((item) => item.type === 'text'));
 
-const selectedId = ref(null);
-const selected = computed(() => items.value.find((item) => item.id === selectedId.value) || null);
+// 动作链的输入文本。
+//
+// ⚠️ **这是唯一的输入源**：点左边列表里的条目 = 「把它的正文填进这里」，
+// 而不是「切换到另一种输入模式」。只留一条数据通路 —— 加这个输入框就是为了
+// 「想试个动作，却得先往剪贴板发一条」这个调试痛点。
+const draft = ref('');
 
-// 正文：服务端存的是 HTML 实体编码过的（`<` 之类），要还原回原文才能跑动作。
+// 服务端存的是 HTML 实体编码过的正文（`<` 之类），填进来之前要还原回原文。
 // 全站唯一实现在 util.js 的 decodeHtmlEntities —— 别在这里再写一份。
-const selectedText = computed(() => (selected.value ? decodeHtmlEntities(selected.value.content || '') : ''));
+function fillFrom(item) {
+    draft.value = decodeHtmlEntities(item.content || '');
+}
 
-// 选中项跟着列表走：内容被删 / 被挤出历史上限 / 搜索词变了，都要自动落到第一条。
-// 不这么做的话右边会一直显示一条**已经不在列表里**的内容，而且没有任何提示。
+// 首次有内容时自动填第一条 —— 一进这个模式就有东西可试。
+// ⚠️ 只在**输入框还空着**时填，否则会把用户正在打的内容冲掉。
 watch(
     items,
     (list) => {
-        if (!list.some((item) => item.id === selectedId.value)) {
-            selectedId.value = list.length ? list[0].id : null;
+        if (!draft.value && list.length) {
+            fillFrom(list[0]);
         }
     },
     { immediate: true },
@@ -103,8 +109,7 @@ async function saveAsNew(content) {
                         :key="item.id"
                         type="button"
                         class="bench-wall__item"
-                        :class="{ 'bench-wall__item--active': item.id === selectedId }"
-                        @click="selectedId = item.id"
+                        @click="fillFrom(item)"
                     >
                         <span class="bench-wall__item-time">{{ formatTimestamp(item.timestamp) }}</span>
                         <span class="bench-wall__item-text">{{ summary(item) }}</span>
@@ -116,11 +121,20 @@ async function saveAsNew(content) {
                 </div>
             </aside>
 
-            <!-- 右：动作链 + 结果 -->
+            <!-- 右：输入框 + 动作链 + 结果。
+                 输入框放在这一栏的**顶部**而不是左栏 —— 左栏那点宽度写长文本太憋屈，
+                 而右边本来就是「工作区」（输入 → 加工 → 结果），三样在同一条竖线上。 -->
             <section class="bench-wall__panel">
-                <ActionChain v-if="selected" :text="selectedText" @save-as-new="saveAsNew" />
+                <textarea
+                    v-model="draft"
+                    class="bench-wall__draft"
+                    :placeholder="t('benchDraftPlaceholder')"
+                    spellcheck="false"
+                ></textarea>
+
+                <ActionChain v-if="draft" class="bench-wall__chain" :text="draft" @save-as-new="saveAsNew" />
                 <div v-else class="bench-wall__empty bench-wall__empty--panel">
-                    {{ t('benchEmpty') }}
+                    {{ t('benchDraftEmpty') }}
                 </div>
             </section>
         </div>
@@ -198,6 +212,41 @@ async function saveAsNew(content) {
     font-weight: 500;
 }
 
+/* 手输的调试输入框 —— 在**右栏顶部**。固定高度 + 允许纵向拖拽：
+   长文本要能看全几行，但不能把下面的动作链挤没。
+   `color: inherit` 是必须的：textarea 默认是黑色，暗色主题下会看不见。
+   背景用 transparent（跟着面板走），这样暗色主题不必再写一条覆盖规则。 */
+.bench-wall__draft {
+    flex: 0 0 auto;
+    height: 88px;
+    min-height: 44px;
+    resize: vertical;
+    border: 1px solid rgba(148, 163, 184, 0.42);
+    border-radius: 10px;
+    background: transparent;
+    padding: 8px 10px;
+    margin-bottom: 10px;
+    font-family: inherit;
+    font-size: 0.75rem;
+    line-height: 1.55;
+    color: inherit;
+    outline: none;
+}
+
+.bench-wall__draft:focus {
+    border-color: rgb(var(--v-theme-primary));
+}
+
+.bench-wall__draft::placeholder {
+    color: rgba(71, 85, 105, 0.5);
+}
+
+/* 动作链占满输入框剩下的高度（它内部再分「链」和「结果」两块） */
+.bench-wall__chain {
+    flex: 1;
+    min-height: 0;
+}
+
 .bench-wall__items {
     flex: 1;
     min-height: 0;
@@ -223,11 +272,6 @@ async function saveAsNew(content) {
 
 .bench-wall__item:hover {
     background: rgba(14, 165, 233, 0.07);
-}
-
-.bench-wall__item--active {
-    background: rgba(14, 165, 233, 0.12);
-    border-color: rgba(14, 165, 233, 0.45);
 }
 
 .bench-wall__item-time {
