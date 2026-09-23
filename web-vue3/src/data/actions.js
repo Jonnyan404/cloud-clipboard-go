@@ -198,6 +198,81 @@ function reverseText(text) {
     return Array.from(String(text || '')).reverse().join('');
 }
 
+// ── 提取 ────────────────────────────────────────────────────────────
+//
+// 这些是**启发式**匹配，不追求 100% 准确：剪贴板里的文本没有格式约束，
+// 目标是把「混在文字里的东西」捞出来 —— **宁可多捞一个，也不要漏**。
+// （所以 `1.2.3.4` 这种版本号也会被「提取 IP」捞出来，那是可接受的代价。）
+
+// ⚠️ 提取用的正则**带 `g`**（`match` 要拿全部），而给 `match()` 用的判据
+// **绝不能带 `g`** —— 带 g 的正则 `test()` 会记住 `lastIndex`，
+// 同一个正则连调两次会交替返回 true / false，于是图标一会儿有一会儿没有。
+// 所以这里成对地写：`XXX_RE`（带 g，提取）+ `XXX_HINT`（不带 g，判定）。
+
+// URL。⚠️ 中文标点必须出现在**排除集**里：不排的话
+// 「见 https://a.com，然后」会把 `，然后` 一起吞进链接。
+const URL_RE = /\bhttps?:\/\/[^\s<>"'，。；：、（）【】《》「」“”]+|\bwww\.[^\s<>"'，。；：、（）【】《》「」“”]+/gi;
+const URL_HINT = /https?:\/\/|www\./i;
+
+const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/g;
+const EMAIL_HINT = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+\.[A-Za-z]{2,}/;
+
+// 中国大陆手机号：1 开头、第二位 3-9、共 11 位。
+// ⚠️ 两边的边界不能省：`(?<!\d)` 后行断言 Safari 16.4 之前不支持，所以用
+// `(?:^|\D)` + 捕获组，右边用前瞻 `(?!\d)` —— 不写的话 `13800138000 12` 里的
+// 长数字串会被截出前 11 位。
+const CN_PHONE_RE = /(?:^|\D)(1[3-9]\d{9})(?!\d)/g;
+const CN_PHONE_HINT = /(?:^|\D)1[3-9]\d{9}(?!\d)/;
+
+// IPv4：每段都限位到 0-255，否则 `999.999.999.999` 也会被当成 IP。
+const IPV4_RE = /\b(?:(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)\b/g;
+const IPV4_HINT = /\b(?:(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)\b/;
+
+// 数字：可带负号、千分位、小数。
+const NUMBER_RE = /-?\d[\d,]*(?:\.\d+)?/g;
+const NUMBER_HINT = /-?\d[\d,]*(?:\.\d+)?/;
+
+/**
+ * 按正则捞一遍，**去重并保持出现顺序**。
+ *
+ * 保序很重要：用户拿到的应该是「按原文出现顺序的清单」，
+ * 按长度或字典序排都会让人对不上原文。
+ */
+function extractAll(text, re) {
+    const matches = String(text || '').match(re) || [];
+    return [...new Set(matches)];
+}
+
+function extractUrls(text) {
+    return extractAll(text, URL_RE).join('\n');
+}
+
+function extractEmails(text) {
+    return extractAll(text, EMAIL_RE).join('\n');
+}
+
+function extractPhones(text) {
+    // 用了捕获组（为了左边界的 `(?:^|\D)`），所以要走 replace 把 `$1` 取出来
+    const out = [];
+    const seen = new Set();
+    String(text || '').replace(CN_PHONE_RE, (_, phone) => {
+        if (!seen.has(phone)) {
+            seen.add(phone);
+            out.push(phone);
+        }
+        return '';
+    });
+    return out.join('\n');
+}
+
+function extractIps(text) {
+    return extractAll(text, IPV4_RE).join('\n');
+}
+
+function extractNumbers(text) {
+    return extractAll(text, NUMBER_RE).join('\n');
+}
+
 // ── 代码视图（转义 + 高亮）──────────────────────────────────────────
 // 把整段文本当成**一个围栏代码块**渲染。
 //
@@ -664,6 +739,7 @@ function newUuid() {
 //   icon     mdi 图标名
 //   direction 'view'（看，出现在预览/工作台）| 'insert'（发，出现在输入框）
 //   render   'text'（默认，按纯文本显示）| 'html'（结果是 HTML，要 v-html 渲染）
+//   fenceLanguage 可选。纯文本结果会被包成代码块渲染，这里声明语言才有高亮（如 'json'）
 //   match    可选。返回 true 表示「这条内容能用这个动作」
 //   run      (text) => string。抛异常 = 这个动作对当前内容不适用（界面显示错误 + 退回原文）
 //
@@ -680,7 +756,14 @@ export const ACTIONS = [
         direction: 'view',
         render: 'html',
         match: (text) => looksLikeMarkdown(text) || looksLikeTaskList(text) || looksLikeTable(text),
-        run: (text) => renderMarkdownHtml(text),
+        // ⚠️ `interactiveTasks` 不能省：不开的话 marked 会给复选框加 `disabled`，
+        // 任务列表就**点不动**了。（原本在 useMarkdown 的 md 分支里，重构成动作库时弄丢过一次。）
+        //
+        // ⚠️ 但**文件预览那条路不接**：那边的正文是**截断过**的，按下标回写会把截断后的
+        // 内容当成全文。用 `ctx.truncated` 区分（useMarkdown 传 `isMarkdownFile()`）。
+        run: (text, ctx) => renderMarkdownHtml(text, {
+            interactiveTasks: looksLikeTaskList(text) && !ctx?.truncated,
+        }),
     },
     {
         id: 'format.code',
@@ -704,6 +787,8 @@ export const ACTIONS = [
         nameKey: 'actionJsonPretty',
         icon: 'mdi-format-indent-increase',
         direction: 'view',
+        // 结果会被包成代码块渲染 —— 标注语言才有高亮（见 useMarkdown 的 renderCurrent）
+        fenceLanguage: 'json',
         match: (text) => isJsonLike(text),
         run: (text) => {
             const out = formatJson(text);
@@ -719,6 +804,7 @@ export const ACTIONS = [
         nameKey: 'actionJsonMin',
         icon: 'mdi-format-indent-decrease',
         direction: 'view',
+        fenceLanguage: 'json',
         match: (text) => isJsonLike(text),
         run: (text) => {
             const out = minifyJson(text);
@@ -877,6 +963,54 @@ export const ACTIONS = [
         direction: 'view',
         match: isLongerThan(1),
         run: (text) => reverseText(text),
+    },
+
+    // ── 提取 ────────────────────────────────────────────────────────
+    // ⚠️ match 里用的是不带 `g` 的 `XXX_HINT`，不是提取用的 `XXX_RE` —— 原因见上面那段注释。
+    {
+        id: 'text.extractUrl',
+        group: 'text',
+        nameKey: 'actionExtractUrl',
+        icon: 'mdi-link',
+        direction: 'view',
+        match: (text) => URL_HINT.test(String(text || '')),
+        run: (text) => extractUrls(text),
+    },
+    {
+        id: 'text.extractEmail',
+        group: 'text',
+        nameKey: 'actionExtractEmail',
+        icon: 'mdi-email-outline',
+        direction: 'view',
+        match: (text) => EMAIL_HINT.test(String(text || '')),
+        run: (text) => extractEmails(text),
+    },
+    {
+        id: 'text.extractPhone',
+        group: 'text',
+        nameKey: 'actionExtractPhone',
+        icon: 'mdi-cellphone',
+        direction: 'view',
+        match: (text) => CN_PHONE_HINT.test(String(text || '')),
+        run: (text) => extractPhones(text),
+    },
+    {
+        id: 'text.extractIp',
+        group: 'text',
+        nameKey: 'actionExtractIp',
+        icon: 'mdi-ip-network-outline',
+        direction: 'view',
+        match: (text) => IPV4_HINT.test(String(text || '')),
+        run: (text) => extractIps(text),
+    },
+    {
+        id: 'text.extractNumber',
+        group: 'text',
+        nameKey: 'actionExtractNumber',
+        icon: 'mdi-numeric',
+        direction: 'view',
+        match: (text) => NUMBER_HINT.test(String(text || '')),
+        run: (text) => extractNumbers(text),
     },
 
     // ── 中文 ────────────────────────────────────────────────────────

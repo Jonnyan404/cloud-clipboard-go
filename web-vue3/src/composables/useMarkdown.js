@@ -85,7 +85,9 @@ export function useMarkdown(getText, isMarkdownFile = () => false) {
         if (!available.value || !id) {
             return { html: '', text: '' };
         }
-        const result = await runChain(getText(), [id], { t });
+        // `truncated` 告诉动作「这条正文是截断过的」—— 目前只有 markdown 那个动作在意它
+        // （截断的正文不能开复选框交互，按下标回写会把截断内容当成全文）。
+        const result = await runChain(getText(), [id], { t, truncated: isMarkdownFile() });
         if (result.error) {
             // 跑不出来就当没有这个视图、退回原文 —— 卡片预览区不该弹错误（报错是工作台的活）
             return { html: '', text: '' };
@@ -102,7 +104,8 @@ export function useMarkdown(getText, isMarkdownFile = () => false) {
         }
         // 3. 纯文本结果（编解码 / 文本处理）统一包成 `<pre>` 形态的 HTML ——
         // 消费方本来就只认 `md.html` 一个分支，多一个分支等于要改 5 个消费方。
-        return { html: renderFenced(result.output), text: result.output };
+        // `fenceLanguage` 是**动作自己声明**的（JSON 那类要标注语言才有高亮），别在这里按 id 硬编码。
+        return { html: renderFenced(result.output, action?.fenceLanguage || ''), text: result.output };
     }
 
     watch(
