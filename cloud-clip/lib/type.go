@@ -73,11 +73,15 @@ type ClipboardServer struct {
 	isRunning       bool
 	connDeviceIDMap map[*websocket.Conn]string
 	runMutex        sync.Mutex
-	parser          *uaparser.Parser            // UA解析器实例
-	deviceHashSeed  uint32                      // 将 deviceHashSeed 添加到服务器实例
-	shareSigningKey []byte                      // 短期分享链接签名密钥
-	shareTokenUsage map[string]*shareUsageEntry // jti -> 使用计数（进程内）
-	shareUsageMutex sync.Mutex
+	parser          *uaparser.Parser // UA解析器实例
+	deviceHashSeed  uint32           // 将 deviceHashSeed 添加到服务器实例
+	shareSigningKey []byte           // 短期分享链接签名密钥
+	// history.json 的写盘锁。它有 7 个调用点，其中 handler 里两处是 `go s.saveHistoryData()`
+	// （改正文 / 看板挪列）—— 两个并发请求会同时写同一个路径，而 messageQueue 的锁
+	// 只保护内存切片、**不保护文件**，所以要独立一把。见 saveHistoryData 的注释。
+	historySaveMutex sync.Mutex
+	shareTokenUsage  map[string]*shareUsageEntry // jti -> 使用计数（进程内）
+	shareUsageMutex  sync.Mutex
 
 	// 分享记录（share-log.json）：谁在哪个房间分享了什么、被打开了几次。
 	// 见 share_log.go 文件头部 —— 列表用房间凭据鉴权，开放房间 = 公开。

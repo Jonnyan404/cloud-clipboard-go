@@ -134,7 +134,10 @@ func (s *ClipboardServer) saveShareLogLocked() {
 	if err != nil {
 		return
 	}
-	if err := os.WriteFile(path, data, 0644); err != nil {
+	// 原子写：share-log.json 和 history.json 同属「运行中反复全量重写」的文件，
+	// 半截 JSON 一样解析不了。调用方（recordShare / saveShareLog）已经持有
+	// shareLogMutex，所以这里不用再自己加锁。
+	if err := writeFileAtomic(path, data, 0644); err != nil {
 		if s.logger != nil {
 			s.logger.Printf("写入分享记录 %s 时出错: %v", path, err)
 		}

@@ -170,8 +170,18 @@ func (s *ClipboardServer) loadHistoryData() error {
 
 	var loadedHist History // History struct from types.go
 	if err := json.Unmarshal(data, &loadedHist); err != nil {
-		s.logger.Printf("无法解析历史数据 %s: %v。将尝试删除损坏的历史文件。", s.historyFilePath, err)
-		os.Remove(s.historyFilePath)
+		// **不删除**。以前这里写的是 os.Remove —— 一次崩溃/截断就等于「抹掉用户全部历史」，
+		// 而且现场也没了，事后查不出为什么坏。改名留档：数据还在，只是不在启动路径上，
+		// 用户想抢救或想报 bug 都有东西可看。
+		//
+		// 服务端仍然以空历史启动（调用方只打印警告），行为和以前一致 —— 变的只是
+		// 「文件保住了」。
+		quarantined := fmt.Sprintf("%s.corrupt-%s", s.historyFilePath, time.Now().Format("20060102-150405"))
+		if renameErr := os.Rename(s.historyFilePath, quarantined); renameErr != nil {
+			s.logger.Printf("无法解析历史数据 %s: %v。改名留档也失败(%v)，原文件保持不动。", s.historyFilePath, err, renameErr)
+		} else {
+			s.logger.Printf("无法解析历史数据 %s: %v。已改名留档到 %s（未删除）。", s.historyFilePath, err, quarantined)
+		}
 		return fmt.Errorf("无法解析历史数据 %s: %w", s.historyFilePath, err)
 	}
 
@@ -211,6 +221,17 @@ func (s *ClipboardServer) loadHistoryData() error {
 }
 
 func (s *ClipboardServer) saveHistoryData() {
+	// 串行化整段（快照 → 序列化 → 落盘），不是只锁落盘那一步。
+	//
+	// 这个方法有 7 个调用点，其中 handler.go 里两处是 `go s.saveHistoryData()`（改正文、
+	// 看板挪列）—— 两个并发请求会同时进来。messageQueue 的锁只保护内存切片、不保护文件，
+	// 两个 os.WriteFile 并发写同一路径会让内容交错。
+	//
+	// 锁在 messageQueue 之前拿：全项目只有这一处获取 historySaveMutex，不存在
+	// 「持 messageQueue 锁再进这里」的反向路径，所以不会死锁。
+	s.historySaveMutex.Lock()
+	defer s.historySaveMutex.Unlock()
+
 	s.logger.Printf("尝试将历史记录保存到: %s", s.historyFilePath)
 
 	s.messageQueue.Lock()
@@ -244,7 +265,9 @@ func (s *ClipboardServer) saveHistoryData() {
 		return
 	}
 
-	if err := os.WriteFile(s.historyFilePath, data, 0644); err != nil {
+	// 原子写：写临时文件 → fsync → rename。以前是 os.WriteFile 直接覆盖，
+	// 写到一半进程被杀就会留下半截 JSON，下次启动被当成损坏文件（旧逻辑还会把它删掉）。
+	if err := writeFileAtomic(s.historyFilePath, data, 0644); err != nil {
 		s.logger.Printf("写入历史文件 %s 时出错: %v", s.historyFilePath, err)
 	} else {
 		s.logger.Printf("历史记录已成功保存到 %s", s.historyFilePath)

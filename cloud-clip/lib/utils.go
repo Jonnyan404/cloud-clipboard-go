@@ -139,6 +139,58 @@ func min(a, b int) int {
 	return b
 }
 
+// writeFileAtomic 原子地写一个文件：写同目录临时文件 → fsync → rename。
+//
+// 为什么必须原子：os.WriteFile 是「截断 + 写入」，进程在写入过程中被杀（崩溃、OOM、
+// 容器被 kill、断电）会留下一个**半截文件**。而 history.json 是启动时唯一的数据来源，
+// 半截 JSON 解析失败 → 被当成损坏文件处理 → 用户的全部历史没了。
+//
+// 为什么临时文件必须放**同一个目录**：os.Rename 只有在同一文件系统内才是原子的，
+// 跨设备会退化成 copy + unlink（不原子）。放系统临时目录再 rename 是个常见错误。
+//
+// 为什么要 fsync：rename 只保证「目录项」的原子切换，不保证数据已经落盘。
+// 不 fsync 的话，断电后可能出现「rename 成功、文件却是空的」。
+//
+// 失败时临时文件会被清掉，不会在目录里攒一堆 .tmp-*。
+func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
+	dir := filepath.Dir(path)
+	tmp, err := os.CreateTemp(dir, filepath.Base(path)+".tmp-*")
+	if err != nil {
+		return fmt.Errorf("创建临时文件失败: %w", err)
+	}
+	tmpName := tmp.Name()
+	// 任何一条失败路径都要清掉临时文件；rename 成功后把它置 false（那时文件已经不在原地了）
+	cleanup := true
+	defer func() {
+		if cleanup {
+			os.Remove(tmpName)
+		}
+	}()
+
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		return fmt.Errorf("写入临时文件失败: %w", err)
+	}
+	if err := tmp.Sync(); err != nil {
+		tmp.Close()
+		return fmt.Errorf("同步临时文件失败: %w", err)
+	}
+	// os.CreateTemp 建出来的是 0600，要显式改回调用方要的权限 ——
+	// rename 之后这个文件就是正式文件了，权限不会自己变回来。
+	if err := tmp.Chmod(perm); err != nil {
+		tmp.Close()
+		return fmt.Errorf("设置临时文件权限失败: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("关闭临时文件失败: %w", err)
+	}
+	if err := os.Rename(tmpName, path); err != nil {
+		return fmt.Errorf("替换目标文件失败: %w", err)
+	}
+	cleanup = false
+	return nil
+}
+
 func pathExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil || !os.IsNotExist(err)
