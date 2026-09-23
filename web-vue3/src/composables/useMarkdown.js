@@ -123,6 +123,20 @@ export function useMarkdown(getText, isMarkdownFile = () => false) {
     // 表现就是「正文和图标各占一列」（Jonny 实测踩到）。那种情况改成给 pre 自己留右边距。
     const leadsWithBlock = computed(() => /^\s*<pre[\s>]/.test(html.value || ''));
 
+    // 「复制」该复制**你正在看的那一份**：原文 / 美化后的 JSON / 压缩后的 JSON / 代码。
+    //
+    // ⚠️ 别永远复制原文 —— 用户切到「压缩」视图，就是为了把那一行拿走。
+    // md / code / raw 三种视图复制的都是原文（md 视图下拿走的是源文，不是渲染后的 HTML）。
+    const copyText = computed(() => {
+        if (mode.value === 'json') {
+            return prettyJson.value || getText();
+        }
+        if (mode.value === 'json-min') {
+            return compactJson.value || getText();
+        }
+        return getText();
+    });
+
     // 图标有几个 → 正文要给图标让出多宽。宽度契约在 MarkdownToggle 的 `--md-toggle-gutter*`，
     // 消费方把 `gutter` 绑到那个变量上，所以图标增减只要改这里的选择。
     const iconCount = computed(() => {
@@ -157,6 +171,7 @@ export function useMarkdown(getText, isMarkdownFile = () => false) {
     return reactive({
         available,
         codeAvailable,
+        copyText,
         gutter,
         html,
         leadsWithBlock,

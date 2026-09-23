@@ -412,22 +412,28 @@ export function minifyJson(text) {
     return compact === raw.trim() ? '' : compact;
 }
 
-// 一眼就是代码的行首关键字。刻意列得**具体**（`package` / `func` / `def` …）而不是
-// 拿 `function` 之类的通用词去撞 —— 散文里出现 "class" 的概率并不低。
-const CODE_HINT_RE = /(^|\n)\s*(package|import|from|func|def|class|struct|interface|enum|public|private|protected|static|void|return|const|let|var|using|namespace|#include|#!|SELECT|INSERT|UPDATE|DELETE|CREATE|fn|impl|use|mod)\b/;
-// 没有关键字时看行尾/行首的代码标点：`{` `}` `;` 收尾，或 if/for/while 开头。
-const CODE_LINE_RE = /([{};]\s*$|^\s*(if|for|while|else|try|catch|switch|case)\b)/;
+// 一眼就是代码的行首关键字。**故意列得宽**（Jonny 要求「不必太保守」）：
+// 宁可把一段像代码的东西当代码 —— 那只是多一个图标，用户还能切回原文 / md；
+// 而漏判的代价是「只能点 md，然后看着 markdown 把代码重排」。
+//
+// 刻意不收 `from` / `use` / `type` / `new` 这类**英语里也常见**的词：
+// 它们做行首在散文里太容易撞上，而它们所在的语言（Python / Rust / TS）另有
+// `import` / `def` / `impl` / `fn` 这些更明确的信号。
+const CODE_HINT_RE = /(^|\n)\s*(package|import|export|require|module|func|fn|def|class|struct|interface|enum|trait|impl|namespace|public|private|protected|static|final|void|return|const|let|var|val|async|await|throw|except|elif|lambda|#include|#!|SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|BEGIN|COMMIT|printf|println|console|echo|puts)\b/;
+
+// 代码的**形状**，不依赖关键字：`;` `{}` 收尾、`foo(...)` 调用、箭头 / 管道 / 泛型、
+// 标签、模板插值、`%s` 这类格式符。
+const CODE_SHAPE_RE = /([;{}]\s*$|\w\s*\([^)]*\)\s*[;{]|=>|->|::|<\/?[a-z][\w-]*>|\$\{[^}]*\}|%[sdvf]\b)/;
 
 /**
  * 内容像**一段源码**吗（决定要不要给「代码」视图那个图标）。
  *
- * 判错两个方向的代价不一样：
- *   · 漏判 → 用户只能看原文，或者点 md 把格式搞乱（就是这次的起因）—— 难受但不丢数据；
- *   · 误判 → 一段散文被当成代码上色，满屏乱配色 —— 更难看。
- * 所以这里**偏保守**：要两行以上，而且要关键字或够密的代码标点。
- *
- * ⚠️ 已经带 ``` 围栏的**不算**：那本来就是 markdown，围栏里的代码会被 MarkdownBody 高亮，
- * 再套一层代码视图等于把 markdown 当代码渲染。
+ * 判定顺序（从便宜到贵）：
+ *   1. 已经带 ``` 围栏的**不算** —— 那本来就是 markdown，围栏里的代码会被 MarkdownBody 高亮；
+ *   2. 是合法 JSON 的**不算** —— JSON 有自己的「美化 / 压缩」两个视图，别抢；
+ *   3. 行首命中关键字 → 是；
+ *   4. **单行**也能是代码：看形状（`const a = 1;` / `foo(1, 2)`）；
+ *   5. 多行：看「像代码的行」占比，门槛 1/4（一段代码里常夹空行和注释）。
  */
 export function looksLikeCode(text) {
     const s = String(text || '');
@@ -437,16 +443,26 @@ export function looksLikeCode(text) {
     if (/^\s*```|[\r\n]\s*```/.test(s)) {
         return false;
     }
-    const lines = s.split('\n').filter((line) => line.trim());
-    if (lines.length < 2) {
+    if (parseJsonObject(s) !== undefined) {
         return false;
     }
     if (CODE_HINT_RE.test(s)) {
         return true;
     }
-    const codeLines = lines.filter((line) => CODE_LINE_RE.test(line)).length;
-    return codeLines >= Math.max(2, Math.ceil(lines.length / 3));
+    const lines = s.split('\n').filter((line) => line.trim());
+    if (lines.length < 2) {
+        const one = s.trim();
+        // 单行也常是代码：`foo(1, 2)` / `const a = 1;` / `x => x + 1`。
+        // 末一条**要求整行就是一个调用**（`标识符(...)`），否则散文里的「见附录 (a)」
+        // 也会被算进去 —— 中文不算 `\w`，所以那条天然挡得住。
+        return CODE_SHAPE_RE.test(one) || /^[A-Za-z_$][\w.$]*\s*\([^)]*\)\s*[;{]?$/.test(one);
+    }
+    const codeLines = lines.filter((line) => CODE_LINE_RE.test(line) || CODE_SHAPE_RE.test(line)).length;
+    return codeLines >= Math.max(2, Math.ceil(lines.length / 4));
 }
+
+// 没有关键字时看行首的代码结构：if/for/while 开头，或 `{` `}` `;` 收尾。
+const CODE_LINE_RE = /([{};]\s*$|^\s*(if|for|while|else|try|catch|switch|case|do)\b)/;
 
 export function looksLikeMarkdown(text) {
     const s = String(text || '');

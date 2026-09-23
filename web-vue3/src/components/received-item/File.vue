@@ -360,6 +360,7 @@ function deviceIcon(type) {
                 :json-available="md.jsonAvailable"
                 :json-compact-available="md.jsonCompactAvailable"
                 :code-available="md.codeAvailable"
+                :copy-text="md.copyText"
             ></markdown-toggle>
                                 <markdown-body v-if="md.html" :html="md.html"></markdown-body>
                                 <pre v-else class="timeline-card__text-preview" :class="{ 'timeline-card__text-preview--md': md.available }">{{ displayedTextPreview }}</pre>

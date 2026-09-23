@@ -73,7 +73,9 @@ async function copyToClipboard(textToCopy, successMessageKey = 'copySuccess', er
     }
 }
 function copyText() {
-    copyToClipboard(decodedContent.value, 'copySuccess');
+    // 复制**当前视图**的正文（`md.copyText`）：切到压缩 JSON 后拿到的就是压缩后的那一行。
+    // 和预览右上角那个复制按钮同一份语义 —— 同一个卡片上「复制」不能有两种含义。
+    copyToClipboard(md.copyText, 'copySuccess');
 }
 async function deleteItem() {
     await axios.delete(`revoke/${props.meta.id}`, {
@@ -150,6 +152,7 @@ async function deleteItem() {
                 :json-available="md.jsonAvailable"
                 :json-compact-available="md.jsonCompactAvailable"
                 :code-available="md.codeAvailable"
+                :copy-text="md.copyText"
             ></markdown-toggle>
                             <markdown-body v-if="md.html" :html="md.html"></markdown-body>
                             <div v-else style="white-space: pre-wrap; word-break: break-all;">{{ decodedContent }}</div>
