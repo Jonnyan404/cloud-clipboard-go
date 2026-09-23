@@ -13,6 +13,7 @@
 //     Android 快捷指令的第二步下载就靠这个（第一次请求的凭据不会跟着走）。
 import { FileHandler } from './.build/file.mjs';
 import { ContentHandler } from './.build/content.mjs';
+import { ShareHandler } from './.build/share.mjs';
 import { issueRoomSessionToken, validateRoomSessionToken, resolveRoomAuth, canAccessRoomAsync } from './.build/auth.mjs';
 import { makeEnv, makeChecker, getJson } from './harness.mjs';
 
@@ -159,6 +160,51 @@ console.log('\n── D. {"open": true} = 全局加密时仍然开放的房间 �
   // open + password 同时给 = 配置写错 → 按**需要密码**处理（不能因为多打一个字段把房间敞开）
   check('open+password 按需要密码处理', resolveRoomAuth(env, 'contradiction').required, true);
   check('open+password 空凭据不放行', await canAccessRoomAsync(env, 'contradiction', ''), false);
+}
+
+console.log('\n── D. 从 UI 分享的文件（令牌 typ=content）也要能读字节 ──');
+// UI 的分享按钮固定发 `{type:'content', id:<内容 id>}`，所以从卡片/时间流分享出去的
+// 图片、视频，令牌里 `typ` 是 "content"，而 `/file/` 按 `typ="file"` 校验 ——
+// 不认 content 的话，受保护实例上一律 401（分享页预览、下载按钮、OG 的 og:image 全挂），
+// 而文本却是好的（它走 /content，那边本来就认 content）。
+// 与 Go 侧 TestContentShareCanReadItsFile 对应。
+{
+  const { env, db } = makeEnv();
+  env.AUTH_PASSWORD = '';
+  env.ROOM_AUTH_JSON = JSON.stringify({ private: 'private-pass' });
+  const token = await issueRoomSessionToken(env, 'private', 3600, '');
+
+  const shareContent = async (contentId) => {
+    const res = await ShareHandler.create(
+      new Request('http://worker.local/share?room=private', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ type: 'content', id: String(contentId), ttl: 600 }),
+      }),
+      env,
+    );
+    return { status: res.status, json: await res.json() };
+  };
+
+  const first = await uploadTo(env, db, 'private', 'photo.png', { auth: token });
+  const second = await uploadTo(env, db, 'private', 'other.png', { auth: token });
+  const share = await shareContent(first.id);
+  check('D 前置：内容分享签发成功', share.status, 200);
+
+  const read = (uuid, name, shareToken) => FileHandler.download(
+    downloadRequest(
+      `http://worker.local/file/${uuid}/${name}?t=${encodeURIComponent(shareToken)}`,
+      { uuid, filename: name },
+    ),
+    env,
+  );
+
+  const own = await read(first.uuid, 'photo.png', share.json.token);
+  check('D1 内容分享的令牌能读它指向的文件', own.status, 200);
+
+  // ⚠️ 但不能拿它去读**别的**文件 —— 那等于绕过房间边界。
+  const cross = await read(second.uuid, 'other.png', share.json.token);
+  check('D2 内容分享不能读别的文件', cross.status, 401);
 }
 
 summary('房间鉴权在 Worker 上成立');

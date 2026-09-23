@@ -3,7 +3,7 @@
 // 为什么单独一个文件：share.js 此前完全没有测试覆盖 —— 而它是「开放房间不发 token」
 // 那个静默丢弃 TTL / 次数限制的 bug 的所在地。这里把修好之后的形状钉住。
 import { makeEnv, makeChecker } from './harness.mjs';
-import { ShareHandler, validateShareToken } from './.build/share.mjs';
+import { ShareHandler, parseShareToken, validateShareToken } from './.build/share.mjs';
 
 const { check, summary } = makeChecker();
 const now = Math.floor(Date.now() / 1000);
@@ -116,6 +116,43 @@ async function getShare(env, token, password) {
   const right = await getShare(env, locked.json.token, 'hunter2');
   check('密码对 → 200', right.status, 200);
   check('密码对 → 标出需要密码', right.json.needsPassword, true);
+}
+
+// ── 带密码的分享：换发「预览令牌」──────────────────────────────────────
+// 浏览器自己发的请求（<img> / <video> / <a download>）**加不了 X-Share-Password 头**，
+// 所以有密码的分享必须换发一个短期、无密码的能力令牌给这些地址用 ——
+// 否则配了密码的实例上图片/视频/下载一律 401，而文本却是好的（那条是 JS 发的）。
+// 与 Go 侧 TestShareInfoIssuesPreviewTokenForPasswordShare 对应。
+{
+  const { env, db } = makeEnv();
+  seed(db);
+
+  const locked = await postShare(env, { type: 'file', uuid: 'uuid-1', ttl: 600, maxUses: 5, password: 'hunter2' });
+  const info = await getShare(env, locked.json.token, 'hunter2');
+  check('预览令牌：带密码的分享会换发', typeof info.json.previewToken === 'string' && info.json.previewToken.length > 0, true);
+  check('预览令牌：有效期不晚于原分享', info.json.previewExpiresAt <= info.json.expiresAt, true);
+
+  // ① 不带密码头也能取文件 —— 这正是 <img src> 的处境
+  const previewReq = () => new Request(
+    `http://worker.local/file/uuid-1/photo.png?t=${encodeURIComponent(info.json.previewToken)}`,
+  );
+  check('预览令牌：不带密码头也放行文件', await validateShareToken(env, previewReq(), 'file', 'uuid-1', 'default'), true);
+
+  const claims = await parseShareToken(env, info.json.previewToken);
+  // ② 不带配额：预览一张图不该烧掉 maxUses
+  check('预览令牌：不带使用配额', [claims.maxUses, claims.jti], [0, '']);
+  // ③ 不能再要求密码，否则等于没换
+  check('预览令牌：不再要求密码', claims.pwdHash, '');
+}
+
+// 不带密码的分享**刻意不发**：原 token 本来就能进 URL，
+// 而多发一个「不限次」的令牌会让 maxUses 形同虚设。
+{
+  const { env, db } = makeEnv();
+  seed(db);
+  const open = await postShare(env, { type: 'file', uuid: 'uuid-1', ttl: 60, maxUses: 2 });
+  const info = await getShare(env, open.json.token);
+  check('预览令牌：不带密码的分享不发（否则绕过 maxUses）', 'previewToken' in info.json, false);
 }
 
 // ── 坏 token ────────────────────────────────────────────────────────────

@@ -639,9 +639,10 @@ export class FileHandler {
 
       const object = env.R2_BUCKET ? await env.R2_BUCKET.get(`files/${uuid}`) : null;
       const room = normalizeRoomName(object?.customMetadata?.room || 'default');
+      // ⚠️ 用 shareFileUUID 而不是 shareType:'file' —— 后者只认 typ=file 的令牌，
+      // 而 UI 的分享按钮固定发 {type:'content'}，于是从卡片分享出去的文件读不到字节。
       const authResult = await ensureRoomOrShareAccess(request, env, room, {
-        shareType: 'file',
-        shareId: uuid,
+        shareFileUUID: uuid,
       });
       if (!authResult.ok) {
         return authResult.response;

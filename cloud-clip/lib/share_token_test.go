@@ -547,6 +547,9 @@ type shareInfoResponse struct {
 	MaxUses       int    `json:"maxUses"`
 	Used          int    `json:"used"`
 	NeedsPassword bool   `json:"needsPassword"`
+	// 带密码的分享在验过密码后换发的短期能力令牌（见 issuePreviewToken）
+	PreviewToken     string `json:"previewToken"`
+	PreviewExpiresAt int64  `json:"previewExpiresAt"`
 }
 
 func TestShareInfoForFileShare(t *testing.T) {
@@ -613,6 +616,136 @@ func TestShareInfoPasswordGate(t *testing.T) {
 	s.handle_share(w2, req)
 	if w2.Code != http.StatusOK {
 		t.Fatalf("expected 200 with the correct password, got %d: %s", w2.Code, w2.Body.String())
+	}
+}
+
+// 带密码的分享：验过密码后必须换发一个「预览令牌」，让分享页能把它拼进图片/视频/下载的地址。
+//
+// 为什么必须有：`<img>` / `<video>` / `<a download>` 是浏览器自己发的请求，**加不了
+// X-Share-Password 头** —— 没有这个令牌，配了密码的实例上这些资源一律 401，
+// 而文本却是好的（那条是 axios 发的）。这个不对称很容易被误判成「只有文件坏了」。
+func TestShareInfoIssuesPreviewTokenForPasswordShare(t *testing.T) {
+	s := newShareInfoTestServer(t, map[string]File{
+		"uuid-2": {Name: "photo.png", UUID: "uuid-2", Size: 4096, ExpireTime: time.Now().Unix() + 600},
+	})
+
+	// maxUses=5：顺带验证预览令牌**不占配额**
+	token, _, err := s.issueShareToken("file", "uuid-2", "default", 600, 5, "hunter2")
+	if err != nil {
+		t.Fatalf("issue failed: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/share?t="+token, nil)
+	req.Header.Set(sharePasswordHeader, "hunter2")
+	w := httptest.NewRecorder()
+	s.handle_share(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 with the password, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp shareInfoResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+	if resp.PreviewToken == "" {
+		t.Fatal("a password-protected share must hand out a preview token")
+	}
+
+	// ① 直接放行文件下载，而且**不带密码头** —— 这正是 <img src> 的处境。
+	previewReq := httptest.NewRequest(http.MethodGet, "/file/uuid-2/photo.png?t="+resp.PreviewToken, nil)
+	if !s.validateShareToken(previewReq, "file", "uuid-2", "default") {
+		t.Fatal("the preview token must authorize the file download without the password header")
+	}
+
+	claims, ok := s.parseShareToken(resp.PreviewToken)
+	if !ok {
+		t.Fatal("the preview token must parse")
+	}
+	// ② 不带配额：预览一张图、拖一下进度条都会被算成一次完整访问，带配额会被白白烧光。
+	if claims.MaxUses != 0 || claims.JTI != "" {
+		t.Fatalf("the preview token must not carry a usage quota, got maxUses=%d jti=%q", claims.MaxUses, claims.JTI)
+	}
+	// ③ 不能再要求密码，否则等于没换。
+	if claims.PwdHash != "" {
+		t.Fatal("the preview token must not carry the password hash")
+	}
+	// ④ 不能比它服务的那条分享活得久。
+	if claims.Exp > resp.ExpiresAt {
+		t.Fatalf("the preview token outlives the share: %d > %d", claims.Exp, resp.ExpiresAt)
+	}
+}
+
+// 不带密码的分享**刻意不发**预览令牌：它的原 token 本来就能进 URL，
+// 而多发一个「不限次」的令牌会让 maxUses 形同虚设 —— 任何拿到链接的人都能换一个来绕过配额。
+func TestShareInfoSkipsPreviewTokenWithoutPassword(t *testing.T) {
+	s := newShareInfoTestServer(t, map[string]File{
+		"uuid-3": {Name: "b.txt", UUID: "uuid-3", Size: 10, ExpireTime: time.Now().Unix() + 600},
+	})
+	token, _, err := s.issueShareToken("file", "uuid-3", "default", 600, 2, "")
+	if err != nil {
+		t.Fatalf("issue failed: %v", err)
+	}
+	w := httptest.NewRecorder()
+	s.handle_share(w, httptest.NewRequest(http.MethodGet, "/share?t="+token, nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp shareInfoResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+	if resp.PreviewToken != "" {
+		t.Fatal("a share without a password must not hand out a preview token (it would bypass maxUses)")
+	}
+}
+
+// 从 UI 分享一个文件时，令牌是 `typ=content`（`ShareLinkButton` 固定发
+// `{type:'content', id:<内容 id>}`），而 `/file/<uuid>/<name>` 曾经只认 `typ=file` ——
+// 于是**配了密码的实例上，从卡片/时间流分享出去的图片、视频、音频取不到字节**：
+// 分享页的预览、下载按钮、以及 OG 卡片的 `og:image` 全挂，而文本分享正常
+// （它走 `/content`，那边本来就认 content）。开放实例里中间件直接放行，所以看不出来。
+// 实测复现过（开放 200 / 配了密码 401）。
+func TestContentShareCanReadItsFile(t *testing.T) {
+	s := newShareLogTestServer(t)
+	s.uploadFileMap["uuid-1"] = File{Name: "photo.png", UUID: "uuid-1", Size: 4096, Room: "default"}
+	s.uploadFileMap["uuid-2"] = File{Name: "other.png", UUID: "uuid-2", Size: 10, Room: "default"}
+	s.messageQueue.List = append(s.messageQueue.List, PostEvent{
+		Event: "receive",
+		Data: ReceiveHolder{FileReceive: &FileReceive{
+			ReceiveBase: ReceiveBase{ID: 7, Type: "file", Room: "default", Timestamp: time.Now().Unix()},
+			Name:        "photo.png",
+			Cache:       "uuid-1",
+			Size:        4096,
+		}},
+	})
+
+	token, _, err := s.issueShareToken("content", "7", "default", 600, 0, "")
+	if err != nil {
+		t.Fatalf("issue failed: %v", err)
+	}
+
+	reqFor := func(uuid string) *http.Request {
+		return httptest.NewRequest(http.MethodGet, "/file/"+uuid+"/photo.png?t="+token, nil)
+	}
+	if !s.canReadSharedFile(reqFor("uuid-1"), "uuid-1", "default") {
+		t.Fatal("a content share pointing at this file must be able to read its bytes")
+	}
+	// ⚠️ 但**不能**拿它去读别的文件 —— 那等于绕过房间边界。
+	if s.canReadSharedFile(reqFor("uuid-2"), "uuid-2", "default") {
+		t.Fatal("a content share must not grant access to a different file")
+	}
+}
+
+// 显式 `type=file` 的令牌照旧能用 —— 别为了修上面那条把原来这条路弄坏。
+func TestFileShareStillReadsItsFile(t *testing.T) {
+	s := newShareLogTestServer(t)
+	s.uploadFileMap["uuid-9"] = File{Name: "a.png", UUID: "uuid-9", Size: 10, Room: "default"}
+	token, _, err := s.issueShareToken("file", "uuid-9", "default", 600, 0, "")
+	if err != nil {
+		t.Fatalf("issue failed: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodGet, "/file/uuid-9/a.png?t="+token, nil)
+	if !s.canReadSharedFile(req, "uuid-9", "default") {
+		t.Fatal("a file share must keep working")
 	}
 }
 

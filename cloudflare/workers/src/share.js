@@ -28,6 +28,9 @@ export const DEFAULT_SHARE_TTL_SECONDS = 15 * 60;
 export const MIN_SHARE_TTL_SECONDS = 60;
 export const MAX_SHARE_TTL_SECONDS = 24 * 60 * 60;
 export const MAX_SHARE_MAX_USES = 1000;
+// 「预览令牌」的有效期。带密码的分享在**验过密码之后**会换发一个短期、无密码的能力令牌，
+// 给浏览器自己要发的那些请求用（见 issuePreviewToken）。短是刻意的：它不限次。
+const PREVIEW_TOKEN_TTL_SECONDS = 10 * 60;
 
 function normalizeShareTTL(ttl) {
   const value = Number(ttl);
@@ -143,6 +146,35 @@ export async function signShareClaims(env, claims) {
   const payload = bytesToBase64Url(textToBytes(JSON.stringify(claims)));
   const signature = await crypto.subtle.sign('HMAC', key, textToBytes(payload));
   return `${payload}.${bytesToBase64Url(new Uint8Array(signature))}`;
+}
+
+/**
+ * 换发一个短期、无密码的能力令牌，专给**浏览器自己要发的请求**用。
+ * 与 Go 侧 share_token.go 的 issuePreviewToken 一一对应。
+ *
+ * 为什么需要它：`<img>` / `<video>` / `<a download>` 由浏览器发起，**加不了自定义请求头**，
+ * 而带密码的分享要求 X-Share-Password —— 于是有密码的实例上，图片、视频、下载按钮一律 401
+ * （文本却是好的，因为那条是 JS 发的、带得上头；这个不对称最容易误判成「只有文件坏了」）。
+ * 根子是**凭据放错了层**：自定义头只服务于 XHR/fetch，浏览器直连的资源必须把凭据放进 URL。
+ *
+ * 为什么不干脆把密码塞进 query：密码进 URL 会落进浏览器历史和访问日志。
+ * 换出去的是**另一个令牌** —— 它只代表「刚刚验过密码」这件事，短命，且绑定同一条分享。
+ *
+ * ⚠️ 它**不带 mu**（=不限次）：预览一张图、拖一下视频进度条都会被算成「一次完整访问」，
+ * 带配额会让预览把 maxUses 白白烧光。代价是「拿到密码的人在 TTL 内可以无限次取这一条内容」——
+ * 所以 TTL 要短，而且**只能由已经验过密码的请求换发**（见 info）。
+ */
+async function issuePreviewToken(env, claims) {
+  const now = Math.floor(Date.now() / 1000);
+  // 不越过原分享的有效期：预览令牌不该比它服务的那条分享活得更久。
+  const exp = Math.min(Number(claims.exp || 0) || now + PREVIEW_TOKEN_TTL_SECONDS, now + PREVIEW_TOKEN_TTL_SECONDS);
+  const token = await signShareClaims(env, {
+    typ: claims.type,
+    id: claims.id,
+    room: claims.room,
+    exp,
+  });
+  return { token, exp };
 }
 
 export async function parseShareToken(env, token) {
@@ -358,9 +390,51 @@ export async function validateShareToken(env, request, expectedType, expectedId,
   return true;
 }
 
+/**
+ * 这个请求能不能读某个文件的字节（走分享令牌的那一条路）。
+ * 与 Go 侧 share_token.go 的 canReadSharedFile 一一对应。
+ *
+ * ⚠️ **两种令牌都要认**，漏一种就是「文本正常、文件 401」：
+ *   · `typ=file`    —— 显式「分享这个文件」签出来的，`id` 就是 uuid；
+ *   · `typ=content` —— **UI 上的分享按钮一律走这条**（ShareLinkButton 固定发
+ *     `{type:'content', id:<内容 id>}`），而它指向的内容可能正是一个文件 ——
+ *     这时 `id` 是**内容 id**，不是 uuid。
+ *
+ * 不认 content 的后果：从卡片/时间流分享出去的图片、视频、音频，在**配了密码**的实例上
+ * 一律 401（分享页的预览、下载按钮、以及 OG 卡片的 `og:image` 全挂）；
+ * 而文本分享正常（它走 /content，那边本来就认 typ=content）。
+ * 开放实例里鉴权直接放行，所以这个不对称一直看不出来（Go 侧实测复现过）。
+ */
+export async function canReadSharedFile(env, request, fileUUID, room) {
+  const normalizedRoom = normalizeRoomName(room);
+  const claims = await parseShareToken(env, extractShareToken(request));
+  if (!claims) {
+    return false;
+  }
+  if (claims.type === 'file') {
+    return validateShareToken(env, request, 'file', fileUUID, normalizedRoom);
+  }
+  if (claims.type !== 'content') {
+    return false;
+  }
+  const contentId = Number(claims.id);
+  if (!Number.isFinite(contentId)) {
+    return false;
+  }
+  // 内容必须真的指向**这个**文件 —— 否则就是拿 A 的分享去读 B 的字节。
+  const row = await findContentById(env, contentId, claims.room, true);
+  if (!row || String(row.uuid || '') !== fileUUID) {
+    return false;
+  }
+  // 密码 / 有效期 / 次数这些规则只在 validateShareToken 里写了一份，别在这儿重写第二份。
+  return validateShareToken(env, request, 'content', claims.id, normalizedRoom);
+}
+
 export async function ensureRoomOrShareAccess(request, env, room, {
   shareType = '',
   shareId = '',
+  // 读文件字节时用这个：它会**同时认 typ=file 与 typ=content**（见 canReadSharedFile）。
+  shareFileUUID = '',
 } = {}) {
   const normalizedRoom = normalizeRoomName(room);
   const requirement = resolveRoomAuth(env, normalizedRoom);
@@ -374,7 +448,11 @@ export async function ensureRoomOrShareAccess(request, env, room, {
     return { ok: true, room: normalizedRoom, token, requirement };
   }
 
-  if (shareType && shareId) {
+  if (shareFileUUID) {
+    if (await canReadSharedFile(env, request, shareFileUUID, normalizedRoom)) {
+      return { ok: true, room: normalizedRoom, token, requirement, viaShare: true };
+    }
+  } else if (shareType && shareId) {
     const shareOk = await validateShareToken(env, request, shareType, shareId, normalizedRoom);
     if (shareOk) {
       return { ok: true, room: normalizedRoom, token, requirement, viaShare: true };
@@ -738,6 +816,15 @@ export class ShareHandler {
         response.size = meta.size;
       } else {
         return errorResponse(400, 'unsupported_type', 'Bad Request', '不支持的分享类型');
+      }
+
+      // 带密码的分享：换发一个预览令牌，让分享页能把它拼进图片/视频/下载的地址。
+      // ⚠️ **不带密码的分享刻意不发** —— 它的原 token 本来就能进 URL（没有密码要带），
+      // 而多发一个「不限次」的令牌会让 maxUses 形同虚设（任何拿到链接的人都能换一个来绕过配额）。
+      if (claims.pwdHash) {
+        const preview = await issuePreviewToken(env, claims);
+        response.previewToken = preview.token;
+        response.previewExpiresAt = preview.exp;
       }
 
       return new Response(JSON.stringify(response), {

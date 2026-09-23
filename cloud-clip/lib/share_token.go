@@ -30,6 +30,11 @@ const (
 	// 用密钥而不是裸 SHA256：token 在 URL 里，裸哈希能被离线爆破；带密钥的算不出来。
 	// 存 token 里而不是内存 map：usage map 是进程内的，重启就没了，密码不能跟着丢。
 	sharePasswordHashLen = 16
+
+	// 「预览令牌」的有效期。带密码的分享在**验过密码之后**会换发一个短期、无密码的能力令牌，
+	// 给浏览器自己要发的那些请求用（见 issuePreviewToken）。短是刻意的：它不限次，
+	// 拿到就等于这条内容在 TTL 内随便取。
+	previewTokenTTLSeconds = 10 * 60
 )
 
 type shareClaims struct {
@@ -166,6 +171,34 @@ func (s *ClipboardServer) sharePasswordHash(password string) string {
 // 从请求里取分享密码（请求头）。
 func extractSharePassword(r *http.Request) string {
 	return strings.TrimSpace(r.Header.Get(sharePasswordHeader))
+}
+
+// issuePreviewToken 换发一个短期、无密码的能力令牌，专给**浏览器自己要发的请求**用。
+//
+// 为什么需要它：`<img>` / `<video>` / `<a download>` 由浏览器发起，**加不了自定义请求头**，
+// 而带密码的分享要求 `X-Share-Password` —— 于是有密码的实例上，图片、视频、下载按钮一律 401
+// （文本却是好的，因为那条是 axios 发的、带得上头；这个不对称最容易误判成「只有文件坏了」）。
+// 根子是**凭据放错了层**：自定义头只服务于 JS 的 XHR/fetch，浏览器直连的资源必须把凭据放进 URL。
+//
+// 为什么不干脆把密码塞进 query：密码进 URL 会落进浏览器历史和服务器访问日志（见文件头约定）。
+// 这里换出去的是**另一个令牌** —— 它只代表「刚刚验过密码」这件事，短命，且绑定同一条分享。
+//
+// ⚠️ 它**不带 maxUses**（=不限次）：预览一张图、拖一下视频进度条都会被算成「一次完整访问」，
+// 带着配额会让预览把 maxUses 白白烧光。代价是「拿到密码的人在 TTL 内可以无限次取这一条内容」——
+// 所以 TTL 要短，而且**只能由已经验过密码的请求换发**（见 handleShareInfo）。
+func (s *ClipboardServer) issuePreviewToken(claims *shareClaims) (string, int64, error) {
+	exp := time.Now().Unix() + previewTokenTTLSeconds
+	// 不越过原分享的有效期：预览令牌不该比它服务的那条分享活得更久。
+	if claims.Exp > 0 && claims.Exp < exp {
+		exp = claims.Exp
+	}
+	token, err := s.signShareClaims(shareClaims{
+		Type: claims.Type,
+		ID:   claims.ID,
+		Room: claims.Room,
+		Exp:  exp,
+	})
+	return token, exp, err
 }
 
 func (s *ClipboardServer) signShareClaims(claims shareClaims) (string, error) {
@@ -421,7 +454,44 @@ func (s *ClipboardServer) canAccessFile(r *http.Request, room string, fileUUID s
 	if s.canAccessRoom(room, token) {
 		return true
 	}
-	return s.validateShareToken(r, "file", fileUUID, room)
+	return s.canReadSharedFile(r, fileUUID, room)
+}
+
+// canReadSharedFile 这个请求能不能读某个文件的字节（走分享令牌的那一条路）。
+//
+// ⚠️ **两种令牌都要认**，漏一种就是「文本正常、文件 401」：
+//   - `typ=file`    —— 显式「分享这个文件」签出来的，`id` 就是 uuid；
+//   - `typ=content` —— **UI 上的分享按钮一律走这条**（`ShareLinkButton` 固定发
+//     `{type:'content', id:<内容 id>}`），而它指向的内容可能正是一个文件 ——
+//     这时 `id` 是**内容 id**，不是 uuid。
+//
+// 不认 content 的后果：从卡片/时间流分享出去的图片、视频、音频，在**配了密码**的实例上
+// 一律 401 —— 分享页的预览、下载按钮、以及 OG 卡片的 `og:image` 全挂；
+// 而文本分享正常（它走 `/content`，那边本来就认 `typ=content`）。
+// 开放实例里 `authMiddleware` 直接放行，所以这个不对称一直看不出来（实测复现过）。
+func (s *ClipboardServer) canReadSharedFile(r *http.Request, fileUUID, room string) bool {
+	claims, ok := s.parseShareToken(extractShareToken(r))
+	if !ok {
+		return false
+	}
+	if claims.Type == "file" {
+		return s.validateShareToken(r, "file", fileUUID, room)
+	}
+	if claims.Type != "content" {
+		return false
+	}
+	contentID, err := strconv.Atoi(strings.TrimSpace(claims.ID))
+	if err != nil {
+		return false
+	}
+	// 内容必须真的指向**这个**文件 —— 否则就是拿 A 的分享去读 B 的字节。
+	_, _, targetUUID, found := s.findContentForShare(contentID, claims.Room, true)
+	if !found || targetUUID == "" || targetUUID != fileUUID {
+		return false
+	}
+	// 密码 / 有效期 / 次数这些规则只在 validateShareToken 里写了一份，
+	// 这里用 content 的类型再走一遍，别在这儿重写第二份。
+	return s.validateShareToken(r, "content", claims.ID, room)
 }
 
 func (s *ClipboardServer) buildAbsoluteURL(r *http.Request, path string, query url.Values) string {
@@ -604,6 +674,16 @@ func (s *ClipboardServer) handleShareInfo(w http.ResponseWriter, r *http.Request
 	default:
 		writeError(w, http.StatusBadRequest, "unsupported_type", "Unsupported share type", "不支持的分享类型")
 		return
+	}
+
+	// 带密码的分享：换发一个预览令牌，让分享页能把它拼进图片/视频/下载的地址。
+	// ⚠️ **不带密码的分享刻意不发** —— 它的原 token 本来就能进 URL（没有密码要带），
+	// 而多发一个「不限次」的令牌会让 maxUses 形同虚设（任何拿到链接的人都能换一个来绕过配额）。
+	if claims.PwdHash != "" {
+		if previewToken, exp, err := s.issuePreviewToken(claims); err == nil {
+			response["previewToken"] = previewToken
+			response["previewExpiresAt"] = exp
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")

@@ -714,7 +714,7 @@ func (s *ClipboardServer) authMiddleware(next http.HandlerFunc) http.HandlerFunc
 		if r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, s.config.Server.Prefix+"/file/") {
 			pathPart := strings.TrimPrefix(r.URL.Path, s.config.Server.Prefix+"/file/")
 			fileUUID := strings.SplitN(pathPart, "/", 2)[0]
-			if fileUUID != "" && s.validateShareToken(r, "file", fileUUID, room) {
+			if fileUUID != "" && s.canReadSharedFile(r, fileUUID, room) {
 				s.logger.Printf("分享令牌认证成功: IP: %s, 路径: %s, 房间: %s", clientIP, r.URL.Path, requirement.Room)
 				next.ServeHTTP(w, r)
 				return
