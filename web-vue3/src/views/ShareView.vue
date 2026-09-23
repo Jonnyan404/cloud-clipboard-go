@@ -15,11 +15,12 @@ import { useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import axios from 'axios';
 import MarkdownBody from '@/components/MarkdownBody.vue';
+import CodeBlock from '@/components/CodeBlock.vue';
 import {
     copyTextToClipboard,
     errorMessage,
+    filePreviewKind,
     formatTimestamp,
-    isImageName,
     prettyFileSize,
     renderMarkdownHtml,
     reportShareVisit,
@@ -65,14 +66,27 @@ const isText = computed(() => info.value?.kind === 'text');
 const html = computed(() => (mdMode.value === 'md' ? renderMarkdownHtml(text.value) : ''));
 const canToggleMd = computed(() => isText.value && Boolean(text.value));
 
+// 文件地址用的令牌。⚠️ **不能直接用原 token** ——
+// `<img>` / `<video>` / `<a download>` 是**浏览器自己发的请求，加不了 `X-Share-Password` 头**，
+// 而带密码的分享要求那个头：配了密码的实例上图片/视频/下载会一律 401（文本却正常，
+// 因为那条是 axios 发的）。服务端因此在验过密码后换发一个短期、无密码的**预览令牌**，
+// 专门给这些地址用（见 Go 的 issuePreviewToken / Worker 的同名函数）。
+// 不带密码的分享没有预览令牌，也不需要有 —— 原 token 本来就够。
+const fileToken = computed(() => String(info.value?.previewToken || '') || token.value);
+
 const fileUrl = computed(() => {
     if (!isFile.value || !info.value?.uuid) {
         return '';
     }
     const name = encodeURIComponent(info.value.name || 'file');
-    return `file/${encodeURIComponent(info.value.uuid)}/${name}?t=${encodeURIComponent(token.value)}`;
+    return `file/${encodeURIComponent(info.value.uuid)}/${name}?t=${encodeURIComponent(fileToken.value)}`;
 });
-const isImage = computed(() => isFile.value && isImageName(info.value?.name));
+// 能就地预览吗、按哪一类渲染（image / video / audio / text，空串=不预览）。
+// 判型收在 util.js 的 filePreviewKind —— **全站唯一实现**（那边注释里写了为什么）。
+const previewKind = computed(() => (isFile.value ? filePreviewKind(info.value?.name) : ''));
+const previewLoading = ref(false);
+// ⚠️ 文本类文件**没有正文**：文件条目只有名字/大小/缩略图，正文要另发一次 GET 取回来。
+const fileText = ref('');
 const roomLabel = computed(() => {
     const room = String(info.value?.room || 'default');
     return room === 'default' ? t('publicRoom') : room;
@@ -109,9 +123,28 @@ async function loadText() {
     text.value = data?.content ?? '';
 }
 
+// 文本类文件的正文：走 fileUrl（相对路径 + token）另取一次，带上分享密码头。
+// 失败**不**把整页变成错误页 —— 下面那行「名字 + 大小 + 下载」还在，收件人照样能拿走文件。
+async function loadFileText() {
+    if (previewKind.value !== 'text' || !fileUrl.value) {
+        return;
+    }
+    previewLoading.value = true;
+    try {
+        const response = await axios.get(fileUrl.value, shareConfig({ responseType: 'text' }));
+        fileText.value = typeof response.data === 'string' ? response.data : String(response.data || '');
+    } catch (error) {
+        fileText.value = '';
+        console.warn('share file preview failed:', errorMessage(error));
+    } finally {
+        previewLoading.value = false;
+    }
+}
+
 async function loadInfo() {
     loading.value = true;
     failure.value = '';
+    fileText.value = '';
     if (!token.value) {
         failure.value = t('sharePageInvalid');
         loading.value = false;
@@ -125,6 +158,8 @@ async function loadInfo() {
         mdMode.value = linkedFormat.value;
         if (data?.kind === 'text') {
             await loadText();
+        } else if (data?.kind === 'file') {
+            await loadFileText();
         }
     } catch (error) {
         const status = error?.response?.status;
@@ -135,6 +170,7 @@ async function loadInfo() {
             passwordNeeded.value = true;
             info.value = null;
             text.value = '';
+            fileText.value = '';
             return;
         }
         failure.value = shareFailureText(code) || errorMessage(error) || t('sharePageInvalid');
@@ -192,6 +228,7 @@ watch(token, () => {
     failure.value = '';
     info.value = null;
     text.value = '';
+    fileText.value = '';
     mdMode.value = linkedFormat.value;
     reportVisit();
     loadInfo();
@@ -267,9 +304,48 @@ watch(token, () => {
                 </template>
 
                 <template v-else-if="isFile">
+                    <!-- 能预览就预览：图片 / 视频 / 音频直接渲染（fileUrl 带 token，浏览器流式加载），
+                         文本类文件另发一次请求取正文；都不是才退回图标。
+                         预览失败不影响下面那行「名字 + 大小 + 下载」—— 收件人至少还能把文件拿走。 -->
+                    <div v-if="previewKind" class="share-page__preview">
+                        <v-progress-circular
+                            v-if="previewLoading"
+                            indeterminate
+                            size="28"
+                            width="3"
+                            color="primary"
+                        />
+                        <img
+                            v-else-if="previewKind === 'image'"
+                            :src="fileUrl"
+                            :alt="info.name"
+                            class="share-page__image"
+                        >
+                        <video
+                            v-else-if="previewKind === 'video'"
+                            :src="fileUrl"
+                            controls
+                            preload="metadata"
+                            class="share-page__video"
+                        ></video>
+                        <audio
+                            v-else-if="previewKind === 'audio'"
+                            :src="fileUrl"
+                            controls
+                            preload="metadata"
+                            class="share-page__audio"
+                        ></audio>
+                        <!-- 代码文件按扩展名上色（认不出来就纯文本渲染）；见 components/CodeBlock.vue -->
+                        <code-block
+                            v-else-if="fileText"
+                            :text="fileText"
+                            :name="info.name"
+                            class="share-page__filetext"
+                        />
+                    </div>
+
                     <div class="share-page__file">
-                        <img v-if="isImage" :src="fileUrl" :alt="info.name" class="share-page__thumb" />
-                        <v-icon v-else size="40" class="share-page__file-icon">{{ mdiFileOutline }}</v-icon>
+                        <v-icon v-if="!previewKind" size="40" class="share-page__file-icon">{{ mdiFileOutline }}</v-icon>
                         <div class="share-page__file-meta">
                             <div class="share-page__file-name">{{ info.name }}</div>
                             <div class="share-page__muted">{{ prettyFileSize(Number(info.size || 0)) }}</div>
@@ -372,11 +448,28 @@ watch(token, () => {
     border-radius: 10px;
     background: rgba(var(--v-theme-on-surface), 0.04);
 }
-.share-page__thumb {
-    max-width: 96px;
-    max-height: 96px;
+/* 媒体区：图片/视频按卡片宽度铺开、高度封顶 —— 别把下面那行下载按钮挤出屏幕。 */
+.share-page__preview {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 60px;
+    margin-top: 14px;
+}
+.share-page__image,
+.share-page__video {
+    max-width: 100%;
+    max-height: 62vh;
     border-radius: 8px;
-    object-fit: cover;
+    object-fit: contain;
+}
+.share-page__audio {
+    width: 100%;
+}
+/* 文本类文件：正文可能很长，自己滚（滚动与配色都在 CodeBlock 里）。
+   ⚠️ 媒体区是 flex，flex 项默认按内容宽 —— 这里要显式撑满。 */
+.share-page__filetext {
+    width: 100%;
 }
 .share-page__file-icon {
     color: rgba(var(--v-theme-on-surface), 0.55);

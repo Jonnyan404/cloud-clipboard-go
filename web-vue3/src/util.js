@@ -455,6 +455,42 @@ export function isImageName(name) {
     return IMAGE_NAME_RE.test(String(name || ''));
 }
 
+// 文件条目「能不能就地预览、该按哪一类渲染」—— **全站唯一实现**。
+//
+// 为什么收进这里：这三条正则（视频 / 音频 / 文本类文件）本来在 7 个文件里各抄了一份
+// （received-item/File、sticky/StickyNote、glance/GlancePreview、ChatWall / MegaWall /
+// TerminalWall / WorkbenchWall），而且**已经漂移**：那几个模式墙「挑渲染分支」的 helper 认
+// `.mov`，而它们自己的 `isPreviewableVideo` 不认 —— 同一个文件在弹窗里是视频播放器、
+// 在卡片上却退回图标。同一份 `isImageName` 当年也是抄了 6 份才收进来的，别再抄第 8 份。
+//
+// 判型只看扩展名，不看内容：服务端不嗅探、客户端也不该嗅探（同 isImageName）。
+//
+// 返回 `'image' | 'video' | 'audio' | 'text'`，不预览时返回 `''`（调用方退回图标）。
+// ⚠️ 图片走 `isImageName`（含 svg / ico / avif），别在这里再列一遍图片后缀。
+const VIDEO_NAME_RE = /\.(mp4|webm|ogv|mov)$/i;
+const AUDIO_NAME_RE = /\.(mp3|wav|ogg|opus|m4a|flac)$/i;
+const TEXT_NAME_RE = /\.(txt|text|md|markdown|json|log|csv|tsv|ya?ml|xml|ini|conf|cfg|toml|properties|env|gitignore|dockerfile|js|jsx|mjs|cjs|ts|tsx|vue|css|scss|sass|less|html|htm|sql|sh|bash|zsh|fish|ps1|bat|cmd|go|py|java|kt|kts|rb|php|rs|c|cc|cpp|cxx|h|hh|hpp|hxx|swift|proto)$/i;
+
+export function filePreviewKind(name) {
+    const value = String(name || '');
+    if (!value) {
+        return '';
+    }
+    if (isImageName(value)) {
+        return 'image';
+    }
+    if (VIDEO_NAME_RE.test(value)) {
+        return 'video';
+    }
+    if (AUDIO_NAME_RE.test(value)) {
+        return 'audio';
+    }
+    if (TEXT_NAME_RE.test(value)) {
+        return 'text';
+    }
+    return '';
+}
+
 /**
  * 把一条内容挪到看板的某一列（`POST /content/<id>/column`）。
  *

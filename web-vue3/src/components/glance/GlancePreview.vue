@@ -22,8 +22,8 @@ import {
     createShareLink,
     deviceLabel,
     errorMessage,
+    filePreviewKind,
     formatTimestamp,
-    isImageName,
     prettyFileSize,
 } from '@/util.js';
 
@@ -40,14 +40,15 @@ const content = computed(() => props.item?.content || '');
 // md 渲染沿用全站约定（useMarkdown 内部：任务列表 / 表格默认就是 md）。
 const md = useMarkdown(() => content.value);
 
-// 文件条目的**可预览类型**。判型靠扩展名（服务端不嗅探，客户端也不该嗅探，
-// 两边同一套标准）——和聊天 / 工作台的阅读器保持一致，别各自写一份。
-// 「图片」用 util 的 isImageName（全站唯一实现）。
-const isImage = computed(() => isFile.value && isImageName(props.item?.name));
-const isVideo = computed(() => /\.(mp4|webm|ogv)$/i.test(props.item?.name || ''));
-const isAudio = computed(() => /\.(mp3|wav|ogg|opus|m4a|flac)$/i.test(props.item?.name || ''));
-const isTextFile = computed(() => /\.(txt|text|md|markdown|json|log|csv|tsv|ya?ml|xml|ini|conf|cfg|toml|properties|env|gitignore|dockerfile|js|jsx|mjs|cjs|ts|tsx|vue|css|scss|sass|less|html|htm|sql|sh|bash|zsh|fish|ps1|bat|cmd|go|py|java|kt|kts|rb|php|rs|c|cc|cpp|cxx|h|hh|hpp|hxx|swift|proto)$/i.test(props.item?.name || ''));
-const canPreview = computed(() => Boolean(isImage.value || isVideo.value || isAudio.value || isTextFile.value));
+// 文件条目的**可预览类型**。判型收在 `util.js` 的 `filePreviewKind`（**全站唯一实现**）——
+// 这段正则本来在 7 个文件里各有一份，而且已经漂移（有的认 `.mov`、有的不认）。
+// 判型只看扩展名，不看内容：服务端不嗅探、客户端也不该嗅探，两边同一套标准。
+const previewKind = computed(() => (isFile.value ? filePreviewKind(props.item?.name) : ''));
+const isImage = computed(() => previewKind.value === 'image');
+const isVideo = computed(() => previewKind.value === 'video');
+const isAudio = computed(() => previewKind.value === 'audio');
+const isTextFile = computed(() => previewKind.value === 'text');
+const canPreview = computed(() => Boolean(previewKind.value));
 
 const previewLoading = ref(false);
 // 媒体（图/视频/音频）走**直连正文**的地址：带 token 的 `rawUrl` 直接塞进 src 就能流式加载，
