@@ -1,6 +1,6 @@
 <script setup>
 import { useI18n } from 'vue-i18n';
-import { copyToClipboard } from '@/util.js';
+import { copyTextToClipboard } from '@/util.js';
 import { toast } from '@/plugins/toast';
 
 // 预览框右上角那排图标：**切换显示方式**，外加一个「复制当前这份」。
@@ -67,7 +67,7 @@ async function copyCurrent() {
         return;
     }
     try {
-        await copyToClipboard(props.copyText);
+        await copyTextToClipboard(props.copyText);
         toast.success(t('copySuccess'));
     } catch {
         toast.error(t('copyFailedGeneral'));
