@@ -304,7 +304,7 @@ function stepDelta(step) {
 
 .action-chain__hint {
     font-size: 0.75rem;
-    color: rgba(71, 85, 105, 0.7);
+    opacity: 0.7;
     padding: 8px 0;
 }
 
@@ -345,7 +345,7 @@ function stepDelta(step) {
 .action-chain__step-delta {
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     font-size: 0.625rem;
-    color: rgba(71, 85, 105, 0.7);
+    opacity: 0.7;
     flex: 0 0 auto;
 }
 
@@ -448,11 +448,12 @@ function stepDelta(step) {
     align-items: flex-start;
     gap: 6px;
     font-size: 0.75rem;
-    color: #b91c1c;
+    /* 主题变量：写死的深红在暗色主题下对比度太低 */
+    color: rgb(var(--v-theme-error));
 }
 
 .action-chain__empty {
     font-size: 0.75rem;
-    color: rgba(71, 85, 105, 0.7);
+    opacity: 0.7;
 }
 </style>

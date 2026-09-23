@@ -117,7 +117,7 @@ const groups = computed(() => {
     font-size: 0.6875rem;
     font-weight: 700;
     letter-spacing: 0.04em;
-    color: rgba(71, 85, 105, 0.75);
+    opacity: 0.75;
     margin: 10px 0 6px;
 }
 
@@ -141,8 +141,10 @@ const groups = computed(() => {
     padding: 5px 10px;
     border: 1px solid rgba(148, 163, 184, 0.5);
     border-radius: 999px;
-    background: #fff;
-    color: #334155;
+    /* 主题变量而不是写死的白底深字 —— 这个面板现在住在弹层里（surface 底色），
+       暗色主题下写死的话就是一堆白胶囊浮在暗底上。 */
+    background: rgb(var(--v-theme-surface));
+    color: inherit;
     font-size: 0.75rem;
     line-height: 1.4;
     cursor: pointer;
@@ -151,8 +153,8 @@ const groups = computed(() => {
 }
 
 .action-picker__item:hover {
-    border-color: #0ea5e9;
-    color: #0369a1;
+    border-color: rgb(var(--v-theme-primary));
+    color: rgb(var(--v-theme-primary));
 }
 
 /* 不适用的置灰（仍可点 —— 点了会给出明确错误，不是「没反应」） */
@@ -168,7 +170,7 @@ const groups = computed(() => {
 
 .action-picker__empty {
     font-size: 0.75rem;
-    color: rgba(71, 85, 105, 0.7);
+    opacity: 0.7;
     padding: 14px 2px;
     text-align: center;
 }

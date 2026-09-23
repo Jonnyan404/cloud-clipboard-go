@@ -298,7 +298,8 @@ async function saveAsNew(content) {
 }
 
 .bench-wall__draft::placeholder {
-    color: rgba(71, 85, 105, 0.5);
+    /* 主题变量：写死的深灰在暗色主题下看不见 */
+    color: rgba(var(--v-theme-on-surface), 0.4);
 }
 
 /* 动作链占满输入框剩下的高度（它内部再分「链」和「结果」两块） */
