@@ -148,7 +148,7 @@
   "renderMarkdown": "渲染 Markdown",
   "beautifyJson": "美化 JSON",
   "minifyJson": "壓縮 JSON",
-  "codeView": "以程式碼顯示",
+  "codeView": "程式碼高亮",
   "rawText": "原文",
   "markdownToggle": "Markdown 切換",
   "shortcuts": "捷徑",

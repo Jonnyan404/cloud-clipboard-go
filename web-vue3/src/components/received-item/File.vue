@@ -185,15 +185,6 @@ async function previewFile() {
 function toggleTextPreview() {
     showFullTextPreview.value = !showFullTextPreview.value;
 }
-async function copyToClipboard(textToCopy, successMessageKey = 'copySuccess', errorMessageKey = 'copyFailedGeneral') {
-    try {
-        await copyTextToClipboard(textToCopy);
-        toast(t(successMessageKey));
-    } catch (err) {
-        console.error('复制失败:', err);
-        toast(t(errorMessageKey));
-    }
-}
 async function deleteItem() {
     try {
         await axios.delete(`revoke/${props.meta.id}`, {
@@ -360,7 +351,6 @@ function deviceIcon(type) {
                 :json-available="md.jsonAvailable"
                 :json-compact-available="md.jsonCompactAvailable"
                 :code-available="md.codeAvailable"
-                :copy-text="md.copyText"
             ></markdown-toggle>
                                 <markdown-body v-if="md.html" :html="md.html"></markdown-body>
                                 <pre v-else class="timeline-card__text-preview" :class="{ 'timeline-card__text-preview--md': md.available }">{{ displayedTextPreview }}</pre>

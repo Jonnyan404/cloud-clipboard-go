@@ -57,9 +57,6 @@ export function readLocationParam(key) {
 export const SHARE_DEFAULT_TTL = 15 * 60; // 15 分钟
 export const SHARE_MIN_TTL = 60; // 1 分钟
 export const SHARE_MAX_TTL = 24 * 60 * 60; // 24 小时
-export const SHARE_TTL_STEP = 60; // 滑块步进：1 分钟
-export const SHARE_MAX_USES_LIMIT = 1000;
-
 /** 分钟 <-> 秒，供 UI 滑块使用 */
 export const SHARE_DEFAULT_TTL_MINUTES = Math.floor(SHARE_DEFAULT_TTL / 60);
 export const SHARE_MIN_TTL_MINUTES = Math.floor(SHARE_MIN_TTL / 60);
@@ -85,13 +82,6 @@ export function minutesToShareTTL(minutes) {
         return SHARE_DEFAULT_TTL;
     }
     return normalizeShareTTL(Math.round(mins) * 60);
-}
-
-export function shareTTLToMinutes(ttlSeconds) {
-    return Math.max(
-        SHARE_MIN_TTL_MINUTES,
-        Math.min(SHARE_MAX_TTL_MINUTES, Math.round(normalizeShareTTL(ttlSeconds) / 60)),
-    );
 }
 
 /**
@@ -185,32 +175,6 @@ export function withCurrentOrigin(url) {
     }
     const m = raw.match(/^[a-z][a-z0-9+.-]*:\/\/[^/]+(\/.*)?$/i);
     return m ? window.location.origin + (m[1] || '/') : raw;
-}
-
-/**
- * 往**老 hash 分享地址**上补展示格式（f=md|raw）。返回的地址直接给收件人用。
- *
- * ⚠️ 老地址走 hash 路由，`?t=` 在 **fragment** 里 —— `new URL(u).searchParams` 看到的是空的，
- * 拿它去 set 会把参数拼到 `#` 前面，页面读不到。必须拆 fragment 再拼。
- * 新地址（`<prefix>/s/<token>`）没有 fragment，直接返回原值。
- *
- * ⚠️ 目前**没有调用方**：发送方预设展示格式那个设置已经删了（分享页自带 raw↔md 切换）。
- * 留着是为了将来真有「按链接预设格式」的需求时不用重新踩 fragment 这个坑。
- */
-export function withSharePageFormat(url, format) {
-    const raw = String(url || '');
-    const hashIndex = raw.indexOf('#');
-    if (!raw || hashIndex < 0) {
-        return raw;
-    }
-    const value = String(format || '').toLowerCase() === 'md' ? 'md' : 'raw';
-    const head = raw.slice(0, hashIndex);
-    const fragment = raw.slice(hashIndex + 1);
-    const queryIndex = fragment.indexOf('?');
-    const routePath = queryIndex < 0 ? fragment : fragment.slice(0, queryIndex);
-    const params = new URLSearchParams(queryIndex < 0 ? '' : fragment.slice(queryIndex + 1));
-    params.set('f', value);
-    return `${head}#${routePath}?${params.toString()}`;
 }
 
 /**
@@ -372,16 +336,6 @@ function parseJsonObject(text) {
     }
 }
 
-/** 内容是一段**能美化的 JSON**（对象或数组）。给「美化」图标当显示条件。 */
-export function looksLikeJson(text) {
-    const s = String(text || '');
-    // 和 looksLikeMarkdown 同一个上限：几万字的条目算一次就够卡一下了。
-    if (!s.trim() || s.length > 20000) {
-        return false;
-    }
-    return parseJsonObject(s) !== undefined;
-}
-
 /**
  * 把 JSON 美化（两空格缩进）。
  *
@@ -416,10 +370,12 @@ export function minifyJson(text) {
 // 宁可把一段像代码的东西当代码 —— 那只是多一个图标，用户还能切回原文 / md；
 // 而漏判的代价是「只能点 md，然后看着 markdown 把代码重排」。
 //
-// 刻意不收 `from` / `use` / `type` / `new` 这类**英语里也常见**的词：
-// 它们做行首在散文里太容易撞上，而它们所在的语言（Python / Rust / TS）另有
-// `import` / `def` / `impl` / `fn` 这些更明确的信号。
-const CODE_HINT_RE = /(^|\n)\s*(package|import|export|require|module|func|fn|def|class|struct|interface|enum|trait|impl|namespace|public|private|protected|static|final|void|return|const|let|var|val|async|await|throw|except|elif|lambda|#include|#!|SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|BEGIN|COMMIT|printf|println|console|echo|puts)\b/;
+// ⚠️ `type` 一开始**被我故意排除了**（怕撞英文散文的「Type ...」），结果 Go 的
+// `type ID = int` 这种单行、又不带 `{` `}` 的定义就认不出来（Jonny 报的）。
+// 权衡之后收回来：多一个图标 vs 少一个视图 —— 宁可多。
+// 仍然不收 `from` / `use` / `new` 这几个：它们所在的语言另有更明确的信号
+// （Python 有 `import`/`def`、Rust 有 `impl`/`fn`、TS 有 `const`/`interface`）。
+const CODE_HINT_RE = /(^|\n)\s*(package|import|export|require|module|func|fn|def|class|struct|interface|enum|trait|impl|namespace|public|private|protected|static|final|void|return|const|let|var|val|type|defer|chan|async|await|throw|except|elif|lambda|#include|#!|SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|BEGIN|COMMIT|printf|println|console|echo|puts)\b/;
 
 // 代码的**形状**，不依赖关键字：`;` `{}` 收尾、`foo(...)` 调用、箭头 / 管道 / 泛型、
 // 标签、模板插值、`%s` 这类格式符。

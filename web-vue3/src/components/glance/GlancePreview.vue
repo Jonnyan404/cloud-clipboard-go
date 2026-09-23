@@ -131,7 +131,9 @@ async function downloadFile() {
 
 async function copyContent() {
     try {
-        await copyTextToClipboard(content.value);
+        // ⚠️ 复制**当前视图**的正文（`md.copyText`）：切到「美化 / 压缩 JSON」或「代码」之后
+        // 拿到的就是那一份，而不是永远复制原文。
+        await copyTextToClipboard(md.copyText);
         toast(t('copySuccess'));
     } catch {
         toast(t('copyFailedGeneral'));
@@ -192,7 +194,6 @@ const timeLabel = computed(() => (props.item?.timestamp ? formatTimestamp(props.
                 :json-available="md.jsonAvailable"
                 :json-compact-available="md.jsonCompactAvailable"
                 :code-available="md.codeAvailable"
-                :copy-text="md.copyText"
             ></markdown-toggle>
             <markdown-body v-if="md.html" :html="md.html"></markdown-body>
             <div v-else class="glance-preview__text">{{ content }}</div>

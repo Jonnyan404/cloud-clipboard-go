@@ -1,12 +1,10 @@
 <script setup>
 import { useI18n } from 'vue-i18n';
-import { copyTextToClipboard } from '@/util.js';
-import { toast } from '@/plugins/toast';
 
-// 预览框右上角那排图标：**切换显示方式**，外加一个「复制当前这份」。
+// 预览框右上角那排「用哪种方式看」的切换图标。
 //
-// ⚠️ 复制放在这里而不是卡片头部那个按钮上，是因为头部那个复制的是**原文** ——
-// 切到「压缩 JSON」之后再点它，拿到的还是压缩前的东西（Jonny 报的就是这个）。
+// ⚠️ **这里不放复制** —— 复制统一走卡片上原来那个复制图标（它会复制**当前视图**的内容，
+// 见各消费方对 `md.copyText` 的用法）。同一个卡片上两个复制按钮、行为还容易不一致。
 //
 // 槽位是**按内容决定**的（最多三个）：
 //   1. 原文        —— 永远有
@@ -25,7 +23,7 @@ import { toast } from '@/plugins/toast';
 //   2. 真正滚动的那个盒子上留出 `--md-toggle-gutter`（见文件末尾的全局变量），
 //      否则图标会盖住第一行行尾；
 //   3. 那层盒子上别挂 overflow —— 0 高 + overflow 会把图标整个裁掉，且不报错。
-const props = defineProps({
+defineProps({
     mode: {
         type: String,
         default: 'raw',
@@ -45,12 +43,6 @@ const props = defineProps({
         type: Boolean,
         default: false,
     },
-    // **当前视图的正文**（`useMarkdown` 的 `copyText`）—— 复制拿的就是它，
-    // 所以切到压缩视图后复制的就是压缩后的那一行。空串则不显示复制图标。
-    copyText: {
-        type: String,
-        default: '',
-    },
 });
 const emit = defineEmits(['update:mode']);
 const { t } = useI18n();
@@ -60,19 +52,6 @@ const mdiLanguageMarkdown = 'mdi-language-markdown';
 const mdiCodeBraces = 'mdi-code-braces';
 const mdiIndentIncrease = 'mdi-format-indent-increase';
 const mdiIndentDecrease = 'mdi-format-indent-decrease';
-const mdiContentCopy = 'mdi-content-copy';
-
-async function copyCurrent() {
-    if (!props.copyText) {
-        return;
-    }
-    try {
-        await copyTextToClipboard(props.copyText);
-        toast.success(t('copySuccess'));
-    } catch {
-        toast.error(t('copyFailedGeneral'));
-    }
-}
 </script>
 
 <template>
@@ -157,23 +136,6 @@ async function copyCurrent() {
                     @keydown.space.prevent="emit('update:mode', 'json-min')"
                 >
                     <v-icon size="20">{{ mdiIndentDecrease }}</v-icon>
-                </span>
-            </template>
-        </v-tooltip>
-
-        <!-- 复制**当前视图**的正文（原文 / 美化后的 JSON / 压缩后的 JSON / 代码） -->
-        <v-tooltip v-if="copyText" :text="t('copyText')" location="top">
-            <template v-slot:activator="{ props: activatorProps }">
-                <span
-                    v-bind="activatorProps"
-                    class="md-toggle__icon"
-                    role="button"
-                    tabindex="0"
-                    @click="copyCurrent"
-                    @keydown.enter.prevent="copyCurrent"
-                    @keydown.space.prevent="copyCurrent"
-                >
-                    <v-icon size="20">{{ mdiContentCopy }}</v-icon>
                 </span>
             </template>
         </v-tooltip>

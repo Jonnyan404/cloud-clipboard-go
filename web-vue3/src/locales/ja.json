@@ -148,7 +148,7 @@
   "renderMarkdown": "Markdown を表示",
   "beautifyJson": "JSON を整形",
   "minifyJson": "JSON を圧縮",
-  "codeView": "コードとして表示",
+  "codeView": "コードハイライト",
   "rawText": "元のテキスト",
   "markdownToggle": "Markdown 切り替え",
   "shortcuts": "ショートカット",

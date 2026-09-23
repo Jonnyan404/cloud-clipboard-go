@@ -152,7 +152,6 @@ async function deleteItem() {
                 :json-available="md.jsonAvailable"
                 :json-compact-available="md.jsonCompactAvailable"
                 :code-available="md.codeAvailable"
-                :copy-text="md.copyText"
             ></markdown-toggle>
                             <markdown-body v-if="md.html" :html="md.html"></markdown-body>
                             <div v-else style="white-space: pre-wrap; word-break: break-all;">{{ decodedContent }}</div>

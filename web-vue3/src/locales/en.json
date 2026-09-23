@@ -148,7 +148,7 @@
   "renderMarkdown": "Render Markdown",
   "beautifyJson": "Beautify JSON",
   "minifyJson": "Minify JSON",
-  "codeView": "Show as code",
+  "codeView": "Code highlighting",
   "rawText": "Raw",
   "markdownToggle": "Markdown toggle",
   "shortcuts": "Shortcuts",

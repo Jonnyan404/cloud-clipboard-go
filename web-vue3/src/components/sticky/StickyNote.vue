@@ -9,7 +9,7 @@ import ShareLinkButton from '@/components/ShareLinkButton.vue';
 import { useWebSocketStore } from '@/store/websocket';
 import { useI18n } from 'vue-i18n';
 import { toast } from '@/plugins/toast';
-import { SHARE_DEFAULT_TTL, copyTextToClipboard, createShareLink, deviceLabel, errorMessage, formatTimestamp, isImageName, prettyFileSize, toggleTaskListItem } from '@/util.js';
+import { SHARE_DEFAULT_TTL, copyTextToClipboard, createShareLink, deviceLabel, errorMessage, formatTimestamp, isImageName, prettyFileSize } from '@/util.js';
 
 const props = defineProps({
     meta: {
@@ -173,7 +173,9 @@ async function downloadFile() {
 }
 async function copyContent() {
     try {
-        await copyTextToClipboard(decodedContent.value);
+        // 复制**当前视图**的正文（切到代码 / JSON 美化 / 压缩后拿到的就是那一份）。
+        // 和卡片头部那个复制按钮同一语义 —— 同一个卡片上「复制」不能有两种含义。
+        await copyTextToClipboard(md.copyText);
         toast(t('copySuccess'));
     } catch (err) {
         console.error('复制失败:', err);
@@ -351,7 +353,6 @@ async function deleteItem() {
                 :json-available="md.jsonAvailable"
                 :json-compact-available="md.jsonCompactAvailable"
                 :code-available="md.codeAvailable"
-                :copy-text="md.copyText"
             ></markdown-toggle>
                     <div
                         class="sticky-note__reader-text"
@@ -394,7 +395,6 @@ async function deleteItem() {
                 :json-available="md.jsonAvailable"
                 :json-compact-available="md.jsonCompactAvailable"
                 :code-available="md.codeAvailable"
-                :copy-text="md.copyText"
             ></markdown-toggle>
                                 <!-- 渲染态：正文是裸 markdown，自己当滚动盒 -->
                                 <div
