@@ -207,6 +207,13 @@ async function handleServer(request, env) {
     version: "cloudflare-worker-v1.0.0",
     roomList: isRoomListEnabled(env),
     history: parseInt(env.HISTORY_LIMIT || '10', 10),
+    // 定时自动化：Worker 侧**没有实现**这一族接口（没有 /tasks、没有 /automation，
+    // 也没有进程内调度器）。这里显式声明 enabled:false，而不是让这个字段干脆缺失 ——
+    // 缺失时前端分不清「这个后端不支持」和「这个字段还没送到」，
+    // 而 SPA 工具栏上那个入口正是按它决定渲不渲染（见 PageToolbar.vue 的 automationEnabled）。
+    // 显式声明之后，Cloudflare 部署里那个图标会稳定地不出现，而不是先闪出来再消失。
+    // ⚠️ 哪天 Worker 侧真的实现了，记得连同 docs/api*.md §8 的「仅 Go 实现」一起改。
+    automation: { enabled: false },
   }), {
     headers: {
       'Content-Type': 'application/json',

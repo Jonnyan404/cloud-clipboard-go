@@ -156,7 +156,14 @@ export class WebSocketRoom {
             chunk: multipartPartSize,
             limit: fileLimit
           },
-          auth: resolveRoomAuth(this.env, room).required
+          auth: resolveRoomAuth(this.env, room).required,
+          // 定时自动化：Worker 侧**没有实现**这一族接口（没有 /tasks、没有 /automation，
+          // 也没有进程内调度器）。显式声明 enabled:false，而不是让这个字段干脆缺失 ——
+          // SPA 工具栏那个入口正是按它决定渲不渲染（PageToolbar.vue 的 automationEnabled），
+          // 而前端读的 `app.config` 就是**这条 config 事件**的载荷（不是 /server 的响应）。
+          // 缺失的话，前端分不清「这个后端不支持」和「字段还没送到」。
+          // ⚠️ 哪天 Worker 侧真的实现了，记得连同 docs/api*.md §8 的「仅 Go 实现」一起改。
+          automation: { enabled: false }
         }
       };
       
