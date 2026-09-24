@@ -58,6 +58,9 @@ header a:hover { text-decoration: underline; }
 .when-name { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 13px; color: var(--fg); cursor: pointer; }
 /* ⚠️ 全局 input 是 width:100%，radio 不覆盖就会被撑成一条方块。 */
 .when-name input[type=radio] { width: auto; margin: 0; padding: 0; cursor: pointer; }
+/* ⚠️ 同一个坑：全局 `input { width: 100% }` 会把 checkbox 撑成一条**满行的方块**。
+   批量选择的复选框满行之后，任务名被挤到看不见 —— 看起来就是「整个任务列表空白」。 */
+.sel, #selAll { width: auto; margin: 0; padding: 0; cursor: pointer; }
 /* 未选中的那一档：灰掉但**仍然可点** —— 禁掉点击会让人以为功能坏了。 */
 .when-name.off { color: var(--mut); }
 .when-body { min-width: 0; }
