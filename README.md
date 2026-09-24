@@ -69,6 +69,7 @@
 | 🔍 **Shortcuts Support** | Android and iOS shortcut integration for one-tap sharing |
 | 🎨 **Nine UI Modes** | Timeline, glance, action bench, sticky notes, board and more — each mode keeps its own display settings, and `?mode=` in the URL pins one mode per browser tab (chat bubbles / mega / workbench / terminal are being retired) |
 | 🧩 **Action Library** | 35 built-in actions: Markdown rendering, JSON beautify/minify, Base64 / URL / Hex codecs, pinyin annotation (per character · table · by word), traditional↔simplified conversion, date math, hashing — use one to view an entry differently, or chain several into a pipeline |
+| ⏰ **Scheduled Automations** | Post rendered text into a room on a schedule — daily / weekly / once / 5-field cron. Bodies are templates (`{{date:+1d}}`, `{{weekday:+1d}}`, `{{latest}}`), and the server-runnable subset of the action library can be chained in. Policy is per room via `roomAuth[x].automation`, and scheduled messages don't consume room history by default (Go server only — the Cloudflare Worker has no scheduler) |
 
 ---
 
