@@ -226,17 +226,21 @@ pre { margin: 6px 0 0; padding: 10px 12px; border-radius: 8px; background: var(-
           <label style="display:flex;align-items:center;gap:6px;margin:0;font-size:13px;color:var(--fg)">
             <input type="checkbox" id="fKeep" style="width:auto"> <span data-i18n="fieldKeep">保留历史</span>
           </label>
-          <!-- 启用状态在**表单里**也能改（和列表上那个开关是同一个状态）：
-               列表上那个是**日常运维**（先停掉它，立即生效），这里的是**配置的一部分**
-               （编辑时顺手定下来，保存时一起提交）。
-               ⚠️ 标签写「启用此任务」而不是光写「启用」：光写「启用」时它紧挨着发送者
-               输入框，被读成「启用发送者显示名」过（那个框当时还没有可见标签）。 -->
-          <label style="display:flex;align-items:center;gap:6px;margin:0;font-size:13px;color:var(--fg)">
-            <input type="checkbox" id="fEnabled" checked style="width:auto"> <span data-i18n="fieldEnabled">启用此任务</span>
-          </label>
           <label style="display:flex;align-items:center;gap:6px;margin:0;font-size:13px;color:var(--fg)">
             <span class="small mut" data-i18n="fieldSender">发送者</span>
             <input id="fSender" style="width:200px" data-i18n-ph="phSender">
+          </label>
+        </div>
+
+        <!-- 启用状态**单独一行**：它管的是**整条任务**，和上面那两个（保留历史 / 发送者）
+             混在一行里时很难一眼认出它是个独立开关。
+             ⚠️ 它和列表上那个开关是**同一个状态**，只是场合不同：列表上那个是日常运维
+             （点了立即生效），这里是配置的一部分（保存时一起提交）。
+             ⚠️ 标签写「启用此任务」而不是光写「启用」：光写「启用」时它紧挨着发送者输入框，
+             被读成「启用发送者显示名」过（那个框当时还没有可见标签）。 -->
+        <div class="f">
+          <label style="display:flex;align-items:center;gap:6px;margin:0;font-size:13px;color:var(--fg)">
+            <input type="checkbox" id="fEnabled" checked style="width:auto"> <span data-i18n="fieldEnabled">启用此任务</span>
           </label>
         </div>
         <div class="small mut" id="keepNote" style="margin-bottom:12px" data-i18n="keepNote"></div>
