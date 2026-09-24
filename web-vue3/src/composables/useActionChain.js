@@ -1,5 +1,5 @@
 import { computed, ref, watch } from 'vue';
-import { findAction } from '@/data/actions.js';
+import { findAction, makeStep, stepId, stepParams } from '@/data/actions.js';
 
 /**
  * 动作链：一串动作 id，按顺序作用在正文上。
@@ -42,8 +42,11 @@ function writeJson(key, value) {
 
 // 只保留还存在的动作 id —— 动作被删掉（或改名）之后，老 localStorage 里会留着孤儿 id，
 // 不清掉的话链上会挂着一个永远跑不了、还删不掉的步骤。
-function sanitize(ids) {
-    return (Array.isArray(ids) ? ids : []).filter((id) => Boolean(findAction(id)));
+//
+// ⚠️ 链元素有**两种形态**（字符串 / `{id, params}`），所以判存在性必须走 `stepId`，
+// 不能拿元素当字符串用（带参数的步骤会变成 `[object Object]`，于是被整条清掉）。
+function sanitize(chain) {
+    return (Array.isArray(chain) ? chain : []).filter((step) => Boolean(findAction(stepId(step))));
 }
 
 const chain = ref(sanitize(readJson(CHAIN_KEY, [])));
@@ -66,7 +69,12 @@ function newTemplateId() {
 
 export function useActionChain() {
     // ── 链本身 ────────────────────────────────────────────────────
-    const steps = computed(() => chain.value.map((id) => ({ id, action: findAction(id) })).filter((s) => s.action));
+    // 每一步：id + **这一步自己的参数** + 动作定义。
+    // ⚠️ params 从**链元素**里读，不从 action 上读 —— 同一个动作可以在链上出现两次、
+    // 两次用不同参数，所以参数属于「这一步」而不是「这个动作」。
+    const steps = computed(() => chain.value
+        .map((step) => ({ id: stepId(step), params: stepParams(step), action: findAction(stepId(step)) }))
+        .filter((s) => s.action));
 
     /**
      * 追加一个动作到链尾。
@@ -99,8 +107,28 @@ export function useActionChain() {
         chain.value = next;
     }
 
-    function setChain(ids) {
-        chain.value = sanitize(ids);
+    /**
+     * 改链上某一步的参数。
+     *
+     * ⚠️ 用 **index** 而不是 id 定位：链**允许重复**（同一步骤出现两次是合法意图），
+     * 按 id 找会改错那一个。
+     *
+     * ⚠️ 值清空后会自动退回**字符串形态**（见 makeStep）—— 存储里不会留下
+     * `{id, params: {find: ''}}` 这种没意义的空壳。
+     */
+    function setParam(index, key, value) {
+        const step = chain.value[index];
+        if (!step) {
+            return;
+        }
+        const params = { ...stepParams(step), [key]: value };
+        const next = [...chain.value];
+        next[index] = makeStep(stepId(step), params);
+        chain.value = next;
+    }
+
+    function setChain(steps) {
+        chain.value = sanitize(steps);
     }
 
     // ── 模板 ──────────────────────────────────────────────────────
@@ -134,6 +162,7 @@ export function useActionChain() {
         removeAt,
         clear,
         move,
+        setParam,
         setChain,
         saveTemplate,
         applyTemplate,

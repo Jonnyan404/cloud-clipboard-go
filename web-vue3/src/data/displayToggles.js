@@ -30,10 +30,27 @@ export const DISPLAY_TOGGLES = [
     { key: 'timestamp', group: 'meta', labelKey: 'showTimestamp', icon: 'mdi-clock-outline' },
     { key: 'device', group: 'meta', labelKey: 'showDeviceInfo', icon: 'mdi-devices' },
     { key: 'ip', group: 'meta', labelKey: 'showSenderIP', icon: 'mdi-ip-network-outline' },
-    // markdown 接在两个模式：标准（时间流卡片 + 文件预览）和便签（阅读器大视图）。
-    // 必须声明 modes：个性化面板是「每模式一组开关」，不声明的话用户会在聊天/终端模式里
-    // 拨到一个完全没反应的开关 —— 显示一个不生效的开关，比不显示它更糟。
-    { key: 'markdown', group: 'content', labelKey: 'markdownToggle', icon: 'mdi-language-markdown-outline', modes: ['default', 'sticky', 'chat'] },
+    // 这条的**名字**说的是它真正管的东西：卡片 / 气泡上那排**动作图标**
+    //（原文↔Markdown、代码、JSON、⋯），不是 Markdown 本身 ——
+    // 早先叫「Markdown 切换」是自相矛盾的：关掉它 Markdown 渲染也跟着没了，
+    // 可它本身并不是一个「渲不渲染」的开关。
+    //
+    // 三个模式（标准 default / 便签 sticky / 聊天 chat）语义**完全一致**，就一条：
+    //   · 开关开着 → 内容有针对性动作时，那排图标就出现（标准/便签走 `useMarkdown`，
+    //     聊天在 ChatWall 里自己画，两边的可用性判断是同一份 `looksLikeMarkdown`）；
+    //   · 开关关掉 → 图标连同渲染视图一起消失，正文一律退回原文。
+    //   · **默认看哪一份不由这个开关决定**，由**内容**决定，而且三处同一条规则
+    //     （`util.js` 的 `prefersRenderedView`）：任务列表 / 表格默认就是渲染视图 ——
+    //     它们的价值全在结构上；其余内容默认原文。用户点图标 = 覆盖这一条的默认值。
+    //
+    // ⚠️ 聊天以前是例外（气泡无条件默认渲染），所以这个开关在那边等于「一键翻转全部
+    // 气泡的默认视图」。Jonny 要求统一，聊天已改成跟另外两处一样。
+    // 改动语义时，消费点（useMarkdown.js / ChatWall.vue）的注释要跟着改。
+    //
+    // 必须声明 modes：个性化面板是「每模式一组开关」，不声明的话用户在终端等模式里
+    // 会拨到一个完全没反应的开关 —— 显示一个不生效的开关，比不显示它更糟。
+    // （存储键仍叫 `markdown`：改名要迁移用户已存的配置，不值当。）
+    { key: 'markdown', group: 'content', labelKey: 'actionIcons', icon: 'mdi-language-markdown-outline', modes: ['default', 'sticky', 'chat'] },
     // 时间流上方的分类条（全部 / 文本 / 图片 / 文件）。
     // ⚠️ **这是「默认关」的例外**，下面 DEFAULT_DISPLAY 里那条「默认全开」的原则在这里**故意不适用**：
     // 分类条是可选的新浏览方式，不是原本就有的东西 —— 默认开会在所有老用户的时间流上
@@ -112,6 +129,8 @@ export const DEFAULT_DISPLAY = {
     // 默认开：实测过，启发式（looksLikeMarkdown）能把普通文本挡在外面 ——
     // `这是一句普通的话` 不会冒图标，`# hi` / `**hi**` / `- a` 才会。
     // 之前默认关，结果是用户写了 markdown 却以为功能没生效（开关藏在设置里，找不到）。
+    // 默认开的含义是「那排动作图标默认就在」；**不是**「默认就渲染」——
+    // 每条默认看原文还是渲染视图由内容决定，见上面 `markdown` 那条的说明。
     markdown: true,
     // ⚠️ 上面那条「默认全开」的原则在这里**故意破例**：分类条是新增的可选浏览方式，
     // 默认开等于给所有老用户的时间流凭空加一条横条。Jonny 要求默认关。

@@ -294,6 +294,36 @@ export function deviceLabel(senderDevice, fallback = '') {
 }
 
 /**
+ * 这条消息是不是**定时任务**发的。
+ *
+ * 服务端在 `deliverMessage` 里给定时投递的消息打上 `source: 'automation'`
+ * （见 lib/broadcast.go 的 messageSource），人发的消息该字段为空。
+ *
+ * ⚠️ 判定**只写这一处**。各模式的呈现方式不同（卡片 / 气泡 / 便签 / 看板），
+ * 但「是不是定时消息」必须是同一个答案 —— 散着写迟早会漂开，
+ * 表现就是「同一个房间，这个模式标了、那个模式没标」。
+ *
+ * ⚠️ 定时消息默认**不进房间历史**（`keepHistory: false`，见 task.go 的论证），
+ * 所以它只存在于实时广播里：刷新页面之后就看不到了。**别把它当成「消息丢了」**，
+ * 也别指望在历史记录里翻到它。
+ */
+export function isAutomationMessage(meta) {
+    return meta?.source === 'automation';
+}
+
+/**
+ * 这条定时消息是不是「错过触发窗口后补发」的。
+ *
+ * 服务端只在超出补发窗口（`automation.graceSeconds`，默认 600s）时才置 `late`。
+ * 界面要把它标出来，因为**它的时间看起来是错的**：消息上的 timestamp 是实际发送时刻，
+ * 而正文里的日期是按**原定时刻**渲染的（见 scheduler.go 的 executeAutomationTask）——
+ * 不标一下，用户会觉得「这条消息的内容和时间对不上，是坏的」。
+ */
+export function isLateMessage(meta) {
+    return Boolean(meta?.late);
+}
+
+/**
  * 从 axios 错误里取出「给人看」的文案。
  *
  * 服务端统一返回 { code, error, message }：message 是中文人话，error 是英文人话。
@@ -456,6 +486,25 @@ export function looksLikeTable(text) {
         }
     }
     return false;
+}
+
+/**
+ * 这条内容**默认**该看渲染视图，还是原文。
+ *
+ * 这是「默认值」的**唯一**判断处，标准模式卡片、便签阅读器、聊天气泡三处都走它 ——
+ * 三处如果各写一套，同一条内容在不同界面里长相不同，用户没法预期。
+ *
+ * 规则：任务列表和表格默认渲染，其余默认原文。
+ *   · 这两种内容的全部价值在**结构**上，默认看原文等于「先让你读一遍 `- [ ]`、
+ *     再点一下才看到清单」；
+ *   · 其余内容默认原文是**故意的**（`looksLikeMarkdown` 的注释解释了为什么宁可漏判）：
+ *     把普通文本默认渲染成斜体 / 有序列表，是改动用户的内容，比多一次点击糟得多。
+ *
+ * ⚠️ 只回答「默认看哪一份」，**不回答「能不能切」**——后者是 `looksLikeMarkdown`
+ * 与个性化里那个动作图标开关的事。三处都不该拿这个函数的返回值去决定要不要给图标。
+ */
+export function prefersRenderedView(text) {
+    return looksLikeTaskList(text) || looksLikeTable(text);
 }
 
 /**

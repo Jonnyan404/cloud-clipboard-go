@@ -2,7 +2,7 @@ import { computed, reactive, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useAppStore } from '@/store/app';
 import { findAction, renderFenced, runChain, targetedActions } from '@/data/actions.js';
-import { looksLikeTable, looksLikeTaskList } from '@/util.js';
+import { prefersRenderedView } from '@/util.js';
 
 /**
  * 一条内容的显示方式 —— **动作库驱动**。
@@ -15,14 +15,20 @@ import { looksLikeTable, looksLikeTaskList } from '@/util.js';
  *   · 把当前动作跑出来的结果变成消费方认的 `html`
  *
  * 两层职责仍然分得很清楚（别合并）：
- *   · 个性化里的开关（`app.display.markdown`）—— 只决定**要不要显示那些图标**
+ *   · 个性化里的开关（`app.display.markdown`，面板上叫「动作图标」）—— 只决定
+ *     **要不要显示那些图标**（连带渲染视图的开关）
  *   · 右上角那几个图标 —— 决定**这一条用哪种方式看**
+ *
+ * ⚠️ 这条语义**三个模式通用**：标准、便签走这里，聊天（views/modes/ChatWall.vue）
+ * 不走本 composable（气泡是列表，形态对不上），但默认值与可用性两条判断都复用
+ * 同一份实现（`util.js` 的 `prefersRenderedView` / `looksLikeMarkdown`）。
+ * 唯一集中说明处仍是 data/displayToggles.js 里 markdown 那条 —— 改语义先改那边。
  *
  * ⚠️ 「原文」不是动作（它不跑任何东西），所以用 `null` 表示。
  *
- * ⚠️ 任务列表和表格**默认就是 md**：这两种内容的全部价值在结构上，默认看原文等于
- * 「先让你读一遍 `- [ ]`、再点一下才看到清单」。其余内容默认看原文。
- * （个性化那个开关仍是上位开关：关掉它，这里连切换图标都不显示。）
+ * ⚠️ 任务列表和表格**默认就是 md**（`prefersRenderedView`）：这两种内容的全部价值
+ * 在结构上，默认看原文等于「先让你读一遍 `- [ ]`、再点一下才看到清单」。
+ * 其余内容默认看原文。（个性化那个开关仍是上位开关：关掉它，这里连图标都不显示。）
  *
  * @param {() => string} getText         取原始文本
  * @param {() => boolean} isMarkdownFile 可选：扩展名是 .md 这类可靠信号。
@@ -55,11 +61,9 @@ export function useMarkdown(getText, isMarkdownFile = () => false) {
     // 文件预览的正文是异步抓回来的，setup 时 getText() 还是空串 ——
     // 那时定成 null（原文）之后就再也不会变。
     // 用「用户覆盖值 ?? 按内容算出来的默认值」表达这个先后关系。
-    const defaultId = computed(() => {
-        const text = getText();
-        const structured = looksLikeTaskList(text) || looksLikeTable(text);
-        return structured ? 'format.markdown' : null;
-    });
+    // 「哪条内容默认看渲染视图」不在这里判断 —— 见 util.js 的 prefersRenderedView
+    // （聊天气泡走同一个函数，两处必须给出同一个答案）。
+    const defaultId = computed(() => (prefersRenderedView(getText()) ? 'format.markdown' : null));
 
     const mode = computed({
         get: () => (override.value === undefined ? defaultId.value : override.value),

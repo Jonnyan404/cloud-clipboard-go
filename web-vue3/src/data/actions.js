@@ -19,6 +19,9 @@
 // ⚠️ 正文上限是 4096 字符（服务端 text.limit），所以这里不需要考虑大文本的性能问题。
 
 import { detectLanguage } from '@/highlight.js';
+// 「查找替换」的常用模式表 —— **与 Go 侧共用同一份数据**（理由见那个文件里的注释）。
+// 前端 import 它、Go 的契约测试读它，任何一边改了没同步另一边，测试立刻红。
+import replaceModeTable from './replace-modes.json';
 import {
     decodeHtmlEntities,
     formatJson,
@@ -191,6 +194,58 @@ function dropBlankLines(text) {
 
 function trimEachLine(text) {
     return String(text || '').split('\n').map((line) => line.trim()).join('\n');
+}
+
+/**
+ * 「查找替换」的常用模式。
+ *
+ * ⚠️ 用户**不能填正则** —— 这里的正则由我们写死，而且**和 Go 侧共用同一份表**
+ * （`./replace-modes.json`；服务端有一份等价的硬编码，契约测试比对两边）。
+ * 让用户填正则的话，JS 的 RegExp 与 Go 的 RE2 会在前瞻 / 替换引用 / 多行标志上分叉，
+ * 症状是「预览区替换掉了、定时任务里没替换」—— 这个模块一直在防的那类错。
+ *
+ * 结构：`{ 模式 key: { source, flags } }`。`source` 为空 = 字面模式（用用户填的 find）。
+ */
+export const REPLACE_MODES = Object.fromEntries(
+    (replaceModeTable.modes || []).map((m) => [m.key, { source: m.source || '', flags: m.flags || '' }]),
+);
+
+/** 模式的 key 顺序（= 下拉里的顺序，第一项是默认值）。 */
+export const REPLACE_MODE_KEYS = (replaceModeTable.modes || []).map((m) => m.key);
+
+/**
+ * 按模式替换。「文本」模式就是字面替换，其余模式用表里那条固定正则。
+ *
+ * ⚠️ 替换文本一律当**字面**用（`String.replace` 传**函数形式**，这样 `$1` 不会被当成组引用）：
+ * 用户填的是「替换成什么文字」，把它当模板会让 `$` 变成危险字符。
+ * Go 那边对应 `ReplaceAllLiteralString`，同一条语义。
+ *
+ * ⚠️「文本」模式下「查找」为空**直接报错**，不能当成「在每个字符之间插入」处理：
+ * 用户只会看到一串乱码，完全不知道发生了什么。服务端的 `renderReplaceLiteral` 同一条规则。
+ */
+function replaceLiteral(text, params, ctx) {
+    const modeKey = String(params?.mode ?? '').trim() || 'text';
+    const mode = REPLACE_MODES[modeKey];
+    if (!mode) {
+        throw new Error(translator(ctx)('actionReplaceBadMode'));
+    }
+    const withText = String(params?.with ?? '');
+    const source = String(text || '');
+
+    // 「文本」模式：字面替换。
+    // ⚠️ 用 split/join 而不是 `String.replace(find, with)`：后者传字符串时**只替换第一个**，
+    // 要全局就得转义成正则 —— 又绕回了正则。
+    if (!mode.source) {
+        const find = String(params?.find ?? '');
+        if (!find) {
+            throw new Error(translator(ctx)('actionReplaceNeedFind'));
+        }
+        return source.split(find).join(withText);
+    }
+
+    // 其余模式：表里的固定正则。补一个 `g` 保证替换全部（表里只写语义相关的标志，如 `i`）。
+    const flags = mode.flags.includes('g') ? mode.flags : `${mode.flags}g`;
+    return source.replace(new RegExp(mode.source, flags), () => withText);
 }
 
 function reverseText(text) {
@@ -730,6 +785,53 @@ function newUuid() {
     });
 }
 
+// ── 链上的一步 ──────────────────────────────────────────────────────
+//
+// 两种形态，**读写都兼容**：
+//
+//	'text.trimLines'                                        无参数（绝大多数）
+//	{ id: 'text.replace', params: { find: 'a', with: 'b' } }  带参数
+//
+// ⚠️ 为什么不「一律用对象」：字符串形态已经存在 localStorage（`ccgActionChain` /
+// `ccgActionTemplates`）和后端的 tasks.json 里了。改成一律对象就要写迁移，
+// 而收益只是「形态统一」—— 不值得。**无参数时保持字符串**就是这条约定的全部内容。
+//
+// ⚠️ 服务端有一份**等价**实现（lib/task.go 的 `AutomationChainStep`，带自定义
+// UnmarshalJSON / MarshalJSON）。两侧的 JSON 形态必须一致，否则同一条任务在两边读出来不一样。
+
+/** 取这一步的动作 id。 */
+export function stepId(step) {
+    if (typeof step === 'string') {
+        return step;
+    }
+    return String(step?.id || '');
+}
+
+/** 取这一步的参数（没有就是空对象）。 */
+export function stepParams(step) {
+    if (step && typeof step === 'object' && step.params && typeof step.params === 'object') {
+        return step.params;
+    }
+    return {};
+}
+
+/**
+ * 组装一步。**无参数时返回字符串**（存储精简，也和存量数据同形）。
+ *
+ * 空字符串的参数会被丢掉 —— 「留空」在语义上就是「没填」，留一个 `{find: ''}` 进去
+ * 只会让存储里多出无意义的键，而 `run` 那边照样要判空。
+ */
+export function makeStep(id, params) {
+    const clean = {};
+    Object.keys(params || {}).forEach((key) => {
+        const value = String(params[key] ?? '');
+        if (value !== '') {
+            clean[key] = value;
+        }
+    });
+    return Object.keys(clean).length ? { id, params: clean } : id;
+}
+
 // ── 动作表 ──────────────────────────────────────────────────────────
 //
 // 字段：
@@ -918,6 +1020,44 @@ export const ACTIONS = [
         icon: 'mdi-format-letter-case-lower',
         direction: 'view',
         run: (text) => String(text || '').toLowerCase(),
+    },
+    {
+        // 第一个**带参数**的动作。参数声明在这里，**值**存在链元素上（见文件头的
+        // stepId / stepParams / makeStep）—— 所以同一条链上可以出现两次、两次用不同参数
+        // （「替换 A→B」再接「替换 C→D」是合法意图，链本来就允许重复）。
+        id: 'text.replace',
+        group: 'text',
+        nameKey: 'actionReplace',
+        icon: 'mdi-find-replace',
+        direction: 'view',
+        params: [
+            // 第一个选项就是默认值 = 字面替换（这个动作原本的行为）。
+            // ⚠️ 选项的 value 必须和 `replace-modes.json` 里的 key 对齐 —— 那边是「匹配什么」，
+            // 这边是「下拉里能选什么」，缺一个就会出现「选了没反应」。
+            {
+                key: 'mode',
+                labelKey: 'actionReplaceMode',
+                type: 'select',
+                options: [
+                    { value: 'text', labelKey: 'actionReplaceModeText' },
+                    { value: 'digits', labelKey: 'actionReplaceModeDigits' },
+                    { value: 'latin', labelKey: 'actionReplaceModeLatin' },
+                    { value: 'spaces', labelKey: 'actionReplaceModeSpaces' },
+                    { value: 'email', labelKey: 'actionReplaceModeEmail' },
+                    { value: 'url', labelKey: 'actionReplaceModeUrl' },
+                    { value: 'phone', labelKey: 'actionReplaceModePhone' },
+                    { value: 'ip', labelKey: 'actionReplaceModeIp' },
+                ],
+            },
+            // 「查找」只在「文本」模式下有意义 —— 其余模式自己决定匹配什么。
+            // 不隐藏的话，用户填了发现不生效，只会以为功能坏了。
+            { key: 'find', labelKey: 'actionReplaceFind', visibleWhen: { key: 'mode', equals: 'text' } },
+            { key: 'with', labelKey: 'actionReplaceWith' },
+        ],
+        // 有内容就能跑。空正文也放它进来 —— 让它跑到 run 里报一句具体的
+        // 「请先填『查找』的内容」，比在这里静默不出现好（用户至少知道为什么点了没反应）。
+        match: (text) => String(text || '').length > 0,
+        run: (text, ctx, params) => replaceLiteral(text, params, ctx),
     },
     {
         id: 'text.dedupe',
@@ -1282,12 +1422,15 @@ export function targetedActions(text, direction = 'view') {
  * 语义：**某一步失败就停在那里**，返回前面成功的结果 + 那一步的错误。
  * 不继续往后跑 —— 链上后一步的输入依赖前一步的输出，硬着头皮跑下去得到的东西没有意义。
  */
-export async function runChain(text, ids, ctx = {}) {
+export async function runChain(text, chain, ctx = {}) {
     const steps = [];
     let current = String(text ?? '');
     let error = '';
 
-    for (const id of ids) {
+    for (const step of chain) {
+        // 链元素两种形态都认（见文件头的 stepId / stepParams）
+        const id = stepId(step);
+        const params = stepParams(step);
         const action = findAction(id);
         if (!action) {
             error = `未知动作: ${id}`;
@@ -1295,7 +1438,7 @@ export async function runChain(text, ids, ctx = {}) {
         }
         const input = current;
         try {
-            const raw = await action.run(input, ctx);
+            const raw = await action.run(input, ctx, params);
             // 动作的返回值有**两种**形态：
             //   · 字符串          —— 纯文本结果（绝大多数动作）
             //   · `{ html, text }` —— **双表示**：html 用来渲染、text 用来复制。
@@ -1309,11 +1452,11 @@ export async function runChain(text, ids, ctx = {}) {
             } else {
                 output = String(raw ?? '');
             }
-            steps.push({ id, action, input, output, html, error: '' });
+            steps.push({ id, params, action, input, output, html, error: '' });
             current = output;
         } catch (err) {
             const message = String(err?.message || err || '执行失败');
-            steps.push({ id, action, input, output: '', error: message });
+            steps.push({ id, params, action, input, output: '', html: '', error: message });
             error = message;
             break;
         }

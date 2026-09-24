@@ -5,7 +5,7 @@ import { useWebSocketStore } from '@/store/websocket';
 import { useTheme } from 'vuetify';
 import { useI18n } from 'vue-i18n';
 import { toast } from '@/plugins/toast';
-import { SHARE_DEFAULT_TTL, copyTextToClipboard, createShareLink, deviceLabel, errorMessage, formatTimestamp, getClientId, isImageName, looksLikeMarkdown, renderMarkdownHtml, prettyFileSize } from '@/util.js';
+import { SHARE_DEFAULT_TTL, copyTextToClipboard, createShareLink, deviceLabel, errorMessage, formatTimestamp, getClientId, isAutomationMessage, isImageName, isLateMessage, looksLikeMarkdown, prefersRenderedView, renderMarkdownHtml, prettyFileSize } from '@/util.js';
 import PageToolbar from '@/components/PageToolbar.vue';
 import StickyComposer from '@/components/sticky/StickyComposer.vue';
 import ShareLinkButton from '@/components/ShareLinkButton.vue';
@@ -18,18 +18,37 @@ const theme = useTheme();
 const isDark = computed(() => theme.current.value?.dark ?? false);
 const { t } = useI18n();
 
-// 聊天气泡的 md 渲染。
+// 聊天气泡的 md 渲染 —— 与标准 / 便签**同一套语义**，三条一起看：
 //
-// 每条气泡**默认渲染 md**（Jonny 明确要求的），气泡那排操作按钮里有切换图标，
-// 想看原文的人自己切 —— 跟标准模式卡片、便签阅读器一致。
-// 每条的状态存在 mdModes（默认 'md'）；渲染结果按 id 先算成一张表，
-// 模板里按 id 取，避免同一条渲染两遍。
-const mdModes = reactive(new Map());
+//   · 个性化里那个开关（panel 上叫「动作图标」，存储键 `app.display.markdown`）只决定
+//     **那排动作图标显不显示**；关掉它，图标和渲染视图一起消失，气泡一律回纯文本。
+//     它**不决定**默认看哪一份。
+//   · 每条气泡默认看哪一份由**内容**决定 —— 任务列表 / 表格默认渲染，其余默认原文。
+//     判断复用 util.js 的 prefersRenderedView（标准 / 便签走的是同一个函数）。
+//   · 用户在气泡上点一次图标 = 覆盖这一条的默认值（存在 mdOverrides，只记点过的）。
+//
+// ⚠️ 聊天以前是**全站唯一默认渲染**的地方（气泡无条件渲染 md），Jonny 要求统一成
+// 跟标准 / 便签一致 —— 所以现在普通 markdown 气泡默认是原文，点一下才渲染。
+// 别再照抄旧的「气泡默认渲染」，语义的集中说明在 data/displayToggles.js 里 markdown 那条。
+//
+// 渲染结果按 id 先算成一张表，模板里按 id 取，避免同一条渲染两遍。
+const mdOverrides = reactive(new Map());
 function setBubbleMd(id, mode) {
-    mdModes.set(id, mode);
+    mdOverrides.set(id, mode);
 }
+// 每条文本气泡的正文（HTML 实体解码）。解码要建个 textarea，不便宜 ——
+// 模板里的图标、标题、渲染表三处都要用，所以按 id 算一次共享。
+const bubbleText = computed(() => {
+    const map = new Map();
+    for (const item of app.visibleReceived) {
+        if (item.type === 'text') map.set(item.id, decodedContent(item));
+    }
+    return map;
+});
 function bubbleMdMode(item) {
-    return mdModes.get(item.id) || 'md';
+    const override = mdOverrides.get(item.id);
+    if (override) return override;
+    return prefersRenderedView(bubbleText.value.get(item.id) || '') ? 'md' : 'raw';
 }
 const bubbleHtml = computed(() => {
     const map = new Map();
@@ -37,14 +56,14 @@ const bubbleHtml = computed(() => {
     for (const item of app.visibleReceived) {
         if (item.type !== 'text') continue;
         if (bubbleMdMode(item) !== 'md') continue;
-        const text = decodedContent(item);
+        const text = bubbleText.value.get(item.id) || '';
         if (looksLikeMarkdown(text)) map.set(item.id, renderMarkdownHtml(text));
     }
     return map;
 });
 // 内容不像 markdown 时不给图标（跟 useMarkdown 的 available 同一条判断）
 function bubbleMdAvailable(item) {
-    return app.display.markdown && item.type === 'text' && looksLikeMarkdown(decodedContent(item));
+    return app.display.markdown && item.type === 'text' && looksLikeMarkdown(bubbleText.value.get(item.id) || '');
 }
 const mdiCodeTags = 'mdi-code-tags';
 const mdiLanguageMarkdown = 'mdi-language-markdown';
@@ -157,6 +176,16 @@ const bubbleFooter = (item) => {
         parts.push(shortTime(item));
     }
     parts.push(item.type === 'text' ? t('chatTypeText') : t('chatTypeFile'));
+    // 定时消息的来源标记。和上面那个类型标签同理，**不归 app.display 那几个开关管** ——
+    // 它标的是「这条不是人发的」，属于结构信息，不是可选展示的元信息。
+    // 判定在 util.js（单点，那边有完整说明）。
+    if (isAutomationMessage(item)) {
+        parts.push(t('automationSource'));
+    }
+    // 补发：正文按原定时刻算、timestamp 是实际发送时刻，标出来免得用户以为内容坏了。
+    if (isLateMessage(item)) {
+        parts.push(t('automationLate'));
+    }
     if (isOwnBubble(item)) {
         parts.push(t('chatSynced'));
     }
@@ -371,7 +400,11 @@ watch(detailItem, (item) => {
                     <div v-else class="chat-wall__text">{{ decodedContent(item) }}</div>
                     <span class="chat-wall__bubble-time">{{ bubbleFooter(item) }}</span>
                     <span class="chat-wall__bubble-ops">
-                        <!-- 原文 / Markdown 切换。只有内容真的像 markdown 时才出现。 -->
+                        <!-- 这一段就是个性化里「动作图标」开关管的东西：开关关掉，
+                             图标和渲染视图一起消失（bubbleMdAvailable 里带了那个开关）。
+                             图标只在内容真的像 markdown 时出现；显示哪种图标标的是
+                             「点一下会变成什么」—— 渲染态给代码图标（切回原文），
+                             原文态给 markdown 图标。 -->
                         <button
                             v-if="bubbleMdAvailable(item)"
                             type="button"

@@ -10,7 +10,7 @@ import { useTaskListToggle } from '@/composables/useTaskListToggle.js';
 import MarkdownBody from '@/components/MarkdownBody.vue';
 import MarkdownToggle from '@/components/MarkdownToggle.vue';
 import ShareLinkButton from '@/components/ShareLinkButton.vue';
-import { copyTextToClipboard, deviceLabel, errorMessage, formatTimestamp } from '@/util.js';
+import { copyTextToClipboard, deviceLabel, errorMessage, formatTimestamp, isAutomationMessage, isLateMessage } from '@/util.js';
 
 const mdiCellphone = 'mdi-cellphone';
 const mdiChevronRight = 'mdi-chevron-right';
@@ -22,6 +22,8 @@ const mdiIpNetworkOutline = 'mdi-ip-network-outline';
 const mdiCodeTags = 'mdi-code-tags';
 const mdiLanguageMarkdown = 'mdi-language-markdown';
 const mdiPound = 'mdi-pound';
+const mdiCalendarClock = 'mdi-calendar-clock';
+const mdiClockAlertOutline = 'mdi-clock-alert-outline';
 const props = defineProps({
     meta: {
         type: Object,
@@ -56,6 +58,10 @@ const { text: decodedContent, onMdClick } = useTaskListToggle(props.meta, () => 
 // v-html 的内容在 renderMarkdownHtml 里已经过了一遍 DOMPurify（内容是别人发的）。
 const md = useMarkdown(() => decodedContent.value);
 const decodedContentPreview = computed(() => decodedContent.value);
+
+// 定时消息的两个标记。**判定在 util.js**（单点，见那边的注释），这里只负责画。
+const isAutomation = computed(() => isAutomationMessage(props.meta));
+const isLate = computed(() => isLateMessage(props.meta));
 function deviceIcon(type) {
     const lowerType = (type || '').toLowerCase();
     if (lowerType.includes('mobile') || lowerType.includes('phone') || lowerType.includes('tablet') || lowerType.includes('ios') || lowerType.includes('android')) {
@@ -102,11 +108,25 @@ async function deleteItem() {
             <v-card-text>
                 <div class="d-flex flex-row align-start">
                     <div class="flex-grow-1" style="min-width: 0">
-                        <div class="text-caption d-flex flex-nowrap align-center mb-2 timeline-card__meta" v-if="meta.timestamp && (app.display.timestamp || app.display.device || app.display.ip)">
+                        <div class="text-caption d-flex flex-nowrap align-center mb-2 timeline-card__meta" v-if="meta.timestamp && (app.display.timestamp || app.display.device || app.display.ip || isAutomation)">
                             <v-chip size="x-small" label variant="flat" color="primary" class="mr-2 flex-shrink-0">{{ t('textMessage') }}</v-chip>
+                            <!-- 定时消息的来源标记。
+                                 ⚠️ 它**刻意不受** app.display 那三个开关管：那不是「元信息显示项」，
+                                 而是「这条不是人发的」这个事实本身 —— 能关掉的话，用户就再也分不出
+                                 定时消息和普通消息了（sender 名可以改，不能只靠它）。上面那个 v-if 里
+                                 额外带上 isAutomation 就是为了这个。 -->
+                            <span v-if="isAutomation" class="mr-3 text-no-wrap flex-shrink-0"><v-icon size="x-small" class="mr-1">{{ mdiCalendarClock }}</v-icon>{{ t('automationSource') }}</span>
                             <template v-if="app.display.timestamp">
                                 <span class="mr-3 text-no-wrap flex-shrink-0"><v-icon size="x-small" class="mr-1">{{ mdiClockOutline }}</v-icon>{{ formatTimestamp(meta.timestamp) }}</span>
                             </template>
+                            <!-- 补发标记。正文里的日期按**原定时刻**算，而 timestamp 是实际发送时刻，
+                                 两者对不上是设计如此（见 scheduler.go 的 executeAutomationTask）——
+                                 不标一下，用户会以为这条消息坏了。 -->
+                            <v-tooltip v-if="isLate" :text="t('automationLateHint')" location="top">
+                                <template v-slot:activator="{ props }">
+                                    <span v-bind="props" class="mr-3 text-no-wrap flex-shrink-0"><v-icon size="x-small" class="mr-1" color="warning">{{ mdiClockAlertOutline }}</v-icon>{{ t('automationLate') }}</span>
+                                </template>
+                            </v-tooltip>
                             <template v-if="app.display.device && meta.senderDevice?.type">
                                 <span class="mr-3 text-no-wrap flex-shrink-0"><v-icon size="x-small" class="mr-1">{{ deviceIcon(meta.senderDevice.type) }}</v-icon>{{ deviceLabel(meta.senderDevice) }}</span>
                             </template>

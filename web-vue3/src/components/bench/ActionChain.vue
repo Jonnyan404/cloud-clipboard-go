@@ -30,7 +30,7 @@ const mdiContentSaveOutline = 'mdi-content-save-outline';
 const mdiContentSavePlusOutline = 'mdi-content-save-plus-outline';
 
 const { t } = useI18n();
-const { chain, steps, templates, add, removeAt, clear, move, saveTemplate, applyTemplate, removeTemplate } = useActionChain();
+const { chain, steps, templates, add, removeAt, clear, move, setParam, saveTemplate, applyTemplate, removeTemplate } = useActionChain();
 
 const naming = ref(false);
 const templateName = ref('');
@@ -105,6 +105,36 @@ function confirmSaveTemplate() {
     }
 }
 
+// 参数的当前值。⚠️ 下拉**没设置时返回第一项** —— 那正是它的默认值，
+// 服务端也是这么理解的（见 render_actions.go：Options 的第一项就是默认）。
+function paramValue(step, p) {
+    const raw = step.params?.[p.key];
+    if (raw !== undefined && raw !== '') {
+        return String(raw);
+    }
+    if (p.type === 'select' && p.options?.length) {
+        return p.options[0].value;
+    }
+    return '';
+}
+
+// 这一步**当前该显示**哪些参数（visibleWhen 不满足的不显示）。
+//
+// ⚠️ 判断依赖项时要用 `paramValue`（当前**生效**的值），不能用链里存的那个：
+// 「查找模式」没设置时它的生效值是第一项（「文本」），按原始值判会让「查找」框
+// 在默认状态下不显示 —— 而那正是最该显示的时候。
+function visibleParams(step) {
+    const all = step.action?.params || [];
+    return all.filter((p) => {
+        if (!p.visibleWhen) {
+            return true;
+        }
+        const dep = all.find((x) => x.key === p.visibleWhen.key);
+        const current = dep ? paramValue(step, dep) : String(step.params?.[p.visibleWhen.key] ?? '');
+        return current === p.visibleWhen.equals;
+    });
+}
+
 // 链上每一步的「字数变化」。用字符数而不是字节 —— 用户看的是正文。
 //
 // ⚠️ 必须容忍 `undefined`：链走到第 N 步失败时 runChain 会**停在那里**，
@@ -139,16 +169,44 @@ function stepDelta(step) {
         <div class="action-chain__steps">
             <div v-if="isEmptyChain" class="action-chain__hint">{{ t('actionChainEmptyHint') }}</div>
 
-            <div v-for="(step, index) in steps" :key="`${step.id}-${index}`" class="action-chain__step">
-                <span class="action-chain__step-n">{{ index + 1 }}</span>
-                <v-icon size="14">{{ step.action.icon }}</v-icon>
-                <span class="action-chain__step-name">{{ t(step.action.nameKey) }}</span>
-                <span class="action-chain__step-delta">{{ stepDelta(result.steps[index]) }}</span>
-                <span class="action-chain__step-actions">
-                    <button type="button" class="action-chain__mini" :disabled="index === 0" :title="t('actionChainMoveUp')" @click="move(index, -1)">↑</button>
-                    <button type="button" class="action-chain__mini" :disabled="index === steps.length - 1" :title="t('actionChainMoveDown')" @click="move(index, 1)">↓</button>
-                    <button type="button" class="action-chain__mini action-chain__mini--danger" :title="t('delete')" @click="removeAt(index)">×</button>
-                </span>
+            <div v-for="(step, index) in steps" :key="`${step.id}-${index}`" class="action-chain__step-wrap">
+                <div class="action-chain__step">
+                    <span class="action-chain__step-n">{{ index + 1 }}</span>
+                    <v-icon size="14">{{ step.action.icon }}</v-icon>
+                    <span class="action-chain__step-name">{{ t(step.action.nameKey) }}</span>
+                    <span class="action-chain__step-delta">{{ stepDelta(result.steps[index]) }}</span>
+                    <span class="action-chain__step-actions">
+                        <button type="button" class="action-chain__mini" :disabled="index === 0" :title="t('actionChainMoveUp')" @click="move(index, -1)">↑</button>
+                        <button type="button" class="action-chain__mini" :disabled="index === steps.length - 1" :title="t('actionChainMoveDown')" @click="move(index, 1)">↓</button>
+                        <button type="button" class="action-chain__mini action-chain__mini--danger" :title="t('delete')" @click="removeAt(index)">×</button>
+                    </span>
+                </div>
+
+                <!-- 带参数的动作：输入框**内联在步骤下面**，不弹窗。
+                     参数是「这一步」的一部分（同一个动作可以在链上出现两次、用不同参数），
+                     弹窗会让人分不清正在改哪一步。
+                     ⚠️ 渲染的是 `visibleParams(step)` 而不是 `step.action.params` ——
+                     参数可以声明「只在另一个参数取某个值时出现」（如「查找」只在「文本」模式下）。 -->
+                <div v-if="visibleParams(step).length" class="action-chain__params">
+                    <label v-for="p in visibleParams(step)" :key="p.key" class="action-chain__param">
+                        <span class="action-chain__param-label">{{ t(p.labelKey) }}</span>
+                        <select
+                            v-if="p.type === 'select'"
+                            class="action-chain__param-input"
+                            :value="paramValue(step, p)"
+                            @change="setParam(index, p.key, $event.target.value)"
+                        >
+                            <option v-for="o in p.options" :key="o.value" :value="o.value">{{ t(o.labelKey) }}</option>
+                        </select>
+                        <input
+                            v-else
+                            type="text"
+                            class="action-chain__param-input"
+                            :value="paramValue(step, p)"
+                            @input="setParam(index, p.key, $event.target.value)"
+                        />
+                    </label>
+                </div>
             </div>
         </div>
 
@@ -353,6 +411,48 @@ function stepDelta(step) {
     display: inline-flex;
     gap: 1px;
     flex: 0 0 auto;
+}
+
+/* 带参数的动作：输入框缩进对齐步骤名（左边 30px = 序号 16 + gap），
+   让「这两行是同一件事」在视觉上成立。 */
+.action-chain__params {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    padding: 4px 8px 2px 30px;
+}
+
+.action-chain__param {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: 1 1 130px;
+    min-width: 0;
+}
+
+.action-chain__param-label {
+    flex: 0 0 auto;
+    font-size: 0.625rem;
+    opacity: 0.7;
+}
+
+/* 原生 input，不是 v-text-field：这一行是紧凑列表，Vuetify 输入框自带的
+   padding / margin 会把每步撑高一大截。颜色一律 inherit —— 写死深灰在暗色下看不见。 */
+.action-chain__param-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 2px 6px;
+    font: inherit;
+    font-size: 0.6875rem;
+    color: inherit;
+    background: transparent;
+    border: 1px solid rgba(148, 163, 184, 0.42);
+    border-radius: 6px;
+}
+
+.action-chain__param-input:focus {
+    outline: none;
+    border-color: rgb(var(--v-theme-primary));
 }
 
 .action-chain__mini {

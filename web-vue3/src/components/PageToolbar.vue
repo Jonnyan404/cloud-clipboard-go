@@ -29,6 +29,19 @@ const roomListEnabled = computed(() => Boolean(actions.roomListEnabled?.value ??
 const roomBrowserVisible = computed(() => Boolean(actions.roomBrowserVisible?.value ?? actions.roomBrowserVisible));
 
 const roomName = computed(() => ws.room || t('publicRoom'));
+
+// 房间 chip 上的锁：🔒 = 进这个房间要密码，🌍 = 公开。
+//
+// 数据来自 `roomProtectionCache`，而它由 `fetchServerInfo` 用 `/server?room=` 的
+// `roomProtected` 填充。**那个字段的含义是「这个房间实际要不要密码」**，不是
+// 「roomAuth 里有没有配这一项」—— 显式 `{open: true}` 的房间有配置项但不要密码，
+// 「有全局密码、没配过房间条目」的房间没配置项却要密码。服务端那边由
+// resolveRoomAuth(...).Required 算（lib/handler.go，有 server_room_protected_test.go 钉着）。
+//
+// ⚠️ 缓存是**三态**的：true / false / undefined（还没问过服务端）。
+// 这里用 Boolean() 把 undefined 归成 false，也就是「未知」先按公开画 ——
+// 窗口是一次 /server 往返（connect() 里必发，见 store/websocket.js），所以只会闪一下；
+// 别把它当成「已经确认公开」的信号用。
 const isProtected = computed(() => Boolean(ws.roomProtectionCache?.[ws.normalizeRoomName(ws.room)]));
 const latencyValue = computed(() => {
     if (ws.latency === null) {
@@ -53,6 +66,35 @@ const latencyHexColor = computed(() => {
 function setMode(mode) {
     app.setUiMode(mode);
 }
+
+// 定时自动化管理页的入口。
+//
+// ⚠️ **同一个标签页内跳转，不开新窗口**。凭据存在 sessionStorage，而 sessionStorage
+// 是按标签页隔离的 —— 开新标签页等于让用户再登一次，正好把「免二次登录」这件事废掉。
+// 同标签页跳过去则直接可用，浏览器返回键就回到这里（那边也有一个「返回主界面」）。
+const automationUrl = computed(() => {
+    const raw = String(app.config?.server?.prefix || '').trim().replace(/^\/+|\/+$/g, '');
+    const prefix = raw ? `/${raw}` : '';
+    const room = ws.room ? `?room=${encodeURIComponent(ws.room)}` : '';
+    return `${prefix}/automation${room}`;
+});
+
+// 这个入口**按服务端的能力声明显示**，不能无条件渲染。
+//
+// ⚠️ Cloudflare Worker 部署里根本没有这一族接口（`/tasks`、`/automation` 都不存在，
+// `/server` 也不下发 `automation`）。无条件渲染的话，点下去会被 Worker 末尾那条
+// `router.all('*', handleFallback)` 当成 SPA 导航兜底掉 —— 用户看到的是
+// 「点了定时任务、回到了首页」，和当初被 Service Worker 吞掉那次是同一种症状
+// （那次是 denylist 漏了，见 vite.config.js 里那段注释）。
+//
+// ⚠️ 判 `=== true` 而不是 `!== false`：`app.config` 要等一次 /server 往返才有，
+// 在此之前 `automation` 是 undefined。这里按「未知就先不显示」处理 ——
+// 代价是工具栏这一格晚一拍出现（和 chip 上那把锁是同一个窗口），
+// 而反过来（未知先显示）会在 Worker 部署下先露出一个点了没用的按钮。
+//
+// 服务端那边 `automation.enabled` 由 `AutomationCapability` 下发（lib/handler.go），
+// 它同时受全局开关 `automation.enabled` 约束 —— 所以配置里关掉之后这个图标也会消失。
+const automationEnabled = computed(() => app.config?.automation?.enabled === true);
 
 const currentMode = computed(() => MODES.find(mode => mode.key === app.uiMode) || MODES[0]);
 
@@ -243,6 +285,23 @@ const DEPRECATED_VOTE_URL = 'https://wj.qq.com/s2/28003735/h3fa/';
                         <template v-slot:activator="{ props }">
                             <v-btn icon density="compact" size="small" variant="text" class="page-toolbar__clear" v-bind="props" @click="actions.openClearAll && actions.openClearAll()">
                                 <v-icon size="24">mdi-broom</v-icon>
+                            </v-btn>
+                        </template>
+                    </v-tooltip>
+
+                    <v-tooltip v-if="automationEnabled" :text="t('automationEntryHint')" location="bottom">
+                        <template v-slot:activator="{ props }">
+                            <v-btn
+                                icon
+                                density="compact"
+                                size="small"
+                                variant="text"
+                                class="page-toolbar__icon"
+                                v-bind="props"
+                                :href="automationUrl"
+                                :aria-label="t('automationEntry')"
+                            >
+                                <v-icon size="24">mdi-calendar-clock</v-icon>
                             </v-btn>
                         </template>
                     </v-tooltip>

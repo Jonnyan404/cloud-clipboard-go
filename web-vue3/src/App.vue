@@ -268,6 +268,10 @@ function createOptimisticRoom(roomName = ws.room || '') {
     return {
         name: normalizedRoomName,
         isFavorite: getFavoriteRooms().includes(normalizedRoomName),
+        // 占位条目：房间还没出现在 /rooms 的返回里时先按缓存画。
+        // 语义与工具栏 chip 上那个锁一致 ——「要不要密码」，不是「roomAuth 里有没有这一项」
+        // （见 PageToolbar.vue 的 isProtected）。缓存里没有这个房间时算作「不要密码」，
+        // 之后由 syncAvailableRooms 用 /rooms 的 isProtected 覆盖成真实值。
         isProtected: Boolean(ws.roomProtectionCache?.[normalizedRoomName]),
         isActive: true,
         messageCount: 0,
