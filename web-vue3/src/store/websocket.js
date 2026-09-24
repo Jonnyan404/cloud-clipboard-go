@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import axios from 'axios';
 import router from '@/router';
+import { APP_BASE_URL } from '@/base.js';
 import { useAppStore } from './app';
 
 const ROOM_AUTH_CACHE_KEY = 'roomAuthCache';
@@ -275,10 +276,19 @@ export const useWebSocketStore = defineStore('websocket', {
 
         getWebSocketEndpoint(room = this.room) {
             const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const app = useAppStore();
-            const prefix = app.config?.server?.prefix || '';
-            const normalizedPrefix = prefix ? `/${prefix.replace(/^\/+|\/+$/g, '')}` : '';
-            const wsUrl = new URL(`${protocol}//${location.host}${normalizedPrefix}/push`);
+            // ⚠️ 必须用 APP_BASE_URL（从 `document.baseURI` 推导），**不能**用
+            // `app.config.server.prefix`。
+            //
+            // 后者只能从 WebSocket 握手时那条 `config` 事件拿到（见本文件 `case 'config'`），
+            // 而这里正是**为了连上 WebSocket** 才拼地址 —— 首次连接时它还是空串，
+            // 于是拼出 `/push` 而不是 `/clip/push`，服务端直接 404。
+            // 这是个鸡生蛋：要连上才知道 prefix，要知道 prefix 才能连上。
+            //
+            // APP_BASE_URL 没有这个问题：它从文档目录推导，服务端在深路径上会注入
+            // `<base href="<prefix>/">`（见 lib/spa_shell.go），页面加载时就确定了。
+            // （Issue #23；#7「prefix 不更新到链接」是同一根因的另一面。）
+            const wsUrl = new URL('push', APP_BASE_URL);
+            wsUrl.protocol = protocol;
             const normalizedRoom = this.normalizeRoomName(room);
             if (normalizedRoom) {
                 wsUrl.searchParams.set('room', normalizedRoom);
