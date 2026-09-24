@@ -1794,7 +1794,17 @@ window.__CC__ = { prefix: "[[.Prefix]]", room: "[[.Room]]" };
           window.alert(t("alertTaskToken"));
         }
         setStatus(t("stSaved"));
-        return refresh();
+        // ⚠️ 刷新之后要**重新选中刚保存的那一条**，不能让它停在列表第一条。
+        // refresh() 内部会 `selectTask(state.tasks[0])`，于是：
+        //   · 「新建」保存完 → 表单里是**别的任务**的内容，用户以为自己那条没建成；
+        //   · 「编辑」保存完 → 选中的是**另一条**，用户以为自己改的没生效。
+        // 两种都表现成「点了保存没反应」，而实际上保存是成功的。
+        var savedId = (data && data.task) ? data.task.id : "";
+        return refresh().then(function () {
+          if (!savedId) { return; }
+          var saved = state.tasks.filter(function (x) { return x.id === savedId; })[0];
+          if (saved) { selectTask(saved); }
+        });
       })
       .catch(function (err) { setStatus(err.message, true); });
   }
