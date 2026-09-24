@@ -226,9 +226,7 @@ pre { margin: 6px 0 0; padding: 10px 12px; border-radius: 8px; background: var(-
           <label style="display:flex;align-items:center;gap:6px;margin:0;font-size:13px;color:var(--fg)">
             <input type="checkbox" id="fKeep" style="width:auto"> <span data-i18n="fieldKeep">保留历史</span>
           </label>
-          <label style="display:flex;align-items:center;gap:6px;margin:0;font-size:13px;color:var(--fg)">
-            <input type="checkbox" id="fEnabled" checked style="width:auto"> <span data-i18n="fieldEnabled">启用</span>
-          </label>
+          <!-- ⚠️ 这里原来还有一个「启用」复选框，已删：列表上每条任务都有开关（立即生效），两处控制同一个状态只会让人困惑（「我在这里改了，列表上怎么还是开着的？」）。 -->
           <input id="fSender" style="width:236px" data-i18n-ph="phSender">
         </div>
         <div class="small mut" id="keepNote" style="margin-bottom:12px" data-i18n="keepNote"></div>
@@ -378,9 +376,8 @@ window.__CC__ = { prefix: "[[.Prefix]]", room: "[[.Room]]" };
     varClickHint:    ["点一下插入到正文", "點一下插入到正文", "Click to insert into the body", "クリックで本文に挿入"],
     fieldChain:      ["动作链（按顺序执行，可选）", "動作鏈（依序執行，選填）", "Action chain (applied in order, optional)", "アクション連鎖（順に実行・任意）"],
     fieldKeep:       ["保留历史", "保留歷史", "Keep in history", "履歴に残す"],
-    fieldEnabled:    ["启用", "啟用", "Enabled", "有効"],
     phSender:        ["发送者显示名（默认 定时任务）", "傳送者顯示名稱（預設 定時任務）", "Sender name (default: automation)", "送信者名（既定：自動化）"],
-    keepNote:        ["不保留历史时**只走实时广播**：房间里正开着的页面能看到，但**刷新一下、换个设备、或者在房间列表里都找不到它**（房间历史是按房间计数的，默认不占额度）。要让它留下来就勾上这一项。", "不保留歷史時**只走即時廣播**：房間裡正開著的頁面看得到，但**重新整理、換裝置、或在房間列表裡都找不到它**（房間歷史是按房間計數的，預設不佔額度）。要讓它留下來就勾選這一項。", "Without history the message only goes out as a live broadcast: pages already open in that room see it, but it is gone after a refresh, on another device, and the room will not appear in the room list. Tick this to keep it.", "履歴を残さない場合、**リアルタイム配信のみ**になります。そのルームを開いているページには届きますが、再読み込み・別端末・ルーム一覧では見つかりません。残す場合はこの項目にチェックしてください。"],
+    keepNote:        ["不保留历史（仅展示、不写入房间）；勾选则写入房间", "不保留歷史（僅顯示、不寫入房間）；勾選則寫入房間", "Without history it is shown only, not written into the room; tick to write it in", "履歴なし（表示のみ・ルームには書き込みません）。チェックするとルームに書き込みます"],
     btnSave:         ["保存", "儲存", "Save", "保存"],
     btnPreview:      ["试算", "試算", "Preview", "プレビュー"],
     btnSend:         ["立即发送", "立即傳送", "Send now", "今すぐ送信"],
@@ -1602,7 +1599,6 @@ window.__CC__ = { prefix: "[[.Prefix]]", room: "[[.Room]]" };
     $("fTZ").placeholder = t("phTZ", { tz: defaultTZ() });
     $("fTpl").value = task ? task.template : "";
     $("fKeep").checked = Boolean(task && task.keepHistory);
-    $("fEnabled").checked = task ? Boolean(task.enabled) : true;
     $("fSender").value = (task && task.sender) ? task.sender : "";
     syncFreqFields();
     renderChain();
@@ -1623,7 +1619,9 @@ window.__CC__ = { prefix: "[[.Prefix]]", room: "[[.Room]]" };
   function body(includeId) {
     var out = {
       name: $("fName").value,
-      enabled: $("fEnabled").checked,
+      // ⚠️ 启用状态**不在这里改** —— 列表上每条任务都有开关，而且立即生效。
+      // 保存时沿用原状态；新建的任务默认启用。
+      enabled: state.current ? Boolean(state.current.enabled) : true,
       freq: getFreq(),
       tz: $("fTZ").value,
       template: $("fTpl").value,
