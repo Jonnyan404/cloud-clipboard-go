@@ -304,6 +304,7 @@ window.__CC__ = { prefix: "[[.Prefix]]", room: "[[.Room]]" };
     batchDone:       ["已处理 {n} 条", "已處理 {n} 筆", "Done — {n} processed", "{n} 件を処理しました"],
     batchPartial:    ["成功 {ok} 条，失败 {fail} 条", "成功 {ok} 筆，失敗 {fail} 筆", "{ok} succeeded, {fail} failed", "{ok} 件成功、{fail} 件失敗"],
     noTasks:         ["还没有任务。", "還沒有任務。", "No automations yet.", "自動化はまだありません。"],
+    noTasksShort:    ["无任务", "無任務", "empty", "なし"],
     foreignTasks:    ["另有 {n} 条任务由别人创建，你无法查看或修改。", "另有 {n} 筆任務由他人建立，你無法檢視或修改。", "{n} more automation(s) were created by someone else and are not yours to view.", "他者が作成した自動化が {n} 件あります（閲覧・変更はできません）。"],
     nextRun:         ["下次 {time}", "下次 {time}", "Next {time}", "次回 {time}"],
     disabledLabel:   ["已停用", "已停用", "Disabled", "停止中"],
@@ -379,7 +380,7 @@ window.__CC__ = { prefix: "[[.Prefix]]", room: "[[.Room]]" };
     fieldKeep:       ["保留历史", "保留歷史", "Keep in history", "履歴に残す"],
     fieldEnabled:    ["启用", "啟用", "Enabled", "有効"],
     phSender:        ["发送者显示名（默认 定时任务）", "傳送者顯示名稱（預設 定時任務）", "Sender name (default: automation)", "送信者名（既定：自動化）"],
-    keepNote:        ["不保留历史时照常广播，但不占房间历史额度（房间历史是按房间计数的）。", "不保留歷史時照常廣播，但不佔房間歷史額度（房間歷史是按房間計數的）。", "When off, the message is still broadcast live but does not consume the room's history quota.", "オフでも配信はされますが、ルームの履歴枠は消費しません。"],
+    keepNote:        ["不保留历史时**只走实时广播**：房间里正开着的页面能看到，但**刷新一下、换个设备、或者在房间列表里都找不到它**（房间历史是按房间计数的，默认不占额度）。要让它留下来就勾上这一项。", "不保留歷史時**只走即時廣播**：房間裡正開著的頁面看得到，但**重新整理、換裝置、或在房間列表裡都找不到它**（房間歷史是按房間計數的，預設不佔額度）。要讓它留下來就勾選這一項。", "Without history the message only goes out as a live broadcast: pages already open in that room see it, but it is gone after a refresh, on another device, and the room will not appear in the room list. Tick this to keep it.", "履歴を残さない場合、**リアルタイム配信のみ**になります。そのルームを開いているページには届きますが、再読み込み・別端末・ルーム一覧では見つかりません。残す場合はこの項目にチェックしてください。"],
     btnSave:         ["保存", "儲存", "Save", "保存"],
     btnPreview:      ["试算", "試算", "Preview", "プレビュー"],
     btnSend:         ["立即发送", "立即傳送", "Send now", "今すぐ送信"],
@@ -948,17 +949,28 @@ window.__CC__ = { prefix: "[[.Prefix]]", room: "[[.Room]]" };
   // 非管理员永远只看到自己那一个，于是横幅对他是隐藏的。
   function renderRoomBar() {
     var el = $("roomBar");
-    var list = state.roomList || [];
-    if (list.length < 2) {
+    var all = state.roomList || [];
+
+    // ⚠️ **当前房间永远在列表里**，哪怕它一个任务都没有。
+    // 否则「切到一个还没有任务的房间」之后横幅里一个 chip 都没有，
+    // 用户根本看不出自己在哪 —— 症状是「切了但界面没反应」。
+    var mine = all.filter(function (r) { return r.room === state.room; })[0];
+    var others = all.filter(function (r) { return r.room !== state.room; });
+    // 除了当前房间没有别的可切 → 整条隐藏（只有一个 chip 的导航没有意义）
+    if (!others.length) {
       el.className = "room-bar hide";
       return;
     }
+
+    var list = [{ room: state.room, count: mine ? mine.count : 0 }].concat(others);
     el.className = "room-bar";
     el.innerHTML = "<span class='small mut'>" + esc(t("roomsWithTasks")) + "</span>" +
       "<span class='chips'>" + list.map(function (r) {
         var on = (r.room === state.room);
+        // 没有任务的房间标「无任务」—— 那是「这里还没有东西」，不是「没加载出来」
+        var label = r.room + " (" + (r.count ? r.count : t("noTasksShort")) + ")";
         return "<span class='chip" + (on ? " on" : "") + "' data-room='" + esc(r.room) + "'>" +
-          esc(r.room) + " (" + r.count + ")</span>";
+          esc(label) + "</span>";
       }).join("") + "</span>";
     Array.prototype.forEach.call(el.querySelectorAll(".chip"), function (chipEl) {
       chipEl.addEventListener("click", function () {
