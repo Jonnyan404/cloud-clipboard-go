@@ -48,6 +48,14 @@ const cleanup = () => {
   try { fs.rmSync(profileDir, { recursive: true, force: true }); } catch { /* 忽略 */ }
 };
 process.on('exit', cleanup);
+// ⚠️ `process.on('exit')` **不会**在 Ctrl-C / SIGTERM / 关终端时触发 —— Node 的默认行为
+// 是直接终止，exit 回调不跑。少了下面这几个处理器，每中断一次就在 /tmp 留一个**无头 Chrome**，
+// 而且它占着调试端口、被 macOS 当成「Chrome 已经在运行」：
+// 之后点 Chrome 图标只是去**激活那个没有窗口的进程**，表现就是「Chrome 打不开了」。
+// （2026-09-25 实际踩到过：/tmp/chrome-prof-bug 那个实例就是这么留下来的。）
+for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
+  process.on(sig, () => { cleanup(); process.exit(130); });
+}
 
 async function waitForDevtools() {
   for (let i = 0; i < 100; i++) {
