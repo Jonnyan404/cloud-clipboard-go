@@ -125,9 +125,16 @@ func (s *ClipboardServer) handle_server(w http.ResponseWriter, r *http.Request) 
 	globalPassword := normalizeAuthValue(s.config.Server.Auth)
 	if _, hasRoom := r.URL.Query()["room"]; hasRoom {
 		room := r.URL.Query().Get("room")
-		authNeeded = s.resolveRoomAuth(room).Required
+		requirement := s.resolveRoomAuth(room)
+		authNeeded = requirement.Required
 		authorized = s.canAccessRoom(room, extractAuthToken(r))
-		roomProtected = s.hasRoomAuthEntry(room)
+		// ⚠️ `roomProtected` 的含义是「这个房间**实际要不要密码**」，不是「roomAuth 里
+		// 有没有这一项」。两者**不是一回事**：显式 `{open: true}` 的房间在配置里有这一项，
+		// 但不要密码；只写 `{automation: "single"}` 的条目同理。这里曾经用
+		// hasRoomAuthEntry，后果是 SPA 顶部那个房间 chip 给一个开放房间挂了一把锁
+		// （`/rooms` 的 isProtected 早就是按「要不要密码」算的，漏的就是这一处；
+		// Cloudflare 侧修过同一个 bug，见 workers/src/auth.js 里那段注释）。
+		roomProtected = requirement.Required
 	} else if globalPassword != "" {
 		authNeeded = true
 		authorized = s.canAccessRoom("default", extractAuthToken(r))
@@ -149,6 +156,9 @@ func (s *ClipboardServer) handle_server(w http.ResponseWriter, r *http.Request) 
 				"roomList": s.config.Server.RoomList,
 			},
 		},
+		// 定时自动化的能力声明。前端据此决定要不要渲染自动化面板 ——
+		// 唯一来源是这里，前端不要自己判断「这个房间有没有密码」（会和服务端策略漂开）。
+		"automation": s.AutomationCapability(r),
 	}
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(response); err != nil {
@@ -297,6 +307,21 @@ func (s *ClipboardServer) handle_push(w http.ResponseWriter, r *http.Request) {
 			Limit  int `json:"limit"`
 		} `json:"file"`
 		Auth bool `json:"auth"`
+		// Automation 只给**开关**，不给完整能力（tier / max / actions / vars 那些在
+		// `/server` 和管理页自己的 `/tasks` 响应里）。
+		//
+		// ⚠️ 为什么必须有它：SPA 工具栏上那个「定时任务」入口要按「**这个后端支不支持**」
+		// 决定渲不渲染。Cloudflare Worker 部署没有这一族接口，无条件渲染的话点下去会被
+		// SPA 兜底吞掉 —— 用户看到的是「点了定时任务、回到了首页」，和当初被 Service
+		// Worker 吞掉那次同一个症状。
+		//
+		// ⚠️ 前端的 `app.config` 来自**这条 config 事件**，不是 `/server` 的 HTTP 响应
+		// （见 store/websocket.js 的 handleEvent('config')）。所以能力开关必须在这里下发 ——
+		// 只在 `/server` 里加、前端却读 app.config，会得到一个永远为 undefined 的字段，
+		// 表现就是入口在**所有**部署下都不显示。
+		Automation struct {
+			Enabled bool `json:"enabled"`
+		} `json:"automation"`
 	}{
 		Version: server_version,
 		Server: struct {
@@ -311,6 +336,9 @@ func (s *ClipboardServer) handle_push(w http.ResponseWriter, r *http.Request) {
 		Text: s.config.Text,
 		File: s.config.File,
 		Auth: authNeeded,
+		Automation: struct {
+			Enabled bool `json:"enabled"`
+		}{Enabled: s.automationEnabled()},
 	}
 
 	configWsMsg := WebSocketMessage{
@@ -703,7 +731,7 @@ func (s *ClipboardServer) updateTextMessage(id int, newContent string, room stri
 				go s.broadcastWebSocketMessage(wsMsg, room)
 
 				// 保存历史数据
-				go s.saveHistoryData()
+				s.saveHistoryAsync()
 
 				s.logger.Printf("文本消息 ID %d 已更新 (房间: %s) - 原内容: '%s', 新内容: '%s'", id, room, originalContent, newContent)
 				return true
@@ -792,7 +820,7 @@ func (s *ClipboardServer) handleContentColumn(w http.ResponseWriter, r *http.Req
 			payload = s.messageQueue.List[i].Data.FileReceive
 		}
 		go s.broadcastWebSocketMessage(WebSocketMessage{Event: "update", Data: payload}, messageRoom)
-		go s.saveHistoryData()
+		s.saveHistoryAsync()
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{

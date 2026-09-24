@@ -67,6 +67,11 @@ func newShortcutServer(t *testing.T, globalAuth string, roomAuth RoomAuthConfig)
 	s.setupRoutes()
 
 	srv := httptest.NewServer(s.httpServer.Handler)
+	// ⚠️ 这里注册顺序是**故意的**：t.Cleanup 是后注册的先跑，所以执行顺序是
+	// srv.Close（会等所有在途请求结束）→ WaitForHistoryWrites（排干异步落盘）
+	// → TempDir 的 RemoveAll。少最后这一步，清理就会和在途的写盘抢目录，
+	// 报 "directory not empty"。
+	t.Cleanup(func() { s.WaitForHistoryWrites() })
 	t.Cleanup(srv.Close)
 	return srv
 }

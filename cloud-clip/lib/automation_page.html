@@ -1,0 +1,1882 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>定时自动化 · Cloud Clipboard</title>
+<meta name="robots" content="noindex, nofollow">
+<style>
+:root { color-scheme: light dark; --bd: #e2e4e9; --bg: #f6f7f9; --fg: #1f2430; --mut: #6b7280; --acc: #3b5bdb; }
+@media (prefers-color-scheme: dark) {
+  :root { --bd: #2c3038; --bg: #16181d; --fg: #e9ecf2; --mut: #9aa2b1; --acc: #7d94f0; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg);
+  font: 14px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", sans-serif; }
+header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 14px 20px; border-bottom: 1px solid var(--bd); background: var(--bg); }
+h1 { font-size: 16px; font-weight: 500; margin: 0; }
+.mut { color: var(--mut); }
+.small { font-size: 12px; }
+main { max-width: 1080px; margin: 0 auto; padding: 20px; }
+.card { border: 1px solid var(--bd); border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; }
+.grid { display: grid; grid-template-columns: 270px minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+label { display: block; font-size: 12px; color: var(--mut); margin: 0 0 4px; }
+input, select, textarea, button { font: inherit; color: inherit; }
+input, select, textarea { width: 100%; padding: 6px 9px; border: 1px solid var(--bd);
+  border-radius: 7px; background: transparent; }
+textarea { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
+button { padding: 6px 12px; border: 1px solid var(--bd); border-radius: 7px;
+  background: transparent; cursor: pointer; }
+button.primary { border-color: var(--acc); color: var(--acc); }
+button.danger { color: #c0392b; border-color: #c0392b; }
+button.mini { padding: 2px 8px; font-size: 12px; border-radius: 6px; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.f { margin-bottom: 12px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-size: 12px; padding: 2px 8px; border: 1px solid var(--bd);
+  border-radius: 999px; cursor: pointer; }
+.chip:hover { border-color: var(--acc); color: var(--acc); }
+.chip.on { border-color: var(--acc); color: var(--acc); }
+.chip code { font-size: 11px; color: var(--mut); margin-left: 4px; }
+/* 链上的一步：胶囊 + （带参数时）它自己的输入框。
+   ⚠️ 输入框必须覆盖全局那条 `input { width: 100% }` —— 在 flex 行里 100% 会把标签挤没。 */
+.chain-step { display: block; margin-bottom: 4px; }
+.chain-params { display: flex; flex-wrap: wrap; gap: 4px 8px; padding: 4px 0 2px 10px; }
+.chain-param { display: flex; align-items: center; gap: 4px; flex: 1 1 140px; min-width: 0; }
+.chain-param span { flex: 0 0 auto; font-size: 11px; color: var(--mut); }
+.chain-param input, .chain-param select { width: auto; flex: 1 1 auto; min-width: 0; padding: 2px 6px; font-size: 12px; }
+.li { padding: 9px 10px; border-radius: 8px; cursor: pointer; }
+.li.on { background: var(--bg); border: 1px solid var(--acc); }
+.li .t { font-weight: 500; }
+header a { color: var(--acc); font-size: 12px; text-decoration: none; }
+header a:hover { text-decoration: underline; }
+/* 「什么时候」：左列名字、右列控件。中间那行「翻译」不是模式，所以不带 radio。 */
+.when { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 12px; align-items: center; }
+.when-name { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 13px; color: var(--fg); cursor: pointer; }
+/* ⚠️ 全局 input 是 width:100%，radio 不覆盖就会被撑成一条方块。 */
+.when-name input[type=radio] { width: auto; margin: 0; padding: 0; cursor: pointer; }
+/* 未选中的那一档：灰掉但**仍然可点** —— 禁掉点击会让人以为功能坏了。 */
+.when-name.off { color: var(--mut); }
+.when-body { min-width: 0; }
+/* 五个字段框**强制一行**。之前是 flex-wrap: wrap，窗口稍微窄一点就会把「周」挤到第二行 ——
+   只掉一个下来比整体换行还难看，而且那行正好是「分 时 日 月 周」这个顺序提示本身。
+   宁可横向滚动（真的窄到放不下时）。 */
+.cron-row { display: flex; flex-wrap: nowrap; gap: 8px 10px; align-items: center;
+  overflow-x: auto; padding: 2px 0; }
+.cron-field { display: flex; flex: 0 0 auto; align-items: center; gap: 4px; margin: 0;
+  font-size: 12px; color: var(--fg); }
+.cron-field input { width: 56px; text-align: center; font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.cron-field > span { color: var(--mut); }
+/* 提示区（翻译 / 提醒 / 未来时刻）**不给标签**：这三行说的就是上面那几个框，
+   再加一个「翻译」的标签只会多一层要读的字。 */
+.when-hint { margin-top: 8px; }
+.when-hint > div { margin-top: 2px; }
+/* 未选中的那一档整体变淡。用属性选择器而不是给每个元素加类：
+   禁用的输入本来就该看起来不可编辑，这件事交给一条规则做到底。 */
+input:disabled { opacity: .45; }
+.warn-line { color: #b7791f; }
+/* 首次加载完成前，常用写法按钮不可点（点了也会被随后的 selectTask 覆盖）。 */
+.chips.off { pointer-events: none; opacity: .45; }
+@media (max-width: 560px) {
+  .when { grid-template-columns: 1fr; gap: 4px; }
+  .when-name { margin-top: 6px; }
+}
+.banner { border-radius: 9px; padding: 9px 12px; font-size: 13px; margin-bottom: 14px; border: 1px solid var(--bd); }
+.banner.warn { border-color: #d9a441; color: #8a6212; }
+.banner.err { border-color: #c0392b; color: #a13224; }
+pre { margin: 6px 0 0; padding: 10px 12px; border-radius: 8px; background: var(--bg);
+  border: 1px solid var(--bd); white-space: pre-wrap; word-break: break-word; font-size: 13px; }
+.badge { font-size: 12px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--bd); color: var(--mut); }
+/* 可点的徽章（房间）。hover / focus 都要有反馈 —— 只靠 cursor 在触屏上完全看不出来，
+   而这个入口在手机上正是唯一的换房间方式。 */
+/* 房间徽章可点：光靠 cursor 在触屏上完全看不出来，所以再加两处暗示 ——
+   一个 ⇄ 后缀（「这里能换」）+ 虚线下划线（「这是可以点的文字」）。 */
+.badge--action { cursor: pointer; user-select: none; text-decoration: underline dotted; text-underline-offset: 2px; }
+.badge--action::after { content: " ⇄"; font-size: 11px; opacity: .85; text-decoration: none; display: inline-block; }
+.badge--action:hover, .badge--action:focus-visible { border-color: var(--acc); color: var(--acc); outline: none; }
+/* 房间导航：有任务的房间 + 条数，点一下切过去。当前房间用 .on 高亮且不可点。 */
+.room-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.room-bar .chip { cursor: pointer; }
+.room-bar .chip.on { border-color: var(--acc); color: var(--acc); cursor: default; opacity: .75; }
+.box { border: 1px dashed var(--bd); border-radius: 8px; padding: 8px 10px; }
+.hide { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <h1 data-i18n="pageTitle">定时自动化</h1>
+  <!-- 房间徽章**可点**：管理页的房间来自 URL 的 ?room=，以前想换房间只能改地址栏 ——
+       而手机上没有地址栏。点它就地弹一个输入框（和「输入凭据」同一种交互）。 -->
+  <span class="badge badge--action" id="roomBadge" role="button" tabindex="0">--</span>
+  <span class="badge" id="tierBadge">--</span>
+  <span class="small mut" id="hint"></span>
+  <span style="flex:1"></span>
+  <!-- 「切换凭据」常驻在头部：原来只有 gate 横幅里那个按钮，而横幅在**一切正常**时
+       只是一段说明文字，按钮混在长句里根本找不到。要对比「房间密码」和「全局密码」
+       看到的差异时，这个入口得一直在。 -->
+  <button id="btnCred" class="mini" data-i18n="switchCredential">切换凭据</button>
+  <!-- 回去的路。SPA 那边是**同标签页**跳过来的，所以这里也回同标签页 ——
+       凭据在 sessionStorage 里，同一标签页内两边都免登录。 -->
+  <a id="backLink" href="/" data-i18n="backToApp">返回主界面</a>
+  <label for="langSel" class="small mut" style="margin:0" data-i18n="langLabel">语言</label>
+  <select id="langSel" style="width:auto"></select>
+</header>
+<main>
+  <!-- 房间导航：**有任务的房间 + 条数**，点一下就切过去。
+       ⚠️ 这是切换房间的**主要**入口 —— 徽章上那个 prompt 只用来切到
+       「还没有任务的房间」（那种房间不会出现在这里，因为列不出来）。
+       没有它的话，用户知道「能切房间」却不知道该切到哪。 -->
+  <div class="room-bar hide" id="roomBar"></div>
+  <div class="banner" id="gate"></div>
+  <div class="grid" id="panel">
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <strong data-i18n="tasksTitle">任务</strong>
+        <button id="btnNew" class="mini" data-i18n="newTask">新建</button>
+      </div>
+      <!-- 批量操作条：有任务时出现；**没选中任何一条时只有「全选」**，不显示那几个动作按钮
+           （避免误点，也让「现在能做什么」一眼可见）。 -->
+      <div id="batchBar" class="row hide" style="margin-top:6px"></div>
+      <div id="list" style="margin-top:8px"></div>
+      <div class="small mut" id="listNote" style="margin-top:10px"></div>
+    </div>
+    <div>
+      <div class="card">
+        <div class="f">
+          <label for="fName" data-i18n="fieldName">任务名称</label>
+          <input id="fName" data-i18n-ph="phName">
+        </div>
+        <div class="f">
+          <label data-i18n="fieldWhen">什么时候</label>
+
+          <!-- 两行二选一：cron 表达式 / 仅一次。
+               做成 radio 而不是下拉框，是因为「什么时候」的两档差别很大，
+               下拉框会把没选的那档藏起来 —— 用户根本不知道还有另一种写法。 -->
+          <div class="when">
+            <label class="when-name" id="whenCronName">
+              <input type="radio" name="ccFreq" value="cron" checked>
+              <span data-i18n="freqRecurring">循环（cron）</span>
+            </label>
+            <div class="when-body">
+              <!-- 五个框各自管一段。为什么不是一个大输入框：
+                   写 「*/30 9-18 * * 1-5」 要求人**先知道字段顺序**才能开始写；
+                   拆成五个框之后，顺序由「分 时 日 月 周」这五个字直接给出，
+                   谁都不用背。而且默认值是 「*」（不限制），任何一段都能单独改。 -->
+              <div class="cron-row">
+                <label class="cron-field"><input class="cron-input" id="fMin" value="*"><span data-i18n="cronUnitMinute">分</span></label>
+                <label class="cron-field"><input class="cron-input" id="fHour" value="*"><span data-i18n="cronUnitHour">时</span></label>
+                <label class="cron-field"><input class="cron-input" id="fDom" value="*"><span data-i18n="cronUnitDom">日</span></label>
+                <label class="cron-field"><input class="cron-input" id="fMonth" value="*"><span data-i18n="cronUnitMonth">月</span></label>
+                <label class="cron-field"><input class="cron-input" id="fDow" value="*"><span data-i18n="cronUnitDow">周</span></label>
+              </div>
+              <div class="row" style="margin-top:6px">
+                <span class="small mut" data-i18n="cronPresetsLabel">常用</span>
+                <span class="chips" id="cronPresets"></span>
+              </div>
+            </div>
+
+            <label class="when-name" id="whenOnceName">
+              <input type="radio" name="ccFreq" value="once">
+              <span data-i18n="freqOnce">仅一次</span>
+            </label>
+            <div class="when-body">
+              <!-- 日期时间用**原生选择器**，不是自由文本框。
+                   以前要用户自己敲 `2026-10-01T09:30` —— 那个 `T` 是纯发明物，
+                   没人猜得到，敲错一格服务端只回一句「需要 runAt（RFC3339 或
+                   2006-01-02T15:04）」。改成 datetime-local 之后：点着选、格式由浏览器
+                   保证、还自带 min（选不了过去的日期，见 syncRunAtLimits）。
+                   value 的形态正好是 `YYYY-MM-DDTHH:mm` —— 就是服务端认的「本地写法」
+                   （lib/task.go 的 automationLocalTimeLayouts），两边不用转换。 -->
+              <input id="fRunAt" type="datetime-local" step="60" style="width:216px">
+            </div>
+          </div>
+
+          <!-- 提示区：跟着当前档位说话。**没有标签** ——
+               这三行说的就是上面那几个框，再加一个「翻译」的标签只是多一层要读的字。 -->
+          <div class="when-hint">
+            <div class="small" id="schedHint"></div>
+            <div class="small warn-line hide" id="cronWarn"></div>
+            <div class="small mut" id="cronNextHint"></div>
+          </div>
+
+          <div class="row" style="margin-top:10px">
+            <span class="small mut" data-i18n="tzLabel">时区</span>
+            <input id="fTZ" style="width:168px">
+          </div>
+        </div>
+        <div class="f">
+          <label for="fTpl" data-i18n="fieldBody">发什么（正文）</label>
+          <textarea id="fTpl" rows="3"></textarea>
+          <div class="small mut" style="margin-top:6px" data-i18n="varClickHint">点一下插入到正文</div>
+          <div class="chips" id="varChips" style="margin-top:6px"></div>
+        </div>
+        <div class="f">
+          <label data-i18n="fieldChain">动作链（按顺序执行，可选）</label>
+          <div class="box" id="actionBox"></div>
+          <div class="chips" id="chainChips" style="margin-top:8px"></div>
+        </div>
+        <div class="f row" style="gap:16px">
+          <label style="display:flex;align-items:center;gap:6px;margin:0;font-size:13px;color:var(--fg)">
+            <input type="checkbox" id="fKeep" style="width:auto"> <span data-i18n="fieldKeep">保留历史</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;margin:0;font-size:13px;color:var(--fg)">
+            <input type="checkbox" id="fEnabled" checked style="width:auto"> <span data-i18n="fieldEnabled">启用</span>
+          </label>
+          <input id="fSender" style="width:236px" data-i18n-ph="phSender">
+        </div>
+        <div class="small mut" id="keepNote" style="margin-bottom:12px" data-i18n="keepNote"></div>
+        <div class="row">
+          <button class="primary" id="btnSave" data-i18n="btnSave">保存</button>
+          <button id="btnPreview" data-i18n="btnPreview">试算</button>
+          <button id="btnSend" data-i18n="btnSend">立即发送</button>
+          <button class="danger" id="btnDelete" data-i18n="btnDelete">删除</button>
+          <span class="small mut" id="status"></span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="row" style="justify-content:space-between">
+          <strong data-i18n="previewTitle">试算结果</strong>
+          <span class="small mut" id="previewAt"></span>
+        </div>
+        <pre id="preview"></pre>
+        <div class="small mut" id="runInfo" style="margin-top:8px"></div>
+      </div>
+    </div>
+  </div>
+</main>
+<script>
+window.__CC__ = { prefix: "[[.Prefix]]", room: "[[.Room]]" };
+</script>
+<script>
+(function () {
+  "use strict";
+  var CC = window.__CC__ || { prefix: "", room: "default" };
+
+  // ── 多语言 ──────────────────────────────────────────────────────
+  //
+  // 每条文案按 LANGS 的顺序排成一行。**故意不在每个语言里各写一份对象**：
+  // 并排放才能在加一种语言时一眼看出哪几条漏翻了，也才好对照修改。
+  var LANGS = ["zh", "zh-TW", "en", "ja"];
+  var LANG_NAMES = ["简体中文", "繁體中文", "English", "日本語"];
+  var BCP47 = { "zh": "zh-CN", "zh-TW": "zh-TW", "en": "en-US", "ja": "ja-JP" };
+
+  var MSG = {
+    pageTitle:       ["定时自动化", "定時自動化", "Scheduled automations", "定時自動化"],
+    backToApp:       ["返回主界面", "返回主介面", "Back to the app", "アプリに戻る"],
+    roomBadge:       ["房间 {room}", "房間 {room}", "Room {room}", "ルーム {room}"],
+    tierAdmin:       ["管理员", "管理員", "Admin", "管理者"],
+    tierRoom:        ["房间凭据", "房間憑證", "Room credential", "ルーム認証"],
+    tierSingle:      ["公开房间 · 单条", "公開房間 · 單筆", "Public room · single", "公開ルーム · 1件"],
+    tierNone:        ["未开放", "未開放", "Not enabled", "未開放"],
+    limitReached:    ["本房间上限 {n} 条", "本房間上限 {n} 筆", "Limit {n} per room", "上限 {n} 件"],
+    limitUnlimited:  ["本房间不限条数", "本房間不限筆數", "No limit here", "件数制限なし"],
+    langLabel:       ["语言", "語言", "Language", "言語"],
+
+    connecting:      ["正在连接…", "正在連線…", "Connecting…", "接続中…"],
+    autoDisabled:    ["服务端未启用定时自动化（automation.enabled = false）。", "伺服器未啟用定時自動化（automation.enabled = false）。", "Automation is disabled on the server (automation.enabled = false).", "サーバー側で自動化が無効です（automation.enabled = false）。"],
+    roomNotOpen:     ["房间 {room} 未开放自动化。", "房間 {room} 未開放自動化。", "This room is not allowed to use automation.", "このルームでは自動化が許可されていません。"],
+    roomNotOpenCred: ["房间 {room} 未开放自动化（凭据是有效的，是这个房间的策略不允许）。", "房間 {room} 未開放自動化（憑證有效，是這個房間的策略不允許）。", "Credentials are valid, but this room's policy does not allow automation.", "認証情報は有効ですが、このルームのポリシーで自動化が許可されていません。"],
+    enterCredential: ["输入凭据", "輸入憑證", "Enter password", "認証情報を入力"],
+    useAnotherCred:  ["换一个凭据", "換一個憑證", "Use another", "別の認証情報"],
+    switchCredential:["切换凭据", "切換憑證", "Switch credential", "認証情報を切替"],
+    promptRoom:      ["切换到哪个房间？", "切換到哪個房間？", "Switch to which room?", "どのルームに切り替えますか？"],
+    switchRoomHint:  ["点击切换房间", "點擊切換房間", "Click to switch room", "クリックでルームを切替"],
+    roomsWithTasks:  ["有任务的房间：", "有任務的房間：", "Rooms with automations:", "自動化があるルーム："],
+    stSwitchingRoom: ["正在切换房间…", "正在切換房間…", "Switching room…", "ルームを切り替えています…"],
+    publicHint:      ["公开房间默认关闭；要开启请由管理员在 roomAuth 里设置 automation。", "公開房間預設關閉；要開啟請由管理員在 roomAuth 裡設定 automation。", "Public rooms are off by default; an admin can enable them via roomAuth.automation.", "公開ルームは既定で無効です。有効化は管理者が roomAuth.automation で設定します。"],
+    connectFailed:   ["连接失败：{msg}", "連線失敗：{msg}", "Connection failed: {msg}", "接続に失敗しました：{msg}"],
+
+    tasksTitle:      ["任务", "任務", "Automations", "自動化"],
+    newTask:         ["新建", "新增", "New", "新規"],
+    selectAll:       ["全选", "全選", "Select all", "すべて選択"],
+    selectedCount:   ["已选 {n} 条", "已選 {n} 筆", "{n} selected", "{n} 件選択中"],
+    batchDisable:    ["批量停用", "批次停用", "Disable selected", "選択を停止"],
+    batchEnable:     ["批量启用", "批次啟用", "Enable selected", "選択を有効化"],
+    batchDelete:     ["批量删除", "批次刪除", "Delete selected", "選択を削除"],
+    batchDeleteConfirm: ["删除选中的 {n} 条任务？删除后不可恢复。", "刪除選取的 {n} 筆任務？刪除後無法復原。", "Delete {n} selected automations? This cannot be undone.", "選択した {n} 件を削除しますか？元に戻せません。"],
+    batchDone:       ["已处理 {n} 条", "已處理 {n} 筆", "Done — {n} processed", "{n} 件を処理しました"],
+    batchPartial:    ["成功 {ok} 条，失败 {fail} 条", "成功 {ok} 筆，失敗 {fail} 筆", "{ok} succeeded, {fail} failed", "{ok} 件成功、{fail} 件失敗"],
+    noTasks:         ["还没有任务。", "還沒有任務。", "No automations yet.", "自動化はまだありません。"],
+    foreignTasks:    ["另有 {n} 条任务由别人创建，你无法查看或修改。", "另有 {n} 筆任務由他人建立，你無法檢視或修改。", "{n} more automation(s) were created by someone else and are not yours to view.", "他者が作成した自動化が {n} 件あります（閲覧・変更はできません）。"],
+    nextRun:         ["下次 {time}", "下次 {time}", "Next {time}", "次回 {time}"],
+    disabledLabel:   ["已停用", "已停用", "Disabled", "停止中"],
+    lastFailed:      ["上次失败", "上次失敗", "last failed", "前回失敗"],
+    lastSkipped:     ["上次跳过", "上次跳過", "last skipped", "前回スキップ"],
+    btnDisable:      ["停用", "停用", "Disable", "停止"],
+    btnEnable:       ["启用", "啟用", "Enable", "有効化"],
+
+    fieldName:       ["任务名称", "任務名稱", "Name", "名前"],
+    phName:          ["留空则取正文首行", "留空則取正文首行", "Defaults to the first line of the body", "空欄なら本文の 1 行目"],
+    fieldWhen:       ["什么时候", "什麼時候", "When", "いつ"],
+    // 两档的名字只说「循环 / 仅一次」，不提「每天 / 每周」——
+    // 每天、每周、每工作日都只是循环的**特例**，各给一个选项会让小白以为
+    // 它们是四种不同的东西，而实际上前三个都能用一个 cron 表达式表达。
+    // 括号里的 cron 保留着：懂 cron 的人会来找这两个字。
+    freqRecurring:   ["循环（cron）", "循環（cron）", "Recurring (cron)", "繰り返し（cron）"],
+    freqOnce:        ["仅一次", "僅一次", "Once", "1 回のみ"],
+    tzLabel:         ["时区", "時區", "Time zone", "タイムゾーン"],
+    phTZ:            ["默认 {tz}", "預設 {tz}", "Default {tz}", "既定 {tz}"],
+
+    // cron 的「翻译」。服务端只回**结构化的形状**（见 lib/cron.go 的 DescribeCron），
+    // 句子在这里按语言拼 —— 否则英文 / 日文用户会看到一句中文。
+    cronUnitMinute:  ["分", "分", " min", " 分"],
+    cronUnitHour:    ["时", "時", " hour", " 時"],
+    cronUnitDom:     ["日", "日", " day", " 日"],
+    cronUnitMonth:   ["月", "月", " month", " 月"],
+    cronUnitDow:     ["周", "週", " weekday", " 曜"],
+    cronDescDaily:   ["每天", "每天", "every day", "毎日"],
+    // 「每」+「周一、周二」=「每周一、周二」，所以 DAYS 里的「周」不能去掉，
+    // 而要用分隔符把「每周」和「周几」分开 —— 直接拼成「每周周一」很难看。
+    listSep:         ["、", "、", ", ", "、"],
+    cronDescWeekly:  ["每{days}", "每{days}", "every {days}", "毎週{days}"],
+    cronDescMonthly: ["每月 {dom} 日", "每月 {dom} 日", "every month on day {dom}", "毎月 {dom} 日"],
+    cronDescEveryNDays: ["每隔 {n} 天", "每隔 {n} 天", "every {n} days", "{n} 日ごと"],
+    cronDescEveryNDaysOrWeekly: ["每隔 {n} 天或每{days}", "每隔 {n} 天或每{days}", "every {n} days or every {days}", "{n} 日ごとまたは毎週{days}"],
+    cronDescMonthlyOrWeekly: ["每月 {dom} 日或每{days}", "每月 {dom} 日或每{days}", "every month on day {dom} or every {days}", "毎月 {dom} 日または毎週{days}"],
+    cronDescMonth:   ["{month} 月", "{month} 月", "in month {month}", "{month} 月"],
+    cronDescEveryMinute: ["每分钟", "每分鐘", "every minute", "毎分"],
+    cronDescEveryMinuteInHours: ["每分钟（只在 {hours} 点）", "每分鐘（只在 {hours} 點）", "every minute (hours {hours} only)", "毎分（{hours} 時のみ）"],
+    cronDescEveryN:  ["每 {n} 分钟", "每 {n} 分鐘", "every {n} minutes", "{n} 分ごと"],
+    cronDescEveryNHours: ["每 {n} 小时的第 {minutes} 分", "每 {n} 小時的第 {minutes} 分", "at minute {minutes} of every {n} hours", "{n} 時間ごとの {minutes} 分"],
+    cronDescEveryNInHours: ["每 {n} 分钟（只在 {hours} 点）", "每 {n} 分鐘（只在 {hours} 點）", "every {n} minutes (hours {hours} only)", "{n} 分ごと（{hours} 時のみ）"],
+    cronDescMinutesEachHour: ["每小时的第 {minutes} 分", "每小時的第 {minutes} 分", "at minute {minutes} of every hour", "毎時 {minutes} 分"],
+    cronDescMinutesEachHourInHours: ["每小时的第 {minutes} 分（只在 {hours} 点）", "每小時的第 {minutes} 分（只在 {hours} 點）", "at minute {minutes} of every hour (hours {hours} only)", "毎時 {minutes} 分（{hours} 時のみ）"],
+    cronDescTimes:   ["{times}", "{times}", "at {times}", "{times}"],
+    cronDescOnce:    ["只在 {at} 触发一次", "只在 {at} 觸發一次", "fires once at {at}", "{at} に 1 回だけ"],
+    // 「仅一次」的时刻由原生选择器给，值只有两种：`YYYY-MM-DDTHH:mm` 或空。
+    runAtEmpty:      ["还没选时间", "還沒選時間", "no time picked yet", "時刻が未選択"],
+    // 过去的时刻**不等于**不触发：服务端把「已经到点」当成到期事件（见 lib/task.go 的
+    // dueOccurrence），保存后立刻就发。不说清楚的话，用户以为定的是明早 9 点。
+    runAtPastWarn:   ["⚠️ 这个时刻已经过去，保存后会立刻发一次", "⚠️ 這個時刻已經過去，儲存後會立刻發送一次", "⚠️ That time is in the past — it fires as soon as you save", "⚠️ その時刻は過ぎています。保存するとすぐ 1 回送信されます"],
+    // 常用写法：只改「日 / 月 / 周」三段，**不动「分 / 时」里已经写好的时刻** ——
+    // 「每天几点」的那个「几点」是用户的事，替他猜一个只会在某天早上发错消息。
+    // ⚠️ 但「分 / 时」**都还是 `*`**（= 没填过）时会补一个默认时刻，见 renderCronPresets ——
+    // 否则「什么都没填就点每天」得到的是「每分钟」，那会往房间里刷屏。
+    cronPresetsLabel: ["常用", "常用", "Common", "よく使う"],
+    cronPresetDaily:  ["每天", "每天", "Every day", "毎日"],
+    cronPresetEvery3Days: ["每隔 3 天", "每隔 3 天", "Every 3 days", "3 日ごと"],
+    // 悬停提示：**必须说清「按月算」**。`*/3` 在「日」上展开是 1,4,7…31，
+    // 跨月时从 31 直接跳到下月 1 号 —— 间隔只有 1 天。标准 cron 表达不出
+    // 真正等距的「每 N 天」，所以按钮上给常用说法、悬停里给准确含义。
+    cronPresetEvery3DaysHint: ["按月算：每月的 1、4、7…31 日；跨月那一次间隔会短一些（最短 1 天）。cron 表达不出真正等距的「每 N 天」。", "按月算：每月的 1、4、7…31 日；跨月那次間隔會短一些（最短 1 天）。cron 表達不出真正等距的「每 N 天」。", "Counted inside each month: days 1, 4, 7…31. The gap across a month boundary is shorter (as little as 1 day) — cron cannot express a truly even every-N-days.", "月ごとの計算：毎月 1、4、7…31 日。月をまたぐ回は間隔が短くなります（最短 1 日）。cron では本当に等間隔の「N 日ごと」は表せません。"],
+    cronPresetWeekday:["工作日", "工作日", "Weekdays", "平日"],
+    cronPresetMonday: ["每周一", "每週一", "Mondays", "毎週月曜"],
+    cronPresetMonthly:["每月 1 日", "每月 1 日", "1st of the month", "毎月 1 日"],
+    // 五个框默认都是 「*」，落地就是「每分钟」—— 那会往房间里刷屏。
+    // 这是**默认状态**就能到达的地方，所以必须显式说一句。
+    cronWarnSpammy:  ["⚠️ 按这个频率会持续往房间里发消息，确认是你要的", "⚠️ 依這個頻率會持續往房間裡發訊息，確認是你要的", "⚠️ This fires continuously into the room — make sure that is what you want", "⚠️ この頻度だとルームに送信し続けます。本当にこれでよいかご確認ください"],
+    cronDescUnknown: ["表达式太灵活，一句话说不准 —— 请看下面的具体时刻", "表達式太靈活，一句話說不準 —— 請看下面的具體時刻", "Too general to summarise in one line — check the times below", "一言で表せません。下の実行時刻をご確認ください"],
+    fieldBody:       ["发什么（正文）", "發什麼（正文）", "Message body", "送る内容（本文）"],
+    varClickHint:    ["点一下插入到正文", "點一下插入到正文", "Click to insert into the body", "クリックで本文に挿入"],
+    fieldChain:      ["动作链（按顺序执行，可选）", "動作鏈（依序執行，選填）", "Action chain (applied in order, optional)", "アクション連鎖（順に実行・任意）"],
+    fieldKeep:       ["保留历史", "保留歷史", "Keep in history", "履歴に残す"],
+    fieldEnabled:    ["启用", "啟用", "Enabled", "有効"],
+    phSender:        ["发送者显示名（默认 定时任务）", "傳送者顯示名稱（預設 定時任務）", "Sender name (default: automation)", "送信者名（既定：自動化）"],
+    keepNote:        ["不保留历史时照常广播，但不占房间历史额度（房间历史是按房间计数的）。", "不保留歷史時照常廣播，但不佔房間歷史額度（房間歷史是按房間計數的）。", "When off, the message is still broadcast live but does not consume the room's history quota.", "オフでも配信はされますが、ルームの履歴枠は消費しません。"],
+    btnSave:         ["保存", "儲存", "Save", "保存"],
+    btnPreview:      ["试算", "試算", "Preview", "プレビュー"],
+    btnSend:         ["立即发送", "立即傳送", "Send now", "今すぐ送信"],
+    btnDelete:       ["删除", "刪除", "Delete", "削除"],
+    previewTitle:    ["试算结果", "試算結果", "Preview output", "プレビュー結果"],
+    previewEmpty:    ["（还没有试算）", "（還沒有試算）", "(nothing previewed yet)", "（まだプレビューしていません）"],
+    runNext:         ["下次触发 {time}", "下次觸發 {time}", "Next run {time}", "次回実行 {time}"],
+    runLast:         ["上次执行 {time}（{status}）", "上次執行 {time}（{status}）", "Last run {time} ({status})", "前回実行 {time}（{status}）"],
+    runError:        ["错误：{msg}", "錯誤：{msg}", "Error: {msg}", "エラー：{msg}"],
+    runKeepsHistory: ["占房间历史额度", "佔房間歷史額度", "consumes history quota", "履歴枠を消費"],
+    previewAt:       ["基准时刻 {time}", "基準時刻 {time}", "Reference time {time}", "基準時刻 {time}"],
+    previewSentAt:   ["已于 {time} 发送", "已於 {time} 傳送", "Sent at {time}", "{time} に送信しました"],
+    cronNext:        ["接下来 3 次：{list}", "接下來 3 次：{list}", "Next three:", "次の 3 回：{list}"],
+
+    freqDailyText:   ["每天 {time}", "每天 {time}", "Daily {time}", "毎日 {time}"],
+    freqWeeklyText:  ["每周 {days} {time}", "每週 {days} {time}", "Weekly {days} {time}", "毎週 {days} {time}"],
+    freqOnceText:    ["仅一次 {at}", "僅一次 {at}", "Once {at}", "1 回 {at}"],
+    freqCronText:    ["cron {expr}", "cron {expr}", "cron {expr}", "cron {expr}"],
+
+    stSaving:        ["保存中…", "儲存中…", "Saving…", "保存中…"],
+    stSaved:         ["已保存", "已儲存", "Saved", "保存しました"],
+    stPreviewing:    ["试算中…", "試算中…", "Rendering…", "プレビュー中…"],
+    stSending:       ["发送中…", "傳送中…", "Sending…", "送信中…"],
+    stSent:          ["已发送", "已傳送", "Sent", "送信しました"],
+    stDeleting:      ["删除中…", "刪除中…", "Deleting…", "削除中…"],
+    stDeleted:       ["已删除", "已刪除", "Deleted", "削除しました"],
+    stVerifying:     ["正在验证…", "正在驗證…", "Verifying…", "確認中…"],
+    stLoggedIn:      ["已登录", "已登入", "Signed in", "ログインしました"],
+    stDisabling:     ["正在停用…", "正在停用…", "Disabling…", "停止中…"],
+    stDisabled:      ["已停用", "已停用", "Disabled", "停止しました"],
+    stEnabling:      ["正在启用…", "正在啟用…", "Enabling…", "有効化中…"],
+    stEnabled:       ["已启用", "已啟用", "Enabled", "有効にしました"],
+    stSaveFirst:     ["先保存一条任务", "先儲存一筆任務", "Save the automation first", "先に自動化を保存してください"],
+
+    confirmSend:     ["会立刻把这条消息发进房间 {room}，确定？", "會立刻把這則訊息傳進房間 {room}，確定？", "This will post the message into room {room} right now. Continue?", "この内容を今すぐルーム {room} に送信します。よろしいですか？"],
+    confirmDelete:   ["删除任务「{name}」？", "刪除任務「{name}」？", "Delete the automation {name}?", "自動化「{name}」を削除しますか？"],
+    alertTaskToken:  ["这是这条任务的钥匙，已保存在本机浏览器。\n\n公开房间里它是你之后修改 / 删除这条任务的唯一凭据，换浏览器就找不回来了。", "這是這筆任務的鑰匙，已儲存在本機瀏覽器。\n\n公開房間裡它是你之後修改 / 刪除這筆任務的唯一憑證，換瀏覽器就找不回來了。", "This is the key for the automation and has been saved in this browser.\n\nIn a public room it is the only way to edit or delete it later; it cannot be recovered from another browser.", "これがこの自動化のキーです（このブラウザに保存しました）。\n\n公開ルームでは、後から変更・削除する唯一の手段になります。別のブラウザでは復元できません。"],
+    promptCred:      ["房间密码或全局密码\n\n只用它换一枚 1 小时有效的会话令牌，密码本身不落盘；\n令牌与本站在同一个标签页里共用，所以不需要二次登录。", "房間密碼或全域密碼\n\n只用它換一枚 1 小時有效的權杖，密碼本身不落盤；\n權杖與本站在同一個分頁裡共用，所以不需要二次登入。", "Room password or global password\n\nUsed only to obtain a 1-hour session token; the password itself is never stored.\nThe token is shared with the main app in the same tab, so you will not be asked twice.", "ルームまたはグローバルのパスワード\n\n1 時間有効のトークンと引き換えるためだけに使い、パスワード自体は保存しません。\n同じタブの本体アプリと共有されるため、二度入力は不要です。"],
+    errNoToken:      ["服务端没有返回令牌", "伺服器沒有回傳權杖", "The server did not return a token", "サーバーがトークンを返しませんでした"],
+    errPassword:     ["密码不正确", "密碼不正確", "Wrong password", "パスワードが正しくありません"],
+    noVars:          ["服务端没有下发可用变量。", "伺服器沒有下發可用變數。", "The server reported no available variables.", "利用できる変数がサーバーから通知されていません。"],
+    noActions:       ["服务端没有下发可用的动作。", "伺服器沒有下發可用的動作。", "The server reported no available actions.", "利用できる動作がサーバーから通知されていません。"],
+    actionScopeHint: ["只列服务端能跑的动作。生成类（UUID / 时间）请直接写进正文：{{uuid}} / {{time}} / {{datetime}}", "只列伺服器能跑的動作。生成類（UUID / 時間）請直接寫進正文：{{uuid}} / {{time}} / {{datetime}}", "Only actions the server can run are listed. For generated values (UUID / time), write them straight into the body: {{uuid}} / {{time}} / {{datetime}}", "サーバーで実行できる動作のみ表示しています。生成系（UUID / 時刻）は本文に直接書いてください：{{uuid}} / {{time}} / {{datetime}}"],
+    // 动作链为空时的占位。⚠️ 这条**曾经漏掉过**：`t()` 取不到条目会原样返回 key，
+    // 于是那个框里真的写着 `phChainClick`（四门语言都躲不开）。
+    // 现在由 TestAutomationPageScriptI18nKeysHaveMessages 拦着。
+    phChainClick:    ["从上面点一个动作加到这里", "從上面點一個動作加到這裡", "Click an action above to add it here", "上の一覧からアクションをクリックして追加"],
+
+    varDate:         ["今天的日期", "今天的日期", "Today's date", "今日の日付"],
+    varDatePlus1:    ["明天的日期", "明天的日期", "Tomorrow's date", "明日の日付"],
+    varWeekdayPlus1: ["明天是周几", "明天是星期幾", "Tomorrow's weekday", "明日の曜日"],
+    varDatetime:     ["日期和时间", "日期和時間", "Date and time", "日付と時刻"],
+    varTime:         ["时刻（时:分）", "時刻（時:分）", "Time (HH:MM)", "時刻（時:分）"],
+    varTimestamp:    ["Unix 时间戳", "Unix 時間戳", "Unix timestamp", "Unix タイムスタンプ"],
+    varUuid:         ["随机 UUID", "隨機 UUID", "Random UUID", "ランダム UUID"],
+    varTask:         ["任务名", "任務名稱", "Task name", "タスク名"],
+    varLatestOwn:    ["本房间最新消息（排除定时消息）", "本房間最新消息（排除定時訊息）", "Latest message in this room (scheduled ones excluded)", "このルームの最新メッセージ（定時送信を除く）"],
+    varLatestOther:  ["指定房间最新消息（同样排除定时消息）", "指定房間最新消息（同樣排除定時訊息）", "Latest message in a given room (scheduled ones excluded too)", "指定したルームの最新メッセージ（こちらも定時送信を除く）"],
+    // 悬停说明：这个变量比别的都「重」—— 它读的是外部状态，还牵涉跨房间权限，
+    // 一句话说不完的部分就放在这里，别让人踩了坑才知道。
+    varLatestHint:   ["取该房间最新一条**人发的**文本（跳过文件，也跳过定时任务自己发的，防止自我循环）。不带房间 = 本房间；写成 {{latest:房间名}} 可指定别的房间 —— 那个房间要**不需要密码就能读**；管理员（用全局密码登录）可以引用任意房间。", "取該房間最新一筆**人發的**文字（略過檔案，也略過定時任務自己發的，防止自我循環）。不帶房間 = 本房間；寫成 {{latest:房間名}} 可指定別的房間 —— 那個房間要**不需要密碼就能讀**；管理員（用全域密碼登入）可以引用任意房間。", "The newest text message a **person** posted in that room (files and the automation’s own messages are skipped, so it cannot feed itself). No room = the task’s own room; write {{latest:room}} for another room — it must be **readable without a password**. Admins (signed in with the global password) may reference any room.", "そのルームで**人が**投稿した最新のテキスト（ファイルと、自動化自身が送ったものは除く＝自己循環しない）。部屋名を省くと自分のルーム、{{latest:ルーム名}} で別のルームを指定できます（**パスワード不要で読めるルーム**に限る）。管理者（グローバルパスワードでログイン）は任意のルームを参照できます。"],
+    varRoom:         ["房间名", "房間名稱", "Room name", "ルーム名"]
+  };
+
+  // 动作名 / 分组名：**key 与 SPA 的 locales 完全相同**，译文也照抄，不另起一套。
+  var ACTION_LABELS = {
+    // ⚠️ 下面这批是**新下沉到服务端的动作**（2026-09-24 那轮）：JSON 美化/压缩、HTML 实体、
+    // Unicode 转义、反转、5 个提取、4 个中文、2 个时间戳。两个分组名（actionGroupFormat /
+    // actionGroupZh）也一并补上 —— 那两组以前没有任何动作能下沉，所以从来没出现过。
+    //
+    // ⚠️ 这张表是 SPA locales（web-vue3/src/locales/*.json）的**抄本**，key 完全相同。
+    // 漏一条的表现是界面上冒出一个裸 key（vartask 就这么漏过一次）。
+    // TestAutomationPageMessagesCoverActionKeys 盯着「每个服务端动作的 key 都在这张表里」。
+    actionJsonPretty:      ["JSON 美化", "JSON 美化", "Beautify JSON", "JSON を整形"],
+    actionJsonMin:         ["JSON 压缩", "JSON 壓縮", "Minify JSON", "JSON を圧縮"],
+    actionReplaceFind:     ["查找", "尋找", "Find", "検索"],
+    actionReplaceWith:     ["替换为（留空即删除）", "取代為（留空即刪除）", "Replace with (empty = delete)", "置換後（空欄なら削除）"],
+    actionReplaceMode:     ["查找模式", "尋找模式", "Find mode", "検索モード"],
+    actionReplaceModeText: ["文本", "文字", "Text", "テキスト"],
+    actionReplaceModeDigits: ["数字", "數字", "Digits", "数字"],
+    actionReplaceModeLatin: ["英文", "英文", "Latin letters", "英字"],
+    actionReplaceModeSpaces: ["连续空格", "連續空格", "Repeated spaces", "連続する空白"],
+    actionReplaceModeEmail: ["邮箱", "電子郵件", "Email", "メールアドレス"],
+    actionReplaceModeUrl:  ["网址", "網址", "URL", "URL"],
+    actionReplaceModePhone: ["手机号", "手機號碼", "Phone number", "携帯番号"],
+    actionReplaceModeIp:   ["IP 地址", "IP 位址", "IP address", "IP アドレス"],
+    actionReplaceBadMode:  ["未知的查找模式", "未知的尋找模式", "Unknown find mode", "不明な検索モード"],
+    actionReplace:         ["查找替换", "尋找取代", "Find and replace", "検索と置換"],
+    actionReverse:         ["反转", "反轉", "Reverse", "反転"],
+    actionExtractUrl:      ["提取链接", "擷取連結", "Extract links", "リンクを抽出"],
+    actionExtractEmail:    ["提取邮箱", "擷取信箱", "Extract emails", "メールを抽出"],
+    actionExtractPhone:    ["提取手机号", "擷取手機號", "Extract phone numbers", "電話番号を抽出"],
+    actionExtractIp:       ["提取 IP", "擷取 IP", "Extract IPs", "IP を抽出"],
+    actionExtractNumber:   ["提取数字", "擷取數字", "Extract numbers", "数値を抽出"],
+    actionHtmlEncode:      ["HTML 实体编码", "HTML 實體編碼", "HTML entity encode", "HTML エンティティをエンコード"],
+    actionHtmlDecode:      ["HTML 实体解码", "HTML 實體解碼", "HTML entity decode", "HTML エンティティをデコード"],
+    actionUnicodeEncode:   ["Unicode 转义", "Unicode 轉義", "Unicode escape", "Unicode エスケープ"],
+    actionUnicodeDecode:   ["Unicode 还原", "Unicode 還原", "Unicode unescape", "Unicode を戻す"],
+    actionFullWidth:       ["转全角", "轉全形", "To full-width", "全角に変換"],
+    actionHalfWidth:       ["转半角", "轉半形", "To half-width", "半角に変換"],
+    actionCnPunctuation:   ["中文标点 → 英文", "中文標點 → 英文", "Chinese punctuation → English", "中国語句読点 → 英語"],
+    actionNumberToChinese: ["数字 → 中文大写", "數字 → 中文大寫", "Number → Chinese numerals", "数字 → 漢数字"],
+    actionTimestampToDate: ["时间戳 → 日期", "時間戳 → 日期", "Timestamp → date", "タイムスタンプ → 日付"],
+    actionDateToTimestamp: ["日期 → 时间戳", "日期 → 時間戳", "Date → timestamp", "日付 → タイムスタンプ"],
+    actionGroupFormat:     ["格式化", "格式化", "Format", "整形"],
+    actionGroupZh:         ["中文", "中文", "Chinese", "中国語"],
+    actionTrimLines:       ["去首尾空白", "去除行首尾空白", "Trim each line", "各行の空白を削除"],
+    actionDropBlankLines:  ["去空行", "移除空行", "Drop blank lines", "空行を削除"],
+    actionDedupeLines:     ["去重行", "移除重複行", "Remove duplicate lines", "重複行を削除"],
+    actionSortLines:       ["排序行", "排序行", "Sort lines", "行を並べ替え"],
+    actionUpperCase:       ["转大写", "轉大寫", "UPPERCASE", "大文字に"],
+    actionLowerCase:       ["转小写", "轉小寫", "lowercase", "小文字に"],
+    actionDateAdd:         ["日期加减", "日期加減", "Add to a date", "日付を加減"],
+    actionDateDiff:        ["日期间隔", "日期間隔", "Days between dates", "日付の間隔"],
+    actionBase64Encode:    ["Base64 编码", "Base64 編碼", "Base64 encode", "Base64 エンコード"],
+    actionBase64Decode:    ["Base64 解码", "Base64 解碼", "Base64 decode", "Base64 デコード"],
+    actionUrlEncode:       ["URL 编码", "URL 編碼", "URL encode", "URL エンコード"],
+    actionUrlDecode:       ["URL 解码", "URL 解碼", "URL decode", "URL デコード"],
+    actionHexEncode:       ["Hex 编码", "Hex 編碼", "Hex encode", "Hex エンコード"],
+    actionHexDecode:       ["Hex 解码", "Hex 解碼", "Hex decode", "Hex デコード"],
+    actionInsertUuid:      ["插入 UUID", "插入 UUID", "Insert UUID", "UUID を挿入"],
+    actionSha256:          ["SHA-256 哈希", "SHA-256 雜湊", "SHA-256 hash", "SHA-256 ハッシュ"],
+    actionGroupText:       ["文本", "文字", "Text", "テキスト"],
+    actionGroupDate:       ["日期", "日期", "Date", "日付"],
+    actionGroupEncode:     ["编解码", "編解碼", "Encode", "エンコード"],
+    actionGroupGenerate:   ["生成", "產生", "Generate", "生成"],
+    actionGroupInspect:    ["分析", "分析", "Inspect", "解析"]
+  };
+
+  var DAYS = [
+    ["周日", "周一", "周二", "周三", "周四", "周五", "周六"],
+    ["週日", "週一", "週二", "週三", "週四", "週五", "週六"],
+    ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+    ["日", "月", "火", "水", "木", "金", "土"]
+  ];
+
+  // 变量胶囊：界面显示人话名字，插入的是表达式（tooltip 里能看到）。
+  var VARIABLES = [
+    { name: "date", expr: "{{date}}", label: "varDate" },
+    { name: "date", expr: "{{date:+1d}}", label: "varDatePlus1" },
+    { name: "weekday", expr: "{{weekday:+1d}}", label: "varWeekdayPlus1" },
+    { name: "datetime", expr: "{{datetime}}", label: "varDatetime" },
+    { name: "time", expr: "{{time}}", label: "varTime" },
+    { name: "timestamp", expr: "{{timestamp}}", label: "varTimestamp" },
+    { name: "uuid", expr: "{{uuid}}", label: "varUuid" },
+    { name: "task", expr: "{{task}}", label: "varTask" },
+    { name: "room", expr: "{{room}}", label: "varRoom" },
+    // 唯一一个「读外部状态」的变量，所以带 hint（见 varLatestHint）。
+    // ⚠️ 拆成**两条**：不带房间名的取**本房间**，带房间名的取**别的房间**。
+    // 合成一条的话，用户点下去只拿到 `{{latest}}`，还得自己想起来去补 `:房间名` ——
+    // 而「指定房间」这个用法光看一个胶囊是想不到的。
+    { name: "latest", expr: "{{latest}}", label: "varLatestOwn", hint: "varLatestHint" },
+    { name: "latest", expr: "{{latest:test}}", label: "varLatestOther", hint: "varLatestHint" }
+  ];
+
+  // ── 凭据：复用 SPA 的那一套 ──────────────────────────────────────
+  //
+  // ⚠️ 这几个常量**必须和 web-vue3/src/store/websocket.js 里的一字不差**。
+  // 共用一个 sessionStorage 键有两个好处，缺一个都不值得这么写：
+  //   1. **同一标签页内零二次登录** —— 在 SPA 里登录过，从它跳到这个页面直接就能用；
+  //      在这里登录过，跳回 SPA 也不用再输。两个方向都通。
+  //   2. 让两边的令牌生命周期由同一套规则管（1 小时 + 到期前静默续签）。
+  //
+  // 存的是**会话令牌**，不是密码。密码只在换令牌的那一瞬间过一次内存 ——
+  // 之前这里存的是明文密码、还是 localStorage（永不过期、关标签页也不清），
+  // 那是这个项目里唯一一处比 SPA 做得差的地方。
+  var ROOM_AUTH_CACHE_KEY = "roomAuthCache";
+  var DEFAULT_ROOM_KEY = "__default__";
+  var GLOBAL_ROOM_KEY = "__global__";
+  var LS_TASK_TOKEN = "ccgAutomationTaskToken:";
+
+  // roomList：**有定时任务的房间**（来自 `GET /tasks/rooms`）。切换房间那个入口靠它列出目标 ——
+  // 没有它的话，用户知道「能切房间」却不知道该切到哪（房间名得自己猜）。
+  // ⚠️ 只有管理员能拿到跨房间的清单，非管理员拿到的就是自己那个房间。
+  // selected：批量操作的选中集（id → true）。**每次 refresh 后清空** ——
+  // 刷新之后列表内容可能变了，留着旧的选中集会出现「我选的明明不是这几条」。
+  var state = { room: CC.room, lang: "zh", langIndex: 0, cap: null, tasks: [], roomList: [], selected: {}, current: null, taskToken: "", chain: [], ready: false };
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  function t(key, params) {
+    var row = MSG[key];
+    var s = row ? (row[state.langIndex] || row[0]) : key;
+    if (params) {
+      Object.keys(params).forEach(function (k) {
+        s = s.split("{" + k + "}").join(String(params[k]));
+      });
+    }
+    return s;
+  }
+
+  function labelFor(key, fallback) {
+    var row = ACTION_LABELS[key];
+    if (!row) { return fallback || key; }
+    return row[state.langIndex] || row[0] || fallback || key;
+  }
+
+  // 旧版本把明文密码写在这个键里。清一次，别让已经落盘的密码继续留着。
+  function purgeLegacyPassword() {
+    try { localStorage.removeItem("ccgAutomationAuth"); } catch (e) {}
+  }
+
+  function roomStorageKey(room) {
+    var r = (room || "").trim();
+    return (r === "" || r === "default") ? DEFAULT_ROOM_KEY : r;
+  }
+
+  function loadAuthCache() {
+    try {
+      var raw = sessionStorage.getItem(ROOM_AUTH_CACHE_KEY);
+      if (!raw) { return {}; }
+      var parsed = JSON.parse(raw);
+      return (parsed && typeof parsed === "object") ? parsed : {};
+    } catch (e) { return {}; }
+  }
+
+  // 取当前房间可用的令牌：先看房间自己的，再退到全局令牌。
+  // 顺序与 SPA 的 getEffectiveAuthEntry 一致 —— 全局密码换来的令牌 scope=global，
+  // 对任意房间都有效，所以它必须能兜底。
+  function currentToken() {
+    var cache = loadAuthCache();
+    var now = Math.floor(Date.now() / 1000);
+    var pick = function (key) {
+      var e = cache[key];
+      if (typeof e === "string" && e) { return e; }
+      if (e && typeof e === "object" && typeof e.token === "string" && e.token) {
+        var exp = Number(e.expiresAt) || 0;
+        if (exp > 0 && exp <= now) { return null; } // 过期当没有 —— 别拿它去撞 401
+        return e.token;
+      }
+      return null;
+    };
+    // ⚠️ 顺序不能反：**先试全局令牌**。
+    //
+    // 反过来的话，「曾经给某个房间单独输过密码」的用户在切到管理员之后，
+    // 那个房间的旧房间令牌会**优先命中** —— 身份悄悄降级成房间成员，
+    // 表现就是「我明明是管理员，怎么切到那个房间就看不到全部任务了」。
+    // 全局令牌是更强的身份，有它就用它；房间令牌只在没有全局令牌时兜底。
+    return pick(GLOBAL_ROOM_KEY) || pick(roomStorageKey(state.room)) || "";
+  }
+
+  function storeToken(token, expiresAt, scope) {
+    var cache = loadAuthCache();
+    var key = (scope === "global") ? GLOBAL_ROOM_KEY : roomStorageKey(state.room);
+    cache[key] = { token: token, expiresAt: Number(expiresAt) || 0 };
+    try { sessionStorage.setItem(ROOM_AUTH_CACHE_KEY, JSON.stringify(cache)); } catch (e) {}
+  }
+
+  // 只清当前房间那一条：全局令牌可能还被别的房间用着，不该一起删。
+  function clearToken() {
+    var cache = loadAuthCache();
+    delete cache[roomStorageKey(state.room)];
+    try { sessionStorage.setItem(ROOM_AUTH_CACHE_KEY, JSON.stringify(cache)); } catch (e) {}
+  }
+
+  // 单独清全局那一条。**「切换凭据」时两条都要清**（见 switchCredential）——
+  // 否则「从管理员降级成房间密码」做不到：全局令牌还在，currentToken 会退回它。
+  function clearGlobalToken() {
+    var cache = loadAuthCache();
+    delete cache[GLOBAL_ROOM_KEY];
+    try { sessionStorage.setItem(ROOM_AUTH_CACHE_KEY, JSON.stringify(cache)); } catch (e) {}
+  }
+
+  // 到期前静默续签。不续签的话，用户会在一小时后突然被踢回「输入凭据」——
+  // 而那时他可能正配到一半。续签失败不做任何事：真的过期了再让他重新登录，
+  // 而不是在这里弹一个他看不懂的错误。
+  var authRefreshTimer = null;
+  function scheduleTokenRefresh() {
+    if (authRefreshTimer) { clearTimeout(authRefreshTimer); authRefreshTimer = null; }
+    var entry = loadAuthCache()[roomStorageKey(state.room)];
+    if (!entry || typeof entry !== "object") { return; }
+    var expiresAt = Number(entry.expiresAt) || 0;
+    if (expiresAt <= 0) { return; }
+    var delay = (expiresAt - Math.floor(Date.now() / 1000) - 300) * 1000;
+    if (delay < 30000) { delay = 30000; }
+    authRefreshTimer = setTimeout(refreshToken, delay);
+  }
+
+  function refreshToken() {
+    var token = currentToken();
+    if (!token) { return; }
+    fetch(CC.prefix + "/auth/token/refresh?room=" + encodeURIComponent(state.room), {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + token }
+    }).then(function (res) {
+      return res.ok ? res.json() : null;
+    }).then(function (data) {
+      if (data && data.token) {
+        storeToken(data.token, data.expiresAt, data.scope);
+        scheduleTokenRefresh();
+      }
+    }).catch(function () {});
+  }
+
+  function taskTokenFor(room) {
+    // ⚠️ 这个**故意留在 localStorage**（与上面的会话令牌相反）：它是公开房间里某一条任务的钥匙，
+    // 关掉标签页就丢的话，用户下次回来就再也改不了自己建的那条任务了。
+    // 它只对一条任务有效、和密码无关，风险面比会话令牌小得多。
+    try { return localStorage.getItem(LS_TASK_TOKEN + room) || ""; } catch (e) { return ""; }
+  }
+
+  function api(path, opts) {
+    opts = opts || {};
+    var headers = { "Content-Type": "application/json" };
+    var tkn = currentToken();
+    if (tkn) { headers["Authorization"] = "Bearer " + tkn; }
+    if (state.taskToken) { headers["X-Task-Token"] = state.taskToken; }
+    var init = { method: opts.method || "GET", headers: headers };
+    if (opts.body !== undefined) { init.body = JSON.stringify(opts.body); }
+    return fetch(CC.prefix + path, init).then(function (res) {
+      return res.text().then(function (text) {
+        var data = null;
+        try { data = text ? JSON.parse(text) : null; } catch (e) { data = { message: text }; }
+        if (!res.ok) {
+          // 401 = 令牌过期或被撤销。清掉缓存，让横幅回到「输入凭据」——
+          // 留着过期令牌只会让每一次请求都白失败一次。
+          if (res.status === 401) { clearToken(); }
+          var err = new Error((data && (data.message || data.error)) || res.statusText);
+          err.status = res.status; err.code = data && data.code;
+          throw err;
+        }
+        return data;
+      });
+    });
+  }
+
+  function esc(s) {
+    return String(s === undefined || s === null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  function fmtTime(unix) {
+    if (!unix) { return "--"; }
+    var d = new Date(unix * 1000);
+    try {
+      return d.toLocaleString(BCP47[state.lang] || "zh-CN", {
+        month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"
+      });
+    } catch (e) {
+      return d.toLocaleString();
+    }
+  }
+
+  function freqText(task) {
+    if (task.freq === "once") { return t("freqOnceText", { at: task.runAt || "" }); }
+    if (task.freq === "cron") {
+      // 列表里也尽量说人话。归纳不出来（desc.mode = unknown）时退回原表达式 ——
+      // 列表这一行很短，「太灵活说不准」这种半句话放进来只会更看不懂。
+      if (task.desc && task.desc.mode && task.desc.mode !== "unknown") {
+        return cronDescText(task.desc);
+      }
+      return t("freqCronText", { expr: task.cron || "" });
+    }
+    if (task.freq === "weekly") {
+      var days = (task.byWeekday || []).map(function (d) { return DAYS[state.langIndex][d]; }).join(" ");
+      return t("freqWeeklyText", { days: days, time: task.time || "" });
+    }
+    return t("freqDailyText", { time: task.time || "" });
+  }
+
+  function setStatus(msg, isErr) {
+    var el = $("status");
+    el.textContent = msg || "";
+    el.style.color = isErr ? "#c0392b" : "";
+  }
+
+  // ── 语言 ────────────────────────────────────────────────────────
+  function normalizeLang(value) {
+    var v = String(value || "").trim();
+    if (!v) { return ""; }
+    var lower = v.toLowerCase();
+    for (var i = 0; i < LANGS.length; i++) {
+      if (LANGS[i].toLowerCase() === lower) { return LANGS[i]; }
+    }
+    if (lower.indexOf("zh-tw") === 0 || lower.indexOf("zh-hk") === 0 || lower.indexOf("zh-hant") === 0) { return "zh-TW"; }
+    if (lower.indexOf("zh") === 0) { return "zh"; }
+    if (lower.indexOf("ja") === 0) { return "ja"; }
+    if (lower.indexOf("en") === 0) { return "en"; }
+    return "";
+  }
+
+  function detectLang() {
+    // 优先级：?lang= > 与 SPA 共用的 localStorage['locale'] > 浏览器语言。
+    // 判断规则与 SPA 的 getBrowserLocale 保持一致，免得同一个浏览器在两个页面里
+    // 得到不同的语言。
+    var hit = "";
+    try { hit = normalizeLang(new URLSearchParams(location.search).get("lang")); } catch (e) {}
+    if (hit) { return hit; }
+    try { hit = normalizeLang(localStorage.getItem("locale")); } catch (e) {}
+    if (hit) { return hit; }
+    hit = normalizeLang(navigator.language || navigator.userLanguage || "");
+    return hit || "zh";
+  }
+
+  function applyLang(code) {
+    state.lang = code;
+    state.langIndex = Math.max(0, LANGS.indexOf(code));
+    document.documentElement.lang = (code === "zh") ? "zh-CN" : code;
+    renderStaticText();
+    renderPickers();
+    renderCronPresets();
+    renderGate();
+    renderBadges();
+    renderList();
+    renderChain();
+    renderRunInfo();
+    syncFreqFields(true);
+    if ($("preview") && $("preview").getAttribute("data-empty") !== "0") {
+      $("preview").textContent = t("previewEmpty");
+    }
+  }
+
+  function renderStaticText() {
+    Array.prototype.forEach.call(document.querySelectorAll("[data-i18n]"), function (el) {
+      el.textContent = t(el.getAttribute("data-i18n"));
+    });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-i18n-ph]"), function (el) {
+      el.placeholder = t(el.getAttribute("data-i18n-ph"));
+    });
+    $("fTZ").placeholder = t("phTZ", { tz: defaultTZ() });
+    $("fName").placeholder = t("phName");
+    $("fSender").placeholder = t("phSender");
+    $("fTpl").placeholder = "{{date}} / {{date:+1d}} / {{weekday:+1d}}";
+    document.title = t("pageTitle") + " · Cloud Clipboard";
+  }
+
+  function renderLangSelect() {
+    $("langSel").innerHTML = LANGS.map(function (code, i) {
+      return "<option value='" + code + "'>" + esc(LANG_NAMES[i]) + "</option>";
+    }).join("");
+    $("langSel").value = state.lang;
+  }
+
+  // ── 凭据 UI ─────────────────────────────────────────────────────
+  function askCredential() {
+    var v = window.prompt(t("promptCred"), "");
+    if (v === null) { return; }
+    var password = v.trim();
+    if (!password) { return; }
+    exchangePassword(password);
+  }
+
+  function switchCredential() {
+    // ⚠️ **两条都清**。只清当前房间的话，「从管理员降级成房间密码」根本做不到 ——
+    // 全局令牌还在，currentToken() 会退回它，用户以为切了其实没切。
+    // （clearToken 自己只清一条是有意的：别的房间可能还在用那个全局令牌。）
+    clearToken();
+    clearGlobalToken();
+    state.cap = null;
+    askCredential();
+  }
+
+  // 点房间徽章 = 切换房间。
+  //
+  // 为什么值得给个入口：管理页的房间来自 URL 的 `?room=`，而 SPA 那边是带着「当前房间」
+  // 跳过来的。想看看别的房间的任务，以前只能改地址栏 —— 而**手机上没有地址栏**。
+  // 切房间。
+  //
+  // `target` 有值 = 从**房间横幅**点过来的（直接切，见 renderRoomBar）；
+  // 没有 = 从**房间徽章**点过来的（弹输入框）—— 那是切到「还没有任务的房间」的**唯一**途径，
+  // 因为那种房间列不出来（没有任务就没有它出现在清单里的理由）。
+  function switchRoom(target) {
+    var room = "";
+    if (typeof target === "string" && target.trim()) {
+      room = target.trim();
+    } else {
+      var v = window.prompt(t("promptRoom"), state.room);
+      if (v === null) { return; }
+      room = v.trim();
+    }
+    if (!room || room === state.room) { return; }
+
+    state.room = room;
+
+    // ⚠️ URL 要跟着换：不换的话刷新会掉回旧房间，用户会以为「切了没用」。
+    // 用 replaceState 而不是 pushState —— 切房间不是「上一个页面」，别塞进浏览器历史。
+    try {
+      var url = new URL(window.location.href);
+      url.searchParams.set("room", room);
+      window.history.replaceState(null, "", url.toString());
+    } catch (e) {}
+
+    // 回去的路也要带上新房间，否则「返回主界面」会回到旧房间
+    var base = String(CC.prefix || "").replace(/\/+$/, "");
+    $("backLink").href = base + "/?room=" + encodeURIComponent(room);
+
+    // 房间变了：凭据是按房间取的（currentToken 自己会拿新的），而 cap / 任务列表 / 表单
+    // 都属于旧房间 —— refresh() 会把它们全部重建（它会先读 /server 再读 /tasks）。
+    setStatus(t("stSwitchingRoom"));
+    refresh();
+  }
+
+  function exchangePassword(password) {
+    setStatus(t("stVerifying"));
+    fetch(CC.prefix + "/auth/token?room=" + encodeURIComponent(state.room), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: password })
+    }).then(function (res) {
+      return res.text().then(function (text) {
+        var data = null;
+        try { data = text ? JSON.parse(text) : null; } catch (e) {}
+        if (!res.ok) {
+          throw new Error((data && (data.message || data.error)) || t("errPassword"));
+        }
+        return data;
+      });
+    }).then(function (data) {
+      if (!data || !data.token) { throw new Error(t("errNoToken")); }
+      storeToken(data.token, data.expiresAt, data.scope);
+      scheduleTokenRefresh();
+      setStatus(t("stLoggedIn"));
+      state.cap = null;
+      return refresh();
+    }).catch(function (err) {
+      setStatus(err.message, true);
+    });
+  }
+
+  function bindAuthButton(handler) {
+    var btn = $("btnAuth");
+    if (btn) { btn.addEventListener("click", handler || askCredential); }
+  }
+
+  function renderGate() {
+    var cap = state.cap;
+    var el = $("gate");
+    el.className = "banner";
+    // 没权限时把编辑器收起来：留着只会让人填半天、保存时吃一个 403。
+    $("panel").className = (cap && cap.allowed) ? "grid" : "grid hide";
+    if (!cap) { el.textContent = t("connecting"); return; }
+
+    if (!cap.enabled) {
+      el.className = "banner warn";
+      el.textContent = t("autoDisabled");
+      return;
+    }
+
+    if (!cap.allowed) {
+      el.className = "banner warn";
+      // 区分「没有凭据」和「有凭据但这个房间不开」—— 这两种情况的下一步完全不同，
+      // 都只说「未开放自动化」会让人以为要换个密码，实际上换什么密码都没用。
+      var hasToken = Boolean(currentToken());
+      var head = hasToken
+        ? t("roomNotOpenCred")
+        : t("roomNotOpen", { room: cap.room });
+      el.innerHTML = head +
+        " <button id='btnAuth' class='mini' style='margin-left:6px'>" +
+        esc(hasToken ? t("useAnotherCred") : t("enterCredential")) + "</button>" +
+        " <span class='small'>" + esc(t("publicHint")) + "</span>";
+      bindAuthButton(hasToken ? switchCredential : askCredential);
+      return;
+    }
+
+    // 有权限时**整条横幅都不显示**：
+    //   · 身份已经在头部那两个徽章里了（房间名 / 档位）；
+    //   · 「切换凭据」按钮也常驻在头部 —— 横幅里再来一个只是重复。
+    // 上面剩下的全是「没权限」的情况，每一种都必须给出**下一步做什么**（那是横幅的全部价值）。
+    el.className = "banner hide";
+  }
+
+  // 房间导航横幅：**有任务的房间 + 条数**，点一下切过去。
+  //
+  // ⚠️ 只在**多于一个**房间时显示。只有一个的话用户本来就在那儿，横幅是纯噪音。
+  // ⚠️ 清单只有管理员拿得到跨房间的（见 handleTaskRooms 的权限说明）——
+  // 非管理员永远只看到自己那一个，于是横幅对他是隐藏的。
+  function renderRoomBar() {
+    var el = $("roomBar");
+    var list = state.roomList || [];
+    if (list.length < 2) {
+      el.className = "room-bar hide";
+      return;
+    }
+    el.className = "room-bar";
+    el.innerHTML = "<span class='small mut'>" + esc(t("roomsWithTasks")) + "</span>" +
+      "<span class='chips'>" + list.map(function (r) {
+        var on = (r.room === state.room);
+        return "<span class='chip" + (on ? " on" : "") + "' data-room='" + esc(r.room) + "'>" +
+          esc(r.room) + " (" + r.count + ")</span>";
+      }).join("") + "</span>";
+    Array.prototype.forEach.call(el.querySelectorAll(".chip"), function (chipEl) {
+      chipEl.addEventListener("click", function () {
+        switchRoom(chipEl.getAttribute("data-room"));
+      });
+    });
+  }
+
+  function renderBadges() {
+    var cap = state.cap || {};
+    $("roomBadge").textContent = t("roomBadge", { room: state.room });
+    // 「这个徽章能点」得说出来 —— 光看样式猜不到（见 CSS 里 .badge--action 的注释）。
+    // 有任务的房间列在**上面的横幅**里，这里就不再重复一遍。
+    $("roomBadge").title = t("switchRoomHint");
+    renderRoomBar();
+    var tierKey = { admin: "tierAdmin", room: "tierRoom", single: "tierSingle", none: "tierNone" }[cap.tier];
+    $("tierBadge").textContent = tierKey ? t(tierKey) : "--";
+    $("hint").textContent = cap.allowed
+      ? (cap.max > 0 ? t("limitReached", { n: cap.max }) : t("limitUnlimited"))
+      : "";
+  }
+
+  // ── 列表 ────────────────────────────────────────────────────────
+  function renderList() {
+    var box = $("list");
+    if (!state.tasks.length) {
+      box.innerHTML = "<div class='small mut'>" + esc(t("noTasks")) + "</div>";
+    } else {
+      box.innerHTML = state.tasks.map(function (task, i) {
+        var cls = "li" + (state.current && state.current.id === task.id ? " on" : "");
+        var extra = "";
+        if (task.lastStatus === "error") { extra = " · " + t("lastFailed"); }
+        else if (task.lastStatus === "skipped") { extra = " · " + t("lastSkipped"); }
+        var when = task.enabled ? t("nextRun", { time: fmtTime(task.nextRunAt) }) : t("disabledLabel");
+        return "<div class='" + cls + "' data-i='" + i + "'>" +
+          "<div style='display:flex;gap:8px;align-items:flex-start;justify-content:space-between'>" +
+            // 批量选择框。⚠️ 点击必须 stopPropagation —— 否则会冒泡到 .li，
+            // 顺手把这条**打开到编辑器里**（「勾选」和「打开来编辑」是两件事）。
+            "<input type='checkbox' class='sel' data-id='" + esc(task.id) + "'" +
+              (state.selected[task.id] ? " checked" : "") +
+              " style='margin-top:4px;flex:0 0 auto'>" +
+            "<div style='min-width:0;flex:1'>" +
+              "<div class='t'>" + esc(task.name) + "</div>" +
+              "<div class='small mut'>" + esc(freqText(task)) + "</div>" +
+              "<div class='small mut'>" + esc(when + extra) + "</div>" +
+            "</div>" +
+            // 开关直接放在列表上：关掉一条任务是最常见的日常操作，
+            // 要求「先选中 → 取消勾选 → 保存」等于把「暂停一下」变成一次编辑。
+            "<button class='mini' data-tgl='" + i + "'>" +
+              esc(task.enabled ? t("btnDisable") : t("btnEnable")) + "</button>" +
+          "</div>" +
+        "</div>";
+      }).join("");
+
+      Array.prototype.forEach.call(box.querySelectorAll(".li"), function (el) {
+        el.addEventListener("click", function () { selectTask(state.tasks[Number(el.getAttribute("data-i"))]); });
+      });
+      Array.prototype.forEach.call(box.querySelectorAll("[data-tgl]"), function (el) {
+        el.addEventListener("click", function (e) {
+          e.stopPropagation(); // 别顺手把这一行也选中了
+          toggleTask(state.tasks[Number(el.getAttribute("data-tgl"))]);
+        });
+      });
+      // ⚠️ 勾选只更新**批量条**，不重建列表 —— 重建会丢滚动位置，
+      // 勾到第 15 条时列表会跳回顶部，用户会以为「点错了」。
+      Array.prototype.forEach.call(box.querySelectorAll(".sel"), function (el) {
+        // 复选框自己的点击别冒泡到 .li —— 那会把这条打开到编辑器里
+        el.addEventListener("click", function (e) { e.stopPropagation(); });
+        el.addEventListener("change", function () {
+          var id = el.getAttribute("data-id");
+          if (el.checked) { state.selected[id] = true; } else { delete state.selected[id]; }
+          renderBatchBar();
+        });
+      });
+    }
+
+    $("listNote").textContent = state.foreignCount
+      ? t("foreignTasks", { n: state.foreignCount })
+      : "";
+
+    renderBatchBar();
+  }
+
+  // ── 变量 / 动作选择器 ───────────────────────────────────────────
+  //
+  // ⚠️ 这个函数**不管有没有权限都要跑**。之前是「没权限就提前 return」，
+  // 而面板当时是可见的 —— 于是用户看到的是一排空控件，只会以为功能坏了。
+  // 空控件没法解释自己为什么空。
+  function renderPickers() {
+    var cap = state.cap || {};
+
+    // 变量：胶囊上写人话（「明天的日期」），插进正文的是表达式 ——
+    // 「{{weekday:+1d}}」对非技术用户就是天书，而「明天是周几」一眼就懂。
+    var available = cap.vars || [];
+    var vars = VARIABLES.filter(function (v) {
+      return !available.length || available.indexOf(v.name) >= 0;
+    });
+    $("varChips").innerHTML = vars.length
+      ? vars.map(function (v) {
+          // title = 表达式 +（若有）说明。说明放在悬停里而不是堆在界面上：
+          // 变量有 9 个，每个都摆一段解释，面板会变成一堵墙。
+          var title = v.expr + (v.hint ? "\n" + t(v.hint) : "");
+          return "<span class='chip' data-v='" + esc(v.expr) + "' title='" + esc(title) + "'>" +
+            esc(t(v.label)) + "<code>" + esc(v.expr) + "</code></span>";
+        }).join("")
+      : "<span class='small mut'>" + esc(t("noVars")) + "</span>";
+    Array.prototype.forEach.call($("varChips").querySelectorAll(".chip"), function (el) {
+      el.addEventListener("click", function () {
+        var ta = $("fTpl");
+        ta.value = ta.value + el.getAttribute("data-v");
+        ta.focus();
+      });
+    });
+
+    // 动作：直接平铺成可点的胶囊，按组分行，写人话名字、id 放 tooltip。
+    // 原来是「下拉选一个 → 再点加一步」，两步；而且显示的是 text.trimLines 这种 id。
+    var actions = cap.actions || [];
+    if (!actions.length) {
+      $("actionBox").innerHTML = "<span class='small mut'>" + esc(t("noActions")) + "</span>";
+      return;
+    }
+    var groups = [];
+    actions.forEach(function (a) {
+      var g = groups.filter(function (x) { return x.key === a.groupKey; })[0];
+      if (!g) { g = { key: a.groupKey, ids: [] }; groups.push(g); }
+      g.ids.push(a);
+    });
+    $("actionBox").innerHTML = groups.map(function (g) {
+      return "<div class='small mut' style='margin:2px 0 4px'>" + esc(labelFor(g.key, g.key)) + "</div>" +
+        "<div class='chips' style='margin-bottom:8px'>" + g.ids.map(function (a) {
+          return "<span class='chip' data-act='" + esc(a.id) + "' title='" + esc(a.id) + "'>" +
+            esc(labelFor(a.key, a.id)) + "</span>";
+        }).join("") + "</div>";
+    }).join("") +
+      // 常驻说明：用户会好奇「为什么 UUID / 时间这类动作不在列表里」。
+      // 服务端**不下发**不可用的动作（它没有「置灰」这回事，见 render_actions.go 文件头），
+      // 所以只能在这里补一句，否则列表短了一截却没人解释。
+      "<div class='small mut' style='margin-top:2px'>" + esc(t("actionScopeHint")) + "</div>";
+    Array.prototype.forEach.call($("actionBox").querySelectorAll(".chip"), function (el) {
+      el.addEventListener("click", function () {
+        state.chain.push(el.getAttribute("data-act"));
+        renderChain();
+      });
+    });
+  }
+
+  function chainActionLabel(id) {
+    var found = ((state.cap && state.cap.actions) || []).filter(function (a) { return a.id === id; })[0];
+    return found ? labelFor(found.key, id) : id;
+  }
+
+  // ── 链上的一步：两种形态 ────────────────────────────────────────
+  //
+  //   "text.trimLines"                                        无参数（绝大多数）
+  //   { id: "text.replace", params: { find: "a", with: "b" } }  带参数
+  //
+  // ⚠️ 这三条必须和**另外两处**逐字对齐（一共三份实现，改一处就要一起改）：
+  //   · 前端 SPA：web-vue3/src/data/actions.js 的 stepId / stepParams / makeStep
+  //   · 服务端：  lib/task.go 的 AutomationChainStep（自定义 Unmarshal / Marshal）
+  // 形态一旦漂开，同一条任务在两边读出来就不是一回事了。
+  function chainStepId(step) {
+    if (typeof step === "string") { return step; }
+    return (step && step.id) ? String(step.id) : "";
+  }
+
+  function chainStepParams(step) {
+    if (step && typeof step === "object" && step.params && typeof step.params === "object") {
+      return step.params;
+    }
+    return {};
+  }
+
+  // 无参数时**退回字符串形态**：存储精简，也和存量 tasks.json 同形。
+  function makeChainStep(id, params) {
+    var clean = {};
+    Object.keys(params || {}).forEach(function (k) {
+      var v = String(params[k] == null ? "" : params[k]);
+      if (v !== "") { clean[k] = v; }
+    });
+    return Object.keys(clean).length ? { id: id, params: clean } : id;
+  }
+
+  // 这一步的动作定义（含 params 声明）。找不到返回 null。
+  function chainActionOf(step) {
+    var id = chainStepId(step);
+    var list = (state.cap && state.cap.actions) || [];
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].id === id) { return list[i]; }
+    }
+    return null;
+  }
+
+  // 参数的当前值。⚠️ 下拉**没设置时返回第一项** —— 那正是它的默认值，
+  // 服务端也是这么理解的（见 render_actions.go：Options 的第一项就是默认）。
+  function chainParamValue(action, values, p) {
+    var raw = values[p.key];
+    if (raw !== undefined && raw !== "") { return String(raw); }
+    if (p.type === "select" && p.options && p.options.length) { return p.options[0].value; }
+    return "";
+  }
+
+  // 当前该显示哪些参数（visibleWhen 不满足的不显示）。
+  //
+  // ⚠️ 判断依赖项要用「当前**生效**的值」而不是链里存的那个：模式没设置时生效值是第一项，
+  // 按原始值判会让「查找」框在默认状态下不显示 —— 而那正是最该显示的时候。
+  function chainVisibleParams(action, values) {
+    var all = (action && action.params) || [];
+    return all.filter(function (p) {
+      if (!p.visibleWhen) { return true; }
+      var dep = null;
+      for (var i = 0; i < all.length; i++) {
+        if (all[i].key === p.visibleWhen.key) { dep = all[i]; break; }
+      }
+      var current = dep ? chainParamValue(action, values, dep) : String(values[p.visibleWhen.key] || "");
+      return current === p.visibleWhen.equals;
+    });
+  }
+
+  function renderChain() {
+    if (!state.chain.length) {
+      $("chainChips").innerHTML = "<span class='small mut'>" + esc(t("phChainClick")) + "</span>";
+      return;
+    }
+    $("chainChips").innerHTML = state.chain.map(function (step, i) {
+      var id = chainStepId(step);
+      var action = chainActionOf(step);
+      var html = "<div class='chain-step'>" +
+        "<span class='chip on' data-i='" + i + "' title='" + esc(id) + "'>" +
+        (i + 1) + ". " + esc(chainActionLabel(id)) + " ×</span>";
+      // 带参数的动作：控件内联在这一行下面。
+      // ⚠️ 文本框输入时**只改 state、不重渲染**（重渲染会让输入框失焦，输一个字断一次）；
+      // 而下拉**必须重渲染** —— visibleWhen 依赖它（换了模式，「查找」框要跟着出现/消失）。
+      if (action && action.params && action.params.length) {
+        var values = chainStepParams(step);
+        html += "<div class='chain-params'>" + chainVisibleParams(action, values).map(function (p) {
+          var current = chainParamValue(action, values, p);
+          var control;
+          if (p.type === "select" && p.options && p.options.length) {
+            control = "<select data-i='" + i + "' data-key='" + esc(p.key) + "'>" +
+              p.options.map(function (o) {
+                return "<option value='" + esc(o.value) + "'" + (o.value === current ? " selected" : "") + ">" +
+                  esc(labelFor(o.labelKey, o.value)) + "</option>";
+              }).join("") + "</select>";
+          } else {
+            control = "<input type='text' data-i='" + i + "' data-key='" + esc(p.key) + "'" +
+              " value='" + esc(current) + "'>";
+          }
+          return "<label class='chain-param'>" +
+            "<span>" + esc(labelFor(p.labelKey, p.key)) + "</span>" + control + "</label>";
+        }).join("") + "</div>";
+      }
+      return html + "</div>";
+    }).join("");
+    Array.prototype.forEach.call($("chainChips").querySelectorAll(".chip"), function (el) {
+      el.addEventListener("click", function () {
+        state.chain.splice(Number(el.getAttribute("data-i")), 1);
+        renderChain();
+      });
+    });
+    // 文本框：只写 state，**不重渲染**（重渲染会让输入框失焦，输一个字断一次）
+    Array.prototype.forEach.call($("chainChips").querySelectorAll("input"), function (el) {
+      el.addEventListener("input", function () { writeChainParam(el); });
+    });
+    // 下拉：写完 state 要**重渲染** —— visibleWhen 依赖它（换了模式，「查找」框要跟着出现/消失）
+    Array.prototype.forEach.call($("chainChips").querySelectorAll("select"), function (el) {
+      el.addEventListener("change", function () { writeChainParam(el); renderChain(); });
+    });
+  }
+
+  // 把控件里的值写回链上那一步。无参数时链元素会退回字符串形态（见 makeChainStep）。
+  function writeChainParam(el) {
+    var i = Number(el.getAttribute("data-i"));
+    var key = el.getAttribute("data-key");
+    var step = state.chain[i];
+    if (!step) { return; }
+    var params = Object.assign({}, chainStepParams(step));
+    params[key] = el.value;
+    state.chain[i] = makeChainStep(chainStepId(step), params);
+  }
+
+  // ── 什么时候：cron 表达式 / 仅一次 ──────────────────────────────
+  function getFreq() {
+    var el = document.querySelector("input[name=ccFreq]:checked");
+    return el ? el.value : "cron";
+  }
+
+  function setFreq(value) {
+    var el = document.querySelector("input[name=ccFreq][value='" + value + "']");
+    if (el) { el.checked = true; }
+  }
+
+  // 老任务（freq = daily / weekly）没有 cron 表达式。编辑时换算成等价的写法：
+  //   daily  "09:30"        → 30 9 * * *
+  //   weekly "10:00" [1,3]  → 0 10 * * 1,3
+  // 语义完全等价，所以不是改用户的东西；但保存后 freq 会变成 cron，
+  // 这点在回复里要说清楚，不能让用户哪天自己发现「我的每天怎么变 cron 了」。
+  function cronFromLegacy(task) {
+    if (!task || !task.time) { return ""; }
+    var parts = String(task.time).split(":");
+    var h = Number(parts[0]), m = Number(parts[1]);
+    if (isNaN(h) || isNaN(m)) { return ""; }
+    if (task.freq === "weekly") {
+      var days = (task.byWeekday && task.byWeekday.length) ? task.byWeekday.join(",") : "*";
+      return m + " " + h + " * * " + days;
+    }
+    return m + " " + h + " * * *";
+  }
+
+  function setHint(text, isError) {
+    var hint = $("schedHint");
+    hint.style.color = isError ? "#c0392b" : "";
+    hint.textContent = text || "";
+  }
+
+  function setNextHint(text) {
+    $("cronNextHint").textContent = text || "";
+  }
+
+  // 首次加载完成前，排期字段一律禁用。理由见 markReady。
+  function markReady() {
+    if (state.ready) { return; }
+    state.ready = true;
+    syncFreqFields(true);
+  }
+
+  function syncFreqFields(keepHint) {
+    var cronOn = getFreq() === "cron";
+    var editable = state.ready;
+    // 没选中的那一档只**禁用输入**，不藏起来 —— 藏起来用户就不知道还有另一种写法。
+    CRON_FIELDS.forEach(function (id) { $(id).disabled = !editable || !cronOn; });
+    $("fRunAt").disabled = !editable || cronOn;
+    // 常用写法按钮同理：现在就点，值会被随后到达的 selectTask 覆盖掉。
+    $("cronPresets").className = "chips" + (editable ? "" : " off");
+    $("btnSave").disabled = !editable;
+    $("whenCronName").className = "when-name" + (cronOn ? "" : " off");
+    $("whenOnceName").className = "when-name" + (cronOn ? " off" : "");
+    if (cronOn) {
+      if (!keepHint) { scheduleCronCheck(); }
+    } else {
+      // 切到「仅一次」：min 跟着时区更新，空框补一个一小时后。
+      // 设值不会触发 input 事件，所以这里得自己把提示刷新一次。
+      syncRunAtLimits();
+      if (!$("fRunAt").value) { $("fRunAt").value = defaultRunAt(); }
+      renderOnceHint();
+    }
+  }
+
+  function renderOnceHint() {
+    setNextHint("");
+    var raw = $("fRunAt").value.trim();
+    if (!raw) {
+      setHint(t("runAtEmpty"), false);
+      hideWarn();
+      return;
+    }
+    // 给机器读的那个 `T` 换成人能读的空格再说给用户听。
+    setHint(t("cronDescOnce", { at: raw.replace("T", " ") }), false);
+    // 过去的时刻**照样会触发**（服务端把已到点的 once 当到期事件，见 lib/task.go 的
+    // dueOccurrence），所以这里是提醒而不是报错：保存后立刻就发。
+    if (isPastRunAt(raw)) { showWarn(t("runAtPastWarn")); } else { hideWarn(); }
+  }
+
+  // ── 「仅一次」的时刻：原生选择器 ←→ 服务端的 runAt ─────────────────
+  //
+  // 服务端存回来的是**带时区的 RFC3339**（`2026-10-01T09:30:00+08:00`），
+  // 直接赋给 `input[type=datetime-local]` 是**静默失败** —— value 会变成空串，
+  // 用户看到的是「这条任务的时间不见了」。取前 16 个字面量就对了：服务端归一化用的是
+  // **任务自己的时区**（normalizeAndValidate），墙上时间不会偏。
+  // 秒会被截掉 —— 选择器的精度是分钟（step=60），秒级没人会去改。
+  var RUNAT_RE = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/;
+
+  function toRunAtValue(raw) {
+    var m = RUNAT_RE.exec(String(raw || "").trim());
+    return m ? m[1] + "-" + m[2] + "-" + m[3] + "T" + m[4] + ":" + m[5] : "";
+  }
+
+  function p2(n) { return (n < 10 ? "0" : "") + n; }
+
+  // 某个时刻在**任务时区**里的墙上时间，`YYYY-MM-DDTHH:mm`。
+  // 为什么不用浏览器本地时间：这个框里的数字是按任务时区解释的（服务端就是这么算的），
+  // min 和「是不是过去」都必须同口径 —— 时区与浏览器不一致时会差好几个小时。
+  function tzStamp(date, tz) {
+    var parts = null;
+    try {
+      var fmt = new Intl.DateTimeFormat("en-CA", {
+        timeZone: tz || undefined, hourCycle: "h23",
+        year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit"
+      });
+      parts = {};
+      fmt.formatToParts(date).forEach(function (p) { parts[p.type] = p.value; });
+    } catch (e) {
+      parts = null; // 时区名写错时 Intl 会抛 —— 退化成浏览器本地时间，别让整个表单崩掉
+    }
+    if (!parts || !parts.year) {
+      return date.getFullYear() + "-" + p2(date.getMonth() + 1) + "-" + p2(date.getDate())
+        + "T" + p2(date.getHours()) + ":" + p2(date.getMinutes());
+    }
+    return parts.year + "-" + parts.month + "-" + parts.day + "T" + parts.hour + ":" + parts.minute;
+  }
+
+  function syncRunAtLimits() {
+    $("fRunAt").min = tzStamp(new Date(), $("fTZ").value.trim());
+  }
+
+  // 切到「仅一次」时的默认值：**一小时后**（按任务时区的墙上时间）。
+  // 留空的话用户面对的是一个停在今天 00:00 的空选择器，得一路点到他要的时刻；
+  // 一小时后是个能直接改的起点，而且天然不在过去（否则一保存就发送）。
+  function defaultRunAt() {
+    return tzStamp(new Date(Date.now() + 3600 * 1000), $("fTZ").value.trim());
+  }
+
+  // 两个 `YYYY-MM-DDTHH:mm` 字符串直接比大小就是比时间 —— 定长、补零，
+  // 字典序与时间序一致，不必再绕一圈 Date。
+  function isPastRunAt(raw) {
+    return raw < tzStamp(new Date(), $("fTZ").value.trim());
+  }
+
+  // 「仅一次」却没选时刻。挡在前端：服务端只会回一句**中文**的
+  // 「需要 runAt（RFC3339 或 2006-01-02T15:04）」，而这页有四份语言。
+  function onceTimeMissing() {
+    return getFreq() === "once" && !$("fRunAt").value;
+  }
+
+  // ── 五个字段框 ←→ 一个 cron 表达式 ──────────────────────────────
+  //
+  // 界面上是五段，存下去的、发给服务端的仍然是一个字符串 —— 协议
+  // （「cron: "<分> <时> <日> <月> <周>"」）一个字都不用改，这里只是拆装的地方。
+  var CRON_FIELDS = ["fMin", "fHour", "fDom", "fMonth", "fDow"];
+
+  function readCron() {
+    return CRON_FIELDS.map(function (id) {
+      var v = String($(id).value || "").trim();
+      // 空框按 「*」（不限制）算：比报错友好，而且和初始值一致
+      return v === "" ? "*" : v;
+    }).join(" ");
+  }
+
+  function writeCron(expr) {
+    var parts = String(expr || "").trim().split(/\s+/).filter(Boolean);
+    var clean = parts.length === CRON_FIELDS.length;
+    CRON_FIELDS.forEach(function (id, i) {
+      if (clean) { $(id).value = parts[i]; return; }
+      // 真遇到不是 5 段的（不该发生：服务端存下来的一定是 5 段），
+      // 整串塞进第一个框，让服务端给出「需要 5 个字段」的明确报错 ——
+      // 比在这里瞎猜怎么拆要诚实。
+      $(id).value = (i === 0) ? (parts.join(" ") || "*") : "*";
+    });
+  }
+
+  // 常用写法：**只动「日 / 月 / 周」三段**，不碰用户已经写好的「分 / 时」。
+  // 替用户猜一个 09:00 只会在某天早上发错消息 —— 几点发是用户的事。
+  var CRON_PRESETS = [
+    { key: "cronPresetDaily", dom: "*", month: "*", dow: "*" },
+    // 「每隔 3 天」= 在「日」字段写 `1/3`（与 `*/3` 等价）。带 hint 的会在悬停时
+    // 把准确含义（按月算、跨月会短）说出来，不让按钮上那句近似话变成静默的假话。
+    { key: "cronPresetEvery3Days", hint: "cronPresetEvery3DaysHint", dom: "1/3", month: "*", dow: "*" },
+    { key: "cronPresetWeekday", dom: "*", month: "*", dow: "1-5" },
+    { key: "cronPresetMonday", dom: "*", month: "*", dow: "1" },
+    { key: "cronPresetMonthly", dom: "1", month: "*", dow: "*" }
+  ];
+
+  // 点「常用」写法时，如果「分 / 时」还**没填过**（都还是 `*`），补上这个默认时刻。
+  //
+  // ⚠️ 为什么需要它：预设**只改「日 / 月 / 周」**（不覆盖用户填好的时刻 —— 见 CRON_PRESETS
+  // 那段注释）。但五个框的**默认值**全是 `*`，于是「什么都没填就点每天」得到的是
+  // `* * * * *` = **每分钟** —— 那不是点「每天」的人想要的，而且会往房间里刷屏。
+  //
+  // 6 点而不是 0 点：0 点发出来的消息会在通知栏里堆一夜，6 点更接近「早上看一眼」的用法。
+  var PRESET_DEFAULT_HOUR = "6";
+  var PRESET_DEFAULT_MINUTE = "0";
+
+  function renderCronPresets() {
+    $("cronPresets").innerHTML = CRON_PRESETS.map(function (p, i) {
+      // title 用双引号 + esc（esc 会转义 & < > "），别用单引号 —— 文案里可能有撇号
+      var hint = p.hint ? ' title="' + esc(t(p.hint)) + '"' : "";
+      return "<span class='chip' data-p='" + i + "'" + hint + ">" + esc(t(p.key)) + "</span>";
+    }).join("");
+    Array.prototype.forEach.call($("cronPresets").querySelectorAll(".chip"), function (el) {
+      el.addEventListener("click", function () {
+        var p = CRON_PRESETS[Number(el.getAttribute("data-p"))];
+        // 只补「完全没填过」的情况：用户已经写好的时刻一律不动 ——
+        // 「每天几点」的那个「几点」是他的事，替他猜只会在某天早上发错消息。
+        if ($("fMin").value.trim() === "*" && $("fHour").value.trim() === "*") {
+          $("fMin").value = PRESET_DEFAULT_MINUTE;
+          $("fHour").value = PRESET_DEFAULT_HOUR;
+        }
+        $("fDom").value = p.dom;
+        $("fMonth").value = p.month;
+        $("fDow").value = p.dow;
+        scheduleCronCheck();
+      });
+    });
+  }
+
+  // 每分钟、或 5 分钟以内一次：这是**五个框全默认**就能到达的状态，
+  // 而它会持续往房间里刷消息。必须显式提醒，不能让人配完才发现。
+  function cronSpammy(d) {
+    if (!d) { return false; }
+    if (d.mode === "everyMinute") { return true; }
+    return d.mode === "everyNMinutes" && d.n > 0 && d.n <= 5;
+  }
+
+  function showWarn(text) {
+    $("cronWarn").textContent = text;
+    $("cronWarn").className = "small warn-line";
+  }
+
+  function hideWarn() {
+    $("cronWarn").className = "small warn-line hide";
+  }
+
+  function wdName(i) {
+    return (DAYS[state.langIndex] || DAYS[0])[i] || "";
+  }
+
+  // 把服务端回的结构化形状拼成一句人话。
+  // 服务端不给成句文案（理由见 lib/cron.go 的 DescribeCron）——这页有四份语言。
+  function cronDescText(d) {
+    if (!d || !d.mode) { return t("cronDescUnknown"); }
+
+    var day;
+    if (d.day === "weekly") {
+      day = t("cronDescWeekly", { days: (d.weekdays || []).map(wdName).join(t("listSep")) });
+    } else if (d.day === "monthly") {
+      day = t("cronDescMonthly", { dom: d.dom });
+    } else if (d.day === "everyNDays") {
+      day = t("cronDescEveryNDays", { n: d.dayN });
+    } else if (d.day === "everyNDaysOrWeekly") {
+      day = t("cronDescEveryNDaysOrWeekly", { n: d.dayN, days: (d.weekdays || []).map(wdName).join(t("listSep")) });
+    } else if (d.day === "monthlyOrWeekly") {
+      day = t("cronDescMonthlyOrWeekly", { dom: d.dom, days: (d.weekdays || []).map(wdName).join(t("listSep")) });
+    } else {
+      day = t("cronDescDaily");
+    }
+
+    var freqPart;
+    switch (d.mode) {
+      case "everyMinute":
+      case "everyNMinutes":
+      case "everyNHours":
+      case "minutesEachHour":
+        // 这三种是**频率**的说法，本身就完整（「每 4 分钟」「每小时的第 0 分」），
+        // 再叠一个「每天」是废话 ——「每天 每 4 分钟」。小时限制放进括号里说清就行。
+        //
+        // 但「每周一 / 每月 1 日」是**必要**信息，绝不能一起丢掉：
+        // 丢了「每 30 分钟」就变成随时都会发，那是会把房间刷爆的错误描述。
+        if (d.day === "daily" && !d.month) { day = ""; }
+        if (d.mode === "everyMinute") {
+          // 「* 9 * * *」（每分钟、但只在 9 点）是很常见的 crontab 写法，不能只说「每分钟」
+          freqPart = d.hours
+            ? t("cronDescEveryMinuteInHours", { hours: d.hours })
+            : t("cronDescEveryMinute");
+        } else if (d.mode === "everyNMinutes") {
+          freqPart = d.hours
+            ? t("cronDescEveryNInHours", { n: d.n, hours: d.hours })
+            : t("cronDescEveryN", { n: d.n });
+        } else if (d.mode === "everyNHours") {
+          // 「0 */2 * * *」 = 每 2 小时。展开成 12 个时刻去数反而看不懂，所以单独有这一档。
+          freqPart = t("cronDescEveryNHours", { n: d.n, minutes: d.minutes });
+        } else {
+          freqPart = d.hours
+            ? t("cronDescMinutesEachHourInHours", { minutes: d.minutes, hours: d.hours })
+            : t("cronDescMinutesEachHour", { minutes: d.minutes });
+        }
+        break;
+      case "times":
+        freqPart = t("cronDescTimes", { times: (d.times || []).join(t("listSep")) + (d.more ? "…" : "") });
+        break;
+      default:
+        return t("cronDescUnknown");
+    }
+
+    var month = d.month ? t("cronDescMonth", { month: d.month }) : "";
+    return [month, day, freqPart].filter(Boolean).join(" ");
+  }
+
+  // ── cron 即时预览 ───────────────────────────────────────────────
+  //
+  // 翻译只是第一眼判断方向对不对，**具体时刻不能省** ——
+  // 归纳总有说不全的时候（「*/5 9-18 * * 1-5」说成「每 5 分钟」就漏了 9-18 点）。
+  // 两者并排给，用户核对的是时刻。
+  var cronTimer = null;
+  function scheduleCronCheck() {
+    if (cronTimer) { clearTimeout(cronTimer); }
+    cronTimer = setTimeout(runCronCheck, 300);
+  }
+
+  function runCronCheck() {
+    var expr = readCron();
+    if (!expr) { setHint("", false); setNextHint(""); hideWarn(); return; }
+    api("/tasks/cron?room=" + encodeURIComponent(state.room)
+      + "&expr=" + encodeURIComponent(expr)
+      + "&tz=" + encodeURIComponent($("fTZ").value.trim()))
+      .then(function (d) {
+        if (!d.valid) {
+          setHint(d.error || expr, true);
+          setNextHint("");
+          hideWarn();
+          return;
+        }
+        setHint(cronDescText(d.desc), false);
+        // 翻译只回答「多久一次」，**不回答「会不会发太多」** ——
+        // 后者是产品判断，所以单独一行、单独一种颜色。
+        if (cronSpammy(d.desc)) { showWarn(t("cronWarnSpammy")); } else { hideWarn(); }
+        setNextHint(t("cronNext", { list: (d.nextFormatted || []).slice(0, 3).join(" · ") }));
+      })
+      .catch(function (err) {
+        setHint(err.message, true);
+        setNextHint("");
+        hideWarn();
+      });
+  }
+
+  // ── 编辑器 ──────────────────────────────────────────────────────
+  function defaultTZ() {
+    return (state.cap && state.cap.defaultTZ) || "Asia/Shanghai";
+  }
+
+  function selectTask(task) {
+    state.current = task;
+    state.chain = (task && task.chain) ? task.chain.slice() : [];
+    $("fName").value = task ? task.name : "";
+    setFreq((task && task.freq === "once") ? "once" : "cron");
+    $("fRunAt").value = toRunAtValue(task && task.runAt);
+    writeCron(task ? (task.cron || cronFromLegacy(task)) : "");
+    // 新任务默认填**服务端下发的默认时区**（默认上海），不留空 —— 留空看似中立，
+    // 实际上会让任务跑在「服务器本地时区」，而容器里那通常是 UTC。
+    $("fTZ").value = (task && task.tz) ? task.tz : defaultTZ();
+    $("fTZ").placeholder = t("phTZ", { tz: defaultTZ() });
+    $("fTpl").value = task ? task.template : "";
+    $("fKeep").checked = Boolean(task && task.keepHistory);
+    $("fEnabled").checked = task ? Boolean(task.enabled) : true;
+    $("fSender").value = (task && task.sender) ? task.sender : "";
+    syncFreqFields();
+    renderChain();
+    renderList();
+    renderRunInfo();
+  }
+
+  function renderRunInfo() {
+    var task = state.current;
+    if (!task) { $("runInfo").textContent = ""; return; }
+    var parts = [task.enabled ? t("runNext", { time: fmtTime(task.nextRunAt) }) : t("disabledLabel")];
+    if (task.lastRunAt) { parts.push(t("runLast", { time: fmtTime(task.lastRunAt), status: task.lastStatus || "" })); }
+    if (task.lastError) { parts.push(t("runError", { msg: task.lastError })); }
+    if (task.keepHistory) { parts.push(t("runKeepsHistory")); }
+    $("runInfo").textContent = parts.join(" · ");
+  }
+
+  function body(includeId) {
+    var out = {
+      name: $("fName").value,
+      enabled: $("fEnabled").checked,
+      freq: getFreq(),
+      tz: $("fTZ").value,
+      template: $("fTpl").value,
+      chain: state.chain,
+      keepHistory: $("fKeep").checked,
+      sender: $("fSender").value
+    };
+    if (includeId && state.current) { out.id = state.current.id; }
+    if (out.freq === "once") {
+      out.runAt = $("fRunAt").value.trim();
+    } else {
+      out.cron = readCron();
+    }
+    return out;
+  }
+
+  // ── 动作 ────────────────────────────────────────────────────────
+  // ── 批量操作 ────────────────────────────────────────────────────
+  //
+  // ⚠️ 服务端**没有**批量接口，这里是**逐条调现有接口**。
+  // 为什么不加一个：单房间的任务上限是 20 条，逐条请求的量级完全可接受；
+  // 而新接口要把鉴权、幂等、测试再走一遍。代价是**可能部分成功** ——
+  // 所以下面统计成功/失败并**如实报出来**，不假装原子。
+
+  function selectedIds() {
+    return Object.keys(state.selected).filter(function (id) { return state.selected[id]; });
+  }
+
+  function renderBatchBar() {
+    var el = $("batchBar");
+    if (!state.tasks.length) {
+      el.className = "row hide";
+      return;
+    }
+    var ids = selectedIds();
+    el.className = "row";
+    el.innerHTML =
+      "<label class='small mut' style='display:flex;align-items:center;gap:4px;margin:0'>" +
+        "<input type='checkbox' id='selAll'" + (ids.length === state.tasks.length ? " checked" : "") + ">" +
+        esc(t("selectAll")) + "</label>" +
+      (ids.length
+        ? "<span style='flex:1'></span>" +
+          "<span class='small mut'>" + esc(t("selectedCount", { n: ids.length })) + "</span>" +
+          "<button id='btnBatchDisable' class='mini'>" + esc(t("batchDisable")) + "</button>" +
+          "<button id='btnBatchEnable' class='mini'>" + esc(t("batchEnable")) + "</button>" +
+          "<button id='btnBatchDelete' class='mini danger'>" + esc(t("batchDelete")) + "</button>"
+        : "<span style='flex:1'></span>");
+
+    $("selAll").addEventListener("change", function () {
+      var on = $("selAll").checked;
+      state.selected = {};
+      if (on) {
+        state.tasks.forEach(function (task) { state.selected[task.id] = true; });
+      }
+      // 只改复选框的 checked，**不重建列表**（重建会丢滚动位置）
+      Array.prototype.forEach.call($("list").querySelectorAll(".sel"), function (box) {
+        box.checked = on;
+      });
+      renderBatchBar();
+    });
+
+    if (ids.length) {
+      $("btnBatchDisable").addEventListener("click", function () { batchToggle(ids, false); });
+      $("btnBatchEnable").addEventListener("click", function () { batchToggle(ids, true); });
+      $("btnBatchDelete").addEventListener("click", function () { batchDelete(ids); });
+    }
+  }
+
+  // 逐条跑一个操作。`one(task)` 返回 Promise —— 成功/失败都由这里统计。
+  //
+  // 串行而不是并发：并发打同一个服务端的写接口没必要，而且串行能让
+  // 「第几条失败」在服务端日志里的顺序和界面上一致。
+  function runBatch(ids, one) {
+    var targets = state.tasks.filter(function (task) { return ids.indexOf(task.id) >= 0; });
+    var ok = 0;
+    var failed = 0;
+    setStatus(t("stSaving"));
+    var chain = Promise.resolve();
+    targets.forEach(function (task) {
+      chain = chain.then(function () {
+        return one(task).then(function () { ok++; }, function () { failed++; });
+      });
+    });
+    return chain.then(function () {
+      setStatus(
+        failed ? t("batchPartial", { ok: ok, fail: failed }) : t("batchDone", { n: ok }),
+        failed > 0
+      );
+      state.selected = {};
+      return refresh();
+    });
+  }
+
+  function batchToggle(ids, enabled) {
+    return runBatch(ids, function (task) {
+      return api("/tasks/" + encodeURIComponent(task.id) + "/toggle?room=" + encodeURIComponent(state.room), {
+        method: "POST",
+        body: { enabled: enabled }
+      });
+    });
+  }
+
+  function batchDelete(ids) {
+    // 危险操作：先确认。删除**不可撤销**（没有回收站），所以要把条数说清楚。
+    if (!window.confirm(t("batchDeleteConfirm", { n: ids.length }))) { return; }
+    return runBatch(ids, function (task) {
+      return api("/tasks/" + encodeURIComponent(task.id) + "?room=" + encodeURIComponent(state.room), {
+        method: "DELETE"
+      });
+    });
+  }
+
+  function refresh() {
+    var q = "?room=" + encodeURIComponent(state.room);
+    return api("/server" + q).then(function (server) {
+      state.cap = server.automation || { enabled: false };
+      state.taskToken = taskTokenFor(state.room);
+      renderPickers(); // 先渲染选择器，再判权限 —— 见 renderPickers 的注释
+      renderGate(); renderBadges();
+      if (!state.cap.allowed) {
+        selectTask(null);
+        return null;
+      }
+      // 顺带取「哪些房间有任务」—— 房间切换入口用它列出目标（见 state.roomList）。
+      // ⚠️ 单独 catch：老服务端没有这个接口，**不能让一个附加查询把整页拖垮**。
+      return Promise.all([
+        api("/tasks" + q),
+        api("/tasks/rooms" + q).catch(function () { return null; }),
+      ]).then(function (results) {
+        var data = results[0];
+        var roomsResp = results[1];
+        state.roomList = (roomsResp && roomsResp.rooms) ? roomsResp.rooms : [];
+        state.tasks = data.tasks || [];
+        state.foreignCount = data.foreignCount || 0;
+        if (data.actions && data.actions.length) { state.cap.actions = data.actions; }
+        if (data.vars && data.vars.length) { state.cap.vars = data.vars; }
+        state.cap.max = data.max;
+        renderPickers();
+        renderBadges();
+        selectTask(state.tasks.length ? state.tasks[0] : null);
+        // ⚠️ selectTask 会**覆盖**排期字段。所以在这之前不能让用户输入 ——
+        // 否则他敲进去的东西会被静默冲掉，现象就是「我刚才输的怎么没了」。
+        markReady();
+      });
+    }).catch(function (err) {
+      $("gate").className = "banner err";
+      $("gate").textContent = t("connectFailed", { msg: err.message });
+    });
+  }
+
+  function toggleTask(task) {
+    setStatus(task.enabled ? t("stDisabling") : t("stEnabling"));
+    api("/tasks/" + encodeURIComponent(task.id) + "/toggle?room=" + encodeURIComponent(state.room), {
+      method: "POST",
+      body: { enabled: !task.enabled }
+    }).then(function () {
+      setStatus(task.enabled ? t("stDisabled") : t("stEnabled"));
+      return refresh();
+    }).catch(function (err) { setStatus(err.message, true); });
+  }
+
+  function save() {
+    if (onceTimeMissing()) { setStatus(t("runAtEmpty"), true); return; }
+    setStatus(t("stSaving"));
+    api("/tasks?room=" + encodeURIComponent(state.room), { method: "POST", body: body(true) })
+      .then(function (data) {
+        if (data.taskToken) {
+          state.taskToken = data.taskToken;
+          try { localStorage.setItem(LS_TASK_TOKEN + state.room, data.taskToken); } catch (e) {}
+          window.alert(t("alertTaskToken"));
+        }
+        setStatus(t("stSaved"));
+        return refresh();
+      })
+      .catch(function (err) { setStatus(err.message, true); });
+  }
+
+  function preview() {
+    if (onceTimeMissing()) { setStatus(t("runAtEmpty"), true); return; }
+    setStatus(t("stPreviewing"));
+    api("/tasks/preview?room=" + encodeURIComponent(state.room), { method: "POST", body: body(false) })
+      .then(function (data) {
+        $("preview").textContent = data.output || "";
+        $("preview").setAttribute("data-empty", "0");
+        $("previewAt").textContent = t("previewAt", { time: data.scheduledAt || "" });
+        setStatus("");
+      })
+      .catch(function (err) { setStatus(err.message, true); });
+  }
+
+  function sendNow() {
+    if (!state.current) { setStatus(t("stSaveFirst"), true); return; }
+    if (!window.confirm(t("confirmSend", { room: state.room }))) { return; }
+    setStatus(t("stSending"));
+    api("/tasks/" + encodeURIComponent(state.current.id) + "/run?room=" + encodeURIComponent(state.room) + "&send=1", { method: "POST" })
+      .then(function (data) {
+        $("preview").textContent = data.output || "";
+        $("preview").setAttribute("data-empty", "0");
+        $("previewAt").textContent = t("previewSentAt", { time: fmtTime(data.sentAt) });
+        setStatus(t("stSent"));
+      })
+      .catch(function (err) { setStatus(err.message, true); });
+  }
+
+  function remove() {
+    if (!state.current) { return; }
+    if (!window.confirm(t("confirmDelete", { name: state.current.name }))) { return; }
+    setStatus(t("stDeleting"));
+    api("/tasks/" + encodeURIComponent(state.current.id) + "?room=" + encodeURIComponent(state.room), { method: "DELETE" })
+      .then(function () { setStatus(t("stDeleted")); return refresh(); })
+      .catch(function (err) { setStatus(err.message, true); });
+  }
+
+  // ── 启动 ────────────────────────────────────────────────────────
+  // 房间徽章可点（切房间）。role=button 就得支持键盘 —— 只绑 click 的话
+  // Tab 聚焦到它之后按回车没反应，那是个很难察觉的无障碍缺口。
+  $("roomBadge").addEventListener("click", switchRoom);
+  $("roomBadge").addEventListener("keydown", function (e) {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      switchRoom();
+    }
+  });
+  // 常驻的「切换凭据」（gate 横幅里那个在一切正常时太不显眼，见 header 的注释）
+  $("btnCred").addEventListener("click", switchCredential);
+  $("btnNew").addEventListener("click", function () { selectTask(null); });
+  $("btnSave").addEventListener("click", save);
+  $("btnPreview").addEventListener("click", preview);
+  $("btnSend").addEventListener("click", sendNow);
+  $("btnDelete").addEventListener("click", remove);
+  Array.prototype.forEach.call(document.querySelectorAll("input[name=ccFreq]"), function (el) {
+    el.addEventListener("change", function () { syncFreqFields(); });
+  });
+  CRON_FIELDS.forEach(function (id) {
+    $(id).addEventListener("input", scheduleCronCheck);
+  });
+  $("fRunAt").addEventListener("input", renderOnceHint);
+  $("fTZ").addEventListener("change", function () {
+    if (getFreq() === "cron") { scheduleCronCheck(); return; }
+    // 时区改了 →「现在」的墙上时间也变了 → min 和「是不是已经过去」都要重算。
+    // **不动用户已经选好的数字**：那是他按那个时区想的墙上时间，换个时区正是让它换个含义，
+    // 跟着改数字才是更糟的意外。
+    syncRunAtLimits();
+    renderOnceHint();
+  });
+  $("langSel").addEventListener("change", function () {
+    var code = $("langSel").value;
+    // 写回 SPA 用的同一个键：整个产品只有一处语言设置，
+    // 不会出现「主界面英文、这个页面中文」这种割裂。
+    try { localStorage.setItem("locale", code); } catch (e) {}
+    applyLang(code);
+  });
+
+  purgeLegacyPassword();
+
+  // 回去的路要带上房间，否则从 home 的管理页返回会掉回默认房间。
+  (function () {
+    var base = String(CC.prefix || "").replace(/\/+$/, "");
+    var q = CC.room ? "?room=" + encodeURIComponent(CC.room) : "";
+    $("backLink").href = base + "/" + q;
+  })();
+  renderLangSelect();
+  applyLang(detectLang());
+  $("preview").textContent = t("previewEmpty");
+  $("preview").setAttribute("data-empty", "1");
+  scheduleTokenRefresh();
+  refresh();
+})();
+</script>
+</body>
+</html>

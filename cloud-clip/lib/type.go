@@ -80,14 +80,25 @@ type ClipboardServer struct {
 	// （改正文 / 看板挪列）—— 两个并发请求会同时写同一个路径，而 messageQueue 的锁
 	// 只保护内存切片、**不保护文件**，所以要独立一把。见 saveHistoryData 的注释。
 	historySaveMutex sync.Mutex
-	shareTokenUsage  map[string]*shareUsageEntry // jti -> 使用计数（进程内）
-	shareUsageMutex  sync.Mutex
+	// 在途的异步落盘次数。handler 里有两处异步落盘（改正文、看板挪列），
+	// 它们必须**可等待** —— 否则进程退出或测试结束（TempDir 清理）时，
+	// 写临时文件的那只手还在动，清理会报 "directory not empty"。
+	historyWriteWG  sync.WaitGroup
+	shareTokenUsage map[string]*shareUsageEntry // jti -> 使用计数（进程内）
+	shareUsageMutex sync.Mutex
 
 	// 分享记录（share-log.json）：谁在哪个房间分享了什么、被打开了几次。
 	// 见 share_log.go 文件头部 —— 列表用房间凭据鉴权，开放房间 = 公开。
 	shareLog         map[string]*shareRecord // jti -> 记录
 	shareLogMutex    sync.Mutex
 	shareVisitDedupe map[string]int64 // "jti|访客" -> 上次上报时间，防刷计数
+
+	// 定时自动化任务（tasks.json）。范式与 shareLog 一致：懒加载 + 整份原子写。
+	// automationTasks 的读写一律在 automationMutex 内，见 task.go。
+	automationTasks  []*AutomationTask `json:"-"`
+	automationMutex  sync.Mutex        `json:"-"`
+	automationLoaded bool              `json:"-"`
+	automationStop   chan struct{}     `json:"-"`
 
 	// 前端静态资源的来源：嵌入式 FS 或外部目录（nil = 这次部署没有前端）。
 	// 发资源、`/s/<token>` 注入 OG、前端路由兜底都要从这里读外壳 index.html，见 spa_shell.go。
@@ -166,6 +177,16 @@ type ReceiveBase struct {
 	// Column 是看板的列（`todo` / `doing` / `done`）。空 = 待办 —— 看板只是条目的一个视图，
 	// 不是另一份数据，所以字段挂在条目自己身上，不另建表。见 handleContentColumn。
 	Column string `json:"column,omitempty"`
+
+	// Source 标记这条消息不是人发的 —— 目前只有 "automation"（定时任务）。
+	// 前端可据此加个角标，也可据此过滤：定时消息默认**不占房间历史额度**
+	// （见 deliverMessage 的 keepHistory），但实时广播照发。
+	Source string `json:"source,omitempty"`
+	// ScheduledAt 是定时任务的**预定触发时刻**（Unix 秒）。补发时它与 Timestamp
+	// 相差较大 —— 这是判断「这条是错过后补发的」的唯一依据。
+	ScheduledAt int64 `json:"scheduledAt,omitempty"`
+	// Late 标记这是一条错过触发窗口后补发的消息。
+	Late bool `json:"late,omitempty"`
 }
 
 // "text" type item in Receive[]

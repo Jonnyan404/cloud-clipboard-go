@@ -133,3 +133,18 @@ func (m *PostList) RemoveById(msgId int) int {
 
 	return index
 }
+
+// NextEphemeralID 给「不入历史」的消息分配一个唯一 ID。
+//
+// 为什么不直接复用 Append：临时消息（定时任务默认 keepHistory=false）不该占房间历史额度 ——
+// trimRoomHistoryLocked 是按房间计数的，一条每天发一次的定时消息十几天就能把房间历史顶光。
+// 但消息本身仍然需要一个唯一 ID：前端拿它做列表 key，也会用它发起「复制 / 引用」。
+// 所以走**同一个计数器**、只是不落进 List —— 这样临时消息和普通消息的 ID 不会撞。
+func (m *PostList) NextEphemeralID() int {
+	m.Lock()
+	defer m.Unlock()
+
+	id := m.nextid
+	m.nextid++
+	return id
+}

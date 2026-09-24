@@ -220,6 +220,29 @@ func (s *ClipboardServer) loadHistoryData() error {
 	return nil
 }
 
+// saveHistoryAsync 触发一次历史落盘，但**可等待**。
+//
+// 为什么不直接写 `go s.saveHistoryData()`：裸的 goroutine 没有任何句柄，
+// 谁都不知道它什么时候写完。于是两件事会踩坑 ——
+//  1. 进程退出时最后一次改动可能还没落盘；
+//  2. 测试里更明显：t.TempDir() 的清理会和它抢同一个目录，报
+//     "TempDir RemoveAll cleanup: directory not empty"（TestBoardColumnUpdate 因此偶发失败）。
+//
+// 计数器让「等它写完」成为一件有名字、有位置的事。
+func (s *ClipboardServer) saveHistoryAsync() {
+	s.historyWriteWG.Add(1)
+	go func() {
+		defer s.historyWriteWG.Done()
+		s.saveHistoryData()
+	}()
+}
+
+// WaitForHistoryWrites 等到所有在途的历史落盘结束。
+// Stop() 会调它；测试也在清理阶段调（见 newShortcutServer）。
+func (s *ClipboardServer) WaitForHistoryWrites() {
+	s.historyWriteWG.Wait()
+}
+
 func (s *ClipboardServer) saveHistoryData() {
 	// 串行化整段（快照 → 序列化 → 落盘），不是只锁落盘那一步。
 	//
@@ -354,6 +377,13 @@ func (s *ClipboardServer) setupRoutes() {
 	mux.HandleFunc(prefix+"/auth/token/refresh", s.corsMiddleware(s.handleAuthTokenRefresh))
 	mux.HandleFunc(prefix+"/push", s.handle_push)
 	mux.HandleFunc(prefix+"/rooms", s.corsMiddleware(s.handleRooms))
+	// /tasks：定时自动化的管理接口。鉴权在 handler 内按**房间凭据**分档
+	// （与 /share 同一套思路），不走 authMiddleware —— 后者只回答「能不能进这个房间」，
+	// 而 /tasks 还要区分「全局密码 = 管理员」这一档，以及房间的 automation 策略。
+	mux.HandleFunc(prefix+"/tasks", s.corsMiddleware(s.handleTasks))
+	mux.HandleFunc(prefix+"/tasks/", s.corsMiddleware(s.handleTaskItem))
+	// /automation：自动化管理页（服务端渲染的独立页面，不进 SPA 构建）。
+	mux.HandleFunc(prefix+"/automation", s.handleAutomationPage)
 	// /share 在 handler 内按目标资源所在房间鉴权（支持 body 中的 file uuid）
 	mux.HandleFunc(prefix+"/share", s.handle_share)
 	// /share/list 用和「在该房间签发分享」同一套鉴权（canAccessRoom），
@@ -458,6 +488,8 @@ func (s *ClipboardServer) Start() error {
 	s.runMutex.Unlock()
 
 	go s.cleanExpiredFilesLoop()
+	// 定时任务调度器：进程内 ticker，扫到期任务并投递（见 scheduler.go）。
+	s.startAutomationScheduler()
 
 	// 为每个监听器创建一个单独的HTTP服务器并启动goroutine
 	errChan := make(chan error, len(listeners))
@@ -510,6 +542,10 @@ func (s *ClipboardServer) Start() error {
 }
 
 func (s *ClipboardServer) Stop() error {
+	// ⚠️ 必须在取 runMutex **之前**调：stopAutomationScheduler 自己也要拿这把锁，
+	// 在里面调会直接死锁 —— 而 Stop 是关闭路径，死锁意味着进程关不掉。
+	s.stopAutomationScheduler()
+
 	s.runMutex.Lock()
 	defer s.runMutex.Unlock()
 
@@ -529,6 +565,8 @@ func (s *ClipboardServer) Stop() error {
 		s.logger.Printf("HTTP 服务器关闭错误: %v", err)
 		return err
 	}
+	// 等在途的历史落盘写完再返回 —— 否则最后一次改动可能随进程一起丢掉。
+	s.WaitForHistoryWrites()
 	s.logger.Println("服务器已成功关闭。")
 	return nil
 }

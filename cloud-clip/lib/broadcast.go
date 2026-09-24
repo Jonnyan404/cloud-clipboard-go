@@ -88,21 +88,73 @@ func (s *ClipboardServer) broadcastMessage(message PostEvent, room string) {
 	}
 }
 
-// addMessageToQueueAndBroadcast 添加消息到队列并广播
+// messageSource 一条消息的来源信息。
+//
+// 为什么要有它：这些字段原本是直接从 *http.Request 上现取的，但定时任务**没有请求** ——
+// 它由调度器在进程内发起。抽成这个结构之后，「HTTP 投递」和「定时投递」共用同一条
+// 入队 → 房间统计 → 广播 → 持久化路径，不会出现「定时消息漏了房间统计」这种
+// 只在其中一条路径上存在的差异（这类差异最难受：两边单看都对，对比才发现不一样）。
+type messageSource struct {
+	IP         string
+	UserAgent  string
+	DeviceName string
+	ClientID   string
+
+	// Source 标记来源类别（空 = 人发的）。目前只有 "automation"。
+	Source string
+	// ScheduledAt 是定时任务的**预定**触发时刻；Late 标记这是一条补发。
+	ScheduledAt int64
+	Late        bool
+}
+
+func messageSourceFromRequest(r *http.Request) messageSource {
+	return messageSource{
+		IP:         get_remote_ip(r),
+		UserAgent:  r.UserAgent(),
+		DeviceName: resolveDeviceName(r),
+		// 前端每客户端持久 ID,用于气泡收发归属
+		ClientID: strings.TrimSpace(r.URL.Query().Get("client")),
+	}
+}
+
+// senderDevice 组装 SenderDevice。
+//
+// ⚠️ 没有 UA 的来源（定时任务）**不能**去调 parse_user_agent：那会拿到
+// `"os": " "` / `"browser": " "` 这种带空格的脏值，而前端的 deviceLabel 取值顺序是
+// name → os → type —— 于是定时消息会被显示成一个空格。
+func (s *ClipboardServer) senderDevice(src messageSource) map[string]string {
+	if strings.TrimSpace(src.UserAgent) == "" {
+		return map[string]string{"name": src.DeviceName, "type": "Automation"}
+	}
+	return s.parse_user_agent(src.UserAgent, src.DeviceName)
+}
+
+// addMessageToQueueAndBroadcast 添加消息到队列并广播（HTTP 路径 —— 人发的消息）。
 // 这是一个辅助函数，供 handle_text, handle_finish 等调用
 func (s *ClipboardServer) addMessageToQueueAndBroadcast(dataType string, data interface{}, room string, r *http.Request) PostEvent {
-	ip := get_remote_ip(r)
-	ua := s.parse_user_agent(r.UserAgent(), resolveDeviceName(r))
+	return s.deliverMessage(dataType, data, room, messageSourceFromRequest(r), true)
+}
 
+// deliverMessage 投递一条消息。
+//
+// keepHistory=false（定时消息的默认档）时**不入历史队列、不计房间统计**，只做实时广播。
+// 为什么这是默认值：房间历史是**按房间**计数的（见 msg.go 的 trimRoomHistoryLocked），
+// 额度就是 server.history（README 的 MESSAGE_NUM 默认 10，config.json 默认 100）。
+// 一个每天 09:30 的任务，十几天就能把这个房间的历史全换成「今天是几号」，
+// 用户翻记录什么都找不到了 —— 那不是「功能不好用」，是「把已有数据弄坏了」。
+func (s *ClipboardServer) deliverMessage(dataType string, data interface{}, room string, src messageSource, keepHistory bool) PostEvent {
 	// Create ReceiveBase first
 	receiveBase := ReceiveBase{
-		// ID will be set by PostList.Append
+		// ID will be set by PostList.Append（临时消息在下面单独分配）
 		Type:           dataType, // This is the inner type for ReceiveHolder (e.g., "text", "file")
 		Room:           room,
 		Timestamp:      time.Now().Unix(),
-		SenderIP:       ip,
-		SenderDevice:   ua,
-		SenderClientID: strings.TrimSpace(r.URL.Query().Get("client")), // 前端每客户端持久 ID,用于气泡收发归属
+		SenderIP:       src.IP,
+		SenderDevice:   s.senderDevice(src),
+		SenderClientID: src.ClientID,
+		Source:         src.Source,
+		ScheduledAt:    src.ScheduledAt,
+		Late:           src.Late,
 	}
 
 	// Create ReceiveHolder
@@ -115,16 +167,10 @@ func (s *ClipboardServer) addMessageToQueueAndBroadcast(dataType string, data in
 		}
 	case "file":
 		fileRec := data.(*FileReceive)
-		// Ensure FileReceive's own ReceiveBase is also populated if it's not already
-		// For now, assuming data.(*FileReceive) might already have its ReceiveBase fields set,
-		// or we can overwrite/set them here.
-		// Let's assume data.(*FileReceive) is mostly complete except for common base fields.
 		fileRec.ReceiveBase = receiveBase // Set the common base
 		rh.FileReceive = fileRec
 	default:
-		// Handle unknown dataType if necessary, though current calls are "text" or "file"
-		s.logger.Printf("警告: addMessageToQueueAndBroadcast 收到未知数据类型: %s", dataType)
-		// Return an empty or error PostEvent
+		s.logger.Printf("警告: deliverMessage 收到未知数据类型: %s", dataType)
 		return PostEvent{}
 	}
 
@@ -133,9 +179,16 @@ func (s *ClipboardServer) addMessageToQueueAndBroadcast(dataType string, data in
 		Event: dataType, // "text" 或 "file"
 		Data:  rh,       // ReceiveHolder
 	}
-	s.messageQueue.Append(&storeEvent) // msg.go 处理这个 PostEvent
-	// 更新房间消息统计
-	s.updateRoomStats(room, 1)
+
+	if keepHistory {
+		s.messageQueue.Append(&storeEvent) // msg.go 处理这个 PostEvent
+		s.updateRoomStats(room, 1)
+	} else {
+		// 临时消息也要有唯一 ID：前端拿它做列表 key，也会用它发起「复制 / 引用」。
+		// 用**同一个计数器**分配（只是不进 List），ID 就不会和普通消息撞。
+		storeEvent.Data.SetID(s.messageQueue.NextEphemeralID())
+	}
+
 	// 准备发送给客户端的 WebSocket 消息
 	var clientPayload interface{}
 	if rh.TextReceive != nil {
@@ -149,10 +202,12 @@ func (s *ClipboardServer) addMessageToQueueAndBroadcast(dataType string, data in
 			Event: "receive",     // 前端期望的事件名
 			Data:  clientPayload, // 前端期望的直接数据
 		}
-		s.broadcastWebSocketMessage(wsMsg, room) // 新的广播函数
+		s.broadcastWebSocketMessage(wsMsg, room)
 	}
 
-	s.saveHistoryData()
+	if keepHistory {
+		s.saveHistoryData()
+	}
 	return storeEvent // 返回内部事件，例如用于获取ID
 }
 

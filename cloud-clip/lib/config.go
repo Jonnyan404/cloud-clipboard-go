@@ -37,6 +37,17 @@ type Config struct {
 		Chunk  int `json:"chunk"`  //done, but no limit
 		Limit  int `json:"limit"`  //done
 	} `json:"file"`
+	// Automation 定时自动化（tasks.json）。
+	//
+	// ⚠️ Enabled 默认 true，但「默认可用」不等于「默认放开」：能不能给**某个房间**装任务
+	// 由 roomAuth[x].automation 决定，公开房间默认是 none（见 auth.go 的
+	// resolveAutomationPolicy）。所以默认开着不会让任何房间凭空多出自动化能力。
+	Automation struct {
+		Enabled      bool   `json:"enabled"`
+		TickSeconds  int    `json:"tickSeconds"`
+		GraceSeconds int    `json:"graceSeconds"`
+		DefaultTZ    string `json:"defaultTZ"`
+	} `json:"automation"`
 }
 
 // var config_path = "config.json"
@@ -126,6 +137,21 @@ func defaultConfig() *Config {
 			Expire: 3600,
 			Chunk:  1 * _MB,
 			Limit:  256 * _MB,
+		},
+		Automation: struct {
+			Enabled      bool   `json:"enabled"`
+			TickSeconds  int    `json:"tickSeconds"`
+			GraceSeconds int    `json:"graceSeconds"`
+			DefaultTZ    string `json:"defaultTZ"`
+		}{
+			Enabled:      true,
+			TickSeconds:  30,
+			GraceSeconds: 600,
+			// 默认上海：这个项目的用户绝大多数在 +08:00，而「服务器本地时区」在容器里
+			// 常常是 UTC —— 一个「每天 09:30」的任务会因此在 17:30 发出去，
+			// 而且只有真到了那一天才看得出来。默认值选「用户很可能在的时区」，
+			// 比默认「服务器的时区」安全得多。
+			DefaultTZ: defaultAutomationTZName,
 		},
 	}
 }
