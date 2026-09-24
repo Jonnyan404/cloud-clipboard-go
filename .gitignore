@@ -35,6 +35,10 @@ openwrt/build/
 # 分享记录的运行时落盘：和 history.json 同类 —— 服务自己会重建，不入库。
 /cloud-clip/share-log.json
 
+# 定时任务（tasks.json）：同样是与 history.json 同目录的运行时落盘。
+# 和 share-log.json 一样，它由服务自己维护，不入库 —— 里面是各人自己配的任务。
+/cloud-clip/tasks.json
+
 # 本地工具的项目标记
 /.freebuff/
 
@@ -61,4 +65,7 @@ __pycache__/
 
 # 本地 AI 工作数据（项目记忆，不入库）
 /.workbuddy-ai/
+# ⚠️ 隔壁这个目录是**另一个工具**的工作目录（含它自己的 handover/ 与 memory/），
+# 同样只在本机有意义 —— 2026-09-24 发现它一直没被忽略。
+/.workbuddy/
 .freebuff/
