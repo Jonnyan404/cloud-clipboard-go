@@ -226,8 +226,16 @@ pre { margin: 6px 0 0; padding: 10px 12px; border-radius: 8px; background: var(-
           <label style="display:flex;align-items:center;gap:6px;margin:0;font-size:13px;color:var(--fg)">
             <input type="checkbox" id="fKeep" style="width:auto"> <span data-i18n="fieldKeep">保留历史</span>
           </label>
-          <!-- ⚠️ 这里原来还有一个「启用」复选框，已删：列表上每条任务都有开关（立即生效），两处控制同一个状态只会让人困惑（「我在这里改了，列表上怎么还是开着的？」）。 -->
-          <input id="fSender" style="width:236px" data-i18n-ph="phSender">
+          <!-- ⚠️ 这里原来还有一个「启用」复选框，已删：列表上每条任务都有开关（立即生效），
+               两处控制同一个状态只会让人困惑（「我在这里取消了，列表上怎么还是开着的？」）。
+               ⚠️ 删之前它还造成过一次**误解**：它紧挨着下面的发送者输入框，而那个框当时
+               **只有 placeholder、没有标签** —— 于是「启用」被读成了「启用发送者显示名」。
+               所以下面那个框现在带**可见标签**了。别再让它裸着：placeholder 只在空的时候
+               可见，填上字之后谁也看不出那个框是什么。 -->
+          <label style="display:flex;align-items:center;gap:6px;margin:0;font-size:13px;color:var(--fg)">
+            <span class="small mut" data-i18n="fieldSender">发送者</span>
+            <input id="fSender" style="width:200px" data-i18n-ph="phSender">
+          </label>
         </div>
         <div class="small mut" id="keepNote" style="margin-bottom:12px" data-i18n="keepNote"></div>
         <div class="row">
@@ -376,6 +384,7 @@ window.__CC__ = { prefix: "[[.Prefix]]", room: "[[.Room]]" };
     varClickHint:    ["点一下插入到正文", "點一下插入到正文", "Click to insert into the body", "クリックで本文に挿入"],
     fieldChain:      ["动作链（按顺序执行，可选）", "動作鏈（依序執行，選填）", "Action chain (applied in order, optional)", "アクション連鎖（順に実行・任意）"],
     fieldKeep:       ["保留历史", "保留歷史", "Keep in history", "履歴に残す"],
+    fieldSender:     ["发送者", "傳送者", "Sender", "送信者"],
     phSender:        ["发送者显示名（默认 定时任务）", "傳送者顯示名稱（預設 定時任務）", "Sender name (default: automation)", "送信者名（既定：自動化）"],
     keepNote:        ["不保留历史（仅展示、不写入房间）；勾选则写入房间", "不保留歷史（僅顯示、不寫入房間）；勾選則寫入房間", "Without history it is shown only, not written into the room; tick to write it in", "履歴なし（表示のみ・ルームには書き込みません）。チェックするとルームに書き込みます"],
     btnSave:         ["保存", "儲存", "Save", "保存"],
