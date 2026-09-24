@@ -511,7 +511,7 @@ func renderDateAdd(text string, ctx renderContext, _ map[string]string) (string,
 
 	base := ctx.Now
 	if strings.TrimSpace(baseRaw) != "" {
-		parsed, ok := parseDateToken(baseRaw, ctx.Now.Location())
+		parsed, ok := parseDateToken(baseRaw, ctx.Now.Location(), ctx.Now)
 		if !ok {
 			// 写了基准但认不出 → 报错。**别悄悄回落到「今天」** ——
 			// 那会让用户拿到一个看着合理、其实完全不对的结果。
@@ -564,8 +564,8 @@ func renderDateDiff(text string, ctx renderContext, _ map[string]string) (string
 		return "", fmt.Errorf("写法：两行日期，或 2026-01-01 ~ 2026-03-15")
 	}
 
-	a, okA := parseDateToken(cleaned[0], loc)
-	b, okB := parseDateToken(cleaned[1], loc)
+	a, okA := parseDateToken(cleaned[0], loc, ctx.Now)
+	b, okB := parseDateToken(cleaned[1], loc, ctx.Now)
 	if !okA || !okB {
 		return "", fmt.Errorf("认不出这个日期")
 	}
@@ -611,7 +611,12 @@ var dateKeywords = map[string]int{
 //
 // ⚠️ 必须用 time.Date(..., loc) 构造，不能 time.Parse(time.RFC3339, ...) ——
 // 后者会当成 UTC，在东八区会整体差 8 小时，日期计算直接错一天。
-func parseDateToken(raw string, loc *time.Location) (time.Time, bool) {
+//
+// ⚠️ `now` 是**基准时刻**（调用方传 ctx.Now），**不要**在函数里用 time.Now()：
+// 「今天 / 明天 / 昨天」要按它算。用真实时间的话，**试算和实发会得到不同结果** ——
+// 试算的 ctx.Now 是「下次触发时刻」（未来），实发时才是当前时刻。
+// 而且测试里注入的固定 Now 也会失效，于是断言跟着真实日期漂（每天早上红一次）。
+func parseDateToken(raw string, loc *time.Location, now time.Time) (time.Time, bool) {
 	s := strings.TrimSpace(raw)
 	if s == "" {
 		return time.Time{}, false
@@ -621,9 +626,9 @@ func parseDateToken(raw string, loc *time.Location) (time.Time, bool) {
 	}
 
 	if offset, ok := dateKeywords[strings.ToLower(s)]; ok {
-		now := time.Now().In(loc)
+		n := now.In(loc)
 		// 关键词按「今天」算：归一化到零点再加偏移，避免把当前时分秒带进去
-		return time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc).AddDate(0, 0, offset), true
+		return time.Date(n.Year(), n.Month(), n.Day(), 0, 0, 0, 0, loc).AddDate(0, 0, offset), true
 	}
 
 	for _, re := range dateTokenPatterns {

@@ -357,7 +357,7 @@ func (s *ClipboardServer) handleTaskRun(w http.ResponseWriter, r *http.Request, 
 		reference = next
 	}
 	if raw := strings.TrimSpace(r.URL.Query().Get("at")); raw != "" {
-		parsed, parseErr := parsePreviewReference(raw, loc)
+		parsed, parseErr := parsePreviewReference(raw, loc, reference)
 		if parseErr != nil {
 			writeError(w, http.StatusBadRequest, "invalid_reference", "Invalid reference time", parseErr.Error())
 			return
@@ -384,11 +384,11 @@ func (s *ClipboardServer) handleTaskRun(w http.ResponseWriter, r *http.Request, 
 	})
 }
 
-func parsePreviewReference(raw string, loc *time.Location) (time.Time, error) {
+func parsePreviewReference(raw string, loc *time.Location, now time.Time) (time.Time, error) {
 	if at, err := time.Parse(time.RFC3339, raw); err == nil {
 		return at, nil
 	}
-	if at, ok := parseDateToken(raw, loc); ok {
+	if at, ok := parseDateToken(raw, loc, now); ok {
 		return at, nil
 	}
 	return time.Time{}, fmt.Errorf("无法解析基准时刻 %q（可用 RFC3339，或 2026-09-25 / 2026-09-25 09:30）", raw)
@@ -446,7 +446,7 @@ func (s *ClipboardServer) handleTaskPreview(w http.ResponseWriter, r *http.Reque
 		reference = next
 	}
 	if raw := strings.TrimSpace(r.URL.Query().Get("at")); raw != "" {
-		parsed, err := parsePreviewReference(raw, loc)
+		parsed, err := parsePreviewReference(raw, loc, reference)
 		if err != nil {
 			writeError(w, http.StatusBadRequest, "invalid_reference", "Invalid reference time", err.Error())
 			return
