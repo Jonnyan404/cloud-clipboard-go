@@ -17,6 +17,10 @@ cloudflare/node_modules
 .kotlin/
 *.keystore
 .kilo
+# ⚠️ clip-sync 有它**自己的本地 git 仓库**（`clip-sync/.git`，2026-09-24 建），
+# **故意不纳入本仓库** —— 本仓库有 GitHub remote，而那个目录**不该被推到远程**。
+# ⚠️ 别删下面这三行：删掉之后 git 会把 `clip-sync/` 当成**嵌套仓库**，
+# 于是 `git add -A` 有可能把它整个提交上去（那正是要避免的事）。
 clip-sync
 clip-sync/dist/
 clip-sync/src-tauri/target/
