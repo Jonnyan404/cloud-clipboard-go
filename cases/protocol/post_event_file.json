@@ -1,0 +1,1 @@
+{"event":"receive","data":{"id":8,"type":"file","room":"default","timestamp":1758700001,"senderIP":"10.0.0.5","senderDevice":{"device":"iPhone","os":"iOS 17"},"name":"screenshot.png","size":20480,"cache":"6f1c9d2e-0000-4000-8000-000000000001","expire":1758703601,"thumbnail":"data:image/png;base64,iVBORw0KGgo=","url":"/file/6f1c9d2e-0000-4000-8000-000000000001/screenshot.png"}}

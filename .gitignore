@@ -24,6 +24,12 @@ cloudflare/node_modules
 clip-sync
 clip-sync/dist/
 clip-sync/src-tauri/target/
+# ⚠️ 同理：`rust/` 是 Rust 重写版（clip9）的**过渡期工作目录**，它有自己的本地 git 仓库
+# （无 remote）。这个仓库有 GitHub remote，**那棵树绝不能推上去** —— 开发完再拆成独立仓库。
+# ⚠️ 别删这一行：删了之后 git 会把 `rust/` 当成**嵌套仓库**，`git add -A` 有可能把它整个提交上去。
+rust/
+# 语言无关的行为用例：**要入库**（Go 与 Rust 测试都读它 = 双跑验证），所以这里不忽略。
+# 见 clip-sync/ARCHITECTURE.md §5.4 与 §10.3。
 openwrt/build/
 
 # macOS
