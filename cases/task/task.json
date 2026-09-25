@@ -1,0 +1,371 @@
+{
+  "note": "定时任务的求值与校验基准：期望值由 Go 的 task.go 跑出（固定时区 + 固定 now）。",
+  "tz": "Asia/Shanghai",
+  "now": "2026-09-24T09:30:00+08:00",
+  "occurrences": [
+    {
+      "expr": "daily 09:30",
+      "freq": "daily",
+      "time": "09:30",
+      "now": "2026-09-24T09:30:00+08:00",
+      "next": 1790299800,
+      "due": 1790213400,
+      "dueKey": "2026-09-24T09:30",
+      "nextKey": "2026-09-25T09:30",
+      "why": "每天 09:30，now 正好是 09:30"
+    },
+    {
+      "expr": "daily 10:00",
+      "freq": "daily",
+      "time": "10:00",
+      "now": "2026-09-24T09:30:00+08:00",
+      "next": 1790215200,
+      "due": 1790128800,
+      "dueKey": "2026-09-23T10:00",
+      "nextKey": "2026-09-24T10:00",
+      "why": "now 是 09:30，10:00 还没到 → due 是昨天 10:00"
+    },
+    {
+      "expr": "daily 08:00",
+      "freq": "daily",
+      "time": "08:00",
+      "now": "2026-09-24T09:30:00+08:00",
+      "next": 1790294400,
+      "due": 1790208000,
+      "dueKey": "2026-09-24T08:00",
+      "nextKey": "2026-09-25T08:00",
+      "why": "08:00 已过 → due 是今天 08:00"
+    },
+    {
+      "expr": "weekly 09:00",
+      "freq": "weekly",
+      "time": "09:00",
+      "byWeekday": [
+        4
+      ],
+      "now": "2026-09-24T09:30:00+08:00",
+      "next": 1790816400,
+      "due": 1790211600,
+      "dueKey": "2026-09-24T09:00",
+      "nextKey": "2026-10-01T09:00",
+      "why": "周四的每周任务，due 是今天（周四）09:00"
+    },
+    {
+      "expr": "weekly 09:00",
+      "freq": "weekly",
+      "time": "09:00",
+      "byWeekday": [
+        1
+      ],
+      "now": "2026-09-24T09:30:00+08:00",
+      "next": 1790557200,
+      "due": 1789952400,
+      "dueKey": "2026-09-21T09:00",
+      "nextKey": "2026-09-28T09:00",
+      "why": "只选周一，due 是本周一 09:00"
+    },
+    {
+      "expr": "weekly 09:00",
+      "freq": "weekly",
+      "time": "09:00",
+      "byWeekday": [
+        4,
+        1
+      ],
+      "now": "2026-09-24T09:30:00+08:00",
+      "next": 1790557200,
+      "due": 1790211600,
+      "dueKey": "2026-09-24T09:00",
+      "nextKey": "2026-09-28T09:00",
+      "why": "周一和周四，due 是今天（周四）09:00"
+    },
+    {
+      "expr": "once 2026-09-24T08:00:00+08:00",
+      "freq": "once",
+      "runAt": "2026-09-24T08:00:00+08:00",
+      "now": "2026-09-24T09:30:00+08:00",
+      "next": null,
+      "due": 1790208000,
+      "dueKey": "2026-09-24T08:00",
+      "nextKey": "",
+      "why": "过去的时刻 → due 是它，next 无"
+    },
+    {
+      "expr": "once 2026-09-25T08:00:00+08:00",
+      "freq": "once",
+      "runAt": "2026-09-25T08:00:00+08:00",
+      "now": "2026-09-24T09:30:00+08:00",
+      "next": 1790294400,
+      "due": null,
+      "dueKey": "",
+      "nextKey": "2026-09-25T08:00",
+      "why": "未来的时刻 → due 无，next 是它"
+    },
+    {
+      "expr": "cron 30 9 * * *",
+      "freq": "cron",
+      "cron": "30 9 * * *",
+      "now": "2026-09-24T09:30:00+08:00",
+      "next": 1790299800,
+      "due": 1790213400,
+      "dueKey": "2026-09-24T09:30",
+      "nextKey": "2026-09-25T09:30",
+      "why": "每天 09:30，due 是今天 09:30"
+    },
+    {
+      "expr": "cron 0 */2 * * *",
+      "freq": "cron",
+      "cron": "0 */2 * * *",
+      "now": "2026-09-24T09:30:00+08:00",
+      "next": 1790215200,
+      "due": 1790208000,
+      "dueKey": "2026-09-24T08:00",
+      "nextKey": "2026-09-24T10:00",
+      "why": "每两小时整点，now 是 09:30 → due 是 08:00"
+    }
+  ],
+  "validates": [
+    {
+      "name": "daily 基本",
+      "input": {
+        "name": "",
+        "freq": "daily",
+        "time": "09:30",
+        "cron": "",
+        "byWeekday": null,
+        "runAt": "",
+        "tz": "Asia/Shanghai",
+        "template": "今天是 {{date}}",
+        "chain": null,
+        "keepHistory": false,
+        "sender": ""
+      },
+      "ok": true,
+      "freq": "daily",
+      "time": "09:30",
+      "nameOut": "今天是 {{date}}",
+      "senderOut": "定时任务"
+    },
+    {
+      "name": "once 归一化成 RFC3339",
+      "input": {
+        "name": "",
+        "freq": "once",
+        "time": "",
+        "cron": "",
+        "byWeekday": null,
+        "runAt": "2026-09-25 08:00",
+        "tz": "Asia/Shanghai",
+        "template": "x",
+        "chain": null,
+        "keepHistory": false,
+        "sender": ""
+      },
+      "ok": true,
+      "freq": "once",
+      "runAt": "2026-09-25T08:00:00+08:00",
+      "nameOut": "x",
+      "senderOut": "定时任务"
+    },
+    {
+      "name": "weekly 去重排序",
+      "input": {
+        "name": "",
+        "freq": "weekly",
+        "time": "09:00",
+        "cron": "",
+        "byWeekday": [
+          4,
+          1,
+          4,
+          1
+        ],
+        "runAt": "",
+        "tz": "Asia/Shanghai",
+        "template": "x",
+        "chain": null,
+        "keepHistory": false,
+        "sender": ""
+      },
+      "ok": true,
+      "freq": "weekly",
+      "time": "09:00",
+      "byWeekday": [
+        1,
+        4
+      ],
+      "nameOut": "x",
+      "senderOut": "定时任务"
+    },
+    {
+      "name": "cron 归一化",
+      "input": {
+        "name": "",
+        "freq": "cron",
+        "time": "",
+        "cron": "0  9 *  * *",
+        "byWeekday": null,
+        "runAt": "",
+        "tz": "Asia/Shanghai",
+        "template": "x",
+        "chain": null,
+        "keepHistory": false,
+        "sender": ""
+      },
+      "ok": true,
+      "freq": "cron",
+      "cron": "0 9 * * *",
+      "nameOut": "x",
+      "senderOut": "定时任务"
+    },
+    {
+      "name": "名字从模板推导",
+      "input": {
+        "name": "",
+        "freq": "daily",
+        "time": "09:00",
+        "cron": "",
+        "byWeekday": null,
+        "runAt": "",
+        "tz": "Asia/Shanghai",
+        "template": "第一行很长很长很长很长很长很长很长很长很长很长",
+        "chain": null,
+        "keepHistory": false,
+        "sender": ""
+      },
+      "ok": true,
+      "freq": "daily",
+      "time": "09:00",
+      "nameOut": "第一行很长很长很长很长很长很长很长很长很…",
+      "senderOut": "定时任务"
+    },
+    {
+      "name": "空模板报错",
+      "input": {
+        "name": "",
+        "freq": "daily",
+        "time": "09:00",
+        "cron": "",
+        "byWeekday": null,
+        "runAt": "",
+        "tz": "Asia/Shanghai",
+        "template": "",
+        "chain": null,
+        "keepHistory": false,
+        "sender": ""
+      },
+      "ok": false,
+      "why": "正文不能为空"
+    },
+    {
+      "name": "坏频次",
+      "input": {
+        "name": "",
+        "freq": "hourly",
+        "time": "09:00",
+        "cron": "",
+        "byWeekday": null,
+        "runAt": "",
+        "tz": "Asia/Shanghai",
+        "template": "x",
+        "chain": null,
+        "keepHistory": false,
+        "sender": ""
+      },
+      "ok": false,
+      "why": "频率只能是 once / daily / weekly / cron"
+    },
+    {
+      "name": "坏时间",
+      "input": {
+        "name": "",
+        "freq": "daily",
+        "time": "25:00",
+        "cron": "",
+        "byWeekday": null,
+        "runAt": "",
+        "tz": "Asia/Shanghai",
+        "template": "x",
+        "chain": null,
+        "keepHistory": false,
+        "sender": ""
+      },
+      "ok": false,
+      "why": "时间超出范围"
+    },
+    {
+      "name": "weekly 没选周几",
+      "input": {
+        "name": "",
+        "freq": "weekly",
+        "time": "09:00",
+        "cron": "",
+        "byWeekday": null,
+        "runAt": "",
+        "tz": "Asia/Shanghai",
+        "template": "x",
+        "chain": null,
+        "keepHistory": false,
+        "sender": ""
+      },
+      "ok": false,
+      "why": "「每周」需要至少选一天"
+    },
+    {
+      "name": "cron 永远算不出未来",
+      "input": {
+        "name": "",
+        "freq": "cron",
+        "time": "",
+        "cron": "0 0 30 2 *",
+        "byWeekday": null,
+        "runAt": "",
+        "tz": "Asia/Shanghai",
+        "template": "x",
+        "chain": null,
+        "keepHistory": false,
+        "sender": ""
+      },
+      "ok": false,
+      "why": "在未来算不出任何触发时刻"
+    },
+    {
+      "name": "未知动作",
+      "input": {
+        "name": "",
+        "freq": "daily",
+        "time": "09:00",
+        "cron": "",
+        "byWeekday": null,
+        "runAt": "",
+        "tz": "Asia/Shanghai",
+        "template": "x",
+        "chain": [
+          "not.a.real.action"
+        ],
+        "keepHistory": false,
+        "sender": ""
+      },
+      "ok": false,
+      "why": "不能用于定时任务"
+    },
+    {
+      "name": "坏时区",
+      "input": {
+        "name": "",
+        "freq": "daily",
+        "time": "09:00",
+        "cron": "",
+        "byWeekday": null,
+        "runAt": "",
+        "tz": "Not/AZone",
+        "template": "x",
+        "chain": null,
+        "keepHistory": false,
+        "sender": ""
+      },
+      "ok": false,
+      "why": "无法识别的时区"
+    }
+  ]
+}
