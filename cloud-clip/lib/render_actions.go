@@ -640,13 +640,28 @@ func parseDateToken(raw string, loc *time.Location, now time.Time) (time.Time, b
 		month, _ := strconv.Atoi(m[2])
 		day, _ := strconv.Atoi(m[3])
 		hour, minute, second := 0, 0, 0
-		if m[4] != "" {
+		// ⚠️⚠️ **下标必须按捕获组个数守一遍**：紧凑写法（`20260923`）那条正则
+		// **没有**时间捕获组，它的 `m` 只有 4 项 —— 直接取 `m[4]` 会下标越界 panic。
+		//
+		// 这个 panic 不是理论上的（2026-09-25 实测撞到）：`date.add` 的输入是**用户写的正文**，
+		// 于是「任务正文里写 `20260924 +1d`」→ 模板渲染 → 链上 date.add → panic。
+		// 而它跑在**调度器 goroutine** 里，`lib` 里一个 recover 都没有 —— 那就是整个进程退出。
+		// （`handleTaskPreview` 那条路是 HTTP，net/http 会按连接兜住，所以只崩一个请求。）
+		//
+		// 原来的测试只覆盖了 `2026-02-31 +1d`（走的是下面那条**回读校验**的错路），
+		// 紧凑写法这条**成功路径**没人写过用例，所以它一直没被发现。
+		//
+		// 修法刻意选「按个数守」而不是「给第三条正则也补上时间捕获组」：后者等于顺手把
+		// 紧凑写法扩展成能带时间（`20260924T10:30`），那是**行为扩展**，不是修 bug ——
+		// 要扩也得单独一次决定，别混在修 panic 里。
+		hasTimeGroups := len(m) > 4
+		if hasTimeGroups && m[4] != "" {
 			hour, _ = strconv.Atoi(m[4])
 		}
-		if m[5] != "" {
+		if hasTimeGroups && m[5] != "" {
 			minute, _ = strconv.Atoi(m[5])
 		}
-		if m[6] != "" {
+		if hasTimeGroups && m[6] != "" {
 			second, _ = strconv.Atoi(m[6])
 		}
 

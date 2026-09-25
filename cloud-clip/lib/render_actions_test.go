@@ -335,6 +335,30 @@ func TestRenderActionRejectsBadDateInput(t *testing.T) {
 	}
 }
 
+// ⚠️ 回归：紧凑写法（`20260923`）那条正则**没有时间捕获组**，而 parseDateToken 里
+// 一律取 m[4]/m[5]/m[6] —— 于是它会**下标越界 panic**（2026-09-25 实测撞到）。
+//
+// 为什么这条值得单独一个测试、而不是混在上面的「坏输入」表里：
+//
+//	· 它不是「报错」，是**崩**。而 `date.add` 的输入是用户写的正文，
+//	  这条链跑在**调度器 goroutine** 上，`lib` 里一个 recover 都没有 → 整个进程退出；
+//	· 原来那张坏输入表里只有 `2026-02-31 +1d`（走的是**回读校验**那条错路），
+//	  紧凑写法这条**成功路径**一条用例都没有，所以它躲过了所有测试；
+//	· 顺带把 date.diff 也覆盖上 —— 它两侧的操作数都走同一个 parseDateToken。
+func TestParseDateTokenAcceptsCompactForm(t *testing.T) {
+	ctx := actionCtx()
+	if got, err := applyRenderActions("20260924 +1d", steps("date.add"), ctx); err != nil {
+		t.Fatalf("紧凑日期应当能算，实际报错: %v", err)
+	} else if got != "2026-09-25" {
+		t.Fatalf("紧凑日期算出来是 %q，期望 2026-09-25", got)
+	}
+	if got, err := applyRenderActions("20260901 ~ 20260924", steps("date.diff"), ctx); err != nil {
+		t.Fatalf("紧凑日期做差应当能算，实际报错: %v", err)
+	} else if got != "23 天\n3 周 2 天" {
+		t.Fatalf("紧凑日期做差是 %q，期望 23 天 / 3 周 2 天", got)
+	}
+}
+
 // ── 与前端动作库的契约 ──────────────────────────────────────────────
 //
 // 定时任务里存的是**动作 id**，服务端和前端各有一份实现。两侧 id 一旦漂开，
