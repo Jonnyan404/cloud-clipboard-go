@@ -28,6 +28,15 @@ clip-sync/src-tauri/target/
 # （无 remote）。这个仓库有 GitHub remote，**那棵树绝不能推上去** —— 开发完再拆成独立仓库。
 # ⚠️ 别删这一行：删了之后 git 会把 `rust/` 当成**嵌套仓库**，`git add -A` 有可能把它整个提交上去。
 rust/
+# ⚠️★ 2026-09-25：`rust/` 已经**拆成独立仓库**了，在 `../clip9`（与这个仓库平级）。
+# 这里那份是**副本、会过期** —— 确认新仓库没问题之后应该删掉它（它还带着 14GB 的 target/）。
+#
+# ⚠️ `clip9/` 这一行是为了**另一种摆法**：把新仓库 clone 进本仓库根目录
+# （`cloud-clipboard-go/clip9`）时，双跑比对 `tools/compare-with-go.mjs` 会自动找到 Go
+# （它按顺序试 `../cloud-clip` 与隔壁两种布局，实测四种摆法都能找到）。
+# ⚠️ 但**必须先有这一行**：否则 git 会把 `clip9/` 当成嵌套仓库，
+# `git add -A` 有可能把它整个提交上去 —— 和上面 `rust/` 那条是同一个坑。
+clip9/
 # 语言无关的行为用例：**要入库**（Go 与 Rust 测试都读它 = 双跑验证），所以这里不忽略。
 # 见 clip-sync/ARCHITECTURE.md §5.4 与 §10.3。
 openwrt/build/
