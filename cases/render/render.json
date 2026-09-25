@@ -1,0 +1,223 @@
+{
+  "note": "模板引擎的行为基准：期望值由 Go 的 render.go 跑出（固定时刻 + 固定上下文）。uuid / timestamp 用 uncertain 标注，见文件头注释。",
+  "now": "2026-09-24T09:30:00+08:00",
+  "task": "值班提醒",
+  "room": "home",
+  "cases": [
+    {
+      "tpl": "{{date}}",
+      "expect": "2026-09-24",
+      "error": false,
+      "why": "基准日期"
+    },
+    {
+      "tpl": "{{date:+1d}}",
+      "expect": "2026-09-25",
+      "error": false
+    },
+    {
+      "tpl": "{{date:-1d}}",
+      "expect": "2026-09-23",
+      "error": false
+    },
+    {
+      "tpl": "{{date:+1w}}",
+      "expect": "2026-10-01",
+      "error": false
+    },
+    {
+      "tpl": "{{date:+1}}",
+      "expect": "2026-09-25",
+      "error": false,
+      "why": "省略单位按天，与动作库 date.add 一致"
+    },
+    {
+      "tpl": "{{date}} 与 {{date:+1d}}",
+      "expect": "2026-09-24 与 2026-09-25",
+      "error": false,
+      "why": "同一条里两个 date 各自偏移"
+    },
+    {
+      "tpl": "{{date:+1m}}",
+      "expect": "2026-10-24",
+      "error": false,
+      "why": "月溢出夹取（9 月 24 日 +1m = 10 月 24 日，不夹）"
+    },
+    {
+      "tpl": "{{date:abc}}",
+      "expect": null,
+      "error": true,
+      "why": "非法偏移"
+    },
+    {
+      "tpl": "{{date:1d+}}",
+      "expect": null,
+      "error": true,
+      "why": "符号在单位后，非法"
+    },
+    {
+      "tpl": "{{weekday}}",
+      "expect": "周四",
+      "error": false,
+      "why": "默认 zh 全名"
+    },
+    {
+      "tpl": "{{weekday:+1d}}",
+      "expect": "周五",
+      "error": false
+    },
+    {
+      "tpl": "{{weekday:-1d}}",
+      "expect": "周三",
+      "error": false
+    },
+    {
+      "tpl": "{{weekday:+2d}}",
+      "expect": "周六",
+      "error": false
+    },
+    {
+      "tpl": "{{weekday:en}}",
+      "expect": "Thursday",
+      "error": false,
+      "why": "en 是全名"
+    },
+    {
+      "tpl": "{{weekday:+1d|en}}",
+      "expect": "Friday",
+      "error": false
+    },
+    {
+      "tpl": "{{weekday:+1d|en-short}}",
+      "expect": "Fri",
+      "error": false
+    },
+    {
+      "tpl": "{{weekday:zh-short}}",
+      "expect": "四",
+      "error": false
+    },
+    {
+      "tpl": "{{weekday:en|+1d}}",
+      "expect": "Friday",
+      "error": false,
+      "why": "参数顺序可换"
+    },
+    {
+      "tpl": "{{weekday:+1d|cn-simple}}",
+      "expect": null,
+      "error": true,
+      "why": "写错的样式名"
+    },
+    {
+      "tpl": "{{weekday:+1d|en|zh}}",
+      "expect": null,
+      "error": true,
+      "why": "参数段太多"
+    },
+    {
+      "tpl": "今天是 {{date}}（{{weekday}}），明天是 {{date:+1d}}（{{weekday:+1d}}）",
+      "expect": "今天是 2026-09-24（周四），明天是 2026-09-25（周五）",
+      "error": false,
+      "why": "周几必须跟着自己的偏移走，否则文案自相矛盾"
+    },
+    {
+      "tpl": "{{time}}",
+      "expect": "09:30",
+      "error": false
+    },
+    {
+      "tpl": "{{datetime}}",
+      "expect": "2026-09-24 09:30",
+      "error": false
+    },
+    {
+      "tpl": "{{task}}",
+      "expect": "值班提醒",
+      "error": false
+    },
+    {
+      "tpl": "{{room}}",
+      "expect": "home",
+      "error": false
+    },
+    {
+      "tpl": "{{time:+1d}}",
+      "expect": null,
+      "error": true,
+      "why": "time 不接受参数"
+    },
+    {
+      "tpl": "{{datetime:x}}",
+      "expect": null,
+      "error": true,
+      "why": "datetime 不接受参数"
+    },
+    {
+      "tpl": "{{uuid}}",
+      "expect": null,
+      "error": false,
+      "uncertain": "uuid"
+    },
+    {
+      "tpl": "{{uuid:x}}",
+      "expect": null,
+      "error": true,
+      "why": "uuid 不接受参数"
+    },
+    {
+      "tpl": "{{timestamp}}",
+      "expect": null,
+      "error": false,
+      "uncertain": "timestamp"
+    },
+    {
+      "tpl": "{{timestamp:x}}",
+      "expect": null,
+      "error": true,
+      "why": "timestamp 不接受参数"
+    },
+    {
+      "tpl": "没有变量",
+      "expect": "没有变量",
+      "error": false,
+      "why": "纯文本原样返回"
+    },
+    {
+      "tpl": "今天是 {{date}}，{{dtae}}",
+      "expect": null,
+      "error": true,
+      "why": "任一变量失败则整体失败，不吐半成品"
+    },
+    {
+      "tpl": "{{ nope }}",
+      "expect": null,
+      "error": true,
+      "why": "变量名两侧空格也要能认出来是未知变量"
+    },
+    {
+      "tpl": "{{latest}}",
+      "expect": "来自 home",
+      "error": false,
+      "why": "不带参数取本房间"
+    },
+    {
+      "tpl": "转：{{latest:ops}}",
+      "expect": "转：来自 ops",
+      "error": false,
+      "why": "带参数取指定房间"
+    },
+    {
+      "tpl": "{{latest:empty}}",
+      "expect": null,
+      "error": true,
+      "why": "空来源是可识别的错误"
+    },
+    {
+      "tpl": "{{latest:my room}}",
+      "expect": null,
+      "error": true,
+      "why": "房间名含空格直接拒"
+    }
+  ]
+}
