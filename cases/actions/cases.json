@@ -335,14 +335,38 @@
     },
     {
       "id": "inspect.timestamp",
+      "input": "999999999",
+      "expect": "2001-09-09 09:46:39",
+      "why": "9 位也按秒算（\u003c13 位一律 ×1000）"
+    },
+    {
+      "id": "inspect.timestamp",
       "input": "0",
       "error": true,
       "why": "只认 10 位（秒）/ 13 位（毫秒）"
     },
     {
       "id": "inspect.timestamp",
+      "input": "12345678",
+      "error": true,
+      "why": "8 位太短"
+    },
+    {
+      "id": "inspect.timestamp",
+      "input": "12345678901234",
+      "error": true,
+      "why": "14 位太长"
+    },
+    {
+      "id": "inspect.timestamp",
       "input": "abc",
       "error": true
+    },
+    {
+      "id": "inspect.timestamp",
+      "input": "１７３５６８９６００",
+      "error": true,
+      "why": "\\d 是 ASCII，全角数字不算"
     },
     {
       "id": "inspect.dateToTimestamp",
@@ -354,6 +378,40 @@
       "id": "inspect.dateToTimestamp",
       "input": "2025-01-01 08:00:00",
       "expect": "1735718400"
+    },
+    {
+      "id": "inspect.dateToTimestamp",
+      "input": "2025-01-01 08:00",
+      "expect": "1735718400"
+    },
+    {
+      "id": "inspect.dateToTimestamp",
+      "input": "2025-01-01T08:00",
+      "expect": "1735718400"
+    },
+    {
+      "id": "inspect.dateToTimestamp",
+      "input": "2025/01/01",
+      "expect": "1735689600",
+      "why": "斜杠先归一成连字符（Safari 对斜杠的解析不一致）"
+    },
+    {
+      "id": "inspect.dateToTimestamp",
+      "input": "2025-1-1",
+      "error": true,
+      "why": "月份必须两位"
+    },
+    {
+      "id": "inspect.dateToTimestamp",
+      "input": "2025-13-01",
+      "error": true,
+      "why": "月份越界"
+    },
+    {
+      "id": "inspect.dateToTimestamp",
+      "input": "2025-02-30",
+      "error": true,
+      "why": "日期不存在（time.Parse 会校验）"
     },
     {
       "id": "inspect.dateToTimestamp",
@@ -369,6 +427,17 @@
       "id": "text.trimLines",
       "input": "单行",
       "expect": "单行"
+    },
+    {
+      "id": "text.trimLines",
+      "input": "a\n\nb",
+      "expect": "a\n\nb"
+    },
+    {
+      "id": "text.trimLines",
+      "input": "  \n  ",
+      "expect": "\n",
+      "why": "两行都是空白 → 两行都变空串，但行还在"
     },
     {
       "id": "text.dropBlank",
@@ -392,6 +461,12 @@
       "expect": "x\n\ny\n"
     },
     {
+      "id": "text.dedupe",
+      "input": "\n\n\n",
+      "expect": "\n\n\n",
+      "why": "全是空行 → 原样（空行从不参与去重）"
+    },
+    {
       "id": "text.sort",
       "input": "b\nc\na",
       "expect": "a\nb\nc"
@@ -401,6 +476,12 @@
       "input": "10\n9\n2",
       "expect": "10\n2\n9",
       "why": "字节序，不是数值序"
+    },
+    {
+      "id": "text.sort",
+      "input": "b\na\nB",
+      "expect": "B\na\nb",
+      "why": "字节序：大写字母排在小写前面"
     },
     {
       "id": "text.upper",
@@ -413,9 +494,20 @@
       "expect": "中文"
     },
     {
+      "id": "text.upper",
+      "input": "aBc123",
+      "expect": "ABC123",
+      "why": "数字与已是大写的字符不动"
+    },
+    {
       "id": "text.lower",
       "input": "ABC",
       "expect": "abc"
+    },
+    {
+      "id": "text.lower",
+      "input": "AbC123",
+      "expect": "abc123"
     },
     {
       "id": "text.reverse",
@@ -429,6 +521,12 @@
       "why": "按码点反转，代理对不能被拆开"
     },
     {
+      "id": "text.reverse",
+      "input": "a\nb",
+      "expect": "b\na",
+      "why": "按码点反转：换行的位置跟着字符走"
+    },
+    {
       "id": "text.extractUrl",
       "input": "见 https://a.com，然后 www.b.cn/x",
       "expect": "https://a.com\nwww.b.cn/x",
@@ -440,9 +538,39 @@
       "expect": ""
     },
     {
+      "id": "text.extractUrl",
+      "input": "见https://a.com",
+      "expect": "https://a.com",
+      "why": "中文紧贴 URL：ASCII 词边界下应当匹配"
+    },
+    {
+      "id": "text.extractUrl",
+      "input": "xhttps://a.com",
+      "expect": "",
+      "why": "字母紧贴：ASCII 词字符 → 没有边界 → 不匹配"
+    },
+    {
+      "id": "text.extractUrl",
+      "input": "www.a.com/path?q=1#h",
+      "expect": "www.a.com/path?q=1#h",
+      "why": "查询串与锚点都在 URL 里（只有空白和中文标点截断）"
+    },
+    {
       "id": "text.extractEmail",
       "input": "a@b.com 和 c.d@e.co",
       "expect": "a@b.com\nc.d@e.co"
+    },
+    {
+      "id": "text.extractEmail",
+      "input": "a@b.c",
+      "expect": "",
+      "why": "顶级域至少两位"
+    },
+    {
+      "id": "text.extractEmail",
+      "input": "A.B+tag@Ex-Ample.co",
+      "expect": "A.B+tag@Ex-Ample.co",
+      "why": "大写、点、加号、带连字符的域名"
     },
     {
       "id": "text.extractPhone",
@@ -456,15 +584,51 @@
       "why": "12 位连写不能被截出前 11 位"
     },
     {
+      "id": "text.extractPhone",
+      "input": "a13800138000b",
+      "expect": "13800138000",
+      "why": "字母包围算边界"
+    },
+    {
+      "id": "text.extractPhone",
+      "input": "913800138000",
+      "expect": "",
+      "why": "左边还有数字 → 右半边那 11 位不算（右边界的另一面）"
+    },
+    {
       "id": "text.extractIp",
       "input": "1.2.3.4 和 999.999.999.999",
       "expect": "1.2.3.4",
       "why": "每段限位 0-255"
     },
     {
+      "id": "text.extractIp",
+      "input": "从1.2.3.4来",
+      "expect": "1.2.3.4",
+      "why": "中文紧贴：ASCII 词边界下应当匹配"
+    },
+    {
+      "id": "text.extractIp",
+      "input": "255.255.255.255 和 256.1.1.1",
+      "expect": "255.255.255.255",
+      "why": "上边界 255 合法、256 非法"
+    },
+    {
       "id": "text.extractNumber",
       "input": "价格 -12.5 和 1,234",
       "expect": "-12.5\n1,234"
+    },
+    {
+      "id": "text.extractNumber",
+      "input": "-5 和 +5",
+      "expect": "-5\n5",
+      "why": "`-?` 只吃负号，加号不吃"
+    },
+    {
+      "id": "text.extractNumber",
+      "input": "１２３",
+      "expect": "",
+      "why": "\\d 是 ASCII：全角数字不算数字"
     },
     {
       "id": "text.replace",
@@ -505,6 +669,16 @@
     },
     {
       "id": "text.replace",
+      "input": "abc",
+      "params": {
+        "mode": "nope",
+        "with": "x"
+      },
+      "error": true,
+      "why": "未知模式必须报错，不能静默不动"
+    },
+    {
+      "id": "text.replace",
       "input": "订单 A123 共 45 元",
       "params": {
         "mode": "digits",
@@ -531,6 +705,16 @@
       },
       "expect": "a b",
       "why": "只压水平空白，换行不在内"
+    },
+    {
+      "id": "text.replace",
+      "input": "a b",
+      "params": {
+        "mode": "spaces",
+        "with": "#"
+      },
+      "expect": "a b",
+      "why": "单个空格不匹配（{2,}）"
     },
     {
       "id": "text.replace",
@@ -562,6 +746,16 @@
     },
     {
       "id": "text.replace",
+      "input": "138001380001",
+      "params": {
+        "mode": "phone",
+        "with": "#"
+      },
+      "expect": "#1",
+      "why": "替换模式没有词边界，会吞掉前 11 位"
+    },
+    {
+      "id": "text.replace",
       "input": "从 192.168.1.1 来",
       "params": {
         "mode": "ip",
@@ -590,6 +784,17 @@
       "why": "替换文本一律当字面，$1 不是组引用"
     },
     {
+      "id": "text.replace",
+      "input": "价格 12 元",
+      "params": {
+        "find": "12",
+        "mode": "digits",
+        "with": "$\u0026"
+      },
+      "expect": "价格 $\u0026 元",
+      "why": "正则模式下的替换文本同样是字面（$\u0026 不该被展开）"
+    },
+    {
       "id": "zh.fullwidth",
       "input": "a b!",
       "expect": "ａ　ｂ！",
@@ -601,9 +806,36 @@
       "expect": "ＡＢ"
     },
     {
+      "id": "zh.fullwidth",
+      "input": "~",
+      "expect": "～",
+      "why": "0x7E 也是可见 ASCII，要转"
+    },
+    {
+      "id": "zh.fullwidth",
+      "input": "a\tb",
+      "expect": "ａ\tｂ",
+      "why": "制表符不在 0x21-0x7E 里，不动"
+    },
+    {
+      "id": "zh.fullwidth",
+      "input": "中文，。",
+      "expect": "中文，。"
+    },
+    {
       "id": "zh.halfwidth",
       "input": "ａ　ｂ！",
       "expect": "a b!"
+    },
+    {
+      "id": "zh.halfwidth",
+      "input": "～",
+      "expect": "~"
+    },
+    {
+      "id": "zh.halfwidth",
+      "input": "中文，。",
+      "expect": "中文,。"
     },
     {
       "id": "zh.punctuation",
@@ -614,6 +846,24 @@
       "id": "zh.punctuation",
       "input": "（测试）「引用」",
       "expect": "(测试)\"引用\""
+    },
+    {
+      "id": "zh.punctuation",
+      "input": "『单』“双”‘单引’",
+      "expect": "'单'\"双\"'单引'",
+      "why": "四种引号两两成对映射到 \" 与 '"
+    },
+    {
+      "id": "zh.punctuation",
+      "input": "等等……然后——再看",
+      "expect": "等等..然后--再看",
+      "why": "双字符标点被拆成两个单字符（可接受）"
+    },
+    {
+      "id": "zh.punctuation",
+      "input": "全角空格　在标点里也换成半角",
+      "expect": "全角空格 在标点里也换成半角",
+      "why": "U+3000 也在表里"
     },
     {
       "id": "zh.number",
@@ -646,6 +896,70 @@
       "expect": "负十二点五"
     },
     {
+      "id": "zh.number",
+      "input": "100000000",
+      "expect": "一亿",
+      "why": "亿"
+    },
+    {
+      "id": "zh.number",
+      "input": "11",
+      "expect": "十一",
+      "why": "十一（不是一十一）"
+    },
+    {
+      "id": "zh.number",
+      "input": "20",
+      "expect": "二十",
+      "why": "二十（「一十」只在整串开头才省）"
+    },
+    {
+      "id": "zh.number",
+      "input": "1.05",
+      "expect": "一点零五",
+      "why": "小数逐位念，零要念出来"
+    },
+    {
+      "id": "zh.number",
+      "input": "007",
+      "expect": "七",
+      "why": "前导零丢掉"
+    },
+    {
+      "id": "zh.number",
+      "input": "0.5",
+      "expect": "零点五"
+    },
+    {
+      "id": "zh.number",
+      "input": "1234567890123456",
+      "expect": "一千二百三十四万亿五千六百七十八亿九千零一十二万三千四百五十六",
+      "why": "四节到底（万亿）"
+    },
+    {
+      "id": "zh.number",
+      "input": "",
+      "error": true
+    },
+    {
+      "id": "zh.number",
+      "input": "+12",
+      "error": true,
+      "why": "不认加号"
+    },
+    {
+      "id": "zh.number",
+      "input": "1e3",
+      "error": true,
+      "why": "不认科学计数法"
+    },
+    {
+      "id": "zh.number",
+      "input": "１２３",
+      "error": true,
+      "why": "全角数字不是 \\d"
+    },
+    {
       "id": "date.add",
       "input": "2026-09-24 +1d",
       "expect": "2026-09-25"
@@ -663,9 +977,32 @@
     },
     {
       "id": "date.add",
+      "input": "2026-09-24 +1y",
+      "expect": "2027-09-24"
+    },
+    {
+      "id": "date.add",
+      "input": "2024-02-29 +1y",
+      "expect": "2025-02-28",
+      "why": "闰日 +1 年 → 夹到 2/28"
+    },
+    {
+      "id": "date.add",
+      "input": "-1d",
+      "expect": "2026-09-23",
+      "why": "省略基准 = ctx.Now 的日期"
+    },
+    {
+      "id": "date.add",
       "input": "今天 +1d",
       "expect": "2026-09-25",
       "why": "今天 = ctx.Now 的日期"
+    },
+    {
+      "id": "date.add",
+      "input": "明天 +1d",
+      "expect": "2026-09-26",
+      "why": "关键词先归零点再加偏移"
     },
     {
       "id": "date.add",
@@ -675,7 +1012,64 @@
     },
     {
       "id": "date.add",
+      "input": "2026-09-24 10:30:07 +1d",
+      "expect": "2026-09-25 10:30",
+      "why": "带秒也按分钟输出（秒被丢掉）"
+    },
+    {
+      "id": "date.add",
+      "input": "2026-09-24 +3",
+      "expect": "2026-09-27",
+      "why": "不写单位按天"
+    },
+    {
+      "id": "date.add",
+      "input": "  2026-09-24   +   1d  ",
+      "expect": "2026-09-25",
+      "why": "运算符两侧的空格都允许"
+    },
+    {
+      "id": "date.add",
+      "input": "2026-9-24 +1d",
+      "expect": "2026-09-25",
+      "why": "月/日可以是一位数"
+    },
+    {
+      "id": "date.add",
+      "input": "2026/09/24 +1d",
+      "expect": "2026-09-25"
+    },
+    {
+      "id": "date.add",
+      "input": "20260924 +1d",
+      "expect": "2026-09-25",
+      "why": "紧凑写法（曾是下标越界 panic 的那条路）"
+    },
+    {
+      "id": "date.add",
+      "input": "2026年09月24日 +1d",
+      "expect": "2026-09-25"
+    },
+    {
+      "id": "date.add",
+      "input": "2026-09-24 +1D",
+      "error": true,
+      "why": "单位只认小写"
+    },
+    {
+      "id": "date.add",
       "input": "不是日期 +1d",
+      "error": true
+    },
+    {
+      "id": "date.add",
+      "input": "2026-02-31 +1d",
+      "error": true,
+      "why": "回读校验：不存在的日期要报错，不能被悄悄滚到 3 月"
+    },
+    {
+      "id": "date.add",
+      "input": "2026-09-24 加一天",
       "error": true
     },
     {
@@ -691,8 +1085,55 @@
     },
     {
       "id": "date.diff",
+      "input": "2026-01-01 至 2026-01-08",
+      "expect": "7 天\n1 周 0 天",
+      "why": "「周 0 天」也要写出来（只要周数 \u003e 0）"
+    },
+    {
+      "id": "date.diff",
+      "input": "2026-01-01～2026-03-15",
+      "expect": "73 天\n10 周 3 天",
+      "why": "全角波浪号"
+    },
+    {
+      "id": "date.diff",
+      "input": "2026-01-01 -\u003e 2026-03-15",
+      "expect": "73 天\n10 周 3 天"
+    },
+    {
+      "id": "date.diff",
+      "input": "2026-01-01 ~ 2026-01-04",
+      "expect": "3 天",
+      "why": "不足一周只出一行"
+    },
+    {
+      "id": "date.diff",
+      "input": "2026-01-01 ~ 2026-01-01",
+      "expect": "0 天",
+      "why": "同一天 = 0 天"
+    },
+    {
+      "id": "date.diff",
+      "input": "2026-03-15 ~ 2026-01-01",
+      "expect": "-73 天\n10 周 3 天",
+      "why": "倒序：天为负、周取绝对值"
+    },
+    {
+      "id": "date.diff",
+      "input": "2026-01-01 23:00 ~ 2026-01-02 01:00",
+      "expect": "1 天",
+      "why": "按本地零点算差，不是时刻差"
+    },
+    {
+      "id": "date.diff",
       "input": "只有一行",
       "error": true
+    },
+    {
+      "id": "date.diff",
+      "input": "2026-02-31 ~ 2026-03-15",
+      "error": true,
+      "why": "任一侧认不出就报错"
     }
   ]
 }
