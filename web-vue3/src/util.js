@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
+import { APP_BASE_URL } from '@/base.js';
 
 export function prettyFileSize(size) {
     let units = ['TB', 'GB', 'MB', 'KB'];
@@ -33,6 +34,29 @@ export function formatTimestamp(timestamp) {
 export function buildCleanAbsoluteRouteUrl(path, prefix = '') {
     const normalizedPath = String(path || '').replace(/^\/+/, '');
     return new URL(`${prefix}/${normalizedPath}`, `${window.location.origin}/`).toString();
+}
+
+/**
+ * 应用内**静态资源**的绝对地址：相对「应用基准目录」而不是相对 `config.server.prefix`。
+ *
+ * ⚠️★ 为什么需要它（2026-09-25，Issue #23 的同一类）：`config.server.prefix` **只能从
+ * WebSocket 握手的 `config` 事件拿到**，所以在「应用还没连上」的那一刻它是空串。
+ * 任何**在那一刻就要用**的地址都不能依赖它 —— 否则拼出来是 `/shortcuts/meta.json`，
+ * 而 `/clip` 部署下正确地址是 `/clip/shortcuts/meta.json` → **404**，而且往往还被
+ * `catch` 吞掉，只表现为「某块内容静默不见了」。
+ *
+ * WebSocket 自己的地址就栽在这上面（要连上才知道 prefix，要知道 prefix 才能连上），
+ * 修法是改用**文档目录** —— 这个函数是同一套办法（`APP_BASE_URL` 由 `document.baseURI`
+ * 推导，页面加载时就定了；服务端在深路径上会注入 `<base href="<prefix>/">`）。
+ *
+ * 附带的好处：反代把 `/x/` 映射到 `/` 时，浏览器看到的路径是 `/x/`、而 config 里的
+ * prefix 是**内部**那个 —— 对「要给别人打开的地址」来说，前者才是对的。
+ *
+ * ⚠️ 与 `buildCleanAbsoluteRouteUrl` 的区别：那个收 **prefix**（`/clip`），
+ * 这个收**相对路径**（`shortcuts/meta.json`）。别混。
+ */
+export function buildAppUrl(path) {
+    return new URL(String(path || '').replace(/^\/+/, ''), APP_BASE_URL).href;
 }
 
 /**

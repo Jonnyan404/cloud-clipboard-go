@@ -1,13 +1,11 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { useAppStore } from '@/store/app';
 import QrcodeVue from 'qrcode.vue';
-import { buildCleanAbsoluteRouteUrl, copyTextToClipboard } from '@/util.js';
+import { buildAppUrl, copyTextToClipboard } from '@/util.js';
 
 const model = defineModel({ type: Boolean, default: false });
 const { t } = useI18n();
-const app = useAppStore();
 
 const tab = ref('apple');
 
@@ -28,9 +26,19 @@ const ANDROID_APP_LINKS = [
     { icon: 'mdi-github', label: 'GitHub', url: 'https://github.com/Waboodoo/HTTP-Shortcuts/releases' },
 ];
 
-const prefix = computed(() => app?.config?.server?.prefix || '');
-const appleUrl = (file) => buildCleanAbsoluteRouteUrl(`shortcuts/apple/${file}`, prefix.value);
-const androidUrl = () => buildCleanAbsoluteRouteUrl('shortcuts/android/shortcuts.zip', prefix.value);
+// ⚠️★ 这三个地址**不能**用 `app.config.server.prefix`（2026-09-25 修，Issue #23 的同一类）。
+//
+// `prefix` 只能从 WebSocket 握手的 `config` 事件拿到，而**本组件的 `onMounted` 在应用挂载
+// 时就跑了** —— `<shortcuts-dialog>` 在 `UnifiedComposer` 的模板里是**无条件渲染**的
+// （`v-dialog` 的懒渲染只延后**内容**，不延后组件本身）。那时候 config 还没到、prefix 是空串，
+// 于是 `meta.json` 被请求成 `/shortcuts/meta.json`，而 `/clip` 部署下正确地址是
+// `/clip/shortcuts/meta.json` → **404**，还被下面的 catch 吞掉，
+// 症状只是「那行『更新于』日期不见了」—— 极难查。
+//
+// 改用 `buildAppUrl()`（相对 `document.baseURI` 推导的应用基准目录，页面加载时就有），
+// 与 `store/websocket.js` 的 `getWebSocketEndpoint()` 同一套办法。
+const appleUrl = (file) => buildAppUrl(`shortcuts/apple/${file}`);
+const androidUrl = () => buildAppUrl('shortcuts/android/shortcuts.zip');
 
 // iOS 的二维码必须用 Shortcuts 的**导入 URL 方案**，不能直接放 .shortcut 的下载地址 ——
 // 后者扫出来只是「下载了一个文件」，还得自己进「文件」App 找到再点开。
@@ -45,11 +53,12 @@ const appleImportUrl = (file) => `shortcuts://import-shortcut?url=${encodeURICom
 // 取的是 shortcuts/apple 与 shortcuts/android **最后一次提交的日期** —— 不是最新 commit，
 // 免得无关提交也让日期往后跳（那会让旁边那句「请更新」变成没人看的噪音）。
 // 拿不到就整个不显示这一行：提醒照常显示，下载照常可用。
+// ⚠️ 这次 fetch 在 `onMounted` 里、**只发一次**，所以地址更不能依赖 `config`（见上面 `appleUrl` 那段）。
 const meta = ref({ apple: null, android: null });
 const activeDate = computed(() => (tab.value === 'apple' ? meta.value.apple : meta.value.android));
 onMounted(async () => {
     try {
-        const url = buildCleanAbsoluteRouteUrl('shortcuts/meta.json', prefix.value);
+        const url = buildAppUrl('shortcuts/meta.json');
         const data = await (await fetch(url)).json();
         meta.value = { apple: data?.apple ?? null, android: data?.android ?? null };
     } catch {
