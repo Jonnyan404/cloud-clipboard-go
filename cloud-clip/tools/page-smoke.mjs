@@ -324,6 +324,12 @@ if (app.includes('var MSG = {')) {
     authed.getEl('actionBox').innerHTML.includes('>text.trimLines<') === false,
     authed.getEl('actionBox').innerHTML.slice(0, 120));
   ok('动作 id 留在 tooltip', authed.getEl('actionBox').innerHTML.includes("title='text.trimLines'"));
+  // ⚠️ 那条常驻说明必须**真的渲染出来**：它是用户唯一能知道
+  // 「Markdown / 拼音 / 简繁 / 生成类为什么不在这」的地方。
+  // 服务端不下发不可用的动作，所以列表短一截时没有别的解释。
+  ok('动作范围说明里交代了两类不在列表里的动作',
+    authed.getEl('actionBox').innerHTML.includes('定时任务') && authed.getEl('actionBox').innerHTML.includes('预览区'),
+    authed.getEl('actionBox').innerHTML.slice(-200));
   ok('变量胶囊显示人话', authed.getEl('varChips').innerHTML.length > 0);
   // 「某房间的最新消息」是唯一需要额外解释的变量（读外部状态 + 跨房间权限），
   // 说明挂在悬停里 —— 别让用户踩了坑才知道规则。

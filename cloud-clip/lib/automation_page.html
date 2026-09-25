@@ -436,7 +436,13 @@ window.__CC__ = { prefix: "[[.Prefix]]", room: "[[.Room]]" };
     errPassword:     ["密码不正确", "密碼不正確", "Wrong password", "パスワードが正しくありません"],
     noVars:          ["服务端没有下发可用变量。", "伺服器沒有下發可用變數。", "The server reported no available variables.", "利用できる変数がサーバーから通知されていません。"],
     noActions:       ["服务端没有下发可用的动作。", "伺服器沒有下發可用的動作。", "The server reported no available actions.", "利用できる動作がサーバーから通知されていません。"],
-    actionScopeHint: ["只列服务端能跑的动作。生成类（UUID / 时间）请直接写进正文：{{uuid}} / {{time}} / {{datetime}}", "只列伺服器能跑的動作。生成類（UUID / 時間）請直接寫進正文：{{uuid}} / {{time}} / {{datetime}}", "Only actions the server can run are listed. For generated values (UUID / time), write them straight into the body: {{uuid}} / {{time}} / {{datetime}}", "サーバーで実行できる動作のみ表示しています。生成系（UUID / 時刻）は本文に直接書いてください：{{uuid}} / {{time}} / {{datetime}}"],
+    // ⚠️ 这条要说清**两类不在列表里的动作**，否则用户只会看到「列表短了一截」而不知道为什么
+    // （服务端不下发不可用的动作，它也没有「置灰」这回事 —— 见 render_actions.go 文件头）：
+    //   ① 生成类（UUID / 时间）：**正文里写变量**就能拿到，而且是内联的、不覆盖正文；
+    //   ② 预览区那些（Markdown / 拼音 / 简繁 / 格式识别）：它们的行为**就是浏览器里那几个库**
+    //      （marked / pinyin-pro / opencc-js），Rust 侧换成另一个 crate 必然算出不同的结果 ——
+    //      所以它们**刻意不进来**（2026-09-25 定），只在预览区可用。
+    actionScopeHint: ["只列定时任务能用的动作。生成类（UUID / 时间）请直接写进正文：{{uuid}} / {{time}} / {{datetime}}。预览区那些（Markdown 渲染、拼音、简繁转换、格式识别）只在浏览器里跑，定时任务用不上。", "只列定時任務能用的動作。生成類（UUID / 時間）請直接寫進正文：{{uuid}} / {{time}} / {{datetime}}。預覽區那些（Markdown 渲染、拼音、簡繁轉換、格式辨識）只在瀏覽器裡跑，定時任務用不上。", "Only actions a scheduled task can run are listed. For generated values (UUID / time), write them straight into the body: {{uuid}} / {{time}} / {{datetime}}. Preview-only actions (Markdown rendering, pinyin, simplified/traditional conversion, format detection) run in the browser and are not available to scheduled tasks.", "定期タスクで実行できる動作だけを表示しています。生成系（UUID / 時刻）は本文に直接書いてください：{{uuid}} / {{time}} / {{datetime}}。プレビュー専用の動作（Markdown レンダリング、ピンイン、簡繁変換、形式判別）はブラウザ内でのみ動作し、定期タスクでは使えません。"],
     // 动作链为空时的占位。⚠️ 这条**曾经漏掉过**：`t()` 取不到条目会原样返回 key，
     // 于是那个框里真的写着 `phChainClick`（四门语言都躲不开）。
     // 现在由 TestAutomationPageScriptI18nKeysHaveMessages 拦着。
