@@ -1,0 +1,349 @@
+{
+  "note": "由 cloud-clip/lib/action_fixture_test.go 生成。id 与前端 web-vue3/src/data/actions.js 逐字一致；服务端只下发 i18n key，译文只在四份 locale 里。",
+  "actions": [
+    {
+      "id": "format.json.pretty",
+      "group": "format",
+      "groupKey": "actionGroupFormat",
+      "key": "actionJsonPretty",
+      "params": []
+    },
+    {
+      "id": "format.json.min",
+      "group": "format",
+      "groupKey": "actionGroupFormat",
+      "key": "actionJsonMin",
+      "params": []
+    },
+    {
+      "id": "text.trimLines",
+      "group": "text",
+      "groupKey": "actionGroupText",
+      "key": "actionTrimLines",
+      "params": []
+    },
+    {
+      "id": "text.dropBlank",
+      "group": "text",
+      "groupKey": "actionGroupText",
+      "key": "actionDropBlankLines",
+      "params": []
+    },
+    {
+      "id": "text.dedupe",
+      "group": "text",
+      "groupKey": "actionGroupText",
+      "key": "actionDedupeLines",
+      "params": []
+    },
+    {
+      "id": "text.sort",
+      "group": "text",
+      "groupKey": "actionGroupText",
+      "key": "actionSortLines",
+      "params": []
+    },
+    {
+      "id": "text.upper",
+      "group": "text",
+      "groupKey": "actionGroupText",
+      "key": "actionUpperCase",
+      "params": []
+    },
+    {
+      "id": "text.lower",
+      "group": "text",
+      "groupKey": "actionGroupText",
+      "key": "actionLowerCase",
+      "params": []
+    },
+    {
+      "id": "text.replace",
+      "group": "text",
+      "groupKey": "actionGroupText",
+      "key": "actionReplace",
+      "params": [
+        {
+          "key": "mode",
+          "labelKey": "actionReplaceMode",
+          "type": "select",
+          "options": [
+            {
+              "value": "text",
+              "labelKey": "actionReplaceModeText"
+            },
+            {
+              "value": "digits",
+              "labelKey": "actionReplaceModeDigits"
+            },
+            {
+              "value": "latin",
+              "labelKey": "actionReplaceModeLatin"
+            },
+            {
+              "value": "spaces",
+              "labelKey": "actionReplaceModeSpaces"
+            },
+            {
+              "value": "email",
+              "labelKey": "actionReplaceModeEmail"
+            },
+            {
+              "value": "url",
+              "labelKey": "actionReplaceModeUrl"
+            },
+            {
+              "value": "phone",
+              "labelKey": "actionReplaceModePhone"
+            },
+            {
+              "value": "ip",
+              "labelKey": "actionReplaceModeIp"
+            }
+          ]
+        },
+        {
+          "key": "find",
+          "labelKey": "actionReplaceFind",
+          "visibleWhen": {
+            "key": "mode",
+            "equals": "text"
+          }
+        },
+        {
+          "key": "with",
+          "labelKey": "actionReplaceWith"
+        }
+      ]
+    },
+    {
+      "id": "text.reverse",
+      "group": "text",
+      "groupKey": "actionGroupText",
+      "key": "actionReverse",
+      "params": []
+    },
+    {
+      "id": "text.extractUrl",
+      "group": "text",
+      "groupKey": "actionGroupText",
+      "key": "actionExtractUrl",
+      "params": []
+    },
+    {
+      "id": "text.extractEmail",
+      "group": "text",
+      "groupKey": "actionGroupText",
+      "key": "actionExtractEmail",
+      "params": []
+    },
+    {
+      "id": "text.extractPhone",
+      "group": "text",
+      "groupKey": "actionGroupText",
+      "key": "actionExtractPhone",
+      "params": []
+    },
+    {
+      "id": "text.extractIp",
+      "group": "text",
+      "groupKey": "actionGroupText",
+      "key": "actionExtractIp",
+      "params": []
+    },
+    {
+      "id": "text.extractNumber",
+      "group": "text",
+      "groupKey": "actionGroupText",
+      "key": "actionExtractNumber",
+      "params": []
+    },
+    {
+      "id": "date.add",
+      "group": "date",
+      "groupKey": "actionGroupDate",
+      "key": "actionDateAdd",
+      "params": []
+    },
+    {
+      "id": "date.diff",
+      "group": "date",
+      "groupKey": "actionGroupDate",
+      "key": "actionDateDiff",
+      "params": []
+    },
+    {
+      "id": "encode.base64",
+      "group": "encode",
+      "groupKey": "actionGroupEncode",
+      "key": "actionBase64Encode",
+      "params": []
+    },
+    {
+      "id": "encode.base64.decode",
+      "group": "encode",
+      "groupKey": "actionGroupEncode",
+      "key": "actionBase64Decode",
+      "params": []
+    },
+    {
+      "id": "encode.url",
+      "group": "encode",
+      "groupKey": "actionGroupEncode",
+      "key": "actionUrlEncode",
+      "params": []
+    },
+    {
+      "id": "encode.url.decode",
+      "group": "encode",
+      "groupKey": "actionGroupEncode",
+      "key": "actionUrlDecode",
+      "params": []
+    },
+    {
+      "id": "encode.hex",
+      "group": "encode",
+      "groupKey": "actionGroupEncode",
+      "key": "actionHexEncode",
+      "params": []
+    },
+    {
+      "id": "encode.hex.decode",
+      "group": "encode",
+      "groupKey": "actionGroupEncode",
+      "key": "actionHexDecode",
+      "params": []
+    },
+    {
+      "id": "encode.html",
+      "group": "encode",
+      "groupKey": "actionGroupEncode",
+      "key": "actionHtmlEncode",
+      "params": []
+    },
+    {
+      "id": "encode.html.decode",
+      "group": "encode",
+      "groupKey": "actionGroupEncode",
+      "key": "actionHtmlDecode",
+      "params": []
+    },
+    {
+      "id": "encode.unicode",
+      "group": "encode",
+      "groupKey": "actionGroupEncode",
+      "key": "actionUnicodeEncode",
+      "params": []
+    },
+    {
+      "id": "encode.unicode.decode",
+      "group": "encode",
+      "groupKey": "actionGroupEncode",
+      "key": "actionUnicodeDecode",
+      "params": []
+    },
+    {
+      "id": "zh.fullwidth",
+      "group": "zh",
+      "groupKey": "actionGroupZh",
+      "key": "actionFullWidth",
+      "params": []
+    },
+    {
+      "id": "zh.halfwidth",
+      "group": "zh",
+      "groupKey": "actionGroupZh",
+      "key": "actionHalfWidth",
+      "params": []
+    },
+    {
+      "id": "zh.punctuation",
+      "group": "zh",
+      "groupKey": "actionGroupZh",
+      "key": "actionCnPunctuation",
+      "params": []
+    },
+    {
+      "id": "zh.number",
+      "group": "zh",
+      "groupKey": "actionGroupZh",
+      "key": "actionNumberToChinese",
+      "params": []
+    },
+    {
+      "id": "inspect.timestamp",
+      "group": "inspect",
+      "groupKey": "actionGroupInspect",
+      "key": "actionTimestampToDate",
+      "params": []
+    },
+    {
+      "id": "inspect.dateToTimestamp",
+      "group": "inspect",
+      "groupKey": "actionGroupInspect",
+      "key": "actionDateToTimestamp",
+      "params": []
+    },
+    {
+      "id": "inspect.sha256",
+      "group": "inspect",
+      "groupKey": "actionGroupInspect",
+      "key": "actionSha256",
+      "params": []
+    }
+  ],
+  "i18nKeys": [
+    "actionBase64Decode",
+    "actionBase64Encode",
+    "actionCnPunctuation",
+    "actionDateAdd",
+    "actionDateDiff",
+    "actionDateToTimestamp",
+    "actionDedupeLines",
+    "actionDropBlankLines",
+    "actionExtractEmail",
+    "actionExtractIp",
+    "actionExtractNumber",
+    "actionExtractPhone",
+    "actionExtractUrl",
+    "actionFullWidth",
+    "actionGroupDate",
+    "actionGroupEncode",
+    "actionGroupFormat",
+    "actionGroupInspect",
+    "actionGroupText",
+    "actionGroupZh",
+    "actionHalfWidth",
+    "actionHexDecode",
+    "actionHexEncode",
+    "actionHtmlDecode",
+    "actionHtmlEncode",
+    "actionJsonMin",
+    "actionJsonPretty",
+    "actionLowerCase",
+    "actionNumberToChinese",
+    "actionReplace",
+    "actionReplaceFind",
+    "actionReplaceMode",
+    "actionReplaceModeDigits",
+    "actionReplaceModeEmail",
+    "actionReplaceModeIp",
+    "actionReplaceModeLatin",
+    "actionReplaceModePhone",
+    "actionReplaceModeSpaces",
+    "actionReplaceModeText",
+    "actionReplaceModeUrl",
+    "actionReplaceWith",
+    "actionReverse",
+    "actionSha256",
+    "actionSortLines",
+    "actionTimestampToDate",
+    "actionTrimLines",
+    "actionUnicodeDecode",
+    "actionUnicodeEncode",
+    "actionUpperCase",
+    "actionUrlDecode",
+    "actionUrlEncode"
+  ],
+  "countHint": 34
+}

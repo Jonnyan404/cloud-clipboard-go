@@ -1,0 +1,698 @@
+{
+  "note": "期望值是 Go 跑出来的（cloud-clip/lib/render_actions_test.go 的 actionCtx 那套时钟）。报错的用例只有 error，不记文案 —— 两侧措辞本来就可以不同。",
+  "context": {
+    "now": "2026-09-24T09:30:00+08:00",
+    "task": "t",
+    "room": "home"
+  },
+  "cases": [
+    {
+      "id": "format.json.pretty",
+      "input": "{\"b\":1,\"a\":[1,2]}",
+      "expect": "{\n  \"b\": 1,\n  \"a\": [\n    1,\n    2\n  ]\n}",
+      "why": "键顺序必须原样保留，不能按字典序重排"
+    },
+    {
+      "id": "format.json.pretty",
+      "input": "{\"nested\":{\"x\":[{\"y\":true}]},\"s\":\"值\"}",
+      "expect": "{\n  \"nested\": {\n    \"x\": [\n      {\n        \"y\": true\n      }\n    ]\n  },\n  \"s\": \"值\"\n}",
+      "why": "嵌套 + 中文"
+    },
+    {
+      "id": "format.json.pretty",
+      "input": "  {\"a\":1}  ",
+      "expect": "{\n  \"a\": 1\n}",
+      "why": "前后空白"
+    },
+    {
+      "id": "format.json.pretty",
+      "input": "{\"a\":[],\"b\":{}}",
+      "expect": "{\n  \"a\": [],\n  \"b\": {}\n}",
+      "why": "空容器不展开"
+    },
+    {
+      "id": "format.json.pretty",
+      "input": "{\"a\":-1.50,\"b\":\"x:y,z\"}",
+      "expect": "{\n  \"a\": -1.50,\n  \"b\": \"x:y,z\"\n}",
+      "why": "数字与字符串里的冒号/逗号不能被动"
+    },
+    {
+      "id": "format.json.pretty",
+      "input": "{\n  \"a\": 1\n}",
+      "error": true,
+      "why": "已经是美化过的 → 报错，不是原样返回"
+    },
+    {
+      "id": "format.json.pretty",
+      "input": "{\"a\":",
+      "error": true,
+      "why": "坏 JSON 要报错，不能吐半截"
+    },
+    {
+      "id": "format.json.min",
+      "input": "{\n  \"a\": 1,\n  \"b\": [1, 2]\n}",
+      "expect": "{\"a\":1,\"b\":[1,2]}"
+    },
+    {
+      "id": "format.json.min",
+      "input": "{\n  \"s\": \"a b, c\",\n  \"n\": [1, 2]\n}",
+      "expect": "{\"s\":\"a b, c\",\"n\":[1,2]}",
+      "why": "字符串里的空白不能动"
+    },
+    {
+      "id": "format.json.min",
+      "input": "{\"a\":1}",
+      "error": true,
+      "why": "已经是一行 → 报错（不是原样返回）"
+    },
+    {
+      "id": "format.json.min",
+      "input": "not json",
+      "error": true
+    },
+    {
+      "id": "encode.base64",
+      "input": "abc",
+      "expect": "YWJj"
+    },
+    {
+      "id": "encode.base64",
+      "input": "",
+      "expect": ""
+    },
+    {
+      "id": "encode.base64",
+      "input": "中文🪶",
+      "expect": "5Lit5paH8J+qtg=="
+    },
+    {
+      "id": "encode.base64.decode",
+      "input": "YWJj",
+      "expect": "abc"
+    },
+    {
+      "id": "encode.base64.decode",
+      "input": "5Lit5paH",
+      "expect": "中文"
+    },
+    {
+      "id": "encode.base64.decode",
+      "input": "abc",
+      "error": true,
+      "why": "长度不是 4 的倍数，前端 atob 也会抛"
+    },
+    {
+      "id": "encode.base64.decode",
+      "input": "!!!",
+      "error": true
+    },
+    {
+      "id": "encode.base64.decode",
+      "input": "YQ==",
+      "expect": "a",
+      "why": "标准填充"
+    },
+    {
+      "id": "encode.base64.decode",
+      "input": "YR==",
+      "expect": "a",
+      "why": "尾比特非零：Go 容忍，Rust 默认不容忍"
+    },
+    {
+      "id": "encode.base64.decode",
+      "input": "YWJj=",
+      "error": true,
+      "why": "填充长度不对"
+    },
+    {
+      "id": "encode.url",
+      "input": "a b\u0026c",
+      "expect": "a%20b%26c"
+    },
+    {
+      "id": "encode.url",
+      "input": "+",
+      "expect": "%2B",
+      "why": "必须是 %2B（encodeURIComponent 与 QueryEscape 的区别之一）"
+    },
+    {
+      "id": "encode.url",
+      "input": "~!*'()-_.",
+      "expect": "~!*'()-_.",
+      "why": "这几个 unreserved 不转义"
+    },
+    {
+      "id": "encode.url",
+      "input": "中文 🪶",
+      "expect": "%E4%B8%AD%E6%96%87%20%F0%9F%AA%B6"
+    },
+    {
+      "id": "encode.url.decode",
+      "input": "a%20b%26c",
+      "expect": "a b\u0026c"
+    },
+    {
+      "id": "encode.url.decode",
+      "input": "+",
+      "expect": "+",
+      "why": "`+` 原样保留，不能被当成空格"
+    },
+    {
+      "id": "encode.url.decode",
+      "input": "%E4%B8%AD%E6%96%87",
+      "expect": "中文"
+    },
+    {
+      "id": "encode.url.decode",
+      "input": "%ZZ",
+      "error": true
+    },
+    {
+      "id": "encode.url.decode",
+      "input": "%",
+      "error": true,
+      "why": "截断的百分号转义"
+    },
+    {
+      "id": "encode.url.decode",
+      "input": "a%4",
+      "error": true,
+      "why": "只有一位十六进制"
+    },
+    {
+      "id": "encode.url.decode",
+      "input": "没有百分号",
+      "expect": "没有百分号",
+      "why": "没有 % 时原样返回"
+    },
+    {
+      "id": "encode.hex",
+      "input": "abc",
+      "expect": "61 62 63"
+    },
+    {
+      "id": "encode.hex",
+      "input": "中文",
+      "expect": "e4 b8 ad e6 96 87"
+    },
+    {
+      "id": "encode.hex",
+      "input": "",
+      "expect": ""
+    },
+    {
+      "id": "encode.hex.decode",
+      "input": "61 62 63",
+      "expect": "abc"
+    },
+    {
+      "id": "encode.hex.decode",
+      "input": "616263",
+      "expect": "abc",
+      "why": "分隔符可有可无"
+    },
+    {
+      "id": "encode.hex.decode",
+      "input": "6e-6f",
+      "expect": "no",
+      "why": "非 hex 字符一律丢掉"
+    },
+    {
+      "id": "encode.hex.decode",
+      "input": "616",
+      "error": true,
+      "why": "奇数长度报错"
+    },
+    {
+      "id": "encode.hex.decode",
+      "input": "  ",
+      "expect": "",
+      "why": "丢掉非 hex 之后是空串 → 返回空串，不是报错"
+    },
+    {
+      "id": "encode.hex.decode",
+      "input": "0x61",
+      "error": true,
+      "why": "x 被丢掉，剩 061 是奇数长度"
+    },
+    {
+      "id": "encode.html",
+      "input": "a\u003cb\u003e\u0026\"c\"",
+      "expect": "a\u0026lt;b\u0026gt;\u0026amp;\u0026quot;c\u0026quot;",
+      "why": "只转 \u0026 \u003c \u003e \"，不转单引号"
+    },
+    {
+      "id": "encode.html",
+      "input": "'",
+      "expect": "'"
+    },
+    {
+      "id": "encode.html.decode",
+      "input": "\u0026lt;a\u0026gt; \u0026amp; \u0026quot;x\u0026quot;",
+      "expect": "\u003ca\u003e \u0026 \"x\""
+    },
+    {
+      "id": "encode.html.decode",
+      "input": "\u0026#39;",
+      "expect": "'"
+    },
+    {
+      "id": "encode.html.decode",
+      "input": "\u0026nbsp;",
+      "expect": " "
+    },
+    {
+      "id": "encode.unicode",
+      "input": "岚🪶",
+      "expect": "\\u5c9a\\ud83e\\udeb6",
+      "why": "emoji 必须走 UTF-16 代理对"
+    },
+    {
+      "id": "encode.unicode",
+      "input": "abc",
+      "expect": "abc"
+    },
+    {
+      "id": "encode.unicode.decode",
+      "input": "\\u5c9a\\ud83e\\udeb6",
+      "expect": "岚🪶"
+    },
+    {
+      "id": "encode.unicode.decode",
+      "input": "\\u0041",
+      "expect": "A"
+    },
+    {
+      "id": "encode.unicode.decode",
+      "input": "\\u00",
+      "expect": "\\u00",
+      "why": "位数不够 → 原样留着"
+    },
+    {
+      "id": "encode.unicode.decode",
+      "input": "\\uZZZZ",
+      "expect": "\\uZZZZ",
+      "why": "不是十六进制 → 原样留着"
+    },
+    {
+      "id": "encode.unicode.decode",
+      "input": "前\\u0041后",
+      "expect": "前A后",
+      "why": "转义两侧的原文要保留"
+    },
+    {
+      "id": "encode.unicode",
+      "input": "ab",
+      "expect": "a\\u007fb",
+      "why": "0x7f 也要转义（\u003e 0x7e）"
+    },
+    {
+      "id": "inspect.sha256",
+      "input": "abc",
+      "expect": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+    },
+    {
+      "id": "inspect.sha256",
+      "input": "",
+      "expect": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "id": "inspect.sha256",
+      "input": "中文🪶",
+      "expect": "b9fec7e660aad4556792c681fdeff4efa47021f4baf92084b3834790bac286f1"
+    },
+    {
+      "id": "inspect.timestamp",
+      "input": "1735689600",
+      "expect": "2025-01-01 08:00:00",
+      "why": "在 +08:00 的 ctx 下是 08:00"
+    },
+    {
+      "id": "inspect.timestamp",
+      "input": "1735689600000",
+      "expect": "2025-01-01 08:00:00",
+      "why": "13 位 = 毫秒"
+    },
+    {
+      "id": "inspect.timestamp",
+      "input": "0",
+      "error": true,
+      "why": "只认 10 位（秒）/ 13 位（毫秒）"
+    },
+    {
+      "id": "inspect.timestamp",
+      "input": "abc",
+      "error": true
+    },
+    {
+      "id": "inspect.dateToTimestamp",
+      "input": "2025-01-01",
+      "expect": "1735689600",
+      "why": "按 UTC 解析，和前端 Date.parse('2025-01-01') 一致"
+    },
+    {
+      "id": "inspect.dateToTimestamp",
+      "input": "2025-01-01 08:00:00",
+      "expect": "1735718400"
+    },
+    {
+      "id": "inspect.dateToTimestamp",
+      "input": "不是日期",
+      "error": true
+    },
+    {
+      "id": "text.trimLines",
+      "input": "  a  \n\tb\t",
+      "expect": "a\nb"
+    },
+    {
+      "id": "text.trimLines",
+      "input": "单行",
+      "expect": "单行"
+    },
+    {
+      "id": "text.dropBlank",
+      "input": "a\n\n  \nb",
+      "expect": "a\nb"
+    },
+    {
+      "id": "text.dropBlank",
+      "input": "   \n\t\n",
+      "expect": ""
+    },
+    {
+      "id": "text.dedupe",
+      "input": "a\na\n\nb\nb",
+      "expect": "a\n\nb",
+      "why": "空行不去重：连着几个空行是有意的排版"
+    },
+    {
+      "id": "text.dedupe",
+      "input": "x\n\ny\n\nx",
+      "expect": "x\n\ny\n"
+    },
+    {
+      "id": "text.sort",
+      "input": "b\nc\na",
+      "expect": "a\nb\nc"
+    },
+    {
+      "id": "text.sort",
+      "input": "10\n9\n2",
+      "expect": "10\n2\n9",
+      "why": "字节序，不是数值序"
+    },
+    {
+      "id": "text.upper",
+      "input": "abc",
+      "expect": "ABC"
+    },
+    {
+      "id": "text.upper",
+      "input": "中文",
+      "expect": "中文"
+    },
+    {
+      "id": "text.lower",
+      "input": "ABC",
+      "expect": "abc"
+    },
+    {
+      "id": "text.reverse",
+      "input": "abc",
+      "expect": "cba"
+    },
+    {
+      "id": "text.reverse",
+      "input": "a🪶b",
+      "expect": "b🪶a",
+      "why": "按码点反转，代理对不能被拆开"
+    },
+    {
+      "id": "text.extractUrl",
+      "input": "见 https://a.com，然后 www.b.cn/x",
+      "expect": "https://a.com\nwww.b.cn/x",
+      "why": "中文标点必须在排除集里"
+    },
+    {
+      "id": "text.extractUrl",
+      "input": "没有网址",
+      "expect": ""
+    },
+    {
+      "id": "text.extractEmail",
+      "input": "a@b.com 和 c.d@e.co",
+      "expect": "a@b.com\nc.d@e.co"
+    },
+    {
+      "id": "text.extractPhone",
+      "input": "13800138000 和 13900139000",
+      "expect": "13800138000\n13900139000"
+    },
+    {
+      "id": "text.extractPhone",
+      "input": "138001380001",
+      "expect": "",
+      "why": "12 位连写不能被截出前 11 位"
+    },
+    {
+      "id": "text.extractIp",
+      "input": "1.2.3.4 和 999.999.999.999",
+      "expect": "1.2.3.4",
+      "why": "每段限位 0-255"
+    },
+    {
+      "id": "text.extractNumber",
+      "input": "价格 -12.5 和 1,234",
+      "expect": "-12.5\n1,234"
+    },
+    {
+      "id": "text.replace",
+      "input": "axb",
+      "params": {
+        "find": ".",
+        "with": "-"
+      },
+      "expect": "axb",
+      "why": "字面替换，`.` 不是任意字符"
+    },
+    {
+      "id": "text.replace",
+      "input": "内网测试环境",
+      "params": {
+        "find": "内网",
+        "with": "外网"
+      },
+      "expect": "外网测试环境"
+    },
+    {
+      "id": "text.replace",
+      "input": "abc",
+      "params": {
+        "with": "x"
+      },
+      "error": true,
+      "why": "查找为空必须报错"
+    },
+    {
+      "id": "text.replace",
+      "input": "abc",
+      "params": {
+        "find": "",
+        "with": "x"
+      },
+      "error": true
+    },
+    {
+      "id": "text.replace",
+      "input": "订单 A123 共 45 元",
+      "params": {
+        "mode": "digits",
+        "with": "#"
+      },
+      "expect": "订单 A# 共 # 元",
+      "why": "[0-9]+ 是贪婪的"
+    },
+    {
+      "id": "text.replace",
+      "input": "订单 A123 共 45 元",
+      "params": {
+        "mode": "latin",
+        "with": "#"
+      },
+      "expect": "订单 #123 共 45 元"
+    },
+    {
+      "id": "text.replace",
+      "input": "a    b",
+      "params": {
+        "mode": "spaces",
+        "with": " "
+      },
+      "expect": "a b",
+      "why": "只压水平空白，换行不在内"
+    },
+    {
+      "id": "text.replace",
+      "input": "联系 a@b.com 或 c@d.cn",
+      "params": {
+        "mode": "email",
+        "with": "***"
+      },
+      "expect": "联系 *** 或 ***"
+    },
+    {
+      "id": "text.replace",
+      "input": "见 https://a.com 和 WWW.B.CN",
+      "params": {
+        "mode": "url",
+        "with": "***"
+      },
+      "expect": "见 *** 和 ***",
+      "why": "大小写不敏感"
+    },
+    {
+      "id": "text.replace",
+      "input": "打 13800138000",
+      "params": {
+        "mode": "phone",
+        "with": "***"
+      },
+      "expect": "打 ***"
+    },
+    {
+      "id": "text.replace",
+      "input": "从 192.168.1.1 来",
+      "params": {
+        "mode": "ip",
+        "with": "***"
+      },
+      "expect": "从 *** 来"
+    },
+    {
+      "id": "text.replace",
+      "input": "A123",
+      "params": {
+        "mode": "digits",
+        "with": ""
+      },
+      "expect": "A",
+      "why": "with 留空 = 删除"
+    },
+    {
+      "id": "text.replace",
+      "input": "a$1b",
+      "params": {
+        "find": "$1",
+        "with": "X"
+      },
+      "expect": "aXb",
+      "why": "替换文本一律当字面，$1 不是组引用"
+    },
+    {
+      "id": "zh.fullwidth",
+      "input": "a b!",
+      "expect": "ａ　ｂ！",
+      "why": "0x20+0xFEE0 = U+FF00 是未分配字符，全角空格是 U+3000"
+    },
+    {
+      "id": "zh.fullwidth",
+      "input": "ＡＢ",
+      "expect": "ＡＢ"
+    },
+    {
+      "id": "zh.halfwidth",
+      "input": "ａ　ｂ！",
+      "expect": "a b!"
+    },
+    {
+      "id": "zh.punctuation",
+      "input": "你好，世界。",
+      "expect": "你好,世界."
+    },
+    {
+      "id": "zh.punctuation",
+      "input": "（测试）「引用」",
+      "expect": "(测试)\"引用\""
+    },
+    {
+      "id": "zh.number",
+      "input": "10001",
+      "expect": "一万零一"
+    },
+    {
+      "id": "zh.number",
+      "input": "10000",
+      "expect": "一万"
+    },
+    {
+      "id": "zh.number",
+      "input": "10000001",
+      "expect": "一千万零一"
+    },
+    {
+      "id": "zh.number",
+      "input": "10",
+      "expect": "十"
+    },
+    {
+      "id": "zh.number",
+      "input": "0",
+      "expect": "零"
+    },
+    {
+      "id": "zh.number",
+      "input": "-12.5",
+      "expect": "负十二点五"
+    },
+    {
+      "id": "date.add",
+      "input": "2026-09-24 +1d",
+      "expect": "2026-09-25"
+    },
+    {
+      "id": "date.add",
+      "input": "2026-09-24 +1w",
+      "expect": "2026-10-01"
+    },
+    {
+      "id": "date.add",
+      "input": "2026-01-31 +1m",
+      "expect": "2026-02-28",
+      "why": "月末溢出要夹到当月最后一天"
+    },
+    {
+      "id": "date.add",
+      "input": "今天 +1d",
+      "expect": "2026-09-25",
+      "why": "今天 = ctx.Now 的日期"
+    },
+    {
+      "id": "date.add",
+      "input": "2026-09-24 10:30 +2d",
+      "expect": "2026-09-26 10:30",
+      "why": "基准带时间则结果保留时间"
+    },
+    {
+      "id": "date.add",
+      "input": "不是日期 +1d",
+      "error": true
+    },
+    {
+      "id": "date.diff",
+      "input": "2026-01-01 ~ 2026-03-15",
+      "expect": "73 天\n10 周 3 天"
+    },
+    {
+      "id": "date.diff",
+      "input": "2026-01-01\n2026-03-15",
+      "expect": "73 天\n10 周 3 天",
+      "why": "两行写法等价"
+    },
+    {
+      "id": "date.diff",
+      "input": "只有一行",
+      "error": true
+    }
+  ]
+}
