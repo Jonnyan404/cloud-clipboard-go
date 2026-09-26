@@ -1511,6 +1511,29 @@ type ContentListResponse struct {
 	Messages []map[string]interface{} `json:"messages"`
 }
 
+// applyAutomationFields 把「定时消息专有」的三个字段补进条目 —— **只在有值的时候补**。
+//
+// ⚠️★ **空值必须省略**（与 `ReceiveBase` 上的 `omitempty` 一致）：不留神写成「总是给」的话，
+// **所有普通消息**都会凭空多出 `"source":""` / `"scheduledAt":0` / `"late":false` 三个键 ——
+// 那等于把「少数派」从 Worker 换回 Go/Rust（Worker 没有自动化能力，永远不输出它们），
+// §0.5 刚统一好的三边条目形状又裂开。
+//
+// ⚠️ **为什么要补它们**：`components/received-item/Text.vue` 的「定时」/「补发」两个标记
+// 读的就是这三个字段（`util.js` 的 `isAutomationMessage` / `isLateMessage`）——
+// 历史改走 `GET /content` 之后，少了它们会让标记**刷新后静默消失**（不报错、不 4xx）。
+// 详见 `docs/specs/ws-live-only.md` §0.6。
+func applyAutomationFields(entry map[string]interface{}, base ReceiveBase) {
+	if base.Source != "" {
+		entry["source"] = base.Source
+	}
+	if base.ScheduledAt != 0 {
+		entry["scheduledAt"] = base.ScheduledAt
+	}
+	if base.Late {
+		entry["late"] = base.Late
+	}
+}
+
 // contentEntryOf 把一条消息投影成 `/content/<id>` 与 `/content`（列表）共用的 JSON。
 //
 // ⚠️ 抽成一个函数、而不是每个 handler 各写一份 map：两个端点的**响应形状必须逐字相同**
@@ -1525,7 +1548,7 @@ func contentEntryOf(msg PostEvent) (map[string]interface{}, bool) {
 		if f == nil {
 			return nil, false
 		}
-		return map[string]interface{}{
+		entry := map[string]interface{}{
 			"type": DetermineResponseType(f.Name),
 			"name": f.Name,
 			"size": f.Size,
@@ -1568,14 +1591,16 @@ func contentEntryOf(msg PostEvent) (map[string]interface{}, bool) {
 			"thumbnail": f.Thumbnail,
 			// 空串 = 待办（看板列，见 handleContentColumn）
 			"column": f.Column,
-		}, true
+		}
+		applyAutomationFields(entry, f.ReceiveBase)
+		return entry, true
 
 	case "text":
 		t := msg.Data.TextReceive
 		if t == nil {
 			return nil, false
 		}
-		return map[string]interface{}{
+		entry := map[string]interface{}{
 			"type":      "text",
 			"content":   t.Content,
 			"id":        strconv.Itoa(msg.Data.ID()),
@@ -1586,7 +1611,9 @@ func contentEntryOf(msg PostEvent) (map[string]interface{}, bool) {
 			"senderClientID": t.SenderClientID,
 			"senderDevice":   t.SenderDevice,
 			"column":         t.Column,
-		}, true
+		}
+		applyAutomationFields(entry, t.ReceiveBase)
+		return entry, true
 	}
 	return nil, false
 }

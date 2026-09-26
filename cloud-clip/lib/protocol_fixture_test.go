@@ -148,6 +148,26 @@ func protocolFixtures() map[string]any {
 		Data:  ReceiveHolder{FileReceive: ptr(sampleFileReceive())},
 	})
 
+	// ⚠️★ **定时消息的 `/content` 投影**（`docs/specs/ws-live-only.md` §0.6）。
+	//
+	// 这一条是**故意**加的：§0.5 那次只用「人发的消息」验「逐字段相等」，而
+	// `source` / `scheduledAt` / `late` 在 `ReceiveBase` 上是 `omitempty` ——
+	// **人发的消息里根本没有这三个键**，于是「相等 ✓」验过了、缺口却漏了：
+	// 历史改走 `GET /content` 之后，气泡上的「定时 / 补发」标记会**静默消失**。
+	// 有了这两条，「这三个键会出现」和「人发的消息里不出现」两头都钉住了。
+	textEntryAuto, _ := contentEntryOf(PostEvent{
+		Event: "receive",
+		Data:  ReceiveHolder{TextReceive: ptr(automation)},
+	})
+	fileAuto := sampleFileReceive()
+	fileAuto.Source = "automation"
+	fileAuto.ScheduledAt = 1758700000
+	fileAuto.Late = true
+	fileEntryAuto, _ := contentEntryOf(PostEvent{
+		Event: "receive",
+		Data:  ReceiveHolder{FileReceive: ptr(fileAuto)},
+	})
+
 	return map[string]any{
 		"device_meta":             sampleDeviceMeta(),
 		"device_meta_no_name":     DeviceMeta{ID: "dev-2", Type: "Mobile", Device: "iPhone", OS: "iOS 17", Browser: "Safari"},
@@ -179,6 +199,11 @@ func protocolFixtures() map[string]any {
 		// `GET /content`（历史分页）的形状 —— 见上面 textEntry / fileEntry 的注释。
 		"content_entry_text": textEntry,
 		"content_entry_file": fileEntry,
+		// ⚠️★ 定时消息的那两条（§0.6）：专门钉住 `source` / `scheduledAt` / `late`
+		// **会出现**。没有它们的话这个缺口会**再漏一次** —— 上一轮就漏在
+		// 「只用人发的消息验逐字段相等」。
+		"content_entry_text_auto": textEntryAuto,
+		"content_entry_file_auto": fileEntryAuto,
 		"content_list": ContentListResponse{
 			Messages: []map[string]interface{}{textEntry, fileEntry},
 		},
@@ -282,8 +307,14 @@ func TestProtocolFixtureRoundTripInGo(t *testing.T) {
 				if err := json.Unmarshal(raw, &back); err != nil {
 					t.Fatalf("DeviceMeta 读不回来: %v", err)
 				}
-			case "content_entry_text", "content_entry_file":
+			case "content_entry_text", "content_entry_file",
+				"content_entry_text_auto", "content_entry_file_auto":
 				// ⚠️ 它们是**投影**（map），不是协议类型 —— 不能走下面的 ReceiveHolder 分支。
+				//
+				// ⚠️★ **新加投影类 fixture 时记得加进这一行**：落进 `default` 会拿
+				// `ReceiveHolder` 去读，而投影的 `id` 是**字符串**、`type` 可能是 `image` ——
+				// 报出来的错（"cannot unmarshal string into … id of type int"）看着像
+				// fixture 坏了，其实只是没登记。
 				var back map[string]interface{}
 				if err := json.Unmarshal(raw, &back); err != nil {
 					t.Fatalf("content 条目读不回来: %v", err)
