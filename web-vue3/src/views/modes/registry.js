@@ -5,30 +5,16 @@ import StickyWall from './StickyWall.vue';
 import BoardWall from './BoardWall.vue';
 
 /**
- * ⚠️★ **已退役的模式**（2026-09-26 真删了，不再是「标记」）。
+ * ⚠️★ **四个模式已退役并真删**（2026-09-26）：`chat` / `mega` / `workbench` / `terminal`。
  *
- * 原来它们是 `deprecated: true` —— 标记而不是删，理由是：
- * 「localStorage 和书签里可能还存着 `?mode=chat`，删掉会让它们**静默**落到兜底模式，
- * 用户只会看到「我的模式没了」」（见 git 历史里 registry.js 那段注释）。
+ * 它们原来是 `deprecated: true` —— 只标记不删，理由是「localStorage 和书签里可能还存着
+ * `?mode=chat`，删掉会让它们**静默**落到兜底模式」。
  *
- * 现在真删了，但**那条顾虑照旧成立** —— 所以留这张表：旧 key 显式映射到一个
- * **还在的模式**，让降级是**有意的**，而不是靠 `resolveModeComponent` 的兜底碰巧生效。
- *
- * ⚠️ 别把这张表也删掉：删了之后 `?mode=chat` 会落到 `default`（兜底），
- * 症状和原来一样是「模式没了」，但那时**没人知道它曾经是什么、该换成什么**。
- *
- * 为什么各自映射到那个模式（按「它原来是干什么的」挑最近的）：
- *   · `chat`      → `default`   —— 都是「一列气泡/卡片」的时间流
- *   · `mega`      → `default`   —— 大字版时间流
- *   · `workbench` → `bench`     —— 多栏；动作台是还在的多栏模式
- *   · `terminal`  → `default`   —— 终端风的一列时间流
+ * ⚠️ **那条理由已经不成立了**（Jonny 2026-09-26：「统统删除，不要考虑老用户，没有老用户」）。
+ * 所以**没有退役映射表、没有兼容分支** —— 旧的 `?mode=chat` 就是会落到 `default`（兜底）。
+ * 别为了「优雅降级」再把那张表加回来：这个项目**没有老用户**，
+ * 而兼容垫片是**永久成本**（它会一直躺在代码里，让下一个人以为还有人依赖它）。
  */
-export const RETIRED_MODES = {
-    chat: 'default',
-    mega: 'default',
-    workbench: 'bench',
-    terminal: 'default',
-};
 
 export const MODES = [
     {
@@ -74,11 +60,10 @@ export const MODES = [
 ];
 
 /**
- * 把模式 key 解析成组件。
+ * 把模式 key 解析成组件。认不出的 key（含已退役那四个）落到 `DefaultMode`。
  *
- * ⚠️ 退役的 key **先过 `RETIRED_MODES`** —— 见那张表的注释：旧链接要**有意**降级。
+ * ⚠️ **不要**为退役的 key 加映射 —— 见上面那段注释（这个项目没有老用户）。
  */
 export function resolveModeComponent(key) {
-    const effective = RETIRED_MODES[key] || key;
-    return MODES.find(mode => mode.key === effective)?.component || DefaultMode;
+    return MODES.find(mode => mode.key === key)?.component || DefaultMode;
 }

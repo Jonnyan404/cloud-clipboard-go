@@ -805,8 +805,6 @@ watch(() => route.fullPath, () => {
                                                             :value="mode.key"
                                                             size="small"
                                                             class="text-none"
-                                                            :style="{ opacity: mode.deprecated ? 0.62 : 1 }"
-                                                            :title="mode.deprecated ? t('uiModeDeprecated') : undefined"
                                                         >
                                                             <v-icon start size="18">{{ mode.icon }}</v-icon>{{ t(mode.labelKey) }}
                                                         </v-btn>

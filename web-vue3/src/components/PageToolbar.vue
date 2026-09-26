@@ -102,14 +102,14 @@ const currentMode = computed(() => MODES.find(mode => mode.key === app.uiMode) |
 //
 // ⚠️ 判断只读 registry 里的 `deprecated` 字段，**别在这里写死一份 key 列表** ——
 // 个性化面板（App.vue）读的是同一个字段，写死两份迟早会漂。
-const activeModes = computed(() => MODES.filter((mode) => !mode.deprecated));
-const deprecatedModes = computed(() => MODES.filter((mode) => mode.deprecated));
+// ⚠️ 原来这里是 `MODES.filter((mode) => !mode.deprecated)` —— `deprecated` 这个概念
+// 随那四个模式一起删了（2026-09-26），所以过滤没有意义了，别再加回来。
+const activeModes = MODES;
 
 // 「即将下架」那一组的投票入口。
 //
 // 为什么放在这个菜单里、而不是设置页或关于页：会点开这个分组的人，正是**还在用这几个模式的人**
 // —— 他们才是该被问的人。放到别处，看到问卷的是另一批（根本没用过这些模式的）用户。
-const DEPRECATED_VOTE_URL = 'https://wj.qq.com/s2/28003735/h3fa/';
 </script>
 
 <template>
@@ -203,49 +203,11 @@ const DEPRECATED_VOTE_URL = 'https://wj.qq.com/s2/28003735/h3fa/';
                             <v-list-item-title>{{ t(mode.labelKey) }}</v-list-item-title>
                         </v-list-item>
 
-                        <!-- 即将下架的那几个：**仍然完全可用**，只是不再推荐。
-                             只弱化视觉（文字变灰 + 折到分割线下面），**不拦点击、不弹确认** ——
-                             会点它们的人就是想用一下，弹个框只会打断他，而他并没做错什么。 -->
-                        <template v-if="deprecatedModes.length">
-                            <v-divider class="my-1"></v-divider>
-                            <v-list-subheader class="page-toolbar__mode-deprecated">
-                                {{ t('uiModeDeprecated') }}
-                            </v-list-subheader>
-                            <v-list-item
-                                v-for="mode in deprecatedModes"
-                                :key="mode.key"
-                                :active="app.uiMode === mode.key"
-                                @click="setMode(mode.key)"
-                            >
-                                <template v-slot:prepend>
-                                    <v-icon size="small">{{ mode.icon }}</v-icon>
-                                </template>
-                                <v-list-item-title class="text-medium-emphasis">{{ t(mode.labelKey) }}</v-list-item-title>
-                            </v-list-item>
-
-                            <!-- 投票入口：外链、新窗口打开（别把用户从正在用的界面上带走）。
-                                 ⚠️ rel="noopener noreferrer" 不能省 —— target=_blank 打开的同源页面
-                                 能通过 window.opener 反向操作本页。 -->
-                            <v-list-item
-                                :href="DEPRECATED_VOTE_URL"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                class="page-toolbar__vote"
-                            >
-                                <template v-slot:prepend>
-                                    <v-icon size="small" color="primary">mdi-vote-outline</v-icon>
-                                </template>
-                                <v-list-item-title class="page-toolbar__vote-title">
-                                    {{ t('uiModeDeprecatedVote') }}
-                                </v-list-item-title>
-                                <v-list-item-subtitle class="page-toolbar__vote-hint">
-                                    {{ t('uiModeDeprecatedVoteHint') }}
-                                </v-list-item-subtitle>
-                                <template v-slot:append>
-                                    <v-icon size="x-small" class="text-medium-emphasis">mdi-open-in-new</v-icon>
-                                </template>
-                            </v-list-item>
-                        </template>
+                        <!-- ⚠️ 这里原来是「即将下架」分组 + 一个投票入口（2026-09-26 删）。
+                             四个模式真删了，所以 `deprecatedModes` 恒为空、那整块是死代码；
+                             投票也用完了（Jonny：「那个投票也可以删了，已经用完了」）。
+                             ⚠️ 别再为「万一还有人想投票」把它加回来 —— 见 registry.js 顶部那段：
+                             **这个项目没有老用户**，兼容/纪念性的东西都是永久成本。 -->
                     </v-list>
                 </v-menu>
 
