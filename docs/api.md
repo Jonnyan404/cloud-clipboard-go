@@ -916,11 +916,27 @@ ws://localhost:9501/push?room=default&token=<token>
 > `config.latestId` is the **largest message id in the room at connect time** (`0` when empty);
 > clients use it to align the boundary between "history fetched over HTTP" and "realtime over WS".
 
-Once connected, new messages in that room are pushed to every listener:
+Once connected, new messages in that room are pushed to every listener. Every frame is
+`{"event": "...", "data": ...}`:
 
-```json
-{"event": "newMessage", "data": { ...same shape as /content/:id JSON... }}
-```
+| `event` | `data` | When |
+|---|---|---|
+| `config` | service limits + **`latestId`** | **Right after connecting, before any realtime message** |
+| `receive` | same shape as `/content/:id` | a new message arrived |
+| `update` | same shape | an existing message was edited **in place** (same `id`) |
+| `revoke` | `{"id": <number>}` | one entry was deleted |
+| `clearAll` | `{"room": "..."}` | the room was cleared |
+| `connect` / `disconnect` | device object | a device in the room / a device left |
+| `pong` | whatever you sent | reply to a client `{"event":"ping","data":<anything>}` |
+
+> ⚠️ **There is no `newMessage` event.** This document claimed one until 2026-09-26 and it was
+> simply wrong — all three backends (Go / Rust / Worker) have always sent **`receive`**.
+>
+> ⚠️★ **Do not touch the clipboard until `config` has arrived.** Use its `latestId` as the
+> history/realtime boundary: `id <= latestId` is history (record it, **do not apply**),
+> `id > latestId` is realtime. **Never guess with a time window** — a window that ends early
+> silently injects history into the user's clipboard and can overwrite what they are copying.
+> If `latestId` is absent (older server) **refuse to write and say why**, rather than trying anyway.
 
 Reconnection is the client's job (the web UI retries with exponential backoff).
 
