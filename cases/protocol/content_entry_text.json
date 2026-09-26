@@ -1,1 +1,1 @@
-{"column":"","content":"hello\nworld","id":"7","timestamp":1758700000,"type":"text"}
+{"column":"","content":"hello\nworld","id":"7","room":"work","senderClientID":"client-abc","senderDevice":{"browser":"Chrome 120","device":"Apple Mac","os":"macOS 14","type":"Desktop"},"senderIP":"192.168.1.20","timestamp":1758700000,"type":"text"}

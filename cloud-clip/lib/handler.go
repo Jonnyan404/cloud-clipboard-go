@@ -1589,6 +1589,25 @@ func contentEntryOf(msg PostEvent) (map[string]interface{}, bool) {
 			"id":        strconv.Itoa(msg.Data.ID()),
 			"timestamp": f.Timestamp,
 			"expire":    f.Expire,
+			// ⚠️★ 下面这几个是 2026-09-26 补的。**目标形状 = WS `receive` 事件的载荷本身**
+			// （SPA 就是按那个形状渲染历史的，逐字段相等 → 它换数据来源时渲染一行都不用改）。
+			//
+			// ⚠️ 补之前这里是**最小投影**，而 SPA **每个**渲染模式都在读 `senderDevice` / `senderIP`
+			// （`received-item/Text.vue`、`File.vue`、三个 wall…）→ 换来源会让气泡上的
+			// 「谁发的」标签和 IP 行**静默消失**（`v-if` 判空，不报错、不 4xx）。
+			// 而且 Worker 一直是富的、`docs/api.md` 的例子里也有这两个字段 ——
+			// **少数派是这里，不是 Worker**。见 `docs/specs/ws-live-only.md` §0.5。
+			"room":     f.Room,
+			"senderIP": f.SenderIP,
+			// ⚠️ `senderClientID` 在 `ReceiveBase` 上是 `omitempty`，这里**总是给**
+			// （空串也是空串）。差别只在「字段在不在」：客户端按真假判断，两种写法行为相同。
+			"senderClientID": f.SenderClientID,
+			"senderDevice":   f.SenderDevice,
+			"cache":          f.Cache,
+			// ⚠️ 缩略图**要带上**：WS 的历史回放本来就把缩略图推给客户端（同样那 100 条），
+			// 所以这里带上**不是回归**；不带的话历史里的文件会**丢预览图**。
+			// （§2.3 担心的「2MB」说的是 1 万条那种规模，不是缩略图。）
+			"thumbnail": f.Thumbnail,
 			// 空串 = 待办（看板列，见 handleContentColumn）
 			"column": f.Column,
 		}, true
@@ -1603,7 +1622,12 @@ func contentEntryOf(msg PostEvent) (map[string]interface{}, bool) {
 			"content":   t.Content,
 			"id":        strconv.Itoa(msg.Data.ID()),
 			"timestamp": t.Timestamp,
-			"column":    t.Column,
+			// 与文件分支同一批补的字段 —— 见那边的注释（目标形状 = WS 载荷）。
+			"room":           t.Room,
+			"senderIP":       t.SenderIP,
+			"senderClientID": t.SenderClientID,
+			"senderDevice":   t.SenderDevice,
+			"column":         t.Column,
 		}, true
 	}
 	return nil, false
