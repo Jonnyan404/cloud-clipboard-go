@@ -1332,21 +1332,21 @@ func writeError(w http.ResponseWriter, status int, code, errText, message string
 	})
 }
 
-// resolveContentFormat 读**显式**的格式信号：?format= > .json 后缀 > ?json=1。
+// resolveContentFormat 读**显式**的格式信号：只有 `?format=` 一个。
 //
-// 为什么要有这个函数：同一件事以前有三种表达，谁优先、哪个算数只能靠读代码。
-// 现在统一成 ?format= 优先，其余两个保留为**兼容信号**。
+// ⚠️ 2026-09-26：**`.json` 路径后缀已经删掉了**（Jonny：「那个 .json 路径后缀也下线，
+// 文档同步更新」）。它挂了很久的「即将下线」牌子，而**这个项目没有老用户** ——
+// 兼容垫片是永久成本，见 `CONTRIBUTING.md` §0 那一族约定。
 //
-// ⚠️ 兼容信号（`.json` 后缀、`?json=1`）**即将下线**：新写的客户端一律用 ?format=json，
-// 捷径侧已经改完。但**现在还不能删** —— 用户手机上装好的老捷径走的就是后缀那条路，
-// 一断存量安装立刻全废。
+// ⚠️ **`?json=1` 暂时保留**（同日 Jonny：「只删 .json，其它暂时保留」）—— 它和刚删掉的
+// 后缀是同一族兼容信号，但这次只下线后缀。所以别把这一支也顺手删了。
 //
 // 返回 "" 表示调用方没显式要格式，由分支自己决定（文本分支会再看 Accept 头，
 // 文件分支不看 —— 见 wantsJSON 的注释）。
 //
 // 第二个返回值 false 表示 format 给了不认识的值（比如 ?format=html）：必须报错、
 // 不能回落，否则客户端以为拿到 HTML、实际拿到原文。
-func resolveContentFormat(r *http.Request, hasJSONSuffix bool) (string, bool) {
+func resolveContentFormat(r *http.Request) (string, bool) {
 	if explicit := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("format"))); explicit != "" {
 		switch explicit {
 		case "json":
@@ -1356,9 +1356,6 @@ func resolveContentFormat(r *http.Request, hasJSONSuffix bool) (string, bool) {
 		default:
 			return "", false
 		}
-	}
-	if hasJSONSuffix {
-		return "json", true
 	}
 	if v := r.URL.Query().Get("json"); v == "true" || v == "1" {
 		return "json", true
@@ -1399,16 +1396,11 @@ func (s *ClipboardServer) handleContent(w http.ResponseWriter, r *http.Request) 
 	idStr := parts[len(parts)-1]
 
 	// 检查是否是访问 "latest"，如果是，让专用处理函数处理
-	if idStr == "latest" || idStr == "latest.json" {
+	if idStr == "latest" {
 		s.handleLatestContent(w, r)
 		return
 	}
-	// 后缀无论格式如何都要剥掉：/content/999.json 的 id 就是 999，哪怕调用方
-	// 用 ?format=raw 显式要原文。
-	hasJSONSuffix := strings.HasSuffix(idStr, ".json")
-	idStr = strings.TrimSuffix(idStr, ".json")
-
-	explicitFormat, formatOK := resolveContentFormat(r, hasJSONSuffix)
+	explicitFormat, formatOK := resolveContentFormat(r)
 	if !formatOK {
 		writeError(w, http.StatusBadRequest, "unsupported_format", "Unsupported format", "不支持的格式（只支持 raw / json）")
 		return
@@ -1713,7 +1705,7 @@ func (s *ClipboardServer) handleLatestContent(w http.ResponseWriter, r *http.Req
 	_, hasRequestedRoom := r.URL.Query()["room"]
 	requestedRoom := normalizeRoomName(r.URL.Query().Get("room"))
 
-	explicitFormat, formatOK := resolveContentFormat(r, strings.HasSuffix(r.URL.Path, "latest.json"))
+	explicitFormat, formatOK := resolveContentFormat(r)
 	if !formatOK {
 		writeError(w, http.StatusBadRequest, "unsupported_format", "Unsupported format", "不支持的格式（只支持 raw / json）")
 		return

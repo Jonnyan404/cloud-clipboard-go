@@ -63,8 +63,7 @@ Three ways, pick one:
 | Priority | Signal | Effect |
 |---|---|---|
 | 1 | `?format=raw\|json` | Explicit, overrides everything else. **New code should use this** |
-| 2 | `.json` path suffix | ⚠️ **Legacy, being retired** — shipped shortcuts still use it, kept for now |
-| 3 | `?json=1` / `?json=true` | ⚠️ **Legacy, being retired**, same as above |
+| 2 | `?json=1` / `?json=true` | ⚠️ **Legacy** — kept for now |
 | 4 | `Accept: application/json` | **Text responses only** |
 | 5 | Default | `raw` |
 
@@ -314,7 +313,7 @@ For file entries you get `uuid` / `name` / `size` / `url` / `expire` instead of 
 
 ### GET /content/:id
 
-Same as above, by exact ID. ⚠️ The `.json` path suffix is a **legacy signal being retired**; new code should use `?format=json`.
+Same as above, by exact ID. ⚠️ The `.json` path suffix **was removed** (2026-09-26) — use `?format=json`.
 
 ### GET /file/:uuid/:name
 

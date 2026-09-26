@@ -40,9 +40,7 @@ router.post('/share/visit', ShareHandler.visit);
 // 它必须落在 Worker 里：资源层只有真实存在的文件，这个地址不存在，会交给 Worker。
 router.get('/s/:token', handleShareLanding);
 router.get('/content/latest', ContentHandler.getLatest);
-router.get('/content/latest.json', ContentHandler.getLatest);
 router.get('/content/:id', ContentHandler.getById);
-router.get('/content/:id.json', ContentHandler.getById);
 // 看板：把卡片挪到某一列。`:id` 不跨 `/`，所以不会和上面两条抢。
 router.post('/content/:id/column', ContentHandler.setColumn);
 router.post('/upload/chunk', FileHandler.createChunk);

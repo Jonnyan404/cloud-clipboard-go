@@ -24,13 +24,13 @@ function normalizeExpire(expireTime) {
   return String(numericExpire).length === 10 ? numericExpire : Math.floor(numericExpire / 1000);
 }
 
-// 读**显式**的格式信号：?format= > .json 后缀 > ?json=1。
+// 读**显式**的格式信号：?format= 与 ?json=1。
 //
 // 与 Go 侧的 resolveContentFormat 是同一份契约 —— 改一边必须改另一边。
 //
-// ⚠️ `.json` 后缀与 `?json=1` 是**兼容信号，即将下线**：新写的客户端一律用 ?format=json，
-// Android 捷径也已经改完。但**现在还不能删** —— 用户手机上装好的老捷径走的就是后缀那条路，
-// 一断存量安装立刻全废。
+// ⚠️ 2026-09-26：**`.json` 路径后缀已经删掉了**（Jonny：「那个 .json 路径后缀也下线」）。
+// 它挂了很久的「即将下线」牌子，而这个项目**没有老用户**。
+// ⚠️ **`?json=1` 暂时保留**（同日：「只删 .json，其它暂时保留」），别顺手也删了。
 //
 // 返回 '' 表示调用方没显式要格式，由分支自己决定（文本分支会再看 Accept 头，
 // 文件分支不看 —— 见 wantsJSON）。返回 null 表示 format 给了不认识的值
@@ -48,9 +48,9 @@ function resolveContentFormat(request, url) {
     return null;
   }
 
-  if (url.pathname.endsWith('.json')) {
-    return 'json';
-  }
+  // ⚠️ 2026-09-26：`.json` 路径后缀**已经删掉了**（Jonny：「那个 .json 路径后缀也下线」）。
+  // 它挂了很久的「即将下线」牌子，而这个项目**没有老用户**。
+  // ⚠️ **`?json=1` 暂时保留**（同日：「只删 .json，其它暂时保留」），见下面那一支。
 
   const jsonParam = String(url.searchParams.get('json') || '').toLowerCase();
   if (jsonParam === 'true' || jsonParam === '1') {
@@ -330,6 +330,15 @@ export class ContentHandler {
   static async getById(request, env) {
     try {
       const { id } = request.params;
+      // ⚠️★ **严格校验 id 全是数字**（2026-09-26）。
+      //
+      // 为什么不能只靠下面的 `parseInt`：`parseInt('5.json', 10)` 会**默默取 5** ——
+      // 于是 `.json` 路径后缀在 Worker 上**仍然「能用」**，而 Go（`strconv.Atoi`）与
+      // Rust（`parse::<i32>`）都直接失败、回 400 `invalid_content_id`。
+      // **三边行为必须一致**，而且「后缀已经删了」这件事不能只在两边成立。
+      if (!/^\d+$/.test(String(id))) {
+        return errorResponse(400, 'invalid_content_id', 'Invalid content id', '无效的内容 ID');
+      }
       const url = new URL(request.url);
       const hasRequestedRoom = url.searchParams.has('room');
       const room = normalizeRoomName(url.searchParams.get('room'));

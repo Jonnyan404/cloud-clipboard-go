@@ -88,8 +88,11 @@ console.log('\n── D. 三种触发 JSON 的方式都要生效（Receive 用�
   const byJsonTrue = await getJson(ContentHandler.getLatest, env, '/content/latest?room=default&json=true');
   check('?json=true 返回 JSON', byJsonTrue.json?.type, 'text');
 
-  const bySuffix = await getJson(ContentHandler.getLatest, env, '/content/latest.json?room=default');
-  check('路径后缀 .json 返回 JSON', bySuffix.json?.type, 'text');
+  // ⚠️ 2026-09-26：`.json` 路径后缀**已经删了**（Jonny：「那个 .json 路径后缀也下线」）。
+  // 原来这里断言「后缀返回 JSON」—— 现在**整条删掉，而不是改成反向断言**：
+  // 这个文件是**直接调 handler** 的（`getLatest` 压根不看路径），所以它**测不到路由层**。
+  // 「后缀不再被接受」由别处钉着：Go 的 `TestContentFormatSelection`、
+  // Worker 的 shortcut-contract F 节、以及双跑比对的 `/content/2.json` 用例。
 
   const byAccept = await getJson(ContentHandler.getLatest, env, '/content/latest?room=default', { accept: 'application/json' });
   check('Accept: application/json 返回 JSON', byAccept.json?.type, 'text');

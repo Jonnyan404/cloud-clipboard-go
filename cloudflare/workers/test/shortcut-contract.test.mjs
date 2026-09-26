@@ -3,8 +3,7 @@
 // 为什么值得单独一份：那几条捷径用的形状和网页端不一样，网页端全绿并不能说明捷径能用 ——
 //   · 鉴权走**查询串** `?auth=`，不是 `Authorization` 头
 //   · 要 JSON 响应一律走**规范信号** `?format=json`
-//     （`.json` 路径后缀、`?json=1` / `?json=true` 是**兼容信号，即将下线** ——
-//     已发布出去的安装还在用，服务端暂时保留；见 resolveContentFormat 与 docs/api.md）
+//     （`?json=1` / `?json=true` 是**兼容信号**，暂时保留；`.json` 路径后缀**已删**，2026-09-26）
 //   · 「展示文件」直连 `/file/<uuid>/<name>`，**且不带 room**（服务端按文件记录的房间鉴权）
 // 上午那个「文本正常、文件/图片 401」就是这么漏出去的：第二次请求（下载）没带凭据。
 // 这条链路上任何一处形状变了，这里必须跟着红。
@@ -201,11 +200,15 @@ console.log('\n── E. 错误响应形状：code / error / message 三字段�
   check('  · message', missing.json?.message, '内容未找到');
 }
 
-console.log('\n── F. /content/* 的格式选择（?format= 优先，旧的三种信号保留）──');
+console.log('\n── F. /content/* 的格式选择（?format= 优先，?json=1 与 Accept 回落）──');
 {
   // 同一件事以前有三种表达（.json 后缀 / ?json=1 / Accept 头），谁优先全靠读代码。
-  // 现在多了显式的 ?format=，优先级必须锁在这里。已发布的 Android 捷径走 .json 后缀，
-  // 那条路断了用户手机上装好的捷径就全废。
+  // 现在多了显式的 ?format=，优先级必须锁在这里。
+  //
+  // ⚠️ 2026-09-26：**`.json` 路径后缀已经删掉了**（Jonny：「那个 .json 路径后缀也下线」）。
+  // 原来那两条后缀用例随之删除，并补了一条「它现在会被拒」的断言 ——
+  // 否则「后缀不再可用」没人钉着，哪天有人把兼容加回来也不会红。
+  // ⚠️ **`?json=1` 暂时保留**（同日：「只删 .json，其它暂时保留」）。
   const { env } = makeEnv();
   const BODY = '格式化测试内容';
 
@@ -213,13 +216,18 @@ console.log('\n── F. /content/* 的格式选择（?format= 优先，旧的�
   check('先放一条文本', sent.status, 200);
   const id = sent.json?.id;
 
+  // ⚠️ 2026-09-26：`.json` 路径后缀**已经删了**。原来那两条后缀用例已删除；
+  // **这里不再补反向断言** —— 本文件是**直接调 handler** 的（`request.params` 由路由注入），
+  // 所以它**测不到路由层**。后缀不再被接受由这三处钉着：
+  //   · Go 的 `TestContentFormatSelection`（走真实 http.Server ✓）
+  //   · 双跑比对的 `GET /content/2.json（后缀已删，两边都应当拒）` ✓
+  //   · Worker 的 `getById` 里那条 `/^\d+$/` 严格校验（路由传进来的 id 才走得到）
+
   const cases = [
     { name: '不带任何信号 → raw', query: 'room=default&auth=123', accept: null, suffix: '', json: false },
     { name: '?format=json', query: 'room=default&auth=123&format=json', accept: null, suffix: '', json: true },
     { name: '?format=raw 压过 Accept 头', query: 'room=default&auth=123&format=raw', accept: 'application/json', suffix: '', json: false },
-    { name: '?format=raw 压过 .json 后缀', query: 'room=default&auth=123&format=raw', accept: null, suffix: '.json', json: false },
-    { name: '.json 后缀（已发布捷径在用）', query: 'room=default&auth=123', accept: null, suffix: '.json', json: true },
-    { name: '?json=1（旧信号）', query: 'room=default&auth=123&json=1', accept: null, suffix: '', json: true },
+    { name: '?json=1（旧信号，暂时保留）', query: 'room=default&auth=123&json=1', accept: null, suffix: '', json: true },
     { name: 'Accept 头', query: 'room=default&auth=123', accept: 'application/json', suffix: '', json: true },
   ];
 

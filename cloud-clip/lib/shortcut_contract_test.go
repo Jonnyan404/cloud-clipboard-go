@@ -295,14 +295,15 @@ func TestShortcutContractRoomPassword(t *testing.T) {
 	shortcutWant(t, "default（没设密码）+ 空 auth", status, http.StatusOK)
 }
 
-// /content/* 的格式选择：?format= 优先，旧的三种信号保留为兼容。
+// /content/* 的格式选择：`?format=` 优先，`?json=1` 与 Accept 头作为回落。
 //
-// 为什么要锁：同一件事以前有三种表达（.json 后缀、?json=1、Accept 头），谁优先全靠读代码；
-// 现在多了一个显式的 ?format=，优先级必须写死在这里。
+// 为什么要锁：同一件事以前有三种表达（`.json` 后缀、`?json=1`、Accept 头），谁优先全靠读代码；
+// 现在多了一个显式的 `?format=`，优先级必须写死在这里。
 //
-// ⚠️ **`.json` 后缀与 `?json=1` 是兼容信号，即将下线**（新写的客户端一律用 ?format=json，
-// 捷径侧已经改完）。但**现在还不能删** —— 用户手机上装好的捷径走的就是 .json 后缀，
-// 那条路一断，存量安装立刻全废。下面那几行兼容用例就是为此存在的，别顺手删掉。
+// ⚠️ 2026-09-26：**`.json` 路径后缀已经删掉了**（Jonny：「那个 .json 路径后缀也下线」）。
+// 原来那两行「后缀兼容」用例随之删除，并补了一条「它现在会被拒」的断言 ——
+// 否则「后缀不再可用」这件事没人钉着，哪天有人把兼容加回来也不会红。
+// ⚠️ **`?json=1` 暂时保留**（同日：「只删 .json，其它暂时保留」），所以它那条用例还在。
 func TestContentFormatSelection(t *testing.T) {
 	srv := newShortcutServer(t, "global-pw", nil)
 	base := srv.URL
@@ -318,6 +319,16 @@ func TestContentFormatSelection(t *testing.T) {
 		t.Fatalf("没拿到 id: %v", latest)
 	}
 
+	// ⚠️ `.json` 后缀**已经删了**：它现在会被当成 id 的一部分 → `Atoi` 失败 → 400。
+	// 这条钉住「它不再被接受」—— 没有这条，把后缀兼容加回来也不会红。
+	{
+		st, raw := shortcutDo(t, http.MethodGet, base+"/content/"+id+".json?room=default&auth="+auth, "", "")
+		shortcutWant(t, ".json 后缀已被删（应当 400，不再是 200）", st, http.StatusBadRequest)
+		if !strings.Contains(string(raw), "invalid_content_id") {
+			t.Fatalf(".json 后缀的报错码变了（期望 invalid_content_id）: %q", string(raw))
+		}
+	}
+
 	cases := []struct {
 		name     string
 		path     string
@@ -327,9 +338,7 @@ func TestContentFormatSelection(t *testing.T) {
 		{"不带任何信号 → raw", "/content/" + id + "?room=default&auth=" + auth, "", false},
 		{"?format=json", "/content/" + id + "?room=default&auth=" + auth + "&format=json", "", true},
 		{"?format=raw 压过 Accept 头", "/content/" + id + "?room=default&auth=" + auth + "&format=raw", "application/json", false},
-		{"?format=raw 压过 .json 后缀", "/content/" + id + ".json?room=default&auth=" + auth + "&format=raw", "", false},
-		{".json 后缀（已发布捷径在用）", "/content/" + id + ".json?room=default&auth=" + auth, "", true},
-		{"?json=1（旧信号）", "/content/" + id + "?room=default&auth=" + auth + "&json=1", "", true},
+		{"?json=1（旧信号，暂时保留）", "/content/" + id + "?room=default&auth=" + auth + "&json=1", "", true},
 		{"Accept 头", "/content/" + id + "?room=default&auth=" + auth, "application/json", true},
 	}
 

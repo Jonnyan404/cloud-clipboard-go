@@ -62,8 +62,7 @@ https://host/cloud-clipboard/text        # PREFIX=/cloud-clipboard
 | 优先级 | 信号 | 效果 |
 |---|---|---|
 | 1 | `?format=raw\|json` | 显式指定，压过其他一切。**新代码一律用这个** |
-| 2 | `.json` 路径后缀 | ⚠️ **兼容信号，即将下线**：已发布的捷径还在用，暂时保留 |
-| 3 | `?json=1` / `?json=true` | ⚠️ **兼容信号，即将下线**，同上 |
+| 2 | `?json=1` / `?json=true` | ⚠️ **兼容信号**，暂时保留 |
 | 4 | `Accept: application/json` | **只对文本生效** |
 | 5 | 默认 | `raw` |
 
@@ -304,7 +303,7 @@ curl "http://localhost:9501/content/latest?room=default&format=json" -H "Authori
 
 ### GET /content/:id
 
-同上，按 ID 精确取。⚠️ `.json` 路径后缀是**即将下线的兼容信号**，新代码请用 `?format=json`。
+同上，按 ID 精确取。⚠️ `.json` 路径后缀**已经删掉了**（2026-09-26），请用 `?format=json`。
 
 ### GET /file/:uuid/:name
 
