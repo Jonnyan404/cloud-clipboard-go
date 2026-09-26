@@ -1,5 +1,5 @@
 import { corsHeaders } from '../cors';
-import { broadcastMessage, buildSenderDevice, ensureBoardColumn } from '../utils';
+import { broadcastMessage, buildSenderDevice, ensureBoardColumn, historyLimit } from '../utils';
 import { ensureRoomAccess, normalizeRoomName } from '../auth';
 import { ensureRoomOrShareAccess } from '../share';
 import { errorResponse } from '../errors';
@@ -106,6 +106,34 @@ function buildJsonContentPayload(row) {
     cache: row.uuid,
     expire: normalizeExpire(row.expireTime),
   };
+}
+
+// 读 `GET /content?limit=`，并**夹在这个 Worker 的 history 上限以内**。
+//
+// 缺省 / 非法 / 非正 / 超过上限 → 一律取上限。⚠️ 缺省值与上限**必须是同一个数**
+// （同一根旋钮，见 utils.js 的 historyLimit）—— 若缺省给 50、上限给 100，
+// 「不传」和「传 100」会拿到不同的量，而调用方从「我没传」推不出「我会拿到多少」。
+function normalizeContentListLimit(raw, max) {
+  const n = parseInt(String(raw ?? '').trim(), 10);
+  if (!Number.isInteger(n) || n <= 0 || n > max) {
+    return max;
+  }
+  return n;
+}
+
+// 读 `GET /content?before=`（id 游标）。认不出 / 不传 → `0` = 不设上界。
+//
+// ⚠️ 只认**纯十进制整数**：`parseInt('5.json', 10)` 会默默取 5，而 Go（`strconv.Atoi`）
+// 与 Rust（`parse::<i32>`）都直接失败。三边行为要一致，别在这里放宽。
+// ⚠️ 认不出**不报错** —— `before` 指向一条已被撤销的消息是很正常的事，
+// 那不是客户端的错，退化成「最近 limit 条」就好（见 contentList 的注释）。
+function normalizeContentListBefore(raw) {
+  const text = String(raw ?? '').trim();
+  if (!/^\d+$/.test(text)) {
+    return 0;
+  }
+  const n = parseInt(text, 10);
+  return Number.isSafeInteger(n) ? n : 0;
 }
 
 export class ContentHandler {
@@ -250,6 +278,76 @@ export class ContentHandler {
       console.error('Latest content handler error:', error);
       console.error('Error stack:', error.stack);
       return errorResponse(500, 'internal_error', 'Internal Server Error', '获取最新内容时发生错误');
+    }
+  }
+
+  // GET /content?room=&before=&limit= —— **历史分页**。
+  //
+  // 为什么要有它：历史以前只能从 WS 握手推来，于是「往回翻」做不到、而且**每次连接**
+  // 都要把整个房间的历史推一遍。有了它，WS 可以只推实时（`?history=0`），
+  // 历史走这个正经的查询接口。完整规格见 `docs/specs/ws-live-only.md`
+  // （Go / Rust / Worker 三边同一份契约，另两边的实现在 `handler.go` 的
+  // `handleContentList` 与 `crates/server/src/handlers.rs` 的 `content_list`）。
+  //
+  // 契约要点（每条都有理由，改之前先读那份 spec）：
+  //   · 游标是 **`id` 而不是时间戳** —— 时间戳是**秒级**、同秒会重复，用它做游标会**漏条或重复**；
+  //   · `limit` **被本 Worker 的 history 上限夹住** —— 否则 `limit=999999` 等于把
+  //     「一次推 2MB」从 WS 挪到 HTTP，**等于没改**；
+  //   · 返回 **正序**（旧的在前）—— 客户端直接 append 渲染，拿 `messages[0].id` 当下一个游标；
+  //   · **游标失效不报错**：`before` 指向一条已被撤销的消息很正常，那不是客户端的错，
+  //     退化成「最近 limit 条」就好，5xx 只会让它卡住；
+  //   · **不给 `hasMore` / `nextBefore`** —— 空数组 = 到头了。少一个字段就少一处会漂的东西。
+  //
+  // ⚠️ 鉴权与 `/content/latest` **同一套**（`ensureRoomAccess`：房间闸门 + 凭据），
+  // 不是新写一份 —— spec 的验收第 4 条就是「与 `/content/latest` 同一个错误码与文案」，
+  // 复用同一个函数是唯一能保证它**永远**成立的做法。
+  static async contentList(request, env) {
+    try {
+      const url = new URL(request.url);
+      const room = normalizeRoomName(url.searchParams.get('room'));
+
+      const authResult = await ensureRoomAccess(request, env, room);
+      if (!authResult.ok) {
+        return authResult.response;
+      }
+
+      if (!env.DB) {
+        return errorResponse(503, 'database_unavailable', 'Database not available', '数据库不可用');
+      }
+
+      const max = historyLimit(env);
+      const limit = normalizeContentListLimit(url.searchParams.get('limit'), max);
+      const before = normalizeContentListBefore(url.searchParams.get('before'));
+
+      // ⚠️ 排序用 **id**：id 是单调的（三边共同的约定），而 timestamp 是秒级 ——
+      // 同一秒里发的两条用 timestamp 排序在 SQLite 里是未定义的。
+      // `?history=0` 之后这条查询就是历史**唯一**的来源，排序错了不会报错、只是列表顺序不对。
+      let query = 'SELECT * FROM messages WHERE room = ?';
+      const params = [room];
+      if (before > 0) {
+        query += ' AND id < ?';
+        params.push(before);
+      }
+      query += ' ORDER BY id DESC LIMIT ?';
+      params.push(limit);
+
+      console.log(`历史分页查询: room=${room}, before=${before}, limit=${limit}`);
+      const result = await env.DB.prepare(query).bind(...params).all();
+
+      // ⚠️ DB 给的是**新的在前**，而这个接口的契约是**正序**（旧的在前）——
+      // 反过来的话客户端 append 渲染会得到一份倒序列表，而它**不会报错**、只是看着不对。
+      const messages = (result.results || [])
+        .slice()
+        .reverse()
+        .map(buildJsonContentPayload);
+
+      return new Response(JSON.stringify({ messages }), {
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      });
+    } catch (error) {
+      console.error('Content list handler error:', error);
+      console.error('Error stack:', error.stack);
+      return errorResponse(500, 'internal_error', 'Internal Server Error', '获取历史消息时发生错误');
     }
   }
 

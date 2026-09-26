@@ -1,5 +1,5 @@
 import { normalizeRoomName, resolveRoomAuth } from '../auth';
-import { buildSenderDevice, parseUserAgent, sanitizeDeviceName } from '../utils';
+import { buildSenderDevice, historyLimit, parseUserAgent, sanitizeDeviceName } from '../utils';
 
 function isRoomListEnabled(env) {
   return ['1', 'true', 'yes', 'on'].includes(String(env.ROOM_LIST || '').toLowerCase());
@@ -100,10 +100,8 @@ export class WebSocketRoom {
         this.handleError(sessionId, event);
       });
 
-      // 与 Go 后端保持一致：先发送历史，再发送配置，再同步设备。
-      await this.sendHistoryMessages(server, room);
-      await this.sendConfigMessage(server, room);
-      await this.sendExistingDevices(server, room, sessionId);
+      // 握手载荷的发送顺序抽在 sendHandshake 里（它也负责 `?history=0` 那个开关）。
+      await this.sendHandshake(server, room, request, sessionId);
 
       // 广播新设备连接
       this.broadcastDeviceConnect(sessionId, userAgent, room);
@@ -133,7 +131,57 @@ export class WebSocketRoom {
     }
   }
 
-  async sendConfigMessage(webSocket, room) {
+  // 握手时依次发：历史 → config → 房间里已有的设备。
+  //
+  // ⚠️★ **顺序是契约，不是碰巧**（`docs/specs/ws-live-only.md` §2.2）：
+  // `config` 事件**必须**在历史之后、实时之前发 —— 新客户端在收到 `config` 之前
+  // **一条都不该写剪贴板**（这是它的第二道保险，万一 `?history=0` 没生效也不会污染剪贴板）。
+  // 别为了首屏快一点把 config 提前。
+  //
+  // ⚠️ `?history=0` → **只跳过历史那一段**，其余不变。默认仍然推 —— 那是向后兼容的关键：
+  // 已发布的 PWA / 老客户端行为**一个字都不变**。⚠️ **别顺手把默认值改成「不推」**：
+  // 那会让所有已发布客户端**静默地只看得到空房间**。
+  //
+  // ⚠️ 抽成独立方法（而不是写在 handleWebSocket 里）是为了**能测**：handleWebSocket
+  // 需要真的 `WebSocketPair`，Node 里造不出来；而这一段的全部输入只是
+  // 「一个能 send 的对象 + 一个 Request」。
+  async sendHandshake(webSocket, room, request, sessionId) {
+    const skipHistory = new URL(request.url).searchParams.get('history') === '0';
+
+    // ⚠️ 水印在**推历史之前**取：晚取的话，握手期间刚到的消息会被算进「历史」，
+    // 客户端于是不会把它写进剪贴板 —— 那是「吞消息」的方向，正是水印要避免的。
+    const latestId = await this.latestMessageId(room);
+
+    if (!skipHistory) {
+      await this.sendHistoryMessages(webSocket, room);
+    }
+    await this.sendConfigMessage(webSocket, room, latestId);
+    await this.sendExistingDevices(webSocket, room, sessionId);
+  }
+
+  // 连接时刻该房间的**最大消息 id**（没有消息时 `0`）—— 客户端的「历史 / 实时」水印。
+  //
+  // ⚠️ 用 `MAX(id)`，不是「取最新那条的 id」：最新那条是按 `timestamp DESC, id DESC` 挑的，
+  // 而 `POST /text?id=` **原地改正文**会把 timestamp 往前刷、id 不变 —— 于是它可能给出一个
+  // **偏小**的值，而偏小是**不安全**的方向（历史消息会被当成实时、写进剪贴板）。
+  async latestMessageId(room) {
+    if (!this.env.DB) {
+      return 0;
+    }
+    try {
+      const row = await this.env.DB.prepare(
+        'SELECT MAX(id) AS latestId FROM messages WHERE room = ?'
+      ).bind(normalizeRoomName(room)).first();
+      return Number(row?.latestId) || 0;
+    } catch (error) {
+      // 取不到水印**不是**致命错误：回 `0` 等于告诉客户端「这个后端没法区分历史与实时」，
+      // 而客户端对那种后端的行为是**拒绝自动写剪贴板**（fail-safe，见 spec §0.4 / §7 第 11 条）。
+      console.error('取水印失败:', error);
+      return 0;
+    }
+  }
+
+  async sendConfigMessage(webSocket, room, latestId = 0) {
     try {
       const fileLimit = parseInt(this.env.FILE_LIMIT) || 104857600;
       const multipartPartSize = fileLimit > 5 * 1024 * 1024
@@ -144,7 +192,9 @@ export class WebSocketRoom {
         data: {
           version: 'cloudflare-worker-v1.0.0',
           server: {
-            history: parseInt(this.env.HISTORY_LIMIT) || 10,
+            // ⚠️ 与 WS 推历史、落库裁剪、`GET /content` 的上限是**同一个数**
+            // （utils.js 的 historyLimit 一处定义）—— 别在这里手写 parseInt(env.HISTORY_LIMIT)。
+            history: historyLimit(this.env),
             prefix: '',
             roomList: isRoomListEnabled(this.env)
           },
@@ -157,6 +207,15 @@ export class WebSocketRoom {
             limit: fileLimit
           },
           auth: resolveRoomAuth(this.env, room).required,
+          // 连接时刻该房间的**最大消息 id**（没有消息时 0）—— 客户端拿它区分历史与实时：
+          // `id <= latestId` → 历史（只认领）；`id > latestId` → 实时（可应用）。
+          //
+          // ⚠️ 为什么 `?history=0` 之后**还要**它：那个开关只对**新客户端**生效，而水印让
+          // 客户端**无论服务端推不推历史都能精确判断**。两条一起用才是「结构上不可能搞错」。
+          // ⚠️★ 它**必须在 WebSocket 握手载荷里**，**不是** `/server` 的 HTTP 响应 ——
+          // 前端读的 `app.config` 就是**这条 `config` 事件**（这个坑踩过两次：
+          // `automation.enabled`、`prefix`）。加错地方会得到一个永远 `undefined` 的字段。
+          latestId,
           // 定时自动化：Worker 侧**没有实现**这一族接口（没有 /tasks、没有 /automation，
           // 也没有进程内调度器）。显式声明 enabled:false，而不是让这个字段干脆缺失 ——
           // SPA 工具栏那个入口正是按它决定渲不渲染（PageToolbar.vue 的 automationEnabled），
@@ -191,9 +250,10 @@ export class WebSocketRoom {
         return;
       }
 
-      // 获取历史消息限制，默认为 10
-      const historyLimit = parseInt(this.env.HISTORY_LIMIT || '10');
-      console.log(`历史消息限制: ${historyLimit}`);
+      // 历史条数上限：与握手 config 的 `server.history`、`GET /content` 的上限
+      // **是同一个数**（utils.js 的 historyLimit 一处定义）。
+      const limit = historyLimit(this.env);
+      console.log(`历史消息限制: ${limit}`);
 
       const query = `
         SELECT * FROM (
@@ -204,9 +264,9 @@ export class WebSocketRoom {
         ) recent
         ORDER BY timestamp ASC, id ASC
       `;
-      const params = [normalizeRoomName(room), historyLimit];
+      const params = [normalizeRoomName(room), limit];
       
-      console.log(`历史消息查询: ${query}, 参数:`, params, `限制: ${historyLimit}`);
+      console.log(`历史消息查询: ${query}, 参数:`, params, `限制: ${limit}`);
       
       const results = await this.env.DB.prepare(query).bind(...params).all();
       
@@ -215,7 +275,7 @@ export class WebSocketRoom {
         return;
       }
 
-      console.log(`找到 ${results.results.length} 条历史消息 (限制: ${historyLimit})`);
+      console.log(`找到 ${results.results.length} 条历史消息 (限制: ${limit})`);
 
       // 发送历史消息
       for (const row of results.results) {
@@ -265,7 +325,7 @@ export class WebSocketRoom {
         
       }
       
-      console.log(`历史消息发送完成，共发送 ${results.results.length} 条 (限制: ${historyLimit})`);
+      console.log(`历史消息发送完成，共发送 ${results.results.length} 条 (限制: ${limit})`);
       
     } catch (error) {
       console.error('发送历史消息失败:', error);

@@ -10,6 +10,7 @@ import { ShareHandler } from './share';
 import { handleShareLanding } from './share-landing';
 import { SHELL_BASE_HREF, injectShellTags, readShellHtml } from './spa-shell';
 import { errorResponse } from './errors';
+import { historyLimit } from './utils';
 
 // 导入 Durable Objects
 export { WebSocketRoom } from './durable-objects/websocket-room';
@@ -40,6 +41,10 @@ router.post('/share/visit', ShareHandler.visit);
 // 它必须落在 Worker 里：资源层只有真实存在的文件，这个地址不存在，会交给 Worker。
 router.get('/s/:token', handleShareLanding);
 router.get('/content/latest', ContentHandler.getLatest);
+// ⚠️ `/content`（**历史分页**，`?room=&before=&limit=`）必须和 `/content/:id` 并存：
+// itty-router 里 `:id` 不跨 `/`、也需要一段，所以 `/content` 不会被它抢走；
+// 但**两条都要在**，少一条的后果是历史整个取不到（`?history=0` 之后前端只会走这条）。
+router.get('/content', ContentHandler.contentList);
 router.get('/content/:id', ContentHandler.getById);
 // 看板：把卡片挪到某一列。`:id` 不跨 `/`，所以不会和上面两条抢。
 router.post('/content/:id/column', ContentHandler.setColumn);
@@ -204,7 +209,9 @@ async function handleServer(request, env) {
     roomProtected,
     version: "cloudflare-worker-v1.0.0",
     roomList: isRoomListEnabled(env),
-    history: parseInt(env.HISTORY_LIMIT || '10', 10),
+    // ⚠️ 与 WS 握手 config 里的 `server.history`、以及 `GET /content` 的 limit 上限
+    // **是同一个数**（`historyLimit` 一处定义）—— 别在这里手写 `parseInt(env.HISTORY_LIMIT)`。
+    history: historyLimit(env),
     // 定时自动化：Worker 侧**没有实现**这一族接口（没有 /tasks、没有 /automation，
     // 也没有进程内调度器）。这里显式声明 enabled:false，而不是让这个字段干脆缺失 ——
     // 缺失时前端分不清「这个后端不支持」和「这个字段还没送到」，
