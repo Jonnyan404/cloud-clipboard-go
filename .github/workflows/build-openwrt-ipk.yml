@@ -90,22 +90,10 @@ jobs:
         include:
           - binary_arch: x86_64
             apk_arch: x86_64
-          - binary_arch: arm_cortex-a5
-            apk_arch: arm_cortex-a5_vfpv4
-          - binary_arch: arm_cortex-a7
-            apk_arch: arm_cortex-a7
-          - binary_arch: arm_cortex-a7
-            apk_arch: arm_cortex-a7_neon-vfpv4
-          - binary_arch: arm_cortex-a7
-            apk_arch: arm_cortex-a7_vfpv4
-          - binary_arch: arm_cortex-a8
-            apk_arch: arm_cortex-a8_vfpv3
           - binary_arch: arm_cortex-a9
             apk_arch: arm_cortex-a9
           - binary_arch: arm_cortex-a9
             apk_arch: arm_cortex-a9_neon
-          - binary_arch: arm_cortex-a9
-            apk_arch: arm_cortex-a9_vfpv3-d16
           - binary_arch: arm_cortex-a15_neon-vfpv4
             apk_arch: arm_cortex-a15_neon-vfpv4
           - binary_arch: aarch64
@@ -116,10 +104,7 @@ jobs:
             apk_arch: aarch64_cortex-a72
           - binary_arch: aarch64
             apk_arch: aarch64_cortex-a76
-          - binary_arch: mips_24kc
-            apk_arch: mips_24kc
-          - binary_arch: mipsel_24kc
-            apk_arch: mipsel_24kc
+
 
     steps:
       - name: Checkout code
