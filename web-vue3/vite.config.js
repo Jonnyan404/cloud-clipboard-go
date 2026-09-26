@@ -86,7 +86,10 @@ export default defineConfig(({ command }) => {
                         /^\/share/,
                         /^\/file\//,
                         /^\/revoke/,
-                        /^\/content\//,
+                        // ⚠️ `/^\/content/` 而**不是** `/^\/content\//` —— `GET /content`
+                        // （历史分页，**没有**尾斜杠）也是一条服务端路由，
+                        // 用带斜杠的写法会让它落进 SW 的导航兜底、点过去看到 SPA 首页。
+                        /^\/content/,
                         /^\/push/,
                         // ⚠️ 下面这三个是**服务端直接吐出去的东西，不是 SPA 路由**，
                         // 漏一个的后果非常难查：SW 的导航兜底会把点击整个吞掉、

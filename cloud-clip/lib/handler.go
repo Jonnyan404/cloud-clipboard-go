@@ -257,17 +257,46 @@ func (s *ClipboardServer) handle_push(w http.ResponseWriter, r *http.Request) {
 	}
 	s.broadcastWebSocketMessageToRoomExcept(newDeviceClientMsg, room, conn)
 
-	// 第二次加锁：获取历史消息（短时间持锁）
+	// 第二次加锁：历史消息 + **连接时刻该房间的最大 id**（短时间持锁）
+	//
+	// ⚠️ `?history=0` → **不推历史**（那条切片留空），但 `latestId` **照算** ——
+	// 它是客户端判断「这条是历史还是实时」的**水印**，与推不推历史无关。
+	// 两条一起用，客户端才是「结构上不可能搞错」，而不是「依赖某个开关有没有生效」。
+	//
+	// ⚠️★ **默认仍然推历史** —— 这是向后兼容的关键：老客户端（已发布的 PWA、
+	// 老版本桌面端）行为**一个字都不变**。**别顺手把默认值改成「不推」** ——
+	// 那会让所有已发布客户端**静默地只看得到空房间**（要改默认值得单开一版并先通知）。
+	skipHistory := r.URL.Query().Get("history") == "0"
+
 	var historyMessages []PostEvent
+	latestID := 0
 	s.messageQueue.Lock()
 	for _, msg := range s.messageQueue.List {
-		if msg.Data.Room() == "" || msg.Data.Room() == room {
+		if msg.Data.Room() != "" && msg.Data.Room() != room {
+			continue
+		}
+		if msg.Data.ID() > latestID {
+			latestID = msg.Data.ID()
+		}
+		if !skipHistory {
 			historyMessages = append(historyMessages, msg)
 		}
 	}
 	s.messageQueue.Unlock() // 立即释放消息队列锁
 
 	// 发送历史消息（在锁外执行）
+	//
+	// ⚠️★ **握手顺序是契约，不是碰巧**（`docs/specs/ws-live-only.md` §2.2）：
+	//
+	//	① connect × N（房间里已有的设备）
+	//	② connect 广播（告诉其他人「我来了」）
+	//	③ receive × N（**历史**，`?history=0` 时这一段整段跳过）
+	//	④ config（`app.config` 的唯一来源，**带 `latestId`**）
+	//	之后才是实时消息。
+	//
+	// ⚠️ **`config` 必须排在历史之后、实时之前** —— 新客户端在收到 `config` 之前
+	// **一条都不该写剪贴板**，这是它的第二道保险：万一 `?history=0` 没生效，
+	// 它也能靠「还没拿到 `latestId`」而拒绝应用。别为了首屏快一点把 `config` 提前发。
 	for _, msg := range historyMessages {
 		var clientPayload interface{}
 		if msg.Data.TextReceive != nil {
@@ -307,6 +336,16 @@ func (s *ClipboardServer) handle_push(w http.ResponseWriter, r *http.Request) {
 			Limit  int `json:"limit"`
 		} `json:"file"`
 		Auth bool `json:"auth"`
+		// LatestID 是**连接时刻该房间的最大消息 id**（没有消息时 0）。
+		//
+		// ⚠️ 为什么 `history=0` 之后**还要**它：`history=0` 只对**新客户端**生效，
+		// 而 `latestId` 让客户端**无论服务端推不推历史都能精确判断**
+		// （`id <= latestId` → 历史，只认领不写剪贴板；`id > latestId` → 实时，可应用）。
+		//
+		// ⚠️★ 它**必须在 WebSocket 握手载荷里**，**不是** `/server` 的 HTTP 响应 ——
+		// `config` 是前端 `app.config` 的**唯一来源**。加错地方会得到一个永远
+		// `undefined` 的字段，而这个坑**已经踩过两次**（`automation.enabled`、`prefix`）。
+		LatestID int `json:"latestId"`
 		// Automation 只给**开关**，不给完整能力（tier / max / actions / vars 那些在
 		// `/server` 和管理页自己的 `/tasks` 响应里）。
 		//
@@ -333,9 +372,10 @@ func (s *ClipboardServer) handle_push(w http.ResponseWriter, r *http.Request) {
 			Prefix:   s.config.Server.Prefix,
 			RoomList: s.config.Server.RoomList,
 		},
-		Text: s.config.Text,
-		File: s.config.File,
-		Auth: authNeeded,
+		Text:     s.config.Text,
+		File:     s.config.File,
+		Auth:     authNeeded,
+		LatestID: latestID,
 		Automation: struct {
 			Enabled bool `json:"enabled"`
 		}{Enabled: s.automationEnabled()},
@@ -1427,20 +1467,9 @@ func (s *ClipboardServer) handleContent(w http.ResponseWriter, r *http.Request) 
 							return
 						}
 
-						responseType := DetermineResponseType(fileReceive.Name)
-
-						responseData := map[string]interface{}{
-							"type":      responseType,
-							"name":      fileReceive.Name,
-							"size":      fileReceive.Size,
-							"uuid":      fileReceive.Cache,
-							"url":       fileReceive.URL,
-							"id":        strconv.Itoa(msg.Data.ID()),
-							"timestamp": fileReceive.Timestamp,
-							"expire":    fileReceive.Expire,
-							// 空串 = 待办（看板列，见 handleContentColumn）
-							"column": fileReceive.Column,
-						}
+						// ⚠️ 形状与 `GET /content`（列表）**共用一份实现**（contentEntryOf）——
+						// 列表里的条目和单条取出来的必须是同一个形状，否则客户端要写两套解析。
+						responseData, _ := contentEntryOf(msg)
 
 						w.Header().Set("Content-Type", "application/json")
 						json.NewEncoder(w).Encode(responseData)
@@ -1484,15 +1513,8 @@ func (s *ClipboardServer) handleContent(w http.ResponseWriter, r *http.Request) 
 				if msg.Data.TextReceive != nil {
 					// 文本分支：显式格式优先，没显式时才看 Accept（文件分支不看，见 wantsJSON）
 					if wantsJSON(explicitFormat, r) {
-						// JSON格式响应
-						responseData := map[string]interface{}{
-							"type":      "text",
-							"content":   msg.Data.TextReceive.Content,
-							"id":        strconv.Itoa(msg.Data.ID()),
-							"timestamp": msg.Data.TextReceive.Timestamp,
-							// 空串 = 待办（看板列，见 handleContentColumn）
-							"column": msg.Data.TextReceive.Column,
-						}
+						// 形状与 `GET /content`（列表）**共用一份实现** —— 见文件分支的注释。
+						responseData, _ := contentEntryOf(msg)
 
 						w.Header().Set("Content-Type", "application/json")
 						json.NewEncoder(w).Encode(responseData)
@@ -1521,6 +1543,142 @@ func (s *ClipboardServer) handleContent(w http.ResponseWriter, r *http.Request) 
 	}
 	s.logger.Printf("未找到内容 ID: %d", id)
 	writeError(w, http.StatusNotFound, "content_not_found", "Content not found", "内容未找到")
+}
+
+// ContentListResponse 是 `GET /content` 的响应体。
+//
+// ⚠️ **不给 `hasMore` / `nextBefore`**（见 handleContentList 的注释）——
+// 少一个字段就少一处会漂的东西。
+type ContentListResponse struct {
+	Messages []map[string]interface{} `json:"messages"`
+}
+
+// contentEntryOf 把一条消息投影成 `/content/<id>` 与 `/content`（列表）共用的 JSON。
+//
+// ⚠️ 抽成一个函数、而不是每个 handler 各写一份 map：两个端点的**响应形状必须逐字相同**
+// ——客户端拿列表里的条目直接渲染，不会为两个端点写两套解析。而这个项目的老毛病
+// 正是「两份实现必然漂」（`CONTRIBUTING.md` §6 的反模式）。
+//
+// 返回 `false` 表示这条消息的类型不认识，调用方跳过它。
+func contentEntryOf(msg PostEvent) (map[string]interface{}, bool) {
+	switch msg.Data.Type() {
+	case "file":
+		f := msg.Data.FileReceive
+		if f == nil {
+			return nil, false
+		}
+		return map[string]interface{}{
+			"type": DetermineResponseType(f.Name),
+			"name": f.Name,
+			"size": f.Size,
+			"uuid": f.Cache,
+			// ⚠️ 这里是**裸的** `/file/<uuid>`，不带文件名 —— 和 `/content/latest`
+			// 那条路刻意不同（那边拼上了转义过的文件名，因为它是个「拿来就能下载的链接」）。
+			// 客户端要下载地址就自己拼 `url + "/" + encodeURIComponent(name)`。
+			"url":       f.URL,
+			"id":        strconv.Itoa(msg.Data.ID()),
+			"timestamp": f.Timestamp,
+			"expire":    f.Expire,
+			// 空串 = 待办（看板列，见 handleContentColumn）
+			"column": f.Column,
+		}, true
+
+	case "text":
+		t := msg.Data.TextReceive
+		if t == nil {
+			return nil, false
+		}
+		return map[string]interface{}{
+			"type":      "text",
+			"content":   t.Content,
+			"id":        strconv.Itoa(msg.Data.ID()),
+			"timestamp": t.Timestamp,
+			"column":    t.Column,
+		}, true
+	}
+	return nil, false
+}
+
+// resolveContentListLimit 读 `?limit=`，并**夹在 `server.history` 以内**。
+//
+// ⚠️ 上限就是 `server.history`，不是「想给多大给多大」——否则 `limit=999999`
+// 等于把「一次推 2MB」从 WS 挪到 HTTP，**等于没改**（`docs/specs/ws-live-only.md` §2.1）。
+// 缺省 / 非法 / 非正 → 用 `server.history`。
+func (s *ClipboardServer) resolveContentListLimit(raw string) int {
+	max := s.config.Server.History
+	if max < 0 {
+		max = 0
+	}
+	n, err := strconv.Atoi(strings.TrimSpace(raw))
+	if err != nil || n <= 0 || n > max {
+		return max
+	}
+	return n
+}
+
+// handleContentList 处理 `GET /content?room=&before=&limit=` —— **历史分页**。
+//
+// 为什么要有它：历史以前只能从 WS 握手推来，于是「往回翻」做不到、而且每次连接
+// 都要把整个房间的历史推一遍。有了它，WS 可以只推实时（`?history=0`），
+// 历史走这个正经的查询接口 —— 详见 `docs/specs/ws-live-only.md`。
+//
+// 契约要点（每条都有理由，改之前先读那份 spec）：
+//
+//   - 游标是 **`id` 而不是时间戳** —— 时间戳是**秒级**、同秒会重复，用它做游标会**漏条或重复**；
+//   - `limit` **被 `server.history` 夹住**（见 resolveContentListLimit）；
+//   - 返回 **正序**（旧的在前）—— 客户端直接 append；
+//   - **游标失效不报错**：`before` 指向一条已被撤销的消息是很正常的事，
+//     那不是客户端的错，退化成「最近 limit 条」就好，5xx 只会让它卡住。
+func (s *ClipboardServer) handleContentList(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "Only GET is allowed", "仅允许 GET 请求")
+		return
+	}
+
+	room := normalizeRoomName(r.URL.Query().Get("room"))
+
+	// 鉴权与 /content/latest **同一套**（房间闸门 + 凭据），不是新写一份。
+	if !s.canAccessRoom(room, extractAuthToken(r)) {
+		writeError(w, http.StatusUnauthorized, "room_forbidden", "No access to this room", "无权访问该房间")
+		return
+	}
+
+	limit := s.resolveContentListLimit(r.URL.Query().Get("limit"))
+
+	before := 0
+	if raw := strings.TrimSpace(r.URL.Query().Get("before")); raw != "" {
+		if n, err := strconv.Atoi(raw); err == nil {
+			before = n
+		}
+		// 认不出的 `before` 不报错 —— 见函数注释最后一条。
+	}
+
+	s.messageQueue.Lock()
+	var candidates []PostEvent
+	for _, msg := range s.messageQueue.List {
+		if normalizeRoomName(msg.Data.Room()) != room {
+			continue
+		}
+		if before > 0 && msg.Data.ID() >= before {
+			continue
+		}
+		candidates = append(candidates, msg)
+	}
+	// 列表按 id 升序追加，所以「最近 limit 条」就是**尾部** limit 条。
+	if len(candidates) > limit {
+		candidates = candidates[len(candidates)-limit:]
+	}
+	s.messageQueue.Unlock()
+
+	messages := make([]map[string]interface{}, 0, len(candidates))
+	for _, msg := range candidates {
+		if entry, ok := contentEntryOf(msg); ok {
+			messages = append(messages, entry)
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(ContentListResponse{Messages: messages})
 }
 
 func (s *ClipboardServer) handleLatestContent(w http.ResponseWriter, r *http.Request) {

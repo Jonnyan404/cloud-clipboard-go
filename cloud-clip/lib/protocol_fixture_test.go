@@ -130,6 +130,19 @@ func protocolFixtures() map[string]any {
 		Content: "no device info",
 	}
 
+	// `GET /content` 的形状（`docs/specs/ws-live-only.md` W0）。
+	//
+	// ⚠️ 这两条钉的是「**列表里的条目**」与「**单条取出来的**」是**同一个形状** ——
+	// 它们共用 `contentEntryOf`，而 fixture 让 Rust 侧不必靠猜。
+	textEntry, _ := contentEntryOf(PostEvent{
+		Event: "receive",
+		Data:  ReceiveHolder{TextReceive: ptr(sampleTextReceive())},
+	})
+	fileEntry, _ := contentEntryOf(PostEvent{
+		Event: "receive",
+		Data:  ReceiveHolder{FileReceive: ptr(sampleFileReceive())},
+	})
+
 	return map[string]any{
 		"device_meta":             sampleDeviceMeta(),
 		"device_meta_no_name":     DeviceMeta{ID: "dev-2", Type: "Mobile", Device: "iPhone", OS: "iOS 17", Browser: "Safari"},
@@ -158,6 +171,12 @@ func protocolFixtures() map[string]any {
 			{Name: "work", MessageCount: 3, DeviceCount: 0, LastActive: 1758700100, IsProtected: true},
 		}},
 		"ws_connect": WebSocketMessage{Event: "connect", Data: sampleDeviceMeta()},
+		// `GET /content`（历史分页）的形状 —— 见上面 textEntry / fileEntry 的注释。
+		"content_entry_text": textEntry,
+		"content_entry_file": fileEntry,
+		"content_list": ContentListResponse{
+			Messages: []map[string]interface{}{textEntry, fileEntry},
+		},
 	}
 }
 
@@ -257,6 +276,23 @@ func TestProtocolFixtureRoundTripInGo(t *testing.T) {
 				var back DeviceMeta
 				if err := json.Unmarshal(raw, &back); err != nil {
 					t.Fatalf("DeviceMeta 读不回来: %v", err)
+				}
+			case "content_entry_text", "content_entry_file":
+				// ⚠️ 它们是**投影**（map），不是协议类型 —— 不能走下面的 ReceiveHolder 分支。
+				var back map[string]interface{}
+				if err := json.Unmarshal(raw, &back); err != nil {
+					t.Fatalf("content 条目读不回来: %v", err)
+				}
+				if back["type"] == nil || back["id"] == nil {
+					t.Fatal("content 条目读回来之后 type / id 缺了")
+				}
+			case "content_list":
+				var back ContentListResponse
+				if err := json.Unmarshal(raw, &back); err != nil {
+					t.Fatalf("ContentListResponse 读不回来: %v", err)
+				}
+				if len(back.Messages) != 2 {
+					t.Fatalf("messages 条数不对: %d", len(back.Messages))
 				}
 			default: // text_* / file_*
 				var back ReceiveHolder

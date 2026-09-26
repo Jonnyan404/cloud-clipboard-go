@@ -402,6 +402,9 @@ func (s *ClipboardServer) setupRoutes() {
 	mux.HandleFunc(prefix+"/revoke/", s.corsMiddleware(s.handle_revoke))
 	mux.HandleFunc(prefix+"/revoke/all", s.corsMiddleware(s.handleClearAll))
 	mux.HandleFunc(prefix+"/content/", s.corsMiddleware(s.handleContent))
+	// `/content`（**没有**尾斜杠）是**历史分页**。Go 的 ServeMux 里 `prefix+"/content"`
+	// 只匹配精确路径，`/content/...` 走上面那条 —— 两条不冲突。
+	mux.HandleFunc(prefix+"/content", s.corsMiddleware(s.handleContentList))
 
 	s.httpServer = &http.Server{
 		Handler: mux,
