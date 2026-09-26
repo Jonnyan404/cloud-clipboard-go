@@ -106,7 +106,7 @@ services:
       LISTEN_IP6: ${LISTEN_IP6:-}               # 默认为空，IPv6 监听地址，可设置为 ::
       LISTEN_PORT: ${LISTEN_PORT:-}             # 服务监听端口，默认为 9501
       PREFIX: ${PREFIX:-}                       # 子路径反代前缀（配合 Nginx 使用），例如 /cloud-clipboard
-      MESSAGE_NUM: ${MESSAGE_NUM:-}             # 历史记录保留条数，默认为 10
+      MESSAGE_NUM: ${MESSAGE_NUM:-}             # 历史记录保留条数，默认为 50
       AUTH_PASSWORD: ${AUTH_PASSWORD:-}         # 全局访问密码，留空即无需密码
       ROOM_AUTH_JSON: '${ROOM_AUTH_JSON:-{}}'   # 房间独立密码与策略 JSON，如 {"finance":"pass","keep":{"password":"kp","fileExpire":0}}
       TEXT_LIMIT: ${TEXT_LIMIT:-}               # 文本最大长度，默认为 4096（约 2048 个汉字）

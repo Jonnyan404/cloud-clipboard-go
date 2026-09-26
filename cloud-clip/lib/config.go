@@ -96,6 +96,12 @@ func defaultConfig() *Config {
 		storageDir = "/etc/cloud-clipboard/data/upload"
 	}
 
+	// ⚠️ 下面 Server.History = 50 与 Rust（`ServerConfig::default().history`）、
+	// Worker（`HISTORY_LIMIT` 的缺省）**是同一个数**（Jonny 2026-09-26 定：三端统一 50）。
+	//
+	// 它是**一根旋钮管三件事**：WS 握手推多少条历史、`GET /content` 的缺省与上限、
+	// 以及下发在 `server.history` 里给客户端看的那个数。改一处就得三处一起想 ——
+	// 详见 `docs/specs/ws-live-only.md` §2.1。
 	return &Config{
 		Server: struct {
 			Host        interface{}    `json:"host"`
@@ -114,7 +120,7 @@ func defaultConfig() *Config {
 			Host:        []string{"0.0.0.0"},
 			Port:        9501,
 			Prefix:      "",
-			History:     100,
+			History:     50, // 三端统一 50，见函数上方那段说明
 			HistoryFile: historyFile,
 			StorageDir:  storageDir,
 			Auth:        false,

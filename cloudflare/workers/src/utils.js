@@ -108,13 +108,15 @@ function normalizeRoomName(room = '') {
 // **缺省值和上限是同一个数（同一根旋钮）** —— 各写各的迟早会漂成
 // 「HTTP 给 100、WS 给 50」，而 SPA 换数据来源时就会看出历史变了一截。
 //
-// 缺省 10 与握手 config 下发的一致（客户端读到的 `server.history` 就是这个值）。
+// 缺省 50：与 Go（`defaultConfig().Server.History`）和 Rust（`ServerConfig::default()`）
+// **是同一个数** —— Jonny 2026-09-26 定的「三端统一 50」。别在这里另挑一个数：
+// 这个缺省一旦和另两端不一样，「同一个客户端换后端就少看/多看一截历史」又会回来。
 //
 // ⚠️ 落库前的裁剪（`cleanupOldMessagesBeforeSave`）**不在**这三处里：它有自己的缺省
 // （没配 `HISTORY_LIMIT` 时留 50）。那是**写入侧**的留存策略，不是客户端看得见的那个数，
 // 两者取不同的缺省是既有的，没在这次改动里动它 —— 别以为改这里就会连着改到裁剪。
 export function historyLimit(env) {
-  return parseInt(env?.HISTORY_LIMIT ?? '', 10) || 10;
+  return parseInt(env?.HISTORY_LIMIT ?? '', 10) || 50;
 }
 
 // deviceName 无法从 userAgent 反推，只能单独存一列。

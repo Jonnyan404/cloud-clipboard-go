@@ -210,4 +210,23 @@ console.log('\n── I. 房间隔离：看不到别的房间的历史 ──');
   check('只拿到本房间的', r.json.messages.map(m => m.content), ['work 里的']);
 }
 
+console.log('\n── J. 缺省就是 50（三端统一的那根旋钮）──');
+{
+  // 完全不配 HISTORY_LIMIT：有效值应当是 50，与 Go / Rust 的内置缺省一致。
+  // 这条钉的是「Jonny 2026-09-26 定：三端统一 50」—— 以前 Worker 缺省是 10，
+  // 于是同一个客户端换后端会少看一截历史。
+  const { env } = makeEnv();
+  delete env.HISTORY_LIMIT;
+
+  const serverRes = await worker.fetch(new Request('http://worker.local/server'), env, {});
+  check('/server 的 history 缺省 = 50', (await serverRes.json()).history, 50);
+
+  const sent = collect();
+  await makeRoom(env).sendHandshake(
+    sent.socket, '默认房间', new Request('https://x/push?room=默认房间&history=0'), 'sid-e',
+  );
+  check('握手 config 的 history 缺省 = 50',
+    sent.sent.find(m => m.event === 'config').data.server.history, 50);
+}
+
 summary('WS 只推实时 / 历史走 HTTP（Worker 侧）');

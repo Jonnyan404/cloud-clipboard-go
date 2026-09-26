@@ -16,7 +16,7 @@ services:
             LISTEN_IP6: ${LISTEN_IP6:-} #默认为空,ipv6地址,可设置为::,不懂勿动
             LISTEN_PORT: ${LISTEN_PORT:-} #默认为9501,可设置为其他端口
             PREFIX: ${PREFIX:-} #子路径,可配合nginx使用,格式: /cloud-clipboard
-            MESSAGE_NUM: ${MESSAGE_NUM:-} #历史记录的数量,默认为10
+            MESSAGE_NUM: ${MESSAGE_NUM:-} #历史记录的数量,默认为50
             AUTH_PASSWORD: ${AUTH_PASSWORD:-} #访问密码,默认为false,可自定义字符串密码
             ROOM_AUTH_JSON: '${ROOM_AUTH_JSON:-{}}' #房间密码JSON, 例如 {"finance":"finance-pass","ops":""}
             TEXT_LIMIT: ${TEXT_LIMIT:-} #文本长度限制,默认为4096(2048个汉字),可设置为其他长度

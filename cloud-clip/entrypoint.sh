@@ -109,7 +109,11 @@ cat>"${CONFIG_FILE}"<<EOF
         "prefix": "${PREFIX}",
         "key": "${KEY}",
         "cert": "${CERT}",
-        "history": ${MESSAGE_NUM:-10},
+        # ⚠️ 50，与内置缺省（config.go 的 defaultConfig）**是同一个数** ——
+        # 「三端统一 50」（Jonny 2026-09-26），见 docs/specs/ws-live-only.md §2.1。
+        # 它是一根旋钮管三件事：WS 推多少条历史 / `GET /content` 的缺省与上限 /
+        # 客户端看到的 server.history。
+        "history": ${MESSAGE_NUM:-50},
         "auth": ${AUTH_JSON_VALUE},
         "roomAuth": ${ROOM_AUTH_JSON_VALUE},
         "historyFile": "/app/server-node/data/history.json",

@@ -106,7 +106,7 @@ services:
       LISTEN_IP6: ${LISTEN_IP6:-}               # Listening IPv6 address, default empty (use :: for IPv6)
       LISTEN_PORT: ${LISTEN_PORT:-}             # Server port, default 9501
       PREFIX: ${PREFIX:-}                       # Subpath prefix for reverse proxies (e.g., /cloud-clipboard)
-      MESSAGE_NUM: ${MESSAGE_NUM:-}             # Number of history records to keep, default 10
+      MESSAGE_NUM: ${MESSAGE_NUM:-}             # Number of history records to keep, default 50
       AUTH_PASSWORD: ${AUTH_PASSWORD:-}         # Global access password, leave empty for no password
       ROOM_AUTH_JSON: '${ROOM_AUTH_JSON:-{}}'   # Room-level auth and policy JSON, e.g. {"finance":"pass","keep":{"password":"kp","fileExpire":0}}
       TEXT_LIMIT: ${TEXT_LIMIT:-}               # Max text length in characters, default 4096 (approx. 2048 Chinese characters)

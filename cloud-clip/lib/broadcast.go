@@ -139,7 +139,7 @@ func (s *ClipboardServer) addMessageToQueueAndBroadcast(dataType string, data in
 //
 // keepHistory=false（定时消息的默认档）时**不入历史队列、不计房间统计**，只做实时广播。
 // 为什么这是默认值：房间历史是**按房间**计数的（见 msg.go 的 trimRoomHistoryLocked），
-// 额度就是 server.history（README 的 MESSAGE_NUM 默认 10，config.json 默认 100）。
+// 额度就是 server.history（内置缺省 50，`MESSAGE_NUM` / config.json 都能覆盖）。
 // 一个每天 09:30 的任务，十几天就能把这个房间的历史全换成「今天是几号」，
 // 用户翻记录什么都找不到了 —— 那不是「功能不好用」，是「把已有数据弄坏了」。
 func (s *ClipboardServer) deliverMessage(dataType string, data interface{}, room string, src messageSource, keepHistory bool) PostEvent {
