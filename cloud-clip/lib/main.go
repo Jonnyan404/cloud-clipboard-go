@@ -795,20 +795,104 @@ func (s *ClipboardServer) authMiddleware(next http.HandlerFunc) http.HandlerFunc
 	}
 }
 
-// corsMiddleware 为未走 authMiddleware 的路由补充 CORS 头并处理 OPTIONS 预检，
-// 供跨源 Web 客户端（如 Tauri 房间视图，页面源为 http://tauri.localhost）调用。
+// corsMiddleware 给「浏览器跨源读」加放行头，并处理 OPTIONS 预检。
+//
+// ⚠️★ **2026-09-26 收窄了**：原来看是 `Access-Control-Allow-Origin: *`，那在本机服务端上是
+// **一个真的洞**。这个服务端跑在用户自己的机器上（默认 127.0.0.1:9501），而房间默认**不需要密码**
+// —— `*` 意味着**用户访问的任意网站**都能这么干：
+//
+//	fetch('http://127.0.0.1:9501/content?room=default&format=json')   // ← 读得到
+//
+// 于是「随手点开的一个网页」就能把本机剪贴板历史整段读走，而用户什么都不会察觉。
+// （`*` 只在「带凭据模式」下被浏览器拒绝，而那个模式管的是 cookie / TLS 客户端证书；
+// 一个开放的房间压根不需要凭据，所以 `*` 拦不住它。）
+//
+// ⚠️ Rust 侧是同一份规则，实现在 `clip9/crates/server/src/cors.rs` —— **两边必须一致**，
+// 否则「Go 能用、Rust 被拦」这种只在跨源时出现的差异会非常难查。
 func (s *ClipboardServer) corsMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Room-Auth-Tokens")
+		if allowed := allowedCORSOrigin(r.Header.Get("Origin")); allowed != "" {
+			w.Header().Set("Access-Control-Allow-Origin", allowed)
+			// ⚠️ 响应随 Origin 变 → 必须告诉缓存，否则中间层会把「给被拒来源的那一份」
+			// 缓存下来，或者反过来。
+			w.Header().Add("Vary", "Origin")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Room-Auth-Tokens")
+		}
 
 		if r.Method == http.MethodOptions {
+			// ⚠️ 预检与实际请求**必须一致地**放行：来源不被放行时这里只回 200、不带放行头，
+			// 由浏览器自己去判定预检失败。别在这儿「先放行再说」。
 			w.WriteHeader(http.StatusOK)
 			return
 		}
 		next.ServeHTTP(w, r)
 	}
+}
+
+// allowedCORSOrigin 判断这个 Origin 能不能跨源读这个服务端：能就返回它（原样回写），
+// 不能就返回空串（调用方据此**一个放行头都不发**）。
+//
+// 放行三类，就这三类：
+//
+//   - `tauri://localhost`   —— **桌面客户端**。⚠️ 这个字符串是**实测**出来的：
+//     那版注释原来猜的是 `http://tauri.localhost`，而记录型代理抓到的实际值是前者。
+//   - `http(s)://localhost[:port]`  —— 本机开发（vite dev 是 http://localhost:5173）
+//   - `http(s)://127.0.0.1[:port]` —— 同上，只是写法不同
+//
+// ⚠️ **SPA 不需要 CORS** —— 它由这个服务端自己渲染（同源）。所以要支持「前端放别处、
+// 只调这个 API」，得加一个**配置项**，而不是把 `*` 放回来。
+//
+// ⚠️ `file://` 页面（用户拿个本地 HTML 当临时客户端）发的是 `Origin: null` —— **不放行**：
+// `null` 同样也是沙箱化 iframe / `data:` URL 的来源，放行它等于把上面那个洞换个写法。
+//
+// ⚠️ `[::1]`（IPv6 回环）**没放行**：只有页面本身跑在 `[::1]` 上时浏览器才发它，
+// 极少见。真要支持得单独加一条 —— 别写成「包含 127 就算过」那种模糊判断。
+func allowedCORSOrigin(origin string) string {
+	origin = strings.TrimSpace(origin)
+	if origin == "" {
+		return ""
+	}
+	if strings.EqualFold(origin, "tauri://localhost") {
+		return origin
+	}
+
+	var rest string
+	switch {
+	case strings.HasPrefix(origin, "http://"):
+		rest = origin[len("http://"):]
+	case strings.HasPrefix(origin, "https://"):
+		rest = origin[len("https://"):]
+	default:
+		return ""
+	}
+
+	// ⚠️ 严格形状：`Origin` 头按规范只有 `scheme://host[:port]`，
+	// 带路径 / 查询 / userinfo 的一律拒 —— 浏览器本来就只发严格形状，
+	// 宽容在这儿只会给出「看起来处理过、其实没有」的假象。
+	if strings.ContainsAny(rest, "/?#@") {
+		return ""
+	}
+
+	host, port := rest, ""
+	if i := strings.LastIndex(rest, ":"); i >= 0 {
+		host, port = rest[:i], rest[i+1:]
+		if port == "" {
+			return ""
+		}
+		for _, c := range port {
+			if c < '0' || c > '9' {
+				// `[::1]:5173` 会落到这儿（host 里残留 `[::`）—— 被拒是对的。
+				return ""
+			}
+		}
+	}
+
+	switch host {
+	case "localhost", "127.0.0.1":
+		return origin
+	}
+	return ""
 }
 
 // generateRandomString 生成指定长度的随机字符串
