@@ -99,7 +99,8 @@ export default defineConfig(({ command }) => {
                         // main.go 里每加一条服务端路由，这里漏了就红。
                         /^\/automation/,
                         /^\/tasks/,
-                        /^\/myip/,
+                        // ⚠️ `/myip` 已经删了（2026-09-26）—— 它唯一的消费者是聊天模式，
+                        // 而那个模式退役了。这里不再需要它的放行条目。
                     ],
                     runtimeCaching: [
                         {
