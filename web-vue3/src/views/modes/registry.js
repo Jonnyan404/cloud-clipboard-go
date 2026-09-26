@@ -2,11 +2,33 @@ import DefaultMode from './DefaultMode.vue';
 import GlanceWall from './GlanceWall.vue';
 import BenchWall from './BenchWall.vue';
 import StickyWall from './StickyWall.vue';
-import MegaWall from './MegaWall.vue';
-import TerminalWall from './TerminalWall.vue';
-import WorkbenchWall from './WorkbenchWall.vue';
-import ChatWall from './ChatWall.vue';
 import BoardWall from './BoardWall.vue';
+
+/**
+ * ⚠️★ **已退役的模式**（2026-09-26 真删了，不再是「标记」）。
+ *
+ * 原来它们是 `deprecated: true` —— 标记而不是删，理由是：
+ * 「localStorage 和书签里可能还存着 `?mode=chat`，删掉会让它们**静默**落到兜底模式，
+ * 用户只会看到「我的模式没了」」（见 git 历史里 registry.js 那段注释）。
+ *
+ * 现在真删了，但**那条顾虑照旧成立** —— 所以留这张表：旧 key 显式映射到一个
+ * **还在的模式**，让降级是**有意的**，而不是靠 `resolveModeComponent` 的兜底碰巧生效。
+ *
+ * ⚠️ 别把这张表也删掉：删了之后 `?mode=chat` 会落到 `default`（兜底），
+ * 症状和原来一样是「模式没了」，但那时**没人知道它曾经是什么、该换成什么**。
+ *
+ * 为什么各自映射到那个模式（按「它原来是干什么的」挑最近的）：
+ *   · `chat`      → `default`   —— 都是「一列气泡/卡片」的时间流
+ *   · `mega`      → `default`   —— 大字版时间流
+ *   · `workbench` → `bench`     —— 多栏；动作台是还在的多栏模式
+ *   · `terminal`  → `default`   —— 终端风的一列时间流
+ */
+export const RETIRED_MODES = {
+    chat: 'default',
+    mega: 'default',
+    workbench: 'bench',
+    terminal: 'default',
+};
 
 export const MODES = [
     {
@@ -30,27 +52,10 @@ export const MODES = [
     {
         // 动作台也是主从两栏，所以挨着速览放 —— 区别在右边那一栏的**性质**：
         // 速览是「读」（渲染好的完整预览，只读），动作台是「加工」（可叠多步的动作链 + 实时结果）。
-        //
-        // ⚠️ 中文名是「动作台」而不是「动作工作台」：已有的 workbench 模式中文就叫「工作台」
-        // （它即将下架，但还在菜单里），两个「工作台」并排会让人分不清谁是谁。
         key: 'bench',
         labelKey: 'uiModeBench',
         icon: 'mdi-auto-fix',
         component: BenchWall,
-    },
-    {
-        key: 'chat',
-        labelKey: 'uiModeChat',
-        icon: 'mdi-chat-outline',
-        component: ChatWall,
-        // ⚠️ 即将下架：**只影响菜单里的分组，功能一切照旧** —— 仍然可选、地址参数照旧、
-        // 组件照常渲染。标记而不是直接删除，是因为 localStorage 和书签里可能还存着
-        // `?mode=chat`，删掉会让它们静默落到兜底模式（用户只会看到「我的模式没了」）。
-        //
-        // 消费点有两处，都读这个字段，别各写一份判断：
-        //   · PageToolbar 的模式下拉框 —— 折到「即将下架」分组，用一条分割线隔开
-        //   · App.vue 个性化面板里的模式按钮组 —— 同样弱化显示
-        deprecated: true,
     },
     {
         key: 'sticky',
@@ -59,28 +64,7 @@ export const MODES = [
         component: StickyWall,
     },
     {
-        key: 'mega',
-        labelKey: 'uiModeMega',
-        icon: 'mdi-newspaper-variant-outline',
-        component: MegaWall,
-        deprecated: true, // 理由见上面 chat 那一项
-    },
-    {
-        key: 'workbench',
-        labelKey: 'uiModeWorkbench',
-        icon: 'mdi-view-column-outline',
-        component: WorkbenchWall,
-        deprecated: true,
-    },
-    {
-        key: 'terminal',
-        labelKey: 'uiModeTerminal',
-        icon: 'mdi-console-line',
-        component: TerminalWall,
-        deprecated: true,
-    },
-    {
-        // 看板放在最后：它是最新加的一个，而且和上面几个的定位不太一样 ——
+        // 看板放在最后：它和上面几个的定位不太一样 ——
         // 那几个都是「同一份内容的不同排版」，看板多了一层「这条在哪一列」的状态。
         key: 'board',
         labelKey: 'uiModeBoard',
@@ -89,6 +73,12 @@ export const MODES = [
     },
 ];
 
+/**
+ * 把模式 key 解析成组件。
+ *
+ * ⚠️ 退役的 key **先过 `RETIRED_MODES`** —— 见那张表的注释：旧链接要**有意**降级。
+ */
 export function resolveModeComponent(key) {
-    return MODES.find(mode => mode.key === key)?.component || DefaultMode;
+    const effective = RETIRED_MODES[key] || key;
+    return MODES.find(mode => mode.key === effective)?.component || DefaultMode;
 }
