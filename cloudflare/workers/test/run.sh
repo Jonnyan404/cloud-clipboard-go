@@ -37,7 +37,7 @@ echo "── 历史消息文件名（不能被拼上图标）"
 node --no-warnings test/history-name.test.mjs
 
 echo
-echo "── 历史分页与 WS 只推实时（GET /content + ?history=0 + config.latestId）"
+echo "── 历史分页与 WS 握手（GET /content + config.latestId；握手不推历史）"
 node --no-warnings test/content-list.test.mjs
 
 echo

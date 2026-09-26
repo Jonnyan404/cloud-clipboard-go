@@ -250,18 +250,12 @@ func (s *ClipboardServer) handle_push(w http.ResponseWriter, r *http.Request) {
 	}
 	s.broadcastWebSocketMessageToRoomExcept(newDeviceClientMsg, room, conn)
 
-	// 第二次加锁：历史消息 + **连接时刻该房间的最大 id**（短时间持锁）
+	// 第二次加锁：**连接时刻该房间的最大 id**（短时间持锁）
 	//
-	// ⚠️ `?history=0` → **不推历史**（那条切片留空），但 `latestId` **照算** ——
-	// 它是客户端判断「这条是历史还是实时」的**水印**，与推不推历史无关。
-	// 两条一起用，客户端才是「结构上不可能搞错」，而不是「依赖某个开关有没有生效」。
-	//
-	// ⚠️★ **默认仍然推历史** —— 这是向后兼容的关键：老客户端（已发布的 PWA、
-	// 老版本桌面端）行为**一个字都不变**。**别顺手把默认值改成「不推」** ——
-	// 那会让所有已发布客户端**静默地只看得到空房间**（要改默认值得单开一版并先通知）。
-	skipHistory := r.URL.Query().Get("history") == "0"
-
-	var historyMessages []PostEvent
+	// ⚠️★ **握手不再推历史了**（Jonny 2026-09-26：「没有老客户端，不用考虑老客户端」）。
+	// 历史改由客户端自己去 `GET /content` 拿，所以这里只需算 `latestId`，不必再攒一份
+	// 历史切片。原来那个 `?history=0` 开关也一并删掉 —— 默认就是不推，它与默认同义，
+	// 留着只会是一处会漂的冗余。
 	latestID := 0
 	s.messageQueue.Lock()
 	for _, msg := range s.messageQueue.List {
@@ -271,47 +265,20 @@ func (s *ClipboardServer) handle_push(w http.ResponseWriter, r *http.Request) {
 		if msg.Data.ID() > latestID {
 			latestID = msg.Data.ID()
 		}
-		if !skipHistory {
-			historyMessages = append(historyMessages, msg)
-		}
 	}
 	s.messageQueue.Unlock() // 立即释放消息队列锁
 
-	// 发送历史消息（在锁外执行）
-	//
 	// ⚠️★ **握手顺序是契约，不是碰巧**（`docs/specs/ws-live-only.md` §2.2）：
 	//
 	//	① connect × N（房间里已有的设备）
 	//	② connect 广播（告诉其他人「我来了」）
-	//	③ receive × N（**历史**，`?history=0` 时这一段整段跳过）
-	//	④ config（`app.config` 的唯一来源，**带 `latestId`**）
+	//	③ config（`app.config` 的唯一来源，**带 `latestId`**）
 	//	之后才是实时消息。
 	//
-	// ⚠️ **`config` 必须排在历史之后、实时之前** —— 新客户端在收到 `config` 之前
-	// **一条都不该写剪贴板**，这是它的第二道保险：万一 `?history=0` 没生效，
-	// 它也能靠「还没拿到 `latestId`」而拒绝应用。别为了首屏快一点把 `config` 提前发。
-	for _, msg := range historyMessages {
-		var clientPayload interface{}
-		if msg.Data.TextReceive != nil {
-			clientPayload = msg.Data.TextReceive
-		} else if msg.Data.FileReceive != nil {
-			clientPayload = msg.Data.FileReceive
-		} else {
-			continue
-		}
-
-		wsMsg := WebSocketMessage{
-			Event: "receive",
-			Data:  clientPayload,
-		}
-		if err := conn.WriteJSON(wsMsg); err != nil {
-			s.logger.Printf("错误: 发送历史消息到客户端 %s 失败: %v", conn.RemoteAddr(), err)
-			s.cleanupWebSocketConnection(conn, deviceID, room)
-			return
-		}
-	}
-	s.logger.Printf("已发送 %d 条历史消息到客户端 %s (房间: %s)", len(historyMessages), conn.RemoteAddr(), room)
-
+	// ⚠️ **`config` 必须排在实时之前** —— 客户端在拿到 `config.latestId` 之前
+	// **一条都不该写剪贴板**（它要用那个 id 对齐「HTTP 取回的历史」与「WS 推来的实时」）。
+	// 别为了首屏快一点把 `config` 挪到后面去。
+	//
 	// 发送配置信息给新连接的客户端
 	clientConfigData := struct {
 		Version string `json:"version"`
@@ -331,9 +298,15 @@ func (s *ClipboardServer) handle_push(w http.ResponseWriter, r *http.Request) {
 		Auth bool `json:"auth"`
 		// LatestID 是**连接时刻该房间的最大消息 id**（没有消息时 0）。
 		//
-		// ⚠️ 为什么 `history=0` 之后**还要**它：`history=0` 只对**新客户端**生效，
-		// 而 `latestId` 让客户端**无论服务端推不推历史都能精确判断**
-		// （`id <= latestId` → 历史，只认领不写剪贴板；`id > latestId` → 实时，可应用）。
+		// ⚠️★ **它现在的职责**：客户端连上后是**自己去 `GET /content` 拿历史**的，
+		// 而「HTTP 取历史」与「WS 收实时」之间有个**时序窗口** —— 请求返回之前
+		// 可能已经推来几条实时消息。有了 `latestId`，客户端才能对齐那条边界：
+		// `id <= latestId` 只当历史认领（**不写剪贴板**），`id > latestId` 才是实时。
+		// 少了它，边界上的消息会被处理两次（或把历史灌进剪贴板）。
+		//
+		// ⚠️ 它**兼作能力探测信号**：老后端（没有 `/content` 这条路由、也就没这个字段）
+		// 不下发它，新客户端据此退回「靠 WS 推历史」的老路 —— 见
+		// `docs/specs/ws-live-only.md` §0.4（用户自己部署的那份 Worker 我们管不着）。
 		//
 		// ⚠️★ 它**必须在 WebSocket 握手载荷里**，**不是** `/server` 的 HTTP 响应 ——
 		// `config` 是前端 `app.config` 的**唯一来源**。加错地方会得到一个永远
@@ -1655,8 +1628,8 @@ func (s *ClipboardServer) resolveContentListLimit(raw string) int {
 // handleContentList 处理 `GET /content?room=&before=&limit=` —— **历史分页**。
 //
 // 为什么要有它：历史以前只能从 WS 握手推来，于是「往回翻」做不到、而且每次连接
-// 都要把整个房间的历史推一遍。有了它，WS 可以只推实时（`?history=0`），
-// 历史走这个正经的查询接口 —— 详见 `docs/specs/ws-live-only.md`。
+// 都要把整个房间的历史推一遍。现在 WS **只推实时**（握手不再推历史了），
+// 历史一律走这个正经的查询接口 —— 详见 `docs/specs/ws-live-only.md`。
 //
 // 契约要点（每条都有理由，改之前先读那份 spec）：
 //

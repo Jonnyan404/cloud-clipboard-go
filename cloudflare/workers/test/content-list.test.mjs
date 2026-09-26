@@ -1,4 +1,4 @@
-// `GET /content`（历史分页）+ WS `?history=0` + `config.latestId` —— W2 的三件事。
+// `GET /content`（历史分页）+ WS 握手（**不推历史**、带 `config.latestId`）。
 //
 // 规格：`docs/specs/ws-live-only.md`（三边同一份契约）。断言照 §5 的验收条目来，
 // 不做「读代码觉得对」那类检查。
@@ -37,9 +37,9 @@ async function seed(env, texts, room = 'default') {
   return ids;
 }
 
-// 造一个 Durable Object 实例（借原型，省掉 state/ctx 依赖）—— 与 history-name.test.mjs 同一招。
+// 造一个 Durable Object 实例（借原型，省掉 state/ctx 依赖）。
 // ⚠️ 握手那一段之所以不能走 router：它需要一个真的 `WebSocketPair`，Node 里造不出来，
-// 所以 `sendHandshake` 被抽成了「只吃一个能 send 的对象 + 一个 Request」的形状。
+// 所以 `sendHandshake` 被抽成了「只吃一个能 send 的对象 + 一个房间名」的形状。
 function makeRoom(env) {
   const room = Object.create(WebSocketRoom.prototype);
   room.env = env;
@@ -180,26 +180,24 @@ console.log('\n── F. 列表里的条目与 /content/<id> 同一个形状 ─
   check('带 column', list.json.messages[0].column, '');
 }
 
-console.log('\n── G. WS `?history=0`：只收到 config，一条 receive 都没有 ──');
+console.log('\n── G. WS 握手不再推历史：一条 receive 都没有 ──');
 {
   const { env } = makeEnv();
   await seed(env, ['历史一', '历史二']);
 
-  const withHistory = collect();
-  await makeRoom(env).sendHandshake(
-    withHistory.socket, 'default', new Request('https://x/push?room=default'), 'sid-a',
-  );
-  check('不带开关 → 默认仍然推历史（老客户端行为不变）',
-    withHistory.sent.map(m => m.event), ['receive', 'receive', 'config']);
-  check('config 在历史之后（顺序是契约）',
-    withHistory.sent.findIndex(m => m.event === 'config'), 2);
+  const sent = collect();
+  await makeRoom(env).sendHandshake(sent.socket, 'default', 'sid-a');
 
-  const skip = collect();
-  await makeRoom(env).sendHandshake(
-    skip.socket, 'default', new Request('https://x/push?room=default&history=0'), 'sid-b',
-  );
-  check('带 history=0 → 一条 receive 都没有', skip.sent.filter(m => m.event === 'receive'), []);
-  check('其余不变（config 照发）', skip.sent.map(m => m.event), ['config']);
+  // ⚠️★ 握手**不推历史**（Jonny 2026-09-26：「没有老客户端，不用考虑老客户端」）——
+  // 历史一律走 `GET /content`。所以握手载荷里**一条 receive 都不该有**：
+  // 有的话就是「历史又混进实时通道」了，那正是这个变更要消灭的东西。
+  check('握手一条 receive 都没有（历史走 HTTP）',
+    sent.sent.filter(m => m.event === 'receive'), []);
+  check('config 照发（`app.config` 的唯一来源）',
+    sent.sent.some(m => m.event === 'config'), true);
+  // ⚠️ config 必须在**实时**之前 —— 客户端拿到 `latestId` 之前一条都不该写剪贴板。
+  check('config 是握手载荷的最后一个事件（早于实时）',
+    sent.sent[sent.sent.length - 1].event, 'config');
 }
 
 console.log('\n── H. `config.latestId`：有消息 = 该房间最大 id；空房间 = 0 ──');
@@ -208,16 +206,12 @@ console.log('\n── H. `config.latestId`：有消息 = 该房间最大 id；�
   const ids = await seed(env, ['一', '二', '三']);
 
   const sent = collect();
-  await makeRoom(env).sendHandshake(
-    sent.socket, 'default', new Request('https://x/push?room=default&history=0'), 'sid-c',
-  );
+  await makeRoom(env).sendHandshake(sent.socket, 'default', 'sid-c');
   const cfg = sent.sent.find(m => m.event === 'config');
   check('latestId = 最大 id', cfg.data.latestId, Number(ids[ids.length - 1]));
 
   const empty = collect();
-  await makeRoom(env).sendHandshake(
-    empty.socket, '空房间', new Request('https://x/push?room=空房间&history=0'), 'sid-d',
-  );
+  await makeRoom(env).sendHandshake(empty.socket, '空房间', 'sid-d');
   check('空房间 = 0', empty.sent.find(m => m.event === 'config').data.latestId, 0);
 
   // ⚠️ 水印只该出现在**握手**载荷里：`/server` 上加一个永远不会被读到的字段，
@@ -250,9 +244,7 @@ console.log('\n── J. 缺省就是 50（三端统一的那根旋钮）──'
   check('/server 的 history 缺省 = 50', (await serverRes.json()).history, 50);
 
   const sent = collect();
-  await makeRoom(env).sendHandshake(
-    sent.socket, '默认房间', new Request('https://x/push?room=默认房间&history=0'), 'sid-e',
-  );
+  await makeRoom(env).sendHandshake(sent.socket, '默认房间', 'sid-e');
   check('握手 config 的 history 缺省 = 50',
     sent.sent.find(m => m.event === 'config').data.server.history, 50);
 }

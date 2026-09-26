@@ -1,5 +1,5 @@
 import { normalizeRoomName, resolveRoomAuth } from '../auth';
-import { buildSenderDevice, historyLimit, parseUserAgent, sanitizeDeviceName } from '../utils';
+import { historyLimit, parseUserAgent, sanitizeDeviceName } from '../utils';
 
 function isRoomListEnabled(env) {
   return ['1', 'true', 'yes', 'on'].includes(String(env.ROOM_LIST || '').toLowerCase());
@@ -100,8 +100,8 @@ export class WebSocketRoom {
         this.handleError(sessionId, event);
       });
 
-      // 握手载荷的发送顺序抽在 sendHandshake 里（它也负责 `?history=0` 那个开关）。
-      await this.sendHandshake(server, room, request, sessionId);
+      // 握手载荷的发送顺序抽在 sendHandshake 里（历史不再由 WS 推，见那里的注释）。
+      await this.sendHandshake(server, room, sessionId);
 
       // 广播新设备连接
       this.broadcastDeviceConnect(sessionId, userAgent, room);
@@ -131,35 +131,37 @@ export class WebSocketRoom {
     }
   }
 
-  // 握手时依次发：历史 → config → 房间里已有的设备。
+  // 握手时依次发：config → 房间里已有的设备。
   //
   // ⚠️★ **顺序是契约，不是碰巧**（`docs/specs/ws-live-only.md` §2.2）：
-  // `config` 事件**必须**在历史之后、实时之前发 —— 新客户端在收到 `config` 之前
-  // **一条都不该写剪贴板**（这是它的第二道保险，万一 `?history=0` 没生效也不会污染剪贴板）。
-  // 别为了首屏快一点把 config 提前。
+  // `config` 事件**必须**在实时之前发 —— 客户端在拿到 `config.latestId` 之前
+  // **一条都不该写剪贴板**（它要用那个 id 对齐「HTTP 取回的历史」与「WS 推来的实时」）。
+  // 别为了首屏快一点把 config 挪到后面去。
   //
-  // ⚠️ `?history=0` → **只跳过历史那一段**，其余不变。默认仍然推 —— 那是向后兼容的关键：
-  // 已发布的 PWA / 老客户端行为**一个字都不变**。⚠️ **别顺手把默认值改成「不推」**：
-  // 那会让所有已发布客户端**静默地只看得到空房间**。
+  // ⚠️★ **握手不再推历史**（Jonny 2026-09-26：「没有老客户端，不用考虑老客户端」）。
+  // 历史改由客户端自己去 `GET /content` 拿；原来那个 `?history=0` 开关也一并删掉
+  // （默认就是不推，它与默认同义，留着只会是一处会漂的冗余）。
   //
   // ⚠️ 抽成独立方法（而不是写在 handleWebSocket 里）是为了**能测**：handleWebSocket
   // 需要真的 `WebSocketPair`，Node 里造不出来；而这一段的全部输入只是
-  // 「一个能 send 的对象 + 一个 Request」。
-  async sendHandshake(webSocket, room, request, sessionId) {
-    const skipHistory = new URL(request.url).searchParams.get('history') === '0';
-
-    // ⚠️ 水印在**推历史之前**取：晚取的话，握手期间刚到的消息会被算进「历史」，
-    // 客户端于是不会把它写进剪贴板 —— 那是「吞消息」的方向，正是水印要避免的。
+  // 「一个能 send 的对象 + 一个房间名」。
+  async sendHandshake(webSocket, room, sessionId) {
+    // ⚠️ 水印要在**发 config 之前**取：它是「连接时刻」的快照，客户端拿它对齐
+    // 「HTTP 取回的历史」与「WS 推来的实时」的边界。晚于 config 就已经没意义了。
     const latestId = await this.latestMessageId(room);
 
-    if (!skipHistory) {
-      await this.sendHistoryMessages(webSocket, room);
-    }
     await this.sendConfigMessage(webSocket, room, latestId);
     await this.sendExistingDevices(webSocket, room, sessionId);
   }
 
-  // 连接时刻该房间的**最大消息 id**（没有消息时 `0`）—— 客户端的「历史 / 实时」水印。
+  // 连接时刻该房间的**最大消息 id**（没有消息时 `0`）—— 客户端拿它对边界。
+  //
+  // ⚠️★ **它现在的职责**：客户端是**自己去 `GET /content` 拿历史**的，而「HTTP 取历史」
+  // 与「WS 收实时」之间有个**时序窗口** —— 请求返回之前可能已经推来几条实时消息。
+  // 有了 `latestId`，客户端才能对齐那条边界：`id <= latestId` 只当历史认领（**不写剪贴板**），
+  // `id > latestId` 才是实时。少了它，边界上的消息会被处理两次（或把历史灌进剪贴板）。
+  // 它**兼作能力探测信号**：老后端（没有 `/content`、也就没这个字段）不下发它，
+  // 新客户端据此退回「靠 WS 推历史」的老路（`docs/specs/ws-live-only.md` §0.4）。
   //
   // ⚠️ 用 `MAX(id)`，不是「取最新那条的 id」：最新那条是按 `timestamp DESC, id DESC` 挑的，
   // 而 `POST /text?id=` **原地改正文**会把 timestamp 往前刷、id 不变 —— 于是它可能给出一个
@@ -207,11 +209,8 @@ export class WebSocketRoom {
             limit: fileLimit
           },
           auth: resolveRoomAuth(this.env, room).required,
-          // 连接时刻该房间的**最大消息 id**（没有消息时 0）—— 客户端拿它区分历史与实时：
-          // `id <= latestId` → 历史（只认领）；`id > latestId` → 实时（可应用）。
-          //
-          // ⚠️ 为什么 `?history=0` 之后**还要**它：那个开关只对**新客户端**生效，而水印让
-          // 客户端**无论服务端推不推历史都能精确判断**。两条一起用才是「结构上不可能搞错」。
+          // 连接时刻该房间的**最大消息 id**（没有消息时 0）—— 客户端拿它对齐
+          // 「HTTP 取回的历史」与「WS 推来的实时」的边界（理由见上面 latestMessageId 那段）。
           // ⚠️★ 它**必须在 WebSocket 握手载荷里**，**不是** `/server` 的 HTTP 响应 ——
           // 前端读的 `app.config` 就是**这条 `config` 事件**（这个坑踩过两次：
           // `automation.enabled`、`prefix`）。加错地方会得到一个永远 `undefined` 的字段。
@@ -233,103 +232,6 @@ export class WebSocketRoom {
       
     } catch (error) {
       console.error('发送配置消息失败:', error);
-    }
-  }
-
-  async sendHistoryMessages(webSocket, room) {
-    try {
-      console.log(`获取房间 ${room} 的历史消息`);
-      
-      if (!this.env.DB) {
-        console.log('DB binding 不可用，跳过历史消息');
-        return;
-      }
-
-      if (webSocket.readyState !== WebSocket.OPEN) {
-        console.log('WebSocket 未就绪，跳过历史消息');
-        return;
-      }
-
-      // 历史条数上限：与握手 config 的 `server.history`、`GET /content` 的上限
-      // **是同一个数**（utils.js 的 historyLimit 一处定义）。
-      const limit = historyLimit(this.env);
-      console.log(`历史消息限制: ${limit}`);
-
-      const query = `
-        SELECT * FROM (
-          SELECT * FROM messages
-          WHERE room = ?
-          ORDER BY timestamp DESC, id DESC
-          LIMIT ?
-        ) recent
-        ORDER BY timestamp ASC, id ASC
-      `;
-      const params = [normalizeRoomName(room), limit];
-      
-      console.log(`历史消息查询: ${query}, 参数:`, params, `限制: ${limit}`);
-      
-      const results = await this.env.DB.prepare(query).bind(...params).all();
-      
-      if (!results.results || results.results.length === 0) {
-        console.log(`房间 ${room} 没有历史消息`);
-        return;
-      }
-
-      console.log(`找到 ${results.results.length} 条历史消息 (限制: ${limit})`);
-
-      // 发送历史消息
-      for (const row of results.results) {
-        if (webSocket.readyState !== WebSocket.OPEN) {
-          console.log('WebSocket 已关闭，停止发送历史消息');
-          break;
-        }
-
-        const historyMessage = {
-          event: 'receive',
-          data: {
-            id: row.id,
-            type: row.type,
-            timestamp: row.timestamp,
-            room: row.room || 'default',
-            senderIP: row.senderIP || 'unknown',
-            senderClientID: row.senderClientID || '',
-            senderDevice: buildSenderDevice(row.userAgent || 'unknown', row.deviceName),
-            // 看板的列，空串 = 待办。前端整张列表都从这条握手载荷来，所以这里漏了的话
-            // 表现是「刷新之后卡片全回待办」—— 列明明存着。
-            column: row.boardColumn || '',
-          }
-        };
-
-        // 根据消息类型添加相应字段
-        if (row.type === 'text') {
-          historyMessage.data.content = row.content;
-        } else if (row.type === 'file') {
-          // name 必须是原始文件名：图标由前端按扩展名自己渲染，服务端不要代劳。
-          // 这里曾经把图标拼进 name（`${icon} ${row.name}`），前端再渲染一次，
-          // 于是每个文件名前面都多出一个图标；而且前端下载时 anchor.download 会拿这个名字当文件名。
-          // 实时消息（file.js 的 receive 广播）和 HTTP 的 /content/latest 都是原始文件名，
-          // 只有历史这条路径拼过图标，所以症状是「刷新后才多出来、新收到的正常」。
-          historyMessage.data.name = row.name;
-          historyMessage.data.size = row.size;
-          historyMessage.data.uuid = row.uuid;
-          historyMessage.data.url = row.url;
-          
-          // 处理过期时间：与实时消息保持一致，统一使用 Unix 秒
-          historyMessage.data.expire = Number(row.expireTime) || 0;
-          historyMessage.data.cache = row.uuid;
-        }
-        
-        console.log(`发送历史消息: ID ${row.id}, 类型 ${row.type}`);
-        
-        webSocket.send(JSON.stringify(historyMessage));
-        
-      }
-      
-      console.log(`历史消息发送完成，共发送 ${results.results.length} 条 (限制: ${limit})`);
-      
-    } catch (error) {
-      console.error('发送历史消息失败:', error);
-      console.error('Error details:', error.stack);
     }
   }
 
