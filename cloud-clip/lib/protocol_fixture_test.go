@@ -80,7 +80,12 @@ func sampleFileReceive() FileReceive {
 		Cache:     "6f1c9d2e-0000-4000-8000-000000000001",
 		Expire:    1758703601,
 		Thumbnail: "data:image/png;base64,iVBORw0KGgo=",
-		URL:       "/file/6f1c9d2e-0000-4000-8000-000000000001/screenshot.png",
+		// ⚠️ 真实的 `FileReceive.URL` 是 `<scheme>://<host><prefix>/file/<uuid>` ——
+		// **不带文件名**（见 handle_upload / handle_finish 里那句 Sprintf）。
+		// 2026-09-26 之前这里写成了 `/file/<uuid>/screenshot.png`，于是
+		// `/content/<id>` 的投影再拼一次文件名就变成 `…/screenshot.png/screenshot.png` ——
+		// **fixture 在说谎**，而它正是 Rust 侧照着写的那份。
+		URL: "http://example.test/file/6f1c9d2e-0000-4000-8000-000000000001",
 	}
 }
 

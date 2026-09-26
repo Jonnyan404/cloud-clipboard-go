@@ -1572,10 +1572,20 @@ func contentEntryOf(msg PostEvent) (map[string]interface{}, bool) {
 			"name": f.Name,
 			"size": f.Size,
 			"uuid": f.Cache,
-			// ⚠️ 这里是**裸的** `/file/<uuid>`，不带文件名 —— 和 `/content/latest`
-			// 那条路刻意不同（那边拼上了转义过的文件名，因为它是个「拿来就能下载的链接」）。
-			// 客户端要下载地址就自己拼 `url + "/" + encodeURIComponent(name)`。
-			"url":       f.URL,
+			// ⚠️★ **拼上文件名**，与 `/content/latest` 逐字一致（2026-09-26 统一的）。
+			//
+			// 为什么统一到**这个**形式而不是反过来（裸的 `/file/<uuid>`）：
+			//   ① 它和 `docs/api.md` 里记的路由形状（`GET /file/:uuid/:name`）一致；
+			//   ② 客户端拿到的 url **直接就能下载** —— 不用自己拼，也就不会把
+			//      `encodeURIComponent` 漏掉或写错（Android 捷径那边就是自己拼的，
+			//      它拼错了整整一路「文件 401」的 bug）；
+			//   ③ 反过来要动 `/content/latest`，而那边有 Worker 的测试钉着
+			//      （`check('url 带上了文件名')`）→ 动它就得三方一起改。
+			//
+			// ⚠️ 手工拼而不是 `filepath.Join`：后者内部会 Clean，把 `http://host` 的双斜杠
+			// 收成 `http:/host`，url 直接是坏的（`content_url_test.go` 就是为这个立的）。
+			// ⚠️ 文件名必须 **PathEscape** —— 它可能是中文、可能带 `?` / `#`。
+			"url":       f.URL + "/" + url.PathEscape(f.Name),
 			"id":        strconv.Itoa(msg.Data.ID()),
 			"timestamp": f.Timestamp,
 			"expire":    f.Expire,
