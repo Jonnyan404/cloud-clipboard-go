@@ -1618,15 +1618,32 @@ func contentEntryOf(msg PostEvent) (map[string]interface{}, bool) {
 	return nil, false
 }
 
-// resolveContentListLimit 读 `?limit=`，并**夹在 `server.history` 以内**。
+// contentListHardCap 单次最多返回多少条 —— 一条**与 `server.history` 无关的硬上限**。
 //
-// ⚠️ 上限就是 `server.history`，不是「想给多大给多大」——否则 `limit=999999`
-// 等于把「一次推 2MB」从 WS 挪到 HTTP，**等于没改**（`docs/specs/ws-live-only.md` §2.1）。
-// 缺省 / 非法 / 非正 → 用 `server.history`。
+// ⚠️★ 为什么必须另有一条：`server.history` 是**用户可配**的（设成 10000 也合法），
+// 而分页的每一页都要塞进**一次** HTTP 响应。只跟着配置走的话，`limit=999999`
+// 会被夹到 10000 —— 那正是这个变更要消灭的「一次推 2MB」，只是从 WS 挪到了 HTTP，
+// **等于没改**。有了硬上限，任何一次请求都是有界的；想看更早的，用 `before` 游标
+// 一页页往回翻（那正是分页存在的意义）。
+//
+// 100：落在 §2.1 说的主流档里（Slack 100 / Discord 100），而且**比缺省 50 大**，
+// 所以默认部署的行为一个字都不变（有效上限 = min(50, 100) = 50）。
+const contentListHardCap = 100
+
+// resolveContentListLimit 读 `?limit=`，并**夹在有效上限以内**。
+//
+// 有效上限 = `min(server.history, contentListHardCap)` ——
+// 缺省 / 非法 / 非正 / 超过有效上限 → 一律取有效上限。
+//
+// ⚠️ 缺省值与有效上限**必须是同一个数**（同一根旋钮，见 §2.1）：若缺省给 20、上限给 50，
+// 那「不传」和「传 50」会拿到不同的量，而调用方没法从「我没传」推出「我会拿到多少」。
 func (s *ClipboardServer) resolveContentListLimit(raw string) int {
 	max := s.config.Server.History
 	if max < 0 {
 		max = 0
+	}
+	if max > contentListHardCap {
+		max = contentListHardCap
 	}
 	n, err := strconv.Atoi(strings.TrimSpace(raw))
 	if err != nil || n <= 0 || n > max {

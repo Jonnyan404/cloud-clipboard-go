@@ -116,6 +116,34 @@ console.log('\n── D. limit 被 history 上限夹住（缺省值与上限是�
   check('非正的 limit 也取上限', bad.json.messages.length, 3);
 }
 
+console.log('\n── D2. 硬上限：配置再大，一次也不会返回一整间房 ──');
+{
+  // ⚠️★ 这条防的是「配置设成 10000，于是 /content 一次返回 10000 条」——
+  // 那正是这个变更要消灭的「一次推 2MB」，只是从 WS 挪到了 HTTP，**等于没改**。
+  const { env, db } = makeEnv();
+  env.HISTORY_LIMIT = '10000';
+
+  const values = [];
+  for (let i = 1; i <= 101; i += 1) {
+    values.push(`('text', 'm${i}', 'default', ${1789000000 + i}, 'unknown', '', 'UA')`);
+  }
+  db.exec(`INSERT INTO messages (type, content, room, timestamp, senderIP, senderClientID, userAgent)
+    VALUES ${values.join(',')}`);
+
+  const huge = await fetchJson(env, '/content?room=default&limit=999999');
+  check('配置 10000 时，一次最多 100 条', huge.json.messages.length, 100);
+  check('取的是**最近**那 100 条', huge.json.messages[huge.json.messages.length - 1].content, 'm101');
+
+  const dflt = await fetchJson(env, '/content?room=default');
+  check('缺省也取有效上限 min(10000,100)，而不是 10000', dflt.json.messages.length, 100);
+
+  // 硬上限不等于「看不到更早的」—— 那正是 `before` 游标存在的意义。
+  const older = await fetchJson(
+    env, `/content?room=default&before=${huge.json.messages[0].id}`,
+  );
+  check('用 before 仍然能翻到更早的', older.json.messages.map(m => m.content), ['m1']);
+}
+
 console.log('\n── E. 鉴权与 /content/latest 同一套（同一错误码、同一文案）──');
 {
   const { env } = makeEnv();

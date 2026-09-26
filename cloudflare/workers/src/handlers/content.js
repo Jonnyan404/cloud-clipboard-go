@@ -108,11 +108,24 @@ function buildJsonContentPayload(row) {
   };
 }
 
-// 读 `GET /content?limit=`，并**夹在这个 Worker 的 history 上限以内**。
+// 单次最多返回多少条 —— 一条**与 `HISTORY_LIMIT` 无关的硬上限**。
 //
-// 缺省 / 非法 / 非正 / 超过上限 → 一律取上限。⚠️ 缺省值与上限**必须是同一个数**
-// （同一根旋钮，见 utils.js 的 historyLimit）—— 若缺省给 50、上限给 100，
-// 「不传」和「传 100」会拿到不同的量，而调用方从「我没传」推不出「我会拿到多少」。
+// ⚠️★ 为什么必须另有一条：`HISTORY_LIMIT` 是**部署者可配**的（设成 10000 也合法），
+// 而一页要塞进**一次** HTTP 响应。只跟配置走的话，`limit=999999` 会被夹到 10000 ——
+// 那正是这个变更要消灭的「一次推 2MB」，只是从 WS 挪到了 HTTP，**等于没改**。
+// 想看更早的，用 `before` 游标一页页翻（那正是分页存在的意义）。
+//
+// 100：落在主流档里（Slack 100 / Discord 100），而且**比缺省 50 大**，
+// 所以默认部署的行为一个字都不变（有效上限 = min(50, 100) = 50）。
+// ⚠️ 与 Go 的 `contentListHardCap`、Rust 的 `CONTENT_LIST_HARD_CAP` 是同一个数。
+const CONTENT_LIST_HARD_CAP = 100;
+
+// 读 `GET /content?limit=`，并**夹在有效上限以内**。
+//
+// 有效上限 = `min(HISTORY_LIMIT, CONTENT_LIST_HARD_CAP)`。
+// 缺省 / 非法 / 非正 / 超过有效上限 → 一律取有效上限。⚠️ 缺省值与有效上限**必须是同一个数**
+// （同一根旋钮，见 utils.js 的 historyLimit）—— 若缺省给 20、上限给 50，
+// 「不传」和「传 50」会拿到不同的量，而调用方从「我没传」推不出「我会拿到多少」。
 function normalizeContentListLimit(raw, max) {
   const n = parseInt(String(raw ?? '').trim(), 10);
   if (!Number.isInteger(n) || n <= 0 || n > max) {
@@ -315,7 +328,8 @@ export class ContentHandler {
         return errorResponse(503, 'database_unavailable', 'Database not available', '数据库不可用');
       }
 
-      const max = historyLimit(env);
+      // ⚠️★ 有效上限 = `min(history 配置, 硬上限)` —— 见 CONTENT_LIST_HARD_CAP 的注释。
+      const max = Math.min(historyLimit(env), CONTENT_LIST_HARD_CAP);
       const limit = normalizeContentListLimit(url.searchParams.get('limit'), max);
       const before = normalizeContentListBefore(url.searchParams.get('before'));
 
