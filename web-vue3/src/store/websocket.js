@@ -8,6 +8,26 @@ const ROOM_AUTH_CACHE_KEY = 'roomAuthCache';
 const DEFAULT_ROOM_KEY = '__default__';
 const GLOBAL_ROOM_KEY = '__global__';
 
+// 「这个后端会不会 `GET /content`」—— 也就是它是不是**新后端**（认 `?history=0` 那一版）。
+//
+// 为什么要**跨刷新记住**：`?history=0` 是**连接时**的查询参数，而探测得先连一次 WS
+// 才能从握手的 `config` 里读到 `latestId`（见 `applyContentApiSupport`）。
+// 不记住的话，每次刷新都会先被白推一份历史 —— `history=0` 就白加了。
+//
+// ⚠️ 按 `APP_BASE_URL` 分开存：同一个浏览器可能连过**不同的部署**（自建的、别人的），
+// 而它们的能力不一样。键里带上 base，两边就不会互相污染。
+function contentApiCacheKey() {
+    return `contentApiSupport:${APP_BASE_URL}`;
+}
+
+function loadContentApiSupport() {
+    try {
+        return localStorage.getItem(contentApiCacheKey()) === '1';
+    } catch {
+        return false;
+    }
+}
+
 function loadRoomAuthCache() {
     try {
         const raw = sessionStorage.getItem(ROOM_AUTH_CACHE_KEY);
@@ -43,6 +63,8 @@ export const useWebSocketStore = defineStore('websocket', {
         latency: null,
         pendingReceiveQueue: [],
         receiveFlushTimer: null,
+        // 这个后端会不会 `GET /content`（= 是不是新后端）。见 `applyContentApiSupport`。
+        contentApiSupported: loadContentApiSupport(),
     }),
 
     getters: {
@@ -293,6 +315,14 @@ export const useWebSocketStore = defineStore('websocket', {
             if (normalizedRoom) {
                 wsUrl.searchParams.set('room', normalizedRoom);
             }
+            // 已知这个后端会 `GET /content` → 让 WS **只推实时**，历史改走那条 HTTP 路径。
+            //
+            // ⚠️ 老后端（用户自己部署的 Worker 不会自动更新）收到这个**不认识的参数会忽略它**、
+            // 仍然推历史 —— 而那时握手里也不会有 `latestId`，于是我们退回老路、
+            // 也**不会**去请求 `/content`（否则拿到的是 SPA 兜底的 HTML）。见 `applyContentApiSupport`。
+            if (this.contentApiSupported) {
+                wsUrl.searchParams.set('history', '0');
+            }
             return wsUrl.toString();
         },
 
@@ -458,6 +488,54 @@ export const useWebSocketStore = defineStore('websocket', {
                 }, 32);
             }
         },
+        // 握手 `config` 到了 —— 顺便判定「这个后端会不会 `GET /content`」。
+        //
+        // ⚠️★ 探测信号就是 `latestId`（`docs/specs/ws-live-only.md` §0.4）：
+        // 握手载荷里**有**它 = 新后端（有 `/content`、认 `?history=0`）；
+        // **没有** = 老后端 → 退回「靠 WS 推历史」那条老路。
+        // 它本来就是为「历史/实时的边界说不清楚」而加的，这里兼任能力标记 —— **一个字段，两个用途**。
+        //
+        // ⚠️ 判的是「**有没有这个字段**」，不是「值大于 0」：空房间的合法值就是 `0`，
+        // 而 `0` 恰恰也说明它是新后端。
+        applyContentApiSupport(config) {
+            const supported = Object.prototype.hasOwnProperty.call(config || {}, 'latestId');
+            if (supported !== this.contentApiSupported) {
+                this.contentApiSupported = supported;
+                try {
+                    localStorage.setItem(contentApiCacheKey(), supported ? '1' : '0');
+                } catch { /* 存不下就算了：代价只是下次刷新多一次白推 */ }
+            }
+            if (supported) {
+                this.loadHistoryFromHttp();
+            }
+        },
+        // 从 `GET /content` 取这个房间的历史 —— WS 只推实时之后，历史就只剩这一条路。
+        //
+        // ⚠️★ **必须真的去请求一次**：`?history=0` 之后握手不再推历史，
+        // 不请求的话「刷新一下就什么都看不到了」—— 这是这个变更最容易漏的一条，
+        // `docs/specs/ws-live-only.md` §5 第 8 条专门点了它。
+        async loadHistoryFromHttp(room = this.room) {
+            const normalizedRoom = this.normalizeRoomName(room);
+            try {
+                const response = await axios.get('content', {
+                    params: new URLSearchParams([['room', normalizedRoom]]),
+                });
+                // 请求还在飞的时候房间被换掉了 —— 这批历史不属于当前房间，丢掉。
+                if (this.normalizeRoomName(this.room) !== normalizedRoom) {
+                    return;
+                }
+                const messages = response.data && Array.isArray(response.data.messages)
+                    ? response.data.messages
+                    : [];
+                // ⚠️ `mergeMessages` 按 id 去重，所以「第一次连接时 WS 还推了一份历史」
+                // 不会重影 —— 那是探测阶段必然会发生的一次重复，不必额外处理。
+                this.mergeMessages(messages);
+            } catch (error) {
+                // 取历史失败**不影响实时**：WS 照样连着、新消息照收，只是这个房间暂时是空的。
+                // 不做重试：下一次握手（重连 / 切房间回来）会再走一遍这里。
+                console.error('Failed to load history from /content:', error);
+            }
+        },
         handleEvent(event, data) {
             const app = useAppStore();
             switch (event) {
@@ -480,6 +558,8 @@ export const useWebSocketStore = defineStore('websocket', {
                 case 'config': {
                     this.flushPendingReceives();
                     app.config = data;
+                    // 顺手判定这个后端会不会 `GET /content`，会的话历史就改走那条路（上面那两条注释）。
+                    this.applyContentApiSupport(data);
                     console.log(
                         `%c Cloud Clipboard ${data.version} by Jonnyan404 %c https://github.com/Jonnyan404/cloud-clipboard-go `,
                         'color:#fff;background-color:#1e88e5',
