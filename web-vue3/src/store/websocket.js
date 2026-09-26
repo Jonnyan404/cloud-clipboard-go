@@ -8,25 +8,14 @@ const ROOM_AUTH_CACHE_KEY = 'roomAuthCache';
 const DEFAULT_ROOM_KEY = '__default__';
 const GLOBAL_ROOM_KEY = '__global__';
 
-// 「这个后端会不会 `GET /content`」—— 也就是它是不是**新后端**（认 `?history=0` 那一版）。
+// ⚠️★ **WS 握手不再推历史了**（Jonny 2026-09-26：「没有老客户端，不用考虑老客户端」）——
+// 历史一律走 `GET /content`（见 `loadHistoryFromHttp`），握手 URL 上也不再有 `history=0`
+// （默认就是不推）。
 //
-// 为什么要**跨刷新记住**：`?history=0` 是**连接时**的查询参数，而探测得先连一次 WS
-// 才能从握手的 `config` 里读到 `latestId`（见 `applyContentApiSupport`）。
-// 不记住的话，每次刷新都会先被白推一份历史 —— `history=0` 就白加了。
-//
-// ⚠️ 按 `APP_BASE_URL` 分开存：同一个浏览器可能连过**不同的部署**（自建的、别人的），
-// 而它们的能力不一样。键里带上 base，两边就不会互相污染。
-function contentApiCacheKey() {
-    return `contentApiSupport:${APP_BASE_URL}`;
-}
-
-function loadContentApiSupport() {
-    try {
-        return localStorage.getItem(contentApiCacheKey()) === '1';
-    } catch {
-        return false;
-    }
-}
+// 于是这里不再需要「这个后端会不会 `/content`」那套能力探测 + 跨刷新缓存 ——
+// 原来它防的是「新 SPA 连用户自己没重新部署的老 Worker」（`docs/specs/ws-live-only.md` §0.4）。
+// 现在两个方向都通：新后端不推历史、由 SPA 自己请求；**老后端仍然推历史**、SPA 照收
+// （它对 `/content` 的请求会失败，但那不影响实时 —— 见 `loadHistoryFromHttp` 里那个 catch）。
 
 function loadRoomAuthCache() {
     try {
@@ -63,8 +52,6 @@ export const useWebSocketStore = defineStore('websocket', {
         latency: null,
         pendingReceiveQueue: [],
         receiveFlushTimer: null,
-        // 这个后端会不会 `GET /content`（= 是不是新后端）。见 `applyContentApiSupport`。
-        contentApiSupported: loadContentApiSupport(),
     }),
 
     getters: {
@@ -315,14 +302,8 @@ export const useWebSocketStore = defineStore('websocket', {
             if (normalizedRoom) {
                 wsUrl.searchParams.set('room', normalizedRoom);
             }
-            // 已知这个后端会 `GET /content` → 让 WS **只推实时**，历史改走那条 HTTP 路径。
-            //
-            // ⚠️ 老后端（用户自己部署的 Worker 不会自动更新）收到这个**不认识的参数会忽略它**、
-            // 仍然推历史 —— 而那时握手里也不会有 `latestId`，于是我们退回老路、
-            // 也**不会**去请求 `/content`（否则拿到的是 SPA 兜底的 HTML）。见 `applyContentApiSupport`。
-            if (this.contentApiSupported) {
-                wsUrl.searchParams.set('history', '0');
-            }
+            // ⚠️★ 这里**不再带 `history=0`** —— 握手默认就不推历史了（理由见文件头那段注释）。
+            // 历史一律由 `loadHistoryFromHttp()` 从 `GET /content` 取。
             return wsUrl.toString();
         },
 
@@ -488,32 +469,10 @@ export const useWebSocketStore = defineStore('websocket', {
                 }, 32);
             }
         },
-        // 握手 `config` 到了 —— 顺便判定「这个后端会不会 `GET /content`」。
+        // 从 `GET /content` 取这个房间的历史 —— 握手不再推历史之后，历史就只剩这一条路。
         //
-        // ⚠️★ 探测信号就是 `latestId`（`docs/specs/ws-live-only.md` §0.4）：
-        // 握手载荷里**有**它 = 新后端（有 `/content`、认 `?history=0`）；
-        // **没有** = 老后端 → 退回「靠 WS 推历史」那条老路。
-        // 它本来就是为「历史/实时的边界说不清楚」而加的，这里兼任能力标记 —— **一个字段，两个用途**。
-        //
-        // ⚠️ 判的是「**有没有这个字段**」，不是「值大于 0」：空房间的合法值就是 `0`，
-        // 而 `0` 恰恰也说明它是新后端。
-        applyContentApiSupport(config) {
-            const supported = Object.prototype.hasOwnProperty.call(config || {}, 'latestId');
-            if (supported !== this.contentApiSupported) {
-                this.contentApiSupported = supported;
-                try {
-                    localStorage.setItem(contentApiCacheKey(), supported ? '1' : '0');
-                } catch { /* 存不下就算了：代价只是下次刷新多一次白推 */ }
-            }
-            if (supported) {
-                this.loadHistoryFromHttp();
-            }
-        },
-        // 从 `GET /content` 取这个房间的历史 —— WS 只推实时之后，历史就只剩这一条路。
-        //
-        // ⚠️★ **必须真的去请求一次**：`?history=0` 之后握手不再推历史，
-        // 不请求的话「刷新一下就什么都看不到了」—— 这是这个变更最容易漏的一条，
-        // `docs/specs/ws-live-only.md` §5 第 8 条专门点了它。
+        // ⚠️★ **必须真的去请求一次**：不请求的话「刷新一下就什么都看不到了」——
+        // 这是这个变更最容易漏的一条，`docs/specs/ws-live-only.md` §5 第 8 条专门点了它。
         async loadHistoryFromHttp(room = this.room) {
             const normalizedRoom = this.normalizeRoomName(room);
             try {
@@ -527,8 +486,8 @@ export const useWebSocketStore = defineStore('websocket', {
                 const messages = response.data && Array.isArray(response.data.messages)
                     ? response.data.messages
                     : [];
-                // ⚠️ `mergeMessages` 按 id 去重，所以「第一次连接时 WS 还推了一份历史」
-                // 不会重影 —— 那是探测阶段必然会发生的一次重复，不必额外处理。
+                // ⚠️ `mergeMessages` 按 id 去重，所以「`/content` 取回的这段」与
+                // 「请求还在飞的时候 WS 推来的实时」重叠时不会重影 —— 边界那几条不必额外处理。
                 this.mergeMessages(messages);
             } catch (error) {
                 // 取历史失败**不影响实时**：WS 照样连着、新消息照收，只是这个房间暂时是空的。
@@ -558,8 +517,8 @@ export const useWebSocketStore = defineStore('websocket', {
                 case 'config': {
                     this.flushPendingReceives();
                     app.config = data;
-                    // 顺手判定这个后端会不会 `GET /content`，会的话历史就改走那条路（上面那两条注释）。
-                    this.applyContentApiSupport(data);
+                    // ⚠️ 拿到 `config` 就去取历史 —— 握手不再推历史，这条 HTTP 请求是**唯一**的来源。
+                    this.loadHistoryFromHttp();
                     console.log(
                         `%c Cloud Clipboard ${data.version} by Jonnyan404 %c https://github.com/Jonnyan404/cloud-clipboard-go `,
                         'color:#fff;background-color:#1e88e5',
