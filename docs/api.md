@@ -125,6 +125,7 @@ Common codes are listed in the [error table](#10-error-codes) below.
 | POST | `/upload/multipart/*` | R2 multipart upload (**Worker only**) | Yes |
 | GET | `/content/latest` | Fetch the newest entry | Yes |
 | GET | `/content/:id` | Fetch one entry by ID | Yes |
+| GET | `/content` | History pagination (`?room=&before=&limit=`, id cursor, ascending) | Yes |
 | POST | `/content/:id/column` | Move an entry to a board column | Password |
 | GET | `/file/:uuid/:name` | Download a file | Yes |
 | GET | `/rooms` | Room list | Yes |
@@ -155,7 +156,7 @@ No auth. Call this on startup to learn the limits — never hard-code them.
 ```json
 {
   "version": "5.0.8",
-  "server": { "prefix": "", "history": 100, "roomList": false },
+  "server": { "prefix": "", "history": 50, "roomList": false },
   "text": { "limit": 4096 },
   "file": { "limit": 268435456, "expire": 3600, "chunk": 1048576 }
 }
@@ -909,6 +910,11 @@ morning it actually sends tomorrow+1 — a misleading preview. `?at=` overrides 
 ```
 ws://localhost:9501/push?room=default&token=<token>
 ```
+
+> ⚠️ **The handshake does not push history** (since 2026-09-26) — it only sends the room's
+> existing devices and `config`. Fetch history yourself with `GET /content` (above).
+> `config.latestId` is the **largest message id in the room at connect time** (`0` when empty);
+> clients use it to align the boundary between "history fetched over HTTP" and "realtime over WS".
 
 Once connected, new messages in that room are pushed to every listener:
 

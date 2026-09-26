@@ -122,6 +122,7 @@ curl "http://localhost:9501/content/7?format=raw"
 | POST | `/upload/multipart/*` | R2 分片上传（**仅 Worker**） | 是 |
 | GET | `/content/latest` | 取最新一条 | 是 |
 | GET | `/content/:id` | 按 ID 取一条 | 是 |
+| GET | `/content` | 历史分页（`?room=&before=&limit=`，游标是 id，正序） | 是 |
 | GET | `/file/:uuid/:name` | 下载文件 | 是 |
 | GET | `/rooms` | 房间列表 | 是 |
 | GET/POST | `/tasks` | 定时自动化任务：列表 / 创建或更新（**仅 Go**） | 房间 |
@@ -151,7 +152,7 @@ curl "http://localhost:9501/content/7?format=raw"
 ```json
 {
   "version": "5.0.8",
-  "server": { "prefix": "", "history": 100, "roomList": false },
+  "server": { "prefix": "", "history": 50, "roomList": false },
   "text": { "limit": 4096 },
   "file": { "limit": 268435456, "expire": 3600, "chunk": 1048576 }
 }
@@ -869,7 +870,13 @@ curl -X POST "http://localhost:9501/tasks/<id>/toggle?room=home&enabled=0" -H "A
 ws://localhost:9501/push?room=default&token=<令牌>
 ```
 
-连接后，该房间的新消息会实时推给所有连接。事件形如：
+连接后，该房间的新消息会实时推给所有连接。
+
+> ⚠️ **握手不推历史**（2026-09-26 起）—— 握手只发「房间里已有的设备」和 `config` 两种事件，
+> 历史一律用 `GET /content`（见上）自己取。`config` 里的 `latestId` 是**连接时刻该房间的
+> 最大消息 id**（空房间为 `0`），客户端拿它对齐「HTTP 取回的历史」与「WS 推来的实时」那条边界。
+
+事件形如：
 
 ```json
 {"event": "newMessage", "data": { ...与 /content/:id 的 JSON 同构... }}
