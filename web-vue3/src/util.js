@@ -586,9 +586,10 @@ export function toggleTaskListItem(text, index) {
     );
 }
 
-// 文件名是不是图片。**全站唯一实现** —— 之前这段正则在 6 个地方各抄了一份
-// （StickyNote 两处、ChatWall / MegaWall / TerminalWall / WorkbenchWall 各一处），
-// 再加一份就是第 7 份，改一处必漏其余。判型只看扩展名，不看内容：
+// 文件名是不是图片。**全站唯一实现** —— 这段正则当年在 6 个地方各抄了一份
+// （便签两处、几个模式墙各一处），再加一份就是第 7 份，改一处必漏其余。
+// ⚠️ 2026-09-26：那几个模式墙已退役删除，所以现在的消费点少了；但**教训不变** ——
+// 判型这种东西只留一份，别因为「只剩两处了」又抄回去。判型只看扩展名，不看内容：
 // 服务端不嗅探、客户端也不该嗅探，两边同一套标准。
 const IMAGE_NAME_RE = /\.(png|jpe?g|gif|webp|svg|bmp|ico|avif)$/i;
 export function isImageName(name) {
@@ -598,10 +599,12 @@ export function isImageName(name) {
 // 文件条目「能不能就地预览、该按哪一类渲染」—— **全站唯一实现**。
 //
 // 为什么收进这里：这三条正则（视频 / 音频 / 文本类文件）本来在 7 个文件里各抄了一份
-// （received-item/File、sticky/StickyNote、glance/GlancePreview、ChatWall / MegaWall /
-// TerminalWall / WorkbenchWall），而且**已经漂移**：那几个模式墙「挑渲染分支」的 helper 认
-// `.mov`，而它们自己的 `isPreviewableVideo` 不认 —— 同一个文件在弹窗里是视频播放器、
-// 在卡片上却退回图标。同一份 `isImageName` 当年也是抄了 6 份才收进来的，别再抄第 8 份。
+// （文件条目、便签、速览预览、几个模式墙），而且**已经漂移**：模式墙里那个「挑渲染分支」
+// 的 helper 认 `.mov`，而它们自己的 `isPreviewableVideo` 不认 —— 同一个文件在弹窗里是
+// 视频播放器、在卡片上却退回图标。
+// ⚠️ 2026-09-26：那几个模式墙已退役删除，所以漂移的那一半不存在了 —— 但**这条最该记住的
+// 是它的成因**：同一个判断抄了 7 份，改一处必漏其余，而且漏了**不报错**（只是同一个文件
+// 在不同地方长得不一样）。`isImageName` 当年也是抄了 6 份才收进来的，别再抄第 8 份。
 //
 // 判型只看扩展名，不看内容：服务端不嗅探、客户端也不该嗅探（同 isImageName）。
 //

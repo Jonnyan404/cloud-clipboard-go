@@ -116,7 +116,6 @@ Common codes are listed in the [error table](#10-error-codes) below.
 | Method | Path | Purpose | Auth |
 |---|---|---|---|
 | GET | `/server` | Service info and limits | No |
-| GET | `/myip` | Client's egress IP | No |
 | GET | `/health` | Health check (**Worker only**) | No |
 | POST | `/auth/token` | Exchange a password for a session token | Password |
 | POST | `/auth/token/refresh` | Renew a session token | Token |
@@ -165,12 +164,6 @@ No auth. Call this on startup to learn the limits — never hard-code them.
 
 Fields such as `authNeeded` / `authorized` reflect the current auth state, which is how the
 web UI decides whether to show a password prompt.
-
-### GET /myip
-
-```json
-{ "ip": "203.0.113.7" }
-```
 
 ### GET /health (Worker only)
 

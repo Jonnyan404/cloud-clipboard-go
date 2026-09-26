@@ -19,9 +19,9 @@ import { prefersRenderedView } from '@/util.js';
  *     **要不要显示那些图标**（连带渲染视图的开关）
  *   · 右上角那几个图标 —— 决定**这一条用哪种方式看**
  *
- * ⚠️ 这条语义**三个模式通用**：标准、便签走这里，聊天（views/modes/ChatWall.vue）
- * 不走本 composable（气泡是列表，形态对不上），但默认值与可用性两条判断都复用
- * 同一份实现（`util.js` 的 `prefersRenderedView` / `looksLikeMarkdown`）。
+ * ⚠️ 这条语义**标准与便签两个模式通用**。
+ * （2026-09-26：原来还有第三个模式聊天，它不走本 composable —— 气泡是列表、形态对不上，
+ * 但复用同一份可用性判断。聊天已退役并删除，所以这里只剩两个消费点。）
  * 唯一集中说明处仍是 data/displayToggles.js 里 markdown 那条 —— 改语义先改那边。
  *
  * ⚠️ 「原文」不是动作（它不跑任何东西），所以用 `null` 表示。

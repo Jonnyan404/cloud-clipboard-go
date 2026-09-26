@@ -113,7 +113,6 @@ curl "http://localhost:9501/content/7?format=raw"
 | 方法 | 路径 | 用途 | 鉴权 |
 |---|---|---|---|
 | GET | `/server` | 服务信息与限制 | 否 |
-| GET | `/myip` | 客户端出口 IP | 否 |
 | GET | `/health` | 健康检查（**仅 Worker**） | 否 |
 | POST | `/auth/token` | 用密码换会话令牌 | 密码 |
 | POST | `/auth/token/refresh` | 续签会话令牌 | 令牌 |
@@ -160,12 +159,6 @@ curl "http://localhost:9501/content/7?format=raw"
 ```
 
 `authNeeded` / `authorized` 等字段会反映当前鉴权状态，前端据此决定是否弹密码框。
-
-### GET /myip
-
-```json
-{ "ip": "203.0.113.7" }
-```
 
 ### GET /health（仅 Worker）
 
