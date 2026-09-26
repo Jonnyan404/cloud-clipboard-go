@@ -11,8 +11,16 @@ package lib
 //   - 收得太松 → 洞又回来了（`*`、`null`、或者「包含 127 就算过」那种模糊判断）。
 //
 // 所以两边都各钉一组用例。Rust 侧同一份规则在 `clip9/crates/server/src/cors.rs`。
+//
+// ⚠️ 文件里分两层：① `allowedCORSOrigin` 这个**判定函数**；② **中间件真的发了哪些头**
+// （后者是 2026-09-26 对活服务端实测后补的 —— 光测判定函数，「头忘了发」照样全绿）。
 
-import "testing"
+import (
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+)
 
 func TestAllowedCORSOrigin(t *testing.T) {
 	allowed := []string{
@@ -77,5 +85,85 @@ func TestAllowedCORSOriginEchoesTheOrigin(t *testing.T) {
 	// 前后空白要去掉（header 值本来不该有，但别依赖对手的规范程度）。
 	if got := allowedCORSOrigin("  tauri://localhost  "); got != "tauri://localhost" {
 		t.Errorf("应当去掉空白，得到 %q", got)
+	}
+}
+
+// 中间件层：**真的发了哪些头**。
+//
+// ⚠️★ 为什么非要这一层：判定函数全绿而中间件忘了发头（或者反过来）是**两种不同的故障**，
+// 而症状都只是「桌面端一条接口都调不通」。这里用 `httptest` 直接调中间件 ——
+// 它不碰 `s` 的字段，所以零值 `&ClipboardServer{}` 就够，不需要起真服务端。
+func TestCORSMiddlewareSendsTheHeaders(t *testing.T) {
+	handler := (&ClipboardServer{}).corsMiddleware(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	})
+
+	cases := []struct {
+		name      string
+		origin    string
+		wantAllow string
+	}{
+		{"放行的来源（桌面端）", "tauri://localhost", "tauri://localhost"},
+		{"放行的来源（本机开发）", "http://localhost:5173", "http://localhost:5173"},
+		{"被拒的来源", "https://evil.example", ""},
+		{"没有 Origin 头", "", ""},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/server", nil)
+			if tc.origin != "" {
+				req.Header.Set("Origin", tc.origin)
+			}
+			rec := httptest.NewRecorder()
+			handler(rec, req)
+
+			if got := rec.Header().Get("Access-Control-Allow-Origin"); got != tc.wantAllow {
+				t.Errorf("Access-Control-Allow-Origin = %q，期望 %q", got, tc.wantAllow)
+			}
+			// ⚠️ `Vary: Origin` **无条件**要带（理由写在 `corsMiddleware` 上）：
+			// 一份没有放行头的响应同样会被缓存，之后再喂给本该放行的来源。
+			if got := rec.Header().Get("Vary"); !strings.Contains(got, "Origin") {
+				t.Errorf("Vary = %q，应当包含 Origin", got)
+			}
+		})
+	}
+}
+
+// 预检（`OPTIONS`）与实际请求**一致**：放行的来源要答上允许的方法与头；
+// 被拒的来源只回 200、**一个放行头都不带**（由浏览器判定预检失败）。
+//
+// ⚠️ 这条是「上行能不能发出去」的那条：上行带 `Authorization` → **一定**会预检，
+// 所以预检不放行的话，「桌面端能读到 /server」是个假象（真上行一条都发不出去）。
+func TestCORSPreflightMatchesTheActualRequest(t *testing.T) {
+	handler := (&ClipboardServer{}).corsMiddleware(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	preflight := func(origin string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodOptions, "/server", nil)
+		req.Header.Set("Origin", origin)
+		req.Header.Set("Access-Control-Request-Method", "POST")
+		req.Header.Set("Access-Control-Request-Headers", "authorization")
+		rec := httptest.NewRecorder()
+		handler(rec, req)
+		return rec
+	}
+
+	allowed := preflight("tauri://localhost")
+	if allowed.Code != http.StatusOK {
+		t.Errorf("放行的来源预检应当 200，得到 %d", allowed.Code)
+	}
+	if got := allowed.Header().Get("Access-Control-Allow-Methods"); !strings.Contains(got, "POST") {
+		t.Errorf("允许的方法里要有 POST，得到 %q", got)
+	}
+	if got := allowed.Header().Get("Access-Control-Allow-Headers"); !strings.Contains(strings.ToLower(got), "authorization") {
+		t.Errorf("允许的头里要有 authorization，得到 %q", got)
+	}
+
+	rejected := preflight("https://evil.example")
+	if got := rejected.Header().Get("Access-Control-Allow-Origin"); got != "" {
+		t.Errorf("被拒的来源不该拿到预检放行头，得到 %q", got)
 	}
 }

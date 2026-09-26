@@ -811,11 +811,16 @@ func (s *ClipboardServer) authMiddleware(next http.HandlerFunc) http.HandlerFunc
 // 否则「Go 能用、Rust 被拦」这种只在跨源时出现的差异会非常难查。
 func (s *ClipboardServer) corsMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// ⚠️★ `Vary` **无条件**加，不只在放行那一支里加 —— 这条是 2026-09-26 对活服务端
+		// 实测时发现两侧不一致（Rust 那层无条件带、Go 原来只在放行时带）之后补的。
+		// 理由是「响应随 `Origin` 变」这件事**在被拒时同样成立**：
+		// 一份**没有放行头**的响应照样会被 HTTP 缓存存下来，之后被喂给那个
+		// **本该放行**的来源（桌面端）—— 症状是「桌面端一条接口都调不通」，
+		// 而且看起来是随机的（取决于谁先请求过）。这不值得为省一个头去赌。
+		w.Header().Add("Vary", "Origin")
+
 		if allowed := allowedCORSOrigin(r.Header.Get("Origin")); allowed != "" {
 			w.Header().Set("Access-Control-Allow-Origin", allowed)
-			// ⚠️ 响应随 Origin 变 → 必须告诉缓存，否则中间层会把「给被拒来源的那一份」
-			// 缓存下来，或者反过来。
-			w.Header().Add("Vary", "Origin")
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Room-Auth-Tokens")
 		}
