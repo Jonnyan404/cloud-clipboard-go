@@ -151,19 +151,36 @@ Common codes are listed in the [error table](#10-error-codes) below.
 
 ### GET /server
 
-No auth. Call this on startup to learn the limits — never hard-code them.
+No auth. Returns where the WebSocket lives, the current auth state, and the capability flags
+the web UI needs.
 
 ```json
 {
-  "version": "5.0.8",
-  "server": { "prefix": "", "history": 50, "roomList": false },
-  "text": { "limit": 4096 },
-  "file": { "limit": 268435456, "expire": 3600, "chunk": 1048576 }
+  "server": "ws://127.0.0.1:9501/push",
+  "auth": false,
+  "authorized": true,
+  "roomProtected": false,
+  "config": { "server": { "history": 50, "roomList": false } },
+  "automation": { "enabled": true }
 }
 ```
 
-Fields such as `authNeeded` / `authorized` reflect the current auth state, which is how the
-web UI decides whether to show a password prompt.
+| Field | Notes |
+|---|---|
+| `server` | The WebSocket URL, **as a string**, scheme already switched to `ws` / `wss` |
+| `auth` / `authorized` / `roomProtected` | Current auth state — this is how the web UI decides whether to show a password prompt |
+| `config.server.*` | The subset of server config the UI reads |
+| `automation` | Capability declaration (abridged above — the full shape is in section 10). Go / Rust return the full object; the Worker returns just `{"enabled": false}` |
+
+> ⚠️★ **This endpoint does not return the size limits, and it does not return `version`.**
+> Until 2026-09-26 this section showed the **WebSocket handshake `config` payload** while claiming
+> to be the `/server` response, and section 11.1 told clients to read their limits from here —
+> which was impossible on all three backends (Go and Rust return no such fields; verified by
+> reading both handlers and curling a live server). `version`, `text.limit` and `file.limit` are
+> sent in the **`config` event of the WebSocket handshake** — see section 9.
+>
+> ⚠️ The Cloudflare Worker *additionally* returns `version`, `history` and `roomList` at the top
+> level, and no nested `config`. Treat those as extras rather than something to depend on.
 
 ### GET /health (Worker only)
 
@@ -921,7 +938,7 @@ Once connected, new messages in that room are pushed to every listener. Every fr
 
 | `event` | `data` | When |
 |---|---|---|
-| `config` | service limits + **`latestId`** | **Right after connecting, before any realtime message** |
+| `config` | `version` + `text.limit` / `file.limit` + **`latestId`** (the only place the limits are sent) | **Right after connecting, before any realtime message** |
 | `receive` | same shape as `/content/:id` | a new message arrived |
 | `update` | same shape | an existing message was edited **in place** (same `id`) |
 | `revoke` | `{"id": <number>}` | one entry was deleted |
@@ -983,7 +1000,10 @@ Reconnection is the client's job (the web UI retries with exponential backoff).
 
 ## 11. Implementation notes for clients
 
-1. **Call `/server` first** for the limits; never hard-code them.
+1. **Get the limits from the WebSocket handshake**, not from `/server`. The `config` event
+   carries `version`, `text.limit` and `file.limit` (section 9); `/server` (section 3) carries
+   the auth state and the `automation` capability and **none of the limits**.
+   Either way: never hard-code them.
 2. **Limits are dynamic**: the numbers inside limit errors come from server config
    (`text.limit` / `file.limit`). Show the server's `message` verbatim instead of composing
    your own sentence.

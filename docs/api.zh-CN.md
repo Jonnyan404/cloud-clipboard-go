@@ -147,18 +147,34 @@ curl "http://localhost:9501/content/7?format=raw"
 
 ### GET /server
 
-无需鉴权。客户端启动时先调它拿限制值，别把限制写死在客户端。
+无需鉴权。返回 WebSocket 的地址、当前鉴权状态，以及 Web 界面要用到的能力声明。
 
 ```json
 {
-  "version": "5.0.8",
-  "server": { "prefix": "", "history": 50, "roomList": false },
-  "text": { "limit": 4096 },
-  "file": { "limit": 268435456, "expire": 3600, "chunk": 1048576 }
+  "server": "ws://127.0.0.1:9501/push",
+  "auth": false,
+  "authorized": true,
+  "roomProtected": false,
+  "config": { "server": { "history": 50, "roomList": false } },
+  "automation": { "enabled": true }
 }
 ```
 
-`authNeeded` / `authorized` 等字段会反映当前鉴权状态，前端据此决定是否弹密码框。
+| 字段 | 说明 |
+|---|---|
+| `server` | WebSocket 地址，**是个字符串**，协议已经换成 `ws` / `wss` |
+| `auth` / `authorized` / `roomProtected` | 当前鉴权状态，前端据此决定是否弹密码框 |
+| `config.server.*` | 界面要读的那部分服务端配置 |
+| `automation` | 能力声明（上面是节选，完整形状见第 10 节）。Go / Rust 下发完整对象；Worker 只下发 `{"enabled": false}` |
+
+> ⚠️★ **这个端点不下发大小限制，也没有 `version`。**
+> 在 2026-09-26 之前，本节把 **WebSocket 握手的 `config` 载荷**当成 `/server` 的响应贴了出来，
+> 而第 11.1 条又让客户端「先调 `/server` 拿限制值」—— 那把三个实现都读不到东西
+> （Go 与 Rust 都不返回这些字段；读两边源码 + 对活服务端打请求确认过）。
+> `version` / `text.limit` / `file.limit` 是在 **WebSocket 握手的 `config` 事件**里下发的 —— 见第 9 节。
+>
+> ⚠️ Cloudflare Worker **额外**在顶层返回 `version` / `history` / `roomList`，且没有嵌套的 `config`。
+> 那些算它的附赠，别当契约来依赖。
 
 ### GET /health（仅 Worker）
 
@@ -880,7 +896,7 @@ ws://localhost:9501/push?room=default&token=<令牌>
 
 | `event` | `data` | 什么时候 |
 |---|---|---|
-| `config` | 服务端限额 + **`latestId`** | **刚连上、任何实时消息之前** |
+| `config` | `version` + `text.limit` / `file.limit` + **`latestId`**（限制值**只有这里**下发） | **刚连上、任何实时消息之前** |
 | `receive` | 与 `/content/:id` 的 JSON 同构 | 来了一条新消息 |
 | `update` | 同上 | 一条已有消息被**原地改正文**（`id` 不变） |
 | `revoke` | `{"id": <数字>}` | 删了一条 |
@@ -941,7 +957,9 @@ ws://localhost:9501/push?room=default&token=<令牌>
 
 ## 11. 客户端实现建议
 
-1. **先调 `/server`** 拿限制值，不要写死。
+1. **限制值从 WebSocket 握手拿**，不是从 `/server`：`config` 事件里有 `version`、
+   `text.limit`、`file.limit`（第 9 节）；`/server`（第 3 节）给的是鉴权状态与
+   `automation` 能力声明，**一个限制值都没有**。总之都不要写死。
 2. **限制是动态的**：超限错误里的数字来自服务端配置（`text.limit` / `file.limit`），
    客户端应原样展示服务端给的 `message`，而不是自己拼一句。
 3. **错误只解析一套**：读 `message`（中文）或 `error`（英文），别按 `Accept` 分叉。
