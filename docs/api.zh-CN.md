@@ -215,7 +215,7 @@ Authorization: Bearer <凭据>
 |---|---|---|
 | `room` | query | 房间名，留空 = `default` |
 | `name` | query | **设备显示名**，写进消息的 `senderDevice.name`。最多 32 字符，控制字符会被剔除；留空则由服务端按 User-Agent 推断 |
-| `client` | query | **客户端唯一 ID**，用于「这条是不是我发的」判断（聊天气泡归属）。与 `name` 是两件事，不能互相替代 |
+| `client` | query | **客户端唯一 ID**，用于「这条是不是我发的」判断（气泡归属）。与 `name` 是两件事，不能互相替代 |
 | `id` | query | 传了就**覆盖**这条已有消息，而不是新建 |
 
 响应：
