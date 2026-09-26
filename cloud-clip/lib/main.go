@@ -745,14 +745,11 @@ func hash_murmur3(data []byte, seed uint32) uint32 {
 
 func (s *ClipboardServer) authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// 添加 CORS 头，允许跨域请求
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Room-Auth-Tokens")
-
-		// 处理预检请求
-		if r.Method == "OPTIONS" {
-			w.WriteHeader(http.StatusOK)
+		// ⚠️ 这一层**以前自己抄了一份** CORS（还是 `*`）—— 而它罩着的是
+		// `/text`、`/upload`、`/content/:id` 这些**主数据路径**。
+		// 也就是说 2026-09-26 那次收窄（只改了 `corsMiddleware`）漏掉了最要紧的一批端点。
+		// 现在四个地方共用 `corsPreflight` 一个实现，理由写在它的注释里。
+		if corsPreflight(w, r, corsMethodsAll, corsHeadersAll) {
 			return
 		}
 
@@ -795,6 +792,47 @@ func (s *ClipboardServer) authMiddleware(next http.HandlerFunc) http.HandlerFunc
 	}
 }
 
+// CORS 的三份「白名单内容」—— 放行哪些方法 / 哪些头。
+// ⚠️ 只有一处定义，因为下面那个 `corsPreflight` 会被**四处**调用（见它的注释）。
+const (
+	corsMethodsAll  = "GET, POST, PUT, DELETE, OPTIONS"
+	corsMethodsRead = "GET, OPTIONS"
+	corsHeadersAll  = "Content-Type, Authorization, X-Room-Auth-Tokens"
+)
+
+// corsPreflight 统一处理 CORS 头与预检。**返回 true = 这是个预检，已经回完了。**
+//
+// ⚠️★ 为什么必须是**一个**实现：原来 CORS 在**四处**各手写了一份
+// （`corsMiddleware` / `authMiddleware` / `handleRooms` / `handle_share`）。
+// 2026-09-26 把 `Access-Control-Allow-Origin: *` 收窄时**只改了其中一处** ——
+// 于是 `/text`、`/upload`、`/content/:id`（走 `authMiddleware`）、`/rooms`、`/share`
+// **仍然**对任意来源放行，而那正是这次要修的洞本身。
+//
+// ⚠️★ 抄件漏了两份，而**没有任何测试能发现**：`cors_test.go` 里那些用例只看得见
+// `allowedCORSOrigin` 这个判定函数与 `corsMiddleware` —— 另外三处各测各的、各自都「对」。
+// 「一份规则、一个实现」是这里唯一能防住它的办法（规则抄三遍就等于没有规则）。
+func corsPreflight(w http.ResponseWriter, r *http.Request, methods, headers string) bool {
+	// ⚠️ `Vary` **无条件**加，不只在放行的那一支里加 ——
+	// 「响应随 `Origin` 变」这件事**在被拒时同样成立**：一份没有放行头的响应
+	// 照样会被 HTTP 缓存存下来，之后被喂给那个**本该放行**的来源（桌面端），
+	// 症状是「桌面端一条接口都调不通」而且看着随机（取决于谁先请求过）。
+	w.Header().Add("Vary", "Origin")
+
+	if allowed := allowedCORSOrigin(r.Header.Get("Origin")); allowed != "" {
+		w.Header().Set("Access-Control-Allow-Origin", allowed)
+		w.Header().Set("Access-Control-Allow-Methods", methods)
+		w.Header().Set("Access-Control-Allow-Headers", headers)
+	}
+
+	if r.Method == http.MethodOptions {
+		// ⚠️ 预检与实际请求**必须一致地**放行：来源不被放行时这里只回 200、不带放行头，
+		// 由浏览器自己去判定预检失败。别在这儿「先放行再说」。
+		w.WriteHeader(http.StatusOK)
+		return true
+	}
+	return false
+}
+
 // corsMiddleware 给「浏览器跨源读」加放行头，并处理 OPTIONS 预检。
 //
 // ⚠️★ **2026-09-26 收窄了**：原来看是 `Access-Control-Allow-Origin: *`，那在本机服务端上是
@@ -811,24 +849,7 @@ func (s *ClipboardServer) authMiddleware(next http.HandlerFunc) http.HandlerFunc
 // 否则「Go 能用、Rust 被拦」这种只在跨源时出现的差异会非常难查。
 func (s *ClipboardServer) corsMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// ⚠️★ `Vary` **无条件**加，不只在放行那一支里加 —— 这条是 2026-09-26 对活服务端
-		// 实测时发现两侧不一致（Rust 那层无条件带、Go 原来只在放行时带）之后补的。
-		// 理由是「响应随 `Origin` 变」这件事**在被拒时同样成立**：
-		// 一份**没有放行头**的响应照样会被 HTTP 缓存存下来，之后被喂给那个
-		// **本该放行**的来源（桌面端）—— 症状是「桌面端一条接口都调不通」，
-		// 而且看起来是随机的（取决于谁先请求过）。这不值得为省一个头去赌。
-		w.Header().Add("Vary", "Origin")
-
-		if allowed := allowedCORSOrigin(r.Header.Get("Origin")); allowed != "" {
-			w.Header().Set("Access-Control-Allow-Origin", allowed)
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Room-Auth-Tokens")
-		}
-
-		if r.Method == http.MethodOptions {
-			// ⚠️ 预检与实际请求**必须一致地**放行：来源不被放行时这里只回 200、不带放行头，
-			// 由浏览器自己去判定预检失败。别在这儿「先放行再说」。
-			w.WriteHeader(http.StatusOK)
+		if corsPreflight(w, r, corsMethodsAll, corsHeadersAll) {
 			return
 		}
 		next.ServeHTTP(w, r)

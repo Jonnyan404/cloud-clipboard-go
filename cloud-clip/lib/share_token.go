@@ -715,12 +715,10 @@ func (s *ClipboardServer) fillShareFileInfo(w http.ResponseWriter, response map[
 }
 
 func (s *ClipboardServer) handle_share(w http.ResponseWriter, r *http.Request) {
-	// 与 authMiddleware 保持一致的 CORS 行为，便于前后端分离调用
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Room-Auth-Tokens, "+sharePasswordHeader)
-	if r.Method == http.MethodOptions {
-		w.WriteHeader(http.StatusOK)
+	// ⚠️ 与其它三处共用 `corsPreflight`（以前是第三份抄件，还是 `*`）。
+	// 分享口额外允许 `sharePasswordHeader` —— 那是它自己那个头，
+	// **不是**把整张白名单放宽给别的端点（所以这里传的是「加一个头」而不是换成常量）。
+	if corsPreflight(w, r, corsMethodsAll, corsHeadersAll+", "+sharePasswordHeader) {
 		return
 	}
 	// GET /share?t=... 是给前端分享页用的「先看一眼」，POST 才是签发。同一条路径两种方法。

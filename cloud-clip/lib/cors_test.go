@@ -16,8 +16,11 @@ package lib
 // （后者是 2026-09-26 对活服务端实测后补的 —— 光测判定函数，「头忘了发」照样全绿）。
 
 import (
+	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -165,5 +168,128 @@ func TestCORSPreflightMatchesTheActualRequest(t *testing.T) {
 	rejected := preflight("https://evil.example")
 	if got := rejected.Header().Get("Access-Control-Allow-Origin"); got != "" {
 		t.Errorf("被拒的来源不该拿到预检放行头，得到 %q", got)
+	}
+}
+
+// newCORSServer 起一个带**真路由**的服务器。
+//
+// ⚠️ 为什么要起真的：这次收窄漏掉三处，根因就是**只测了判定函数与一层中间件** ——
+// 另外三个端点各自抄了一份，没人碰过它们。绕开 `setupRoutes` 就等于看不见
+// 「哪个端点挂在哪一层」，而那正是漏掉的地方。
+func newCORSServer(t *testing.T) *httptest.Server {
+	t.Helper()
+
+	dir := t.TempDir()
+	cfg := &Config{}
+	cfg.Server.StorageDir = filepath.Join(dir, "uploads")
+	cfg.Server.HistoryFile = filepath.Join(dir, "history.json")
+	cfg.Server.History = 50
+	cfg.Server.RoomList = false // 别在测试里起房间清理 goroutine
+	cfg.Text.Limit = 40960
+	cfg.File.Limit = 204857600
+
+	s, err := NewClipboardServer(cfg)
+	if err != nil {
+		t.Fatalf("构造服务器失败: %v", err)
+	}
+	s.logger = log.New(io.Discard, "", 0)
+	s.setupRoutes()
+
+	srv := httptest.NewServer(s.httpServer.Handler)
+	// ⚠️ 顺序是故意的：后注册的先跑 → srv.Close（等在途请求）→ 排干异步落盘 → 删目录。
+	t.Cleanup(func() { s.WaitForHistoryWrites() })
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+// ⚠️★ 端点级回归：**每一个自己处理 CORS 的端点**都要被这条盖住。
+//
+// 2026-09-26 收窄 `*` 的时候漏了三处（`authMiddleware` 罩着的 `/text`、`/upload`、
+// `/content/:id`，以及 `handleRooms`、`handle_share`）—— 它们仍然对任意来源放行，
+// 而 `/content` 正是「任意网站读走本机剪贴板历史」那条路。
+//
+// ⚠️ 这条测试的价值全在**按端点打**：只测 `allowedCORSOrigin` 的话，
+// 上面那三处漏改**一条都不会红**。
+func TestCORSIsNarrowedOnEveryEndpoint(t *testing.T) {
+	srv := newCORSServer(t)
+
+	cases := []struct {
+		name   string
+		method string
+		path   string
+	}{
+		// 走 corsMiddleware 的
+		{"GET /server", http.MethodGet, "/server"},
+		{"GET /content（敏感读）", http.MethodGet, "/content?room=default&format=json"},
+		{"GET /rooms（自己还有一份）", http.MethodGet, "/rooms"},
+		// 走 authMiddleware 的（以前自己抄了一份 `*`）
+		{"POST /text", http.MethodPost, "/text?room=default&name=t&client=c"},
+		{"POST /upload", http.MethodPost, "/upload?room=default&name=t"},
+		{"GET /content/1", http.MethodGet, "/content/1?format=json"},
+		// handle_share（第三份抄件）
+		{"GET /share", http.MethodGet, "/share?room=default"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			// ① 被拒的来源：一个放行头都不许有。
+			req, err := http.NewRequest(tc.method, srv.URL+tc.path, nil)
+			if err != nil {
+				t.Fatalf("构造请求失败: %v", err)
+			}
+			req.Header.Set("Origin", "https://evil.example")
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatalf("请求失败: %v", err)
+			}
+			defer resp.Body.Close()
+			if got := resp.Header.Get("Access-Control-Allow-Origin"); got != "" {
+				t.Errorf("任意网站拿到了放行头 %q —— 本机剪贴板历史读得走了", got)
+			}
+			if got := resp.Header.Get("Vary"); !strings.Contains(got, "Origin") {
+				t.Errorf("Vary = %q，应当包含 Origin", got)
+			}
+
+			// ② 放行的来源（桌面端）：要拿到原样回写的头，否则桌面端一条接口都调不通。
+			req2, err := http.NewRequest(tc.method, srv.URL+tc.path, nil)
+			if err != nil {
+				t.Fatalf("构造请求失败: %v", err)
+			}
+			req2.Header.Set("Origin", "tauri://localhost")
+			resp2, err := http.DefaultClient.Do(req2)
+			if err != nil {
+				t.Fatalf("请求失败: %v", err)
+			}
+			defer resp2.Body.Close()
+			if got := resp2.Header.Get("Access-Control-Allow-Origin"); got != "tauri://localhost" {
+				t.Errorf("桌面端来源应当被放行，Access-Control-Allow-Origin = %q", got)
+			}
+		})
+	}
+}
+
+// ⚠️ 预检也要**逐端点**一致：桌面上行带 `Authorization` → 一定先预检。
+// 预检不过的话，「能读到 /server」是个假象（真上行一条都发不出去）。
+func TestCORSPreflightIsNarrowedOnEveryEndpoint(t *testing.T) {
+	srv := newCORSServer(t)
+
+	for _, path := range []string{"/text", "/upload", "/content/1", "/rooms", "/share", "/server"} {
+		t.Run(path, func(t *testing.T) {
+			req, err := http.NewRequest(http.MethodOptions, srv.URL+path, nil)
+			if err != nil {
+				t.Fatalf("构造请求失败: %v", err)
+			}
+			req.Header.Set("Origin", "https://evil.example")
+			req.Header.Set("Access-Control-Request-Method", "POST")
+			req.Header.Set("Access-Control-Request-Headers", "authorization")
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatalf("请求失败: %v", err)
+			}
+			defer resp.Body.Close()
+			if got := resp.Header.Get("Access-Control-Allow-Origin"); got != "" {
+				t.Errorf("%s 的预检把 %q 放行了", path, got)
+			}
+		})
 	}
 }

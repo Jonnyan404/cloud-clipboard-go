@@ -1901,14 +1901,10 @@ func (s *ClipboardServer) handleLatestContent(w http.ResponseWriter, r *http.Req
 
 // handleRooms 处理房间列表请求
 func (s *ClipboardServer) handleRooms(w http.ResponseWriter, r *http.Request) {
-	// 添加 CORS 头
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Room-Auth-Tokens")
-
-	// 处理预检请求
-	if r.Method == "OPTIONS" {
-		w.WriteHeader(http.StatusOK)
+	// ⚠️ 这一层以前也自己抄了一份（还是 `*`）。现在与其它三处共用 `corsPreflight`。
+	// 这里仍然显式调一次（而不是「反正路由上挂了 corsMiddleware」）——
+	// 挂载方式是**别处**决定的，把 CORS 的正确性寄托在它上面，就是下一个抄件的来源。
+	if corsPreflight(w, r, corsMethodsRead, corsHeadersAll) {
 		return
 	}
 
