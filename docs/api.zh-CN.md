@@ -240,7 +240,8 @@ Authorization: Bearer <凭据>
 {"id": "7", "type": "text", "url": "http://localhost:9501/content/7"}
 ```
 
-超限时返回 `413` + `code: text_too_long`（上限见 `/server` 的 `text.limit`）。
+超限时返回 `413` + `code: text_too_long`（上限来自 WS 握手的 `config` 事件 → `text.limit`；
+见第 11 节第 1 条。⚠️ **不是** `/server`）。
 
 **正文有三种形态**，按 `Content-Type` 分：
 
@@ -967,3 +968,10 @@ ws://localhost:9501/push?room=default&token=<令牌>
 5. **`name` 与 `client` 别混用**：前者给人看，后者给程序判归属。
 6. **别依赖「不传 room = default」**：不传 `room` 在部分端点意味着「不限房间」，
    想指定默认房间就显式写 `?room=default`。
+7. ⚠️ **除了 `text.limit`，还有一道「请求体绝对上限」，两者不是一回事。**
+   Rust 实现把 `POST /text` 的请求体钉在 **8 MiB**、单次上传钉在 **16 MiB**，
+   与 `text.limit` / `file.limit` **无关** —— 因为框架自己的默认值（2 MiB）会先拒，
+   而它返回的 body **不是** `{code,error,message}` 形状。超过这条线的拒绝来自 HTTP 层，
+   不是本接口。⚠️ 这两个数也**不要写死**，也**别**把 `text.limit` 调到它们之上再指望生效：
+   客户端应当待在 `text.limit` / `file.limit` 之内，更大的内容走文件
+   （`/upload`，大文件走分片）。

@@ -248,7 +248,8 @@ Response:
 {"id": "7", "type": "text", "url": "http://localhost:9501/content/7"}
 ```
 
-Over the limit returns `413` with `code: text_too_long` (limit from `/server` → `text.limit`).
+Over the limit returns `413` with `code: text_too_long` (limit from the WS handshake `config`
+event → `text.limit`; see section 11.1).
 
 **The body comes in three shapes**, picked by `Content-Type`:
 
@@ -1014,3 +1015,11 @@ Reconnection is the client's job (the web UI retries with exponential backoff).
    which messages are its own.
 6. **Do not rely on "no room means default"**: omitting `room` means "any room" on some
    endpoints. If you mean the default room, send `?room=default` explicitly.
+7. **There is also an absolute body ceiling, and it is not `text.limit`.** The Rust
+   implementation caps the `POST /text` request body at 8 MiB and single-shot uploads at 16 MiB,
+   independently of `text.limit` / `file.limit`, because the HTTP framework's own default (2 MiB)
+   would otherwise reject large bodies with an error body that is **not** the `{code,error,message}`
+   shape. A rejection above that ceiling therefore comes from the HTTP layer, not from this API.
+   ⚠️ Do not hard-code these numbers either, and do not raise `text.limit` past them expecting it
+   to work: keep clients inside `text.limit` / `file.limit`, and send anything larger as a file
+   (`/upload`, with the chunked path for large files).
