@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import QrcodeVue from 'qrcode.vue';
 import { buildAppUrl, copyTextToClipboard } from '@/util.js';
@@ -73,6 +73,45 @@ onMounted(async () => {
     }
 });
 
+// ── 时间轴放几个节点：**按容器宽度算** ─────────────────────────────────────
+//
+// 横向排一行，放不下的**截掉最旧的那几个**（左端用 `+N` 交代还有更早的）。
+//
+// ⚠️ 别拿「对话框 `max-width=560`」写死一个数：窄屏（手机）上那个盒子只有 300 出头，
+//    写死就会让这条轴横向溢出。
+// ⚠️★ 这个盒子是 `v-dialog` 的**懒渲染**内容 —— 第一次打开之前它根本不存在，
+//    所以不能只在 `onMounted` 里量一次：要 `watch` 这个 ref，它一出现就挂上观察器。
+// ⚠️ 这个数是**估的，并且刻意取大**：9(圆点) + 6(间距) + 72(`2026-09-22` 在 12px 等宽数字下)
+//    + 24(连接线) = 111 → 取 112。估大了最坏是**少显示一个**日期；估小了那条轴会横向溢出，
+//    而且 `flex` 不会自己换行（见样式里那段注释）。
+//    实测效果：桌面（对话框内容宽 ~528）留 4 个，手机（~310）留 2 个。
+const TIMELINE_ITEM_WIDTH = 112;
+const timelineEl = ref(null);
+const timelineWidth = ref(0);
+let timelineObserver = null;
+const maxItems = computed(() =>
+    Math.max(1, Math.floor((timelineWidth.value || 520) / TIMELINE_ITEM_WIDTH)),
+);
+// 数据是「最新在前」；轴上从左到右画成「旧 → 新」，所以渲染前反过来。
+const visibleHistory = computed(() => activeHistory.value.slice(0, maxItems.value).reverse());
+const hiddenCount = computed(() => Math.max(0, activeHistory.value.length - maxItems.value));
+
+watch(timelineEl, (el) => {
+    timelineObserver?.disconnect();
+    timelineObserver = null;
+    if (!el || typeof ResizeObserver === 'undefined') {
+        // 量不出来就当桌面宽度算 —— 「只显示一个」比「整条轴撑破」更糟
+        timelineWidth.value = 0;
+        return;
+    }
+    timelineObserver = new ResizeObserver(([entry]) => {
+        timelineWidth.value = entry.contentRect.width;
+    });
+    timelineObserver.observe(el);
+    timelineWidth.value = el.clientWidth;
+});
+onBeforeUnmount(() => timelineObserver?.disconnect());
+
 // 二维码单独一个小对话框：手机扫码直接下载到设备，比在手机上敲地址省事。
 const qrVisible = ref(false);
 const qrUrl = ref('');
@@ -98,23 +137,28 @@ function showQr(url) {
                  原来这里是「旧版捷径请重新导入」那句警告 + 一个「更新于 X」的日期。
                  2026-09-28 改掉：那句警告是**噪音** —— 它替用户下了结论，却不告诉他
                  「那我手上这份到底旧不旧」；而能回答这个问题的正是**发布日期**。
-                 于是改成把更新历史摊开：看到最近一次是 9/22，自己就能判断。 -->
-            <div v-if="activeHistory.length" class="shortcuts-dialog__timeline">
+                 于是改成把更新历史摊开：看到最近一次是 9/22，自己就能判断。
+                 ⚠️ 2026-09-28 又改成**横向**：纵向列表三五条就把两个 tab 的内容往下挤一截，
+                 横着排只占一行；放不下时只留最近的 N 个（N 按容器宽度算，见脚本里的 maxItems）。 -->
+            <div v-if="activeHistory.length" ref="timelineEl" class="shortcuts-dialog__timeline">
                 <div class="shortcuts-dialog__timeline-title">
                     <v-icon size="16" class="shortcuts-dialog__timeline-icon">mdi-history</v-icon>
                     <span>{{ t('scUpdateHistory') }}</span>
                 </div>
-                <ol class="shortcuts-dialog__timeline-list">
-                    <li
-                        v-for="(date, index) in activeHistory"
+                <div class="shortcuts-dialog__timeline-track">
+                    <!-- 轴上从左到右是「旧 → 新」，所以被截掉的**一定是最旧**的那几个，
+                         这个提示画在左端。`+2` 是数字不是文案，不用 i18n。 -->
+                    <span v-if="hiddenCount" class="shortcuts-dialog__timeline-more">+{{ hiddenCount }}</span>
+                    <div
+                        v-for="(date, index) in visibleHistory"
                         :key="date"
                         class="shortcuts-dialog__timeline-item"
-                        :class="{ 'shortcuts-dialog__timeline-item--latest': index === 0 }"
+                        :class="{ 'shortcuts-dialog__timeline-item--latest': index === visibleHistory.length - 1 }"
                     >
                         <span class="shortcuts-dialog__timeline-dot"></span>
                         <span class="shortcuts-dialog__timeline-date">{{ date }}</span>
-                    </li>
-                </ol>
+                    </div>
+                </div>
             </div>
 
             <v-tabs-window v-model="tab">
@@ -222,8 +266,8 @@ function showQr(url) {
 </template>
 
 <style scoped>
-/* 更新时间轴。**刻意不用 v-alert**：这是常驻信息，v-alert 的体积会把两个 tab 的内容
-   都往下挤。一根竖线 + 几个圆点，比一行字更省地方，也更像「一串日期」。
+/* 横向更新时间轴。**刻意不用 v-alert**：这是常驻信息，v-alert 的体积会把两个 tab 的内容
+   都往下挤。一条轴 + 几个点只占一行，比纵向列表省地方，也更像「一串日期」。
    配色走中性（不再是原来的警告黄）—— 它现在是**信息**，不是警告。 */
 .shortcuts-dialog__timeline {
     padding: 10px 16px 12px;
@@ -237,7 +281,7 @@ function showQr(url) {
     display: flex;
     align-items: center;
     gap: 6px;
-    margin-bottom: 4px;
+    margin-bottom: 6px;
     color: rgba(var(--v-theme-on-surface), 0.7);
 }
 
@@ -245,51 +289,58 @@ function showQr(url) {
     color: rgb(var(--v-theme-primary));
 }
 
-.shortcuts-dialog__timeline-list {
-    position: relative;
-    list-style: none;
-    margin: 0;
-    padding: 0 0 0 4px;
-}
-
-/* 竖线：上下各留 9px —— 只在圆点的**中心**之间连，不贯穿出头。
-   只有一条记录时容器就那么高，这两头一收线就缩没了 —— 正好（一个点的「轴」不该有）。 */
-.shortcuts-dialog__timeline-list::before {
-    content: '';
-    position: absolute;
-    left: 8px;
-    top: 9px;
-    bottom: 9px;
-    width: 1px;
-    background: rgba(var(--v-theme-on-surface), 0.16);
+/* ⚠️ 刻意**不换行**（没有 `flex-wrap`）：放不下时靠脚本截断，不靠折行 ——
+   折行会让这条「轴」断成两截，看起来像两组不相干的数据。 */
+.shortcuts-dialog__timeline-track {
+    display: flex;
+    align-items: center;
+    min-width: 0;
 }
 
 .shortcuts-dialog__timeline-item {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 2px 0;
-    /* 日期列对齐：四位年 + 两位月日，等宽数字下不会左右抖 */
+    gap: 6px;
+    flex: none;
+    /* 日期是「四位年 + 两位月日」：等宽数字下各节点一样宽，轴上的间隔才均匀 */
     font-variant-numeric: tabular-nums;
 }
 
+/* 连接线画在两个节点中间的空隙里（最后一个节点后面没有） */
+.shortcuts-dialog__timeline-item:not(:last-child)::after {
+    content: '';
+    flex: none;
+    width: 12px;
+    height: 1px;
+    margin: 0 6px;
+    background: rgba(var(--v-theme-on-surface), 0.2);
+}
+
 .shortcuts-dialog__timeline-dot {
-    position: relative;
-    z-index: 1;
     flex: none;
     box-sizing: border-box;
     width: 9px;
     height: 9px;
-    margin-left: 1px;
     border-radius: 50%;
     background: rgba(var(--v-theme-on-surface), 0.24);
 }
 
-/* 最近一次：主色实心，并在外面描一圈**卡片底色**，把竖线在它身后断开 ——
-   于是「最新」那个点看起来是轴上的一颗珠子。 */
+/* 最近一次：主色实心 —— 它在轴的**最右端**（左边都是更早的） */
 .shortcuts-dialog__timeline-item--latest .shortcuts-dialog__timeline-dot {
     background: rgb(var(--v-theme-primary));
-    box-shadow: 0 0 0 3px rgb(var(--v-theme-surface));
+    box-shadow: 0 0 0 3px rgba(var(--v-theme-primary), 0.18);
+}
+
+/* 左端的 `+N`：还有几次更早的更新被截掉了 */
+.shortcuts-dialog__timeline-more {
+    flex: none;
+    margin-right: 10px;
+    padding: 1px 7px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: rgba(var(--v-theme-on-surface), 0.6);
+    background: rgba(var(--v-theme-on-surface), 0.08);
 }
 
 .shortcuts-dialog__body {
