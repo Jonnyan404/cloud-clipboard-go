@@ -690,7 +690,25 @@ function handlePaste(event) {
     }
     const items = Array.from(event.clipboardData.items || []);
     const files = items.filter(item => item.kind === 'file').map(item => item.getAsFile()).filter(Boolean);
+    if (!files.length) {
+        // ⚠️ 有的浏览器把文件只放进 `files`、`items` 里看不到 —— 便签模式那条路也是这么兜的。
+        files.push(...Array.from(event.clipboardData.files || []).filter(Boolean));
+    }
     if (files.length) {
+        // ⚠️★ 有文件时**必须**拦下浏览器默认的粘贴行为。
+        //
+        // 不拦的后果：剪贴板里带文件时（从访达复制的文件、截图），默认行为会把**文件名**
+        // 当文本插进输入框 —— 于是「粘一张图」变成「输入框里多了一行 `截图 2026-09-28.png`」，
+        // 而且那行字还会被当成正文发出去。
+        // 文件走 `app.send.files`（缩略图那一排），输入框只收文本，两者不能同时来。
+        //
+        // ⚠️ 只在**确实有文件**时才拦：纯文本粘贴（含剪贴板里同时有文本与 HTML 的情况）
+        // 必须原样落进输入框，拦了就变成「粘贴没反应」。
+        //
+        // ⚠️ 便签模式（`sticky/StickyComposer.vue`）的同一个函数一直是带这一句的 ——
+        // 这里是漏掉的那一处，两处要对齐（`web-vue3/scripts/check-display-semantics.mjs`
+        // 第 4 节同时钉着这两处）。
+        event.preventDefault();
         handleSelectFiles(files);
     }
 }

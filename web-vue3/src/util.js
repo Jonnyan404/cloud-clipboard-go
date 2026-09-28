@@ -1,7 +1,10 @@
 import axios from 'axios';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
-import { APP_BASE_URL } from '@/base.js';
+// ⚠️ 这里用**相对路径**而不是 `@/base.js`：`scripts/check-display-semantics.mjs` 要在
+// 纯 Node 里直接 import 这个文件（没有 vite，也就没有 `@` 别名）—— 用别名那条路会让
+// 那个自检**当场 ERR_MODULE_NOT_FOUND 跑不起来**，而它跑不起来就等于没有牙。
+import { APP_BASE_URL } from './base.js';
 
 export function prettyFileSize(size) {
     let units = ['TB', 'GB', 'MB', 'KB'];
