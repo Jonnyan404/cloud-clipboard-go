@@ -5,8 +5,7 @@
 // 那条路），不再犯。所以 public/shortcuts/ 是派生产物，写在 .gitignore 里。
 //
 // dev 和 build 都跑这个脚本：dev 下 vite 也会服务 public/，这样本地就能点下载。
-import { cpSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
+import { cpSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -35,32 +34,37 @@ for (const name of appleFiles) {
 // Android：HTTP Shortcuts 的导入包
 cpSync(join(src, 'android', 'shortcuts.zip'), join(dest, 'android', 'shortcuts.zip'));
 
-// 产物的「更新于」日期，给网页上那个下载弹窗用。
+// 产物的更新日期清单，给网页上那个下载弹窗的**时间轴**用。
 //
-// 取的是**这两个目录最后一次提交的日期**，不是最新 commit 的日期 ——
-// 日期就贴在「旧版请重新导入」那句提醒旁边，如果随便一个无关提交都让它往后跳，
-// 这句提醒很快就会变成没人看的噪音。
+// ⚠️★ 这份日期**不从 git 算**。本仓库 2026-09-28 才从 cloud-clipboard-go 导入 `shortcuts/`，
+// 历史里所有产物提交都落在导入那一天 —— 用 `git log` 算出来的「更新于」全是 `2026-09-28`，
+// 而它对使用者毫无意义（那是搬家的日子，不是捷径变过的日子）。
 //
-// 拿不到 git（比如打包环境里没有仓库/历史）就写成 null：页面少显示一行日期，
-// 提醒本身照常显示，不影响下载。
-function lastCommitDate(paths) {
+// 所以日期由 `shortcuts/history.json` **人工维护**：某个平台的产物真的变了，
+// 就往那个平台的头一行加一个日期。（上游 cloud-clipboard-go 那份快捷指令的更新记录是
+// `2026-09-17` 首发、`2026-09-22` 重建 —— 这份文件把它们继承了下来。）
+//
+// ⚠️ 必须「最新在前」：弹窗把数组第一条当作最近一次更新。
+// ⚠️ 格式与顺序由 `web-vue3/scripts/check-display-semantics.mjs` 钉着（写错就在门禁上红）。
+//
+// 读不到这个文件（或某平台没有记录）就当作「没有更新记录」：弹窗不显示时间轴，
+// 下载与提醒都照常。
+function readHistory() {
     try {
-        const out = execFileSync('git', ['log', '-1', '--format=%cs', '--', ...paths], {
-            cwd: repoRoot,
-            encoding: 'utf8',
-            stdio: ['ignore', 'pipe', 'ignore'],
-        });
-        return out.trim() || null;
+        return JSON.parse(readFileSync(join(src, 'history.json'), 'utf8'));
     } catch {
-        return null;
+        return {};
     }
 }
 
+const history = readHistory();
+const dates = (platform) => (Array.isArray(history?.[platform]) ? history[platform] : []);
+
 const meta = {
-    apple: lastCommitDate(['shortcuts/apple']),
-    android: lastCommitDate(['shortcuts/android']),
+    apple: dates('apple'),
+    android: dates('android'),
 };
 writeFileSync(join(dest, 'meta.json'), `${JSON.stringify(meta, null, 2)}\n`);
 
 console.log(`[shortcuts] 已同步 ${appleFiles.length} 个 Apple 捷径 + 1 个 Android 包 → public/shortcuts/`);
-console.log(`[shortcuts] 产物日期：apple=${meta.apple || '未知'} · android=${meta.android || '未知'}`);
+console.log(`[shortcuts] 更新记录：apple=${meta.apple.join(' ') || '（空）'} · android=${meta.android.join(' ') || '（空）'}`);

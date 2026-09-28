@@ -49,18 +49,25 @@ const androidUrl = () => buildAppUrl('shortcuts/android/shortcuts.zip');
 // 不传 name，让 iOS 用文件名当快捷指令名（传了就是重命名，多语言下还会各叫各的）。
 const appleImportUrl = (file) => `shortcuts://import-shortcut?url=${encodeURIComponent(appleUrl(file))}`;
 
-// 产物的「更新于」日期。`meta.json` 由 scripts/sync-shortcuts.mjs 在 dev/build 时生成，
-// 取的是 shortcuts/apple 与 shortcuts/android **最后一次提交的日期** —— 不是最新 commit，
-// 免得无关提交也让日期往后跳（那会让旁边那句「请更新」变成没人看的噪音）。
-// 拿不到就整个不显示这一行：提醒照常显示，下载照常可用。
+// 各平台产物的更新日期，最新在前。
+//
+// `meta.json` 由 scripts/sync-shortcuts.mjs 从 `shortcuts/history.json` 生成 —— 那份
+// 是**人工维护**的清单，不是 git 日期：本仓库的 `shortcuts/` 是 2026-09-28 整批导入的，
+// 用 git 算「最后提交日期」只会得到搬家那天（详见 sync-shortcuts.mjs 里的注释）。
+//
+// 取不到（老产物里没有 / 离线）就整个不显示时间轴：下载与文案都照常。
 // ⚠️ 这次 fetch 在 `onMounted` 里、**只发一次**，所以地址更不能依赖 `config`（见上面 `appleUrl` 那段）。
-const meta = ref({ apple: null, android: null });
-const activeDate = computed(() => (tab.value === 'apple' ? meta.value.apple : meta.value.android));
+// ⚠️ 用 `Array.isArray` 把守：早期产物里这两个字段是**字符串**，直接当数组用会当场报错。
+const meta = ref({ apple: [], android: [] });
+const activeHistory = computed(() => (tab.value === 'apple' ? meta.value.apple : meta.value.android));
 onMounted(async () => {
     try {
         const url = buildAppUrl('shortcuts/meta.json');
         const data = await (await fetch(url)).json();
-        meta.value = { apple: data?.apple ?? null, android: data?.android ?? null };
+        meta.value = {
+            apple: Array.isArray(data?.apple) ? data.apple : [],
+            android: Array.isArray(data?.android) ? data.android : [],
+        };
     } catch {
         // 老版本产物里没有这个文件，或者离线 —— 两种都不该影响这个弹窗
     }
@@ -87,13 +94,27 @@ function showQr(url) {
             </v-tabs>
             <v-divider></v-divider>
 
-            <!-- 日期 + 「旧版请重新导入」。两个 tab 共用这一条，日期跟着当前 tab 走。
-                 旧版的请求格式即将下线（见 docs/api.md），届时老版本会直接不可用，
-                 所以这句要显眼、常驻，而不是塞在某个 tab 的角落里。 -->
-            <div class="shortcuts-dialog__notice">
-                <v-icon size="16" class="shortcuts-dialog__notice-icon">mdi-alert-circle-outline</v-icon>
-                <span class="shortcuts-dialog__notice-text">{{ t('scOutdatedNotice') }}</span>
-                <span v-if="activeDate" class="shortcuts-dialog__notice-date">{{ t('scUpdatedAt', { date: activeDate }) }}</span>
+            <!-- 更新时间轴（内容跟着当前 tab 走）。
+                 原来这里是「旧版捷径请重新导入」那句警告 + 一个「更新于 X」的日期。
+                 2026-09-28 改掉：那句警告是**噪音** —— 它替用户下了结论，却不告诉他
+                 「那我手上这份到底旧不旧」；而能回答这个问题的正是**发布日期**。
+                 于是改成把更新历史摊开：看到最近一次是 9/22，自己就能判断。 -->
+            <div v-if="activeHistory.length" class="shortcuts-dialog__timeline">
+                <div class="shortcuts-dialog__timeline-title">
+                    <v-icon size="16" class="shortcuts-dialog__timeline-icon">mdi-history</v-icon>
+                    <span>{{ t('scUpdateHistory') }}</span>
+                </div>
+                <ol class="shortcuts-dialog__timeline-list">
+                    <li
+                        v-for="(date, index) in activeHistory"
+                        :key="date"
+                        class="shortcuts-dialog__timeline-item"
+                        :class="{ 'shortcuts-dialog__timeline-item--latest': index === 0 }"
+                    >
+                        <span class="shortcuts-dialog__timeline-dot"></span>
+                        <span class="shortcuts-dialog__timeline-date">{{ date }}</span>
+                    </li>
+                </ol>
             </div>
 
             <v-tabs-window v-model="tab">
@@ -201,35 +222,74 @@ function showQr(url) {
 </template>
 
 <style scoped>
-/* 日期 + 「旧版请重新导入」。用「警告色的一圈淡底」而不是 v-alert：
-   这是常驻提示，v-alert 的体积会把两个 tab 的内容都往下挤。 */
-.shortcuts-dialog__notice {
-    display: flex;
-    align-items: baseline;
-    flex-wrap: wrap;
-    gap: 4px 8px;
-    padding: 8px 16px;
+/* 更新时间轴。**刻意不用 v-alert**：这是常驻信息，v-alert 的体积会把两个 tab 的内容
+   都往下挤。一根竖线 + 几个圆点，比一行字更省地方，也更像「一串日期」。
+   配色走中性（不再是原来的警告黄）—— 它现在是**信息**，不是警告。 */
+.shortcuts-dialog__timeline {
+    padding: 10px 16px 12px;
     font-size: 12px;
     line-height: 1.5;
     color: rgb(var(--v-theme-on-surface));
-    background: rgba(var(--v-theme-warning), 0.12);
-    border-bottom: 1px solid rgba(var(--v-theme-warning), 0.3);
+    border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.08);
 }
 
-.shortcuts-dialog__notice-icon {
-    color: rgb(var(--v-theme-warning));
-    align-self: center;
+.shortcuts-dialog__timeline-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+    color: rgba(var(--v-theme-on-surface), 0.7);
 }
 
-.shortcuts-dialog__notice-text {
-    flex: 1;
-    min-width: 12em;
+.shortcuts-dialog__timeline-icon {
+    color: rgb(var(--v-theme-primary));
 }
 
-.shortcuts-dialog__notice-date {
-    flex-shrink: 0;
-    opacity: 0.7;
+.shortcuts-dialog__timeline-list {
+    position: relative;
+    list-style: none;
+    margin: 0;
+    padding: 0 0 0 4px;
+}
+
+/* 竖线：上下各留 9px —— 只在圆点的**中心**之间连，不贯穿出头。
+   只有一条记录时容器就那么高，这两头一收线就缩没了 —— 正好（一个点的「轴」不该有）。 */
+.shortcuts-dialog__timeline-list::before {
+    content: '';
+    position: absolute;
+    left: 8px;
+    top: 9px;
+    bottom: 9px;
+    width: 1px;
+    background: rgba(var(--v-theme-on-surface), 0.16);
+}
+
+.shortcuts-dialog__timeline-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 2px 0;
+    /* 日期列对齐：四位年 + 两位月日，等宽数字下不会左右抖 */
     font-variant-numeric: tabular-nums;
+}
+
+.shortcuts-dialog__timeline-dot {
+    position: relative;
+    z-index: 1;
+    flex: none;
+    box-sizing: border-box;
+    width: 9px;
+    height: 9px;
+    margin-left: 1px;
+    border-radius: 50%;
+    background: rgba(var(--v-theme-on-surface), 0.24);
+}
+
+/* 最近一次：主色实心，并在外面描一圈**卡片底色**，把竖线在它身后断开 ——
+   于是「最新」那个点看起来是轴上的一颗珠子。 */
+.shortcuts-dialog__timeline-item--latest .shortcuts-dialog__timeline-dot {
+    background: rgb(var(--v-theme-primary));
+    box-shadow: 0 0 0 3px rgb(var(--v-theme-surface));
 }
 
 .shortcuts-dialog__body {

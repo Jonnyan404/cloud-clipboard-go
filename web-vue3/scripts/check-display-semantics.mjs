@@ -191,6 +191,56 @@ for (const { label, file } of COMPOSERS) {
     );
 }
 
+// ── 5. 快捷指令的更新时间轴 ────────────────────────────────────────────
+//
+// 日期清单是**人工维护**的（`shortcuts/history.json`），不是 git 日期：本仓库的
+// `shortcuts/` 是 2026-09-28 整批导入的，`git log` 只会给出搬家那天（详见
+// `scripts/sync-shortcuts.mjs`）。人工清单最容易出的三种错都不会报错，只会让时间轴
+// 显示得莫名其妙，所以逐条钉住：
+//   · 写反顺序  → 「最近一次更新」显示成最早那次，用户据此以为自己的捷径是新的；
+//   · 写重复    → 轴上多一个假节点；
+//   · 平台名打错 → 那个平台的时间轴整块空掉（没有报错）。
+const historyPath = path.join(root, '..', 'shortcuts', 'history.json');
+let history = null;
+try {
+    history = JSON.parse(fs.readFileSync(historyPath, 'utf8'));
+} catch {
+    history = null;
+}
+ok('shortcuts/history.json 存在且能解析', history !== null && typeof history === 'object');
+
+// 字段名必须和 `meta.json` / `ShortcutsDialog.vue` 用的那两个一致。
+const PLATFORMS = ['apple', 'android'];
+if (history) {
+    for (const key of Object.keys(history)) {
+        ok(`history.json 里没有多余的平台键：${key}`, PLATFORMS.includes(key), '打错字不会报错，那个平台的时间轴会整块空掉');
+    }
+    for (const platform of PLATFORMS) {
+        const dates = history[platform];
+        ok(`${platform}: 是日期数组`, Array.isArray(dates), `${typeof dates} —— 弹窗会 Array.isArray 挡掉，时间轴不显示`);
+        if (!Array.isArray(dates) || dates.length === 0) continue;
+        ok(`${platform}: 全是 YYYY-MM-DD`, dates.every((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)), JSON.stringify(dates));
+        ok(`${platform}: 没有重复`, new Set(dates).size === dates.length, JSON.stringify(dates));
+        const sorted = [...dates].sort().reverse();
+        ok(`${platform}: 最新在前`, JSON.stringify(dates) === JSON.stringify(sorted), `应该是 ${JSON.stringify(sorted)}`);
+    }
+    for (const platform of PLATFORMS) {
+        ok(`${platform} 有更新记录（时间轴要有内容可画）`, (history[platform] ?? []).length > 0);
+    }
+}
+
+// 弹窗那一侧：确实在画时间轴，而且旧的那条警告已经拆干净（拆一半会同时看到两套说法）。
+const dialog = fs.readFileSync(path.join(root, 'src/components/ShortcutsDialog.vue'), 'utf8');
+ok('弹窗用 scUpdateHistory 当时间轴标题', dialog.includes("t('scUpdateHistory')"));
+ok('弹窗按当前 tab 取更新记录', /activeHistory/.test(dialog));
+ok('旧的「旧版请重新导入」提示已拆掉', !dialog.includes('scOutdatedNotice'));
+ok('旧的「更新于 {date}」已拆掉', !dialog.includes('scUpdatedAt'));
+for (const locale of LOCALES) {
+    const dict = allDicts[locale];
+    ok(`locale ${locale}: 有 scUpdateHistory 且非空`, typeof dict.scUpdateHistory === 'string' && dict.scUpdateHistory.trim().length > 0);
+    ok(`locale ${locale}: 已不残留 scOutdatedNotice / scUpdatedAt`, !('scOutdatedNotice' in dict) && !('scUpdatedAt' in dict));
+}
+
 // ── 6. 已构建产物（有就查，没有就跳过）────────────────────────────────
 if (!process.argv.includes('--src')) {
     const assetsDir = path.join(root, 'dist/assets');
