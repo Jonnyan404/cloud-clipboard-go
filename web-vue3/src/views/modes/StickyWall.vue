@@ -16,9 +16,12 @@ const theme = useTheme();
 const isDark = computed(() => theme.current.value?.dark ?? false);
 const { t } = useI18n();
 const composer = ref(null);
-const streamItems = computed(() => [...app.visibleReceived].reverse());
+// ⚠️ 直接用 visibleReceived 的顺序（websocket.js 的 mergeMessages 按时间倒序排，
+// **最新的在最前**）。原来这里多了一个 `.reverse()`，把最新的压到流的最底下 ——
+// 2026-09-29 Jonny：「便签模式的内容顺序调回最新的在顶部」。
+const streamItems = computed(() => app.visibleReceived);
 const streamEl = ref(null);
-const { pinToBottom } = useStickyAutoscroll(streamEl, {
+const { pinToTop } = useStickyAutoscroll(streamEl, {
     items: () => [...streamItems.value],
     room: () => ws.room,
 });
@@ -108,7 +111,7 @@ function handlePageDrop(event) {
             </div>
 
             <div class="sticky-wall__composer">
-                <sticky-composer ref="composer" @sent="pinToBottom()"></sticky-composer>
+                <sticky-composer ref="composer" @sent="pinToTop()"></sticky-composer>
             </div>
         </div>
     </div>
