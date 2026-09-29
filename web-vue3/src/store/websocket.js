@@ -8,6 +8,48 @@ const ROOM_AUTH_CACHE_KEY = 'roomAuthCache';
 const DEFAULT_ROOM_KEY = '__default__';
 const GLOBAL_ROOM_KEY = '__global__';
 
+/**
+ * 原生外壳交给页面的那个对象名。
+ *
+ * ⚠️★ 必须与 `WebAppActivity.AUTH_BRIDGE`（以及 `AuthBridge.roomAuth()` 这个方法名）
+ * **逐字一致**。对不上的症状是**什么都没发生** —— 不报错、不提示，只是又被问了一次密码。
+ * `tools/android-contract-smoke.mjs` 有一条判据盯着这两处。
+ */
+const NATIVE_AUTH_BRIDGE = 'clip9Auth';
+
+/**
+ * 问一次原生外壳：有没有**已经换好的**房间凭据。
+ *
+ * ⚠️★ 这是「免打开界面认证」的第二步（第一步在外壳那一侧：先用保存的密码换一张会话令牌，
+ * 换到了才 `loadUrl`）。所以这里问到的是一张**刚刚**换出来的牌。
+ *
+ * ⚠️★ 为什么是「页面来问它」而不是「它往页面里塞一段脚本」：见 `WebAppActivity` 的类文档 ——
+ * 自己重放一次主文档（状态码、重定向、gzip、编码、以及**自签证书的确认**）任何一处没做对，
+ * 症状都是「界面白了」或者「证书对话框不出现了」。让页面主动问一句要小得多。
+ *
+ * ⚠️ 浏览器里没有这个对象（不是 Android 壳），那就当没有 —— 这条路是**加分项**，
+ * 网页里自己输密码那条路一直都在。
+ */
+function readNativeRoomAuth() {
+    try {
+        const bridge = typeof window !== 'undefined' ? window[NATIVE_AUTH_BRIDGE] : null;
+        if (!bridge || typeof bridge.roomAuth !== 'function') {
+            return {};
+        }
+        // ⚠️ 外壳只能回 String（`addJavascriptInterface` 的返回值只支持基本类型与 String）
+        // → 序列化是外壳做的，解析在这里做。
+        const raw = bridge.roomAuth();
+        if (!raw || typeof raw !== 'string') {
+            return {};
+        }
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {
+        // 读不出来就当没有。⚠️ 这一步失败**不能**影响页面能不能用。
+        return {};
+    }
+}
+
 // ⚠️★ **WS 握手不再推历史了**（Jonny 2026-09-26：「没有老客户端，不用考虑老客户端」）——
 // 历史一律走 `GET /content`（见 `loadHistoryFromHttp`），握手 URL 上也不再有 `history=0`
 // （默认就是不推）。
@@ -18,16 +60,23 @@ const GLOBAL_ROOM_KEY = '__global__';
 // （它对 `/content` 的请求会失败，但那不影响实时 —— 见 `loadHistoryFromHttp` 里那个 catch）。
 
 function loadRoomAuthCache() {
+    let fromSession = {};
     try {
         const raw = sessionStorage.getItem(ROOM_AUTH_CACHE_KEY);
-        if (!raw) {
-            return {};
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === 'object') {
+                fromSession = parsed;
+            }
         }
-        const parsed = JSON.parse(raw);
-        return parsed && typeof parsed === 'object' ? parsed : {};
     } catch {
-        return {};
+        fromSession = {};
     }
+    // ⚠️★ 外壳给的那一份**盖在上面**：它是**刚刚**用密码换出来的（换完才 `loadUrl`），
+    // 而 `sessionStorage` 里那份可能是上一次会话留下的、服务端早已不认的旧令牌。
+    // 反过来盖的话，用户会遇到「明明存了密码、却还是被拒一次」——而且换一次密码才复现。
+    // ⚠️ 只盖它给了的键：别的房间（以及没开自动认证的那几台）照旧用 sessionStorage 的。
+    return { ...fromSession, ...readNativeRoomAuth() };
 }
 
 export const useWebSocketStore = defineStore('websocket', {
