@@ -15,7 +15,7 @@ diff -rq ../clip9/cases cases        # 两个仓库平级时
 ```
 
 ⚠️ 拆库前它们是同一份文件（所以「不可能漂」），现在**同步是手动的一步** ——
-这是拆库的固有成本，`clip9/docs/ARCHITECTURE.md` §10.4 当时就警告过。
+这是拆库的固有成本，`clip9/dev-docs/ARCHITECTURE.md` §10.4 当时就警告过。
 
 ## protocol/ —— 从 Go 导出的 JSON fixture
 
