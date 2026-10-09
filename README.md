@@ -1,3 +1,5 @@
+# 2026年10月09日 本项目停更,项目已切换至 https://github.com/Jonnyan404/clip9
+
 <h1 align="center"> Cloud Clipboard Go </h1>
 
 <p align="center">
